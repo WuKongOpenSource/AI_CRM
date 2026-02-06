@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.CustomerMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.CustomerListVO">
+        SELECT
+            c.customer_id,
+            c.company_name,
+            c.industry,
+            c.stage,
+            c.level,
+            c.source,
+            c.quotation,
+            c.contract_amount,
+            c.revenue,
+            c.last_contact_time,
+            c.next_follow_time,
+            c.owner_id,
+            u.realname AS owner_name,
+            c.create_time,
+            (SELECT name FROM crm_contact WHERE customer_id = c.customer_id AND is_primary = 1 LIMIT 1) AS primary_contact_name,
+            (SELECT phone FROM crm_contact WHERE customer_id = c.customer_id AND is_primary = 1 LIMIT 1) AS primary_contact_phone
+        FROM crm_customer c
+        LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        WHERE c.status = 1
+        <if test="query.keyword != null and query.keyword != ''">
+            AND c.company_name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.stage != null and query.stage != ''">
+            AND c.stage = #{query.stage}
+        </if>
+        <if test="query.stages != null and query.stages.size() > 0">
+            AND c.stage IN
+            <foreach collection="query.stages" item="stage" open="(" separator="," close=")">
+                #{stage}
+            </foreach>
+        </if>
+        <if test="query.level != null and query.level != ''">
+            AND c.level = #{query.level}
+        </if>
+        <if test="query.ownerId != null">
+            AND c.owner_id = #{query.ownerId}
+        </if>
+        <if test="query.industry != null and query.industry != ''">
+            AND c.industry = #{query.industry}
+        </if>
+        <if test="query.source != null and query.source != ''">
+            AND c.source = #{query.source}
+        </if>
+        <if test="query.tag != null and query.tag != ''">
+            AND EXISTS (SELECT 1 FROM crm_customer_tag t WHERE t.customer_id = c.customer_id AND t.tag_name = #{query.tag})
+        </if>
+        ORDER BY c.create_time DESC
+    </select>
+
+    <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerListVO">
+        SELECT
+            c.customer_id,
+            c.company_name,
+            c.industry,
+            c.stage,
+            c.level,
+            c.source,
+            c.quotation,
+            c.contract_amount,
+            c.revenue,
+            c.last_contact_time,
+            c.next_follow_time,
+            c.owner_id,
+            u.realname AS owner_name,
+            c.create_time
+        FROM crm_customer c
+        LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        WHERE c.customer_id = #{customerId} AND c.status = 1
+    </select>
+
+    <select id="countByStage" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM crm_customer WHERE status = 1 AND stage = #{stage}
+    </select>
+
+    <select id="countByLevel" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM crm_customer WHERE status = 1 AND level = #{level}
+    </select>
+
+</mapper>

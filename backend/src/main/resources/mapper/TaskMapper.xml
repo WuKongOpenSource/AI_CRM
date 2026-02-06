@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.TaskMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.TaskVO">
+        SELECT
+            t.task_id,
+            t.title,
+            t.description,
+            t.due_date,
+            t.priority,
+            t.status,
+            t.assigned_to,
+            u.realname AS assigned_to_name,
+            t.customer_id,
+            c.company_name AS customer_name,
+            t.generated_by_ai,
+            t.completed_time,
+            t.create_user_id,
+            cu.realname AS create_user_name,
+            t.create_time
+        FROM crm_task t
+        LEFT JOIN manager_user u ON t.assigned_to = u.user_id
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
+        WHERE 1=1
+        <if test="query.keyword != null and query.keyword != ''">
+            AND t.title LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.status != null and query.status != ''">
+            AND LOWER(t.status) = LOWER(#{query.status})
+        </if>
+        <if test="query.priority != null and query.priority != ''">
+            AND LOWER(t.priority) = LOWER(#{query.priority})
+        </if>
+        <if test="query.assignedTo != null">
+            AND t.assigned_to = #{query.assignedTo}
+        </if>
+        <if test="query.customerId != null">
+            AND t.customer_id = #{query.customerId}
+        </if>
+        <if test="query.generatedByAi != null">
+            AND t.generated_by_ai = #{query.generatedByAi}
+        </if>
+        <if test="query.dueDateStart != null">
+            AND t.due_date &gt;= #{query.dueDateStart}
+        </if>
+        <if test="query.dueDateEnd != null">
+            AND t.due_date &lt;= #{query.dueDateEnd}
+        </if>
+        <if test="query.filter == 'today'">
+            AND DATE(t.due_date) = CURRENT_DATE AND LOWER(t.status) != 'completed'
+        </if>
+        <if test="query.filter == 'thisWeek'">
+            AND EXTRACT(WEEK FROM t.due_date) = EXTRACT(WEEK FROM CURRENT_DATE)
+            AND EXTRACT(YEAR FROM t.due_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+            AND LOWER(t.status) != 'completed'
+        </if>
+        <if test="query.filter == 'overdue'">
+            AND t.due_date &lt; CURRENT_TIMESTAMP AND LOWER(t.status) != 'completed'
+        </if>
+        ORDER BY
+            CASE WHEN LOWER(t.status) = 'pending' THEN 0 WHEN LOWER(t.status) = 'in_progress' THEN 1 ELSE 2 END,
+            CASE WHEN LOWER(t.priority) = 'high' THEN 0 WHEN LOWER(t.priority) = 'medium' THEN 1 ELSE 2 END,
+            t.due_date ASC
+    </select>
+
+    <select id="getMyPendingTasks" resultType="com.kakarote.ai_crm.entity.VO.TaskVO">
+        SELECT
+            t.task_id,
+            t.title,
+            t.description,
+            t.due_date,
+            t.priority,
+            t.status,
+            t.assigned_to,
+            u.realname AS assigned_to_name,
+            t.customer_id,
+            c.company_name AS customer_name,
+            t.generated_by_ai,
+            t.create_user_id,
+            cu.realname AS create_user_name,
+            t.create_time
+        FROM crm_task t
+        LEFT JOIN manager_user u ON t.assigned_to = u.user_id
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
+        WHERE t.assigned_to = #{userId} AND LOWER(t.status) != 'completed'
+        ORDER BY
+            CASE WHEN LOWER(t.priority) = 'high' THEN 0 WHEN LOWER(t.priority) = 'medium' THEN 1 ELSE 2 END,
+            t.due_date ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="getMyTasksFiltered" resultType="com.kakarote.ai_crm.entity.VO.TaskVO">
+        SELECT
+            t.task_id,
+            t.title,
+            t.description,
+            t.due_date,
+            t.priority,
+            t.status,
+            t.assigned_to,
+            u.realname AS assigned_to_name,
+            t.customer_id,
+            c.company_name AS customer_name,
+            t.generated_by_ai,
+            t.create_user_id,
+            cu.realname AS create_user_name,
+            t.create_time
+        FROM crm_task t
+        LEFT JOIN manager_user u ON t.assigned_to = u.user_id
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
+        WHERE t.assigned_to = #{userId} AND LOWER(t.status) != 'completed'
+        <if test="filter == 'today'">
+            AND DATE(t.due_date) = CURRENT_DATE
+        </if>
+        <if test="filter == 'thisWeek'">
+            AND t.due_date &lt;= #{weekEnd}
+        </if>
+        <if test="filter == 'overdue'">
+            AND t.due_date &lt; #{today} AND LOWER(t.status) != 'completed'
+        </if>
+        ORDER BY
+            t.due_date ASC,
+            CASE WHEN LOWER(t.priority) = 'high' THEN 0 WHEN LOWER(t.priority) = 'medium' THEN 1 ELSE 2 END
+    </select>
+
+    <select id="countPending" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM crm_task
+        WHERE assigned_to = #{userId} AND LOWER(status) != 'completed'
+    </select>
+
+</mapper>

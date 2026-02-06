@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ChatSessionMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.ChatSessionVO">
+        SELECT
+            s.session_id,
+            s.user_id,
+            s.agent_id,
+            a.label AS agent_name,
+            s.customer_id,
+            c.company_name AS customer_name,
+            s.title,
+            s.status,
+            s.create_time,
+            s.update_time,
+            (SELECT content FROM crm_chat_message WHERE session_id = s.session_id ORDER BY create_time DESC LIMIT 1) AS last_message,
+            (SELECT COUNT(*) FROM crm_chat_message WHERE session_id = s.session_id) AS message_count
+        FROM crm_chat_session s
+        LEFT JOIN crm_ai_agent a ON s.agent_id = a.agent_id
+        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        WHERE s.user_id = #{userId}
+        ORDER BY s.update_time DESC
+    </select>
+
+    <select id="getSessionById" resultType="com.kakarote.ai_crm.entity.VO.ChatSessionVO">
+        SELECT
+            s.session_id,
+            s.user_id,
+            s.agent_id,
+            a.label AS agent_name,
+            s.customer_id,
+            c.company_name AS customer_name,
+            s.title,
+            s.status,
+            s.create_time,
+            s.update_time
+        FROM crm_chat_session s
+        LEFT JOIN crm_ai_agent a ON s.agent_id = a.agent_id
+        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        WHERE s.session_id = #{sessionId}
+    </select>
+
+</mapper>

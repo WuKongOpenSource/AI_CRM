@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ManagerMenuMapper">
+
+    <select id="queryAllMenuList" resultType="com.kakarote.ai_crm.entity.VO.MenuVO">
+        select a.menu_id,a.realm,a.realm_name,a.parent_id,a.type FROM manager_menu as a
+    </select>
+    <select id="queryMenuList" resultType="com.kakarote.ai_crm.entity.PO.ManagerMenu">
+        SELECT a.realm, a.menu_id, a.parent_id,a.type
+        FROM manager_menu as a
+        WHERE menu_id IN
+              (
+                  SELECT menu_id FROM manager_role_menu AS a INNER JOIN manager_user_role as b ON a.role_id = b.role_id
+                  WHERE a.del_flag=0 and b.del_flag=0 and b.user_id = #{userId} group by a.menu_id
+              )
+    </select>
+</mapper>

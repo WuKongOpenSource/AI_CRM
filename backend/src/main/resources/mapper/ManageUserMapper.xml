@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ManageUserMapper">
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
+        SELECT a.user_id, a.username,a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.parent_id
+        FROM manager_user
+        <if test="data.roleId != null">
+            left join manager_user_role as g on a.user_id = g.user_id
+        </if>
+        where 1=1
+        <if test="data.search!=null and data.search!=''">
+            AND (
+            a.username LIKE CONCAT('%',#{data.search},'%')
+            OR a.realname LIKE CONCAT('%',#{data.search},'%')
+            OR a.mobile LIKE CONCAT('%',#{data.search},'%')
+            )
+        </if>
+        <if test="data.roleId != null">
+            and g.role_id=#{data.roleId}
+        </if>
+    </select>
+    <select id="getUserId" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
+        SELECT a.user_id, a.password, a.username,a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.parent_id
+        FROM manager_user a where a.user_id=#{userId}
+    </select>
+    <select id="queryUserByUsername" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">
+        SELECT a.user_id, a.password, a.username,a.img, a.create_time, a.realname, a.num, a.mobile, a.email, a.sex, a.dept_id, a.post, a.status, a.parent_id
+        FROM manager_user a where a.username=#{username}
+    </select>
+</mapper>

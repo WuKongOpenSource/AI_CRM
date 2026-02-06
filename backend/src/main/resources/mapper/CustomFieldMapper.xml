@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.CustomFieldMapper">
+
+    <!-- 查询实体的自定义字段值 -->
+    <select id="getCustomFieldValues" resultType="map">
+        SELECT
+        <foreach collection="columns" item="col" separator=",">
+            ${col}
+        </foreach>
+        FROM ${tableName}
+        WHERE ${idColumn} = #{entityId}
+    </select>
+
+    <!-- 更新实体的自定义字段值 -->
+    <update id="updateCustomFieldValues">
+        UPDATE ${tableName}
+        <set>
+            <foreach collection="values" index="key" item="value">
+                ${key} = #{value},
+            </foreach>
+        </set>
+        WHERE ${idColumn} = #{entityId}
+    </update>
+
+</mapper>

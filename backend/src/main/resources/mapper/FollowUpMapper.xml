@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.FollowUpMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.FollowUpVO">
+        SELECT
+            f.follow_up_id,
+            f.customer_id,
+            c.company_name AS customer_name,
+            f.contact_id,
+            ct.name AS contact_name,
+            f.type,
+            f.content,
+            f.follow_time,
+            f.next_follow_time,
+            f.create_user_id,
+            u.realname AS create_user_name,
+            f.create_time
+        FROM crm_follow_up f
+        LEFT JOIN crm_customer c ON f.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON f.contact_id = ct.contact_id
+        LEFT JOIN manager_user u ON f.create_user_id = u.user_id
+        WHERE 1=1
+        <if test="query.customerId != null">
+            AND f.customer_id = #{query.customerId}
+        </if>
+        <if test="query.contactId != null">
+            AND f.contact_id = #{query.contactId}
+        </if>
+        <if test="query.type != null and query.type != ''">
+            AND f.type = #{query.type}
+        </if>
+        <if test="query.startTime != null">
+            AND f.follow_time &gt;= #{query.startTime}
+        </if>
+        <if test="query.endTime != null">
+            AND f.follow_time &lt;= #{query.endTime}
+        </if>
+        ORDER BY f.follow_time DESC
+    </select>
+
+    <select id="getRecentByCustomerId" resultType="com.kakarote.ai_crm.entity.VO.FollowUpVO">
+        SELECT
+            f.follow_up_id,
+            f.customer_id,
+            f.contact_id,
+            ct.name AS contact_name,
+            f.type,
+            f.content,
+            f.follow_time,
+            f.next_follow_time,
+            f.create_user_id,
+            u.realname AS create_user_name,
+            f.create_time
+        FROM crm_follow_up f
+        LEFT JOIN crm_contact ct ON f.contact_id = ct.contact_id
+        LEFT JOIN manager_user u ON f.create_user_id = u.user_id
+        WHERE f.customer_id = #{customerId}
+        ORDER BY f.follow_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countThisMonth" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM crm_follow_up
+        WHERE create_user_id = #{userId}
+        AND EXTRACT(YEAR FROM follow_time) = EXTRACT(YEAR FROM CURRENT_DATE)
+        AND EXTRACT(MONTH FROM follow_time) = EXTRACT(MONTH FROM CURRENT_DATE)
+    </select>
+
+</mapper>

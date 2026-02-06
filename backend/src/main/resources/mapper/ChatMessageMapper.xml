@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ChatMessageMapper">
+
+    <select id="getMessagesBySessionId" resultType="com.kakarote.ai_crm.entity.VO.ChatMessageVO">
+        SELECT
+            message_id,
+            session_id,
+            role,
+            content,
+            tokens_used,
+            model_name,
+            create_time
+        FROM crm_chat_message
+        WHERE session_id = #{sessionId}
+        ORDER BY create_time ASC
+    </select>
+
+    <select id="getLastMessage" resultType="com.kakarote.ai_crm.entity.PO.ChatMessage">
+        SELECT * FROM crm_chat_message
+        WHERE session_id = #{sessionId}
+        ORDER BY create_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="countBySessionId" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM crm_chat_message WHERE session_id = #{sessionId}
+    </select>
+
+</mapper>
