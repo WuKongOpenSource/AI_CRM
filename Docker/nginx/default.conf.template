@@ -1,0 +1,77 @@
+server {
+    listen 80;
+    server_name localhost;
+    # Default 50M, configured via MAX_FILE_SIZE_MB env var
+    client_max_body_size ${MAX_FILE_SIZE};
+    
+    # 安全头配置
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # 错误日志配置
+    error_log /var/log/nginx/error.log warn;
+    access_log /var/log/nginx/access.log;
+
+        # 前端静态文件
+    location / {
+		proxy_buffering off; 
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto  $scheme;
+		proxy_connect_timeout 60;
+		proxy_send_timeout 300;
+		proxy_read_timeout 300;
+		proxy_pass  http://crm:8088/;
+    }
+
+    location /crmapi/ {
+		proxy_buffering off; 
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto  $scheme;
+		proxy_connect_timeout 60;
+		proxy_send_timeout 300;
+		proxy_read_timeout 300;
+		proxy_pass  http://crm:8088/;
+
+    }
+    # 前端静态文件
+    location /rag/ {
+        alias /usr/share/nginx/html/;
+        index index.html;
+        try_files $uri $uri/ /rag/index.html;
+    }
+    # API请求代理到后端服务
+    location /api/ {
+        proxy_pass http://app:8080/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 连接和重试配置
+        proxy_connect_timeout 30s;                 # 连接超时时间
+        proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;               # 重试次数
+        proxy_next_upstream_timeout 30s;           # 重试超时时间
+        
+        # SSE 相关配置
+        proxy_http_version 1.1;                    # 使用 HTTP/1.1
+        proxy_set_header Connection "";            # 禁用 Connection: close，保持连接打开
+        chunked_transfer_encoding off;             # 关闭分块传输编码
+        proxy_buffering off;                       # 关闭缓冲
+        proxy_cache off;                           # 关闭缓存
+        proxy_read_timeout 3600s;                  # 增加读取超时时间
+        proxy_send_timeout 3600s;                  # 增加发送超时时间
+    }
+
+    # 错误页面
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+    }
+}
