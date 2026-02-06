@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.KnowledgeMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.KnowledgeVO">
+        SELECT
+            k.knowledge_id,
+            k.name,
+            k.type,
+            k.file_size,
+            k.mime_type,
+            k.customer_id,
+            c.company_name AS customer_name,
+            k.summary,
+            k.status,
+            k.upload_user_id,
+            u.realname AS upload_user_name,
+            k.create_time
+        FROM crm_knowledge k
+        LEFT JOIN crm_customer c ON k.customer_id = c.customer_id
+        LEFT JOIN manager_user u ON k.upload_user_id = u.user_id
+        WHERE k.status != 2
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (k.name LIKE CONCAT('%', #{query.keyword}, '%') OR k.content_text LIKE CONCAT('%', #{query.keyword}, '%'))
+        </if>
+        <if test="query.type != null and query.type != ''">
+            AND k.type = #{query.type}
+        </if>
+        <if test="query.customerId != null">
+            AND k.customer_id = #{query.customerId}
+        </if>
+        <if test="query.uploadUserId != null">
+            AND k.upload_user_id = #{query.uploadUserId}
+        </if>
+        <if test="query.tag != null and query.tag != ''">
+            AND EXISTS (SELECT 1 FROM crm_knowledge_tag t WHERE t.knowledge_id = k.knowledge_id AND t.tag_name = #{query.tag})
+        </if>
+        ORDER BY k.create_time DESC
+    </select>
+
+    <select id="getKnowledgeById" resultType="com.kakarote.ai_crm.entity.VO.KnowledgeVO">
+        SELECT
+            k.knowledge_id,
+            k.name,
+            k.type,
+            k.file_size,
+            k.mime_type,
+            k.customer_id,
+            c.company_name AS customer_name,
+            k.summary,
+            k.status,
+            k.upload_user_id,
+            u.realname AS upload_user_name,
+            k.create_time
+        FROM crm_knowledge k
+        LEFT JOIN crm_customer c ON k.customer_id = c.customer_id
+        LEFT JOIN manager_user u ON k.upload_user_id = u.user_id
+        WHERE k.knowledge_id = #{knowledgeId}
+    </select>
+
+</mapper>

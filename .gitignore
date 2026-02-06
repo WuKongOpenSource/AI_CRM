@@ -1,0 +1,13 @@
+.DS_Store
+.idea/
+*.iml
+logs/**
+*.log
+test
+target
+*/target/**
+frontend/node_modules
+frontend/dist
+uploads/**
+docker
+backend/src/main/resources/public/

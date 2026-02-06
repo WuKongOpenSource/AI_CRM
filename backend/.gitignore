@@ -1,0 +1,7 @@
+.idea
+target
+*.iml
+src/test/*
+logs
+src/main/webapp/public/**
+src/main/resources/public/**

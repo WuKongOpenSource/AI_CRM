@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ContactMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.ContactVO">
+        SELECT
+            c.contact_id,
+            c.customer_id,
+            cu.company_name AS customer_name,
+            c.name,
+            c.position,
+            c.phone,
+            c.email,
+            c.wechat,
+            c.is_primary,
+            c.last_contact_time,
+            c.notes,
+            c.create_time
+        FROM crm_contact c
+        LEFT JOIN crm_customer cu ON c.customer_id = cu.customer_id
+        WHERE c.status = 1
+        <if test="query.customerId != null">
+            AND c.customer_id = #{query.customerId}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND c.name LIKE CONCAT('%', #{query.keyword}, '%')
+        </if>
+        <if test="query.isPrimary != null">
+            AND c.is_primary = #{query.isPrimary}
+        </if>
+        ORDER BY c.is_primary DESC, c.create_time DESC
+    </select>
+
+    <select id="getPrimaryContact" resultType="com.kakarote.ai_crm.entity.PO.Contact">
+        SELECT * FROM crm_contact
+        WHERE customer_id = #{customerId} AND is_primary = 1 AND status = 1
+        LIMIT 1
+    </select>
+
+</mapper>

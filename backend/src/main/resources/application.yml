@@ -1,0 +1,104 @@
+server:
+  port: 8088
+spring:
+  application:
+    name: manager
+  datasource:
+    url: jdbc:postgresql://192.168.1.170:5432/wk_ai_crm
+    username: postgres
+    password: postgres123!@#
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 100
+      minimum-idle: 10
+  jackson:
+    dateFormat: yyyy-MM-dd hh:mm:ss
+    timeZone: GMT+8
+  data:
+    redis:
+      host: 192.168.1.116
+      port: 6379
+      password: 123456
+      database: 7
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-111111}
+      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/}
+      chat:
+        options:
+          model: qwen-max
+          temperature: 0.7
+          max-tokens: 2048
+logging:
+  config: classpath:logback-spring.xml
+# token配置
+token:
+  # 令牌自定义标识
+  header: Manager-Token
+  # 令牌密钥
+  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌有效期（默认30分钟）
+  expireTime: 10080
+knife4j:
+  enable: true
+
+# 文件上传配置
+file:
+  upload-path: ./uploads
+
+# MinIO 对象存储配置 (S3 兼容，同时支持 RustFS)
+minio:
+  # 是否启用 MinIO（设为 false 使用本地文件存储）
+  enabled: true
+  # MinIO/RustFS 服务地址
+  endpoint: http://192.168.1.170:9000
+  # Access Key
+  access-key: minioadmin
+  # Secret Key
+  secret-key: minioadmin
+  # 存储桶名称
+  bucket: ai-crm
+  # 下载是否使用预签名 URL
+  use-presigned-url: true
+  # 预签名 URL 有效期（秒）
+  presigned-expiry: 3600
+  # 注意：console-url 已移除，现在从请求中动态获取
+
+# OIDC Provider 配置 (用于 MinIO SSO 登录)
+# 注意：issuer、redirect-uri、frontend-login-url 已改为从请求中动态获取，无需配置
+oidc:
+  # OIDC 客户端 ID（需与 MinIO 环境变量一致）
+  client-id: minio-console
+  # OIDC 客户端密钥（需与 MinIO 环境变量一致）
+  client-secret: minio-console-secret-key-2024
+  # MinIO Console 端口（用于动态生成 redirect_uri）
+  minio-console-port: 9001
+  # 授权码有效期（秒）
+  code-expiry: 300
+  # Access Token 有效期（秒）
+  token-expiry: 3600
+  # Session Cookie 名称
+  session-cookie: CRM_SESSION
+
+# WeKnora 知识库服务配置
+weknora:
+  # 是否启用 WeKnora 集成（设为 false 可禁用，仅使用本地存储）
+  enabled: true
+  # WeKnora API 基础 URL
+  base-url: http://192.168.1.170/api/v1
+  # WeKnora API Key（从 WeKnora 管理界面获取）
+  api-key: sk-NgkVLxONp7oNgyG3lm-EBGSLdDlGBCgJrEUW4ncowLRNlaLc
+  # 默认知识库 ID（CRM 文档将上传到此知识库）
+  knowledge-base-id: 398435ff-1a23-49ab-8571-91fa89f0f8e3
+  # 搜索配置
+  search:
+    # 检索返回的最大结果数
+    match-count: 5
+    # 向量相似度阈值 (0-1)，只返回相似度高于此阈值的结果
+    vector-threshold: 0.5
+    # 是否启用自动 RAG（启用后每次对话都会自动检索相关文档）
+    auto-rag-enabled: true
