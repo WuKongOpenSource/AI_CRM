@@ -9,5 +9,4 @@ target
 frontend/node_modules
 frontend/dist
 uploads/**
-docker
 backend/src/main/resources/public/
