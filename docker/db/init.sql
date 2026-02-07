@@ -15,8 +15,8 @@ CREATE TABLE "public"."crm_ai_agent" (
   "prompt" text COLLATE "pg_catalog"."default" NOT NULL,
   "persona" text COLLATE "pg_catalog"."default",
   "knowledge_base_types" varchar(500) COLLATE "pg_catalog"."default",
-  "enabled" int2,
-  "sort_order" int4,
+  "enabled" int2 DEFAULT 1,
+  "sort_order" int4 DEFAULT 0,
   "category" varchar(50) COLLATE "pg_catalog"."default",
   "create_user_id" int8,
   "update_user_id" int8,
@@ -83,7 +83,7 @@ CREATE TABLE "public"."crm_chat_message" (
   "session_id" int8 NOT NULL,
   "role" varchar(20) COLLATE "pg_catalog"."default" NOT NULL,
   "content" text COLLATE "pg_catalog"."default" NOT NULL,
-  "tokens_used" int4,
+  "tokens_used" int4 DEFAULT 0,
   "model_name" varchar(100) COLLATE "pg_catalog"."default",
   "function_call" text COLLATE "pg_catalog"."default",
   "create_time" timestamp(6)
@@ -113,7 +113,7 @@ CREATE TABLE "public"."crm_chat_session" (
   "agent_id" int8,
   "customer_id" int8,
   "title" varchar(255) COLLATE "pg_catalog"."default",
-  "status" int2,
+  "status" int2 DEFAULT 1,
   "create_time" timestamp(6),
   "update_time" timestamp(6)
 )
@@ -147,7 +147,7 @@ CREATE TABLE "public"."crm_contact" (
   "is_primary" int2,
   "last_contact_time" timestamp(6),
   "notes" text COLLATE "pg_catalog"."default",
-  "status" int2,
+  "status" int2 DEFAULT 1,
   "create_user_id" int8,
   "update_user_id" int8,
   "create_time" timestamp(6),
@@ -210,13 +210,13 @@ CREATE TABLE "public"."crm_custom_field" (
   "column_type" varchar(100) COLLATE "pg_catalog"."default" NOT NULL,
   "default_value" varchar(500) COLLATE "pg_catalog"."default",
   "placeholder" varchar(200) COLLATE "pg_catalog"."default",
-  "is_required" int2,
-  "is_searchable" int2,
-  "is_show_in_list" int2,
+  "is_required" int2 DEFAULT 0,
+  "is_searchable" int2 DEFAULT 0,
+  "is_show_in_list" int2 DEFAULT 1,
   "options" text COLLATE "pg_catalog"."default",
   "validation_rules" text COLLATE "pg_catalog"."default",
-  "sort_order" int4,
-  "status" int2,
+  "sort_order" int4 DEFAULT 0,
+  "status" int2 DEFAULT 1,
   "create_user_id" int8,
   "create_time" timestamp(6),
   "update_time" timestamp(6)
@@ -261,13 +261,13 @@ CREATE TABLE "public"."crm_customer" (
   "source" varchar(100) COLLATE "pg_catalog"."default",
   "address" varchar(500) COLLATE "pg_catalog"."default",
   "website" varchar(255) COLLATE "pg_catalog"."default",
-  "quotation" numeric(15,2),
-  "contract_amount" numeric(15,2),
-  "revenue" numeric(15,2),
+  "quotation" numeric(15,2) DEFAULT 0.00,
+  "contract_amount" numeric(15,2) DEFAULT 0.00,
+  "revenue" numeric(15,2) DEFAULT 0.00,
   "last_contact_time" timestamp(6),
   "next_follow_time" timestamp(6),
   "remark" text COLLATE "pg_catalog"."default",
-  "status" int2,
+  "status" int2 DEFAULT 1,
   "create_user_id" int8,
   "update_user_id" int8,
   "create_time" timestamp(6),
@@ -313,7 +313,7 @@ CREATE TABLE "public"."crm_customer_tag" (
   "customer_id" int8 NOT NULL,
   "tag_name" varchar(100) COLLATE "pg_catalog"."default" NOT NULL,
   "create_time" timestamp(6),
-  "color" varchar(20) COLLATE "pg_catalog"."default"
+  "color" varchar(20) COLLATE "pg_catalog"."default" DEFAULT '#3b82f6'::character varying
 )
 ;
 COMMENT ON COLUMN "public"."crm_customer_tag"."id" IS '主键';
@@ -397,7 +397,7 @@ CREATE TABLE "public"."crm_knowledge" (
   "customer_id" int8,
   "summary" text COLLATE "pg_catalog"."default",
   "content_text" text COLLATE "pg_catalog"."default",
-  "status" int2,
+  "status" int2 DEFAULT 1,
   "upload_user_id" int8 NOT NULL,
   "create_time" timestamp(6),
   "update_time" timestamp(6),
@@ -507,6 +507,7 @@ COMMENT ON TABLE "public"."crm_system_config" IS '系统配置表';
 -- Records of crm_system_config
 -- ----------------------------
 INSERT INTO "public"."crm_system_config" VALUES (1, 'ai_api_url', 'https://dashscope.aliyuncs.com/compatible-mode/', 'ai', 'AI API地址', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
+INSERT INTO "public"."crm_system_config" VALUES (2, 'ai_api_key', 'sk-sss', 'ai', 'AI API密钥', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
 INSERT INTO "public"."crm_system_config" VALUES (3, 'ai_model', 'qwen-max', 'ai', 'AI模型名称', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
 INSERT INTO "public"."crm_system_config" VALUES (4, 'ai_max_tokens', '2048', 'ai', '最大Token数', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
 INSERT INTO "public"."crm_system_config" VALUES (5, 'ai_temperature', '0.7', 'ai', 'AI温度参数', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
@@ -514,7 +515,6 @@ INSERT INTO "public"."crm_system_config" VALUES (6, 'file_upload_path', '/upload
 INSERT INTO "public"."crm_system_config" VALUES (7, 'file_max_size', '52428800', 'file', '文件最大大小(字节)', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
 INSERT INTO "public"."crm_system_config" VALUES (8, 'file_allowed_types', 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,mp3,mp4,jpg,png', 'file', '允许的文件类型', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
 INSERT INTO "public"."crm_system_config" VALUES (2017413716023709698, 'ai_provider', 'dashscope', 'ai', NULL, '2026-01-31 09:44:46', '2026-01-31 09:44:46');
-INSERT INTO "public"."crm_system_config" VALUES (2, 'ai_api_key', 'sk-sss', 'ai', 'AI API密钥', '2026-01-27 17:40:23', '2026-01-27 17:40:23');
 
 -- ----------------------------
 -- Table structure for crm_task
@@ -529,7 +529,7 @@ CREATE TABLE "public"."crm_task" (
   "status" varchar(20) COLLATE "pg_catalog"."default",
   "assigned_to" int8,
   "customer_id" int8,
-  "generated_by_ai" int2,
+  "generated_by_ai" int2 DEFAULT 0,
   "ai_context" text COLLATE "pg_catalog"."default",
   "completed_time" timestamp(6),
   "create_user_id" int8,
@@ -768,10 +768,10 @@ CREATE TABLE "public"."manager_user" (
   "num" varchar(64) COLLATE "pg_catalog"."default",
   "mobile" varchar(32) COLLATE "pg_catalog"."default",
   "email" varchar(128) COLLATE "pg_catalog"."default",
-  "sex" int2,
+  "sex" int2 DEFAULT 0,
   "dept_id" int4,
   "post" varchar(64) COLLATE "pg_catalog"."default",
-  "status" int2,
+  "status" int2 DEFAULT 2,
   "parent_id" int8
 )
 ;
