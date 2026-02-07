@@ -82,7 +82,7 @@ export async function sendMessageStream(
   }
 
   try {
-    const response = await fetch('/api/chat/send', {
+    const response = await fetch('/crmapi/chat/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
