@@ -1,20 +1,20 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50">
     <!-- Header -->
-    <div class="px-6 py-4 bg-white border-b border-gray-200">
+    <div class="px-4 md:px-6 py-4 bg-white border-b border-gray-200">
       <div class="flex items-start justify-between">
         <div>
           <h1 class="text-lg font-semibold text-gray-900">客户管理</h1>
-          <p class="text-sm text-gray-500 mt-1">查看和管理所有客户信息与商机</p>
+          <p class="text-sm text-gray-500 mt-1 hidden md:block">查看和管理所有客户信息与商机</p>
         </div>
-        <div class="text-sm text-gray-500">
+        <div class="text-sm text-gray-500 hidden md:block">
           您的权限: <span class="text-gray-700">{{ userStore.realname || '销售经理' }}，完整权限</span>
         </div>
       </div>
     </div>
 
     <!-- Statistics Cards -->
-    <div class="px-6 py-4 grid grid-cols-4 gap-4 bg-gray-50">
+    <div class="px-4 md:px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 bg-gray-50">
       <!-- 总客户数 -->
       <div class="bg-white rounded-lg border border-gray-200 p-4">
         <div class="flex items-center justify-between">
@@ -57,22 +57,25 @@
     </div>
 
     <!-- Search and Filter Bar -->
-    <div class="px-6 py-3 bg-white flex items-center gap-4">
+    <div class="px-4 md:px-6 py-3 bg-white flex items-center gap-2 md:gap-4">
       <el-input
         v-model="customerStore.queryParams.keyword"
-        placeholder="搜索客户公司或联系人..."
+        placeholder="搜索客户..."
         :prefix-icon="Search"
         clearable
-        class="flex-1 max-w-md"
+        class="flex-1"
+        :class="{ 'max-w-md': !isMobile }"
         @change="handleSearch"
       />
-      <div class="flex-1"></div>
-      <el-button :icon="Filter">筛选</el-button>
-      <el-button type="primary" :icon="Plus" @click="showAddDialog = true">添加客户</el-button>
+      <div v-if="!isMobile" class="flex-1"></div>
+      <el-button v-if="!isMobile" :icon="Filter">筛选</el-button>
+      <el-button type="primary" :icon="Plus" @click="showAddDialog = true">
+        <span v-if="!isMobile">添加客户</span>
+      </el-button>
     </div>
 
     <!-- Stage Tabs -->
-    <div class="px-6 py-3 bg-white flex gap-2 flex-wrap border-b border-gray-200">
+    <div class="px-4 md:px-6 py-3 bg-white flex gap-2 flex-wrap border-b border-gray-200 overflow-x-auto">
       <el-button
         v-for="tab in stageTabs"
         :key="tab.value"
@@ -89,7 +92,7 @@
     <!-- Main Content Area -->
     <div class="flex-1 flex overflow-hidden">
       <!-- Left: Customer Card List -->
-      <div ref="scrollContainer" class="flex-1 overflow-auto p-6" v-loading="customerStore.loading">
+      <div ref="scrollContainer" class="flex-1 overflow-auto p-4 md:p-6" v-loading="customerStore.loading">
         <div class="space-y-4">
           <div
             v-for="customer in customerStore.customerList"
@@ -99,17 +102,18 @@
           >
             <!-- Row 1: Company name + Level + Stage + Actions -->
             <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+              <div class="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 hidden md:flex">
                   <el-icon class="text-primary-500 text-xl"><OfficeBuilding /></el-icon>
                 </div>
-                <span class="font-medium text-base">{{ customer.companyName }}</span>
-                <el-tag :type="getLevelType(customer.level)" size="small" round>
+                <span class="font-medium text-base truncate">{{ customer.companyName }}</span>
+                <el-tag :type="getLevelType(customer.level)" size="small" round class="flex-shrink-0">
                   {{ customer.level }}级
                 </el-tag>
                 <el-tag
                   size="small"
                   round
+                  class="flex-shrink-0"
                   :style="{
                     backgroundColor: getStageColor(customer.stage) + '20',
                     color: getStageColor(customer.stage),
@@ -119,7 +123,7 @@
                   {{ getStageLabel(customer.stage) }}
                 </el-tag>
               </div>
-              <div class="flex items-center gap-2" @click.stop>
+              <div class="flex items-center gap-2 flex-shrink-0" @click.stop>
                 <el-popconfirm
                   :title="`确定要删除客户「${customer.companyName}」吗？`"
                   confirm-button-text="删除"
@@ -128,7 +132,7 @@
                   @confirm="handleDelete(customer)"
                 >
                   <template #reference>
-                    <el-button type="danger" text size="small" :icon="Delete">删除</el-button>
+                    <el-button type="danger" text size="small" :icon="Delete" class="hidden md:inline-flex">删除</el-button>
                   </template>
                 </el-popconfirm>
                 <el-icon class="text-gray-400"><ArrowRight /></el-icon>
@@ -221,7 +225,8 @@
             v-model:page-size="customerStore.queryParams.limit"
             :total="customerStore.totalCount"
             :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
+            :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next'"
+            :small="isMobile"
             background
             @current-change="handlePageChange"
             @size-change="handleSizeChange"
@@ -229,8 +234,8 @@
         </div>
       </div>
 
-      <!-- Right: Sidebar -->
-      <div class="w-80 border-l border-gray-200 bg-white overflow-auto flex-shrink-0">
+      <!-- Right: Sidebar - desktop only -->
+      <div v-if="!isMobile" class="w-80 border-l border-gray-200 bg-white overflow-auto flex-shrink-0">
         <!-- Funnel Chart -->
         <div class="p-4 border-b border-gray-200">
           <h3 class="font-medium flex items-center gap-2">
@@ -314,7 +319,8 @@
     <el-dialog
       v-model="showAddDialog"
       :title="editingCustomer ? '编辑客户' : '新建客户'"
-      width="600px"
+      :width="isMobile ? '95%' : '600px'"
+      :fullscreen="isMobile"
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="80px">
         <el-form-item label="公司名称" prop="companyName">
@@ -324,7 +330,7 @@
           <el-input v-model="formData.industry" placeholder="请输入行业" />
         </el-form-item>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="客户级别" prop="level">
               <el-select v-model="formData.level" class="w-full">
                 <el-option label="A级客户" value="A" />
@@ -333,7 +339,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="商机阶段" prop="stage">
               <el-select v-model="formData.stage" class="w-full">
                 <el-option label="线索" value="lead" />
@@ -350,12 +356,12 @@
           <el-input v-model="formData.contactName" placeholder="联系人姓名" />
         </el-form-item>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="电话" prop="contactPhone">
               <el-input v-model="formData.contactPhone" placeholder="联系电话" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="邮箱" prop="contactEmail">
               <el-input v-model="formData.contactEmail" placeholder="邮箱地址" />
             </el-form-item>
@@ -385,6 +391,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from
 import { useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
+import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import {
   Plus,
@@ -412,6 +419,7 @@ import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 const router = useRouter()
 const customerStore = useCustomerStore()
 const userStore = useUserStore()
+const { isMobile } = useResponsive()
 
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)

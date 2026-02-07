@@ -1,7 +1,10 @@
 <template>
-  <div class="h-full flex">
+  <div class="h-full flex" :class="{ 'flex-col': isMobile }">
     <!-- Left Sidebar - Session History -->
-    <div class="w-64 border-r border-gray-200 bg-gray-50 flex flex-col">
+    <div
+      v-if="!isMobile || mobilePanel === 'sessions'"
+      :class="isMobile ? 'flex-1 flex flex-col' : 'w-64 border-r border-gray-200 bg-gray-50 flex flex-col'"
+    >
       <!-- Sidebar Header -->
       <div class="h-14 px-4 flex items-center justify-between border-b border-gray-200">
         <span class="font-medium text-gray-700">历史对话</span>
@@ -95,21 +98,33 @@
     </div>
 
     <!-- Chat Area -->
-    <div class="flex-1 flex flex-col bg-white">
+    <div
+      v-if="!isMobile || mobilePanel === 'chat'"
+      :class="isMobile ? 'flex-1 flex flex-col bg-white' : 'flex-1 flex flex-col bg-white'"
+    >
       <!-- Header -->
-      <div class="h-14 px-6 flex items-center justify-between border-b border-gray-200">
-        <div>
-          <h1 class="text-lg font-semibold text-gray-800">AI对话助手</h1>
-          <p class="text-xs text-gray-400">通过AI对话快速建立客户档案和生成任务</p>
+      <div class="h-14 px-4 md:px-6 flex items-center justify-between border-b border-gray-200">
+        <div class="flex items-center gap-2">
+          <el-icon v-if="isMobile" class="cursor-pointer" @click="mobilePanel = 'sessions'"><ArrowLeft /></el-icon>
+          <div>
+            <h1 class="text-base md:text-lg font-semibold text-gray-800">AI对话助手</h1>
+            <p class="text-xs text-gray-400 hidden md:block">通过AI对话快速建立客户档案和生成任务</p>
+          </div>
         </div>
-        <div class="text-sm text-gray-500">
-          <span class="text-gray-400">您的权限</span>
-          <span class="ml-2 text-gray-700">{{ userStore.realname || '销售经理' }} · 完整权限</span>
+        <div class="flex items-center gap-2">
+          <el-button v-if="isMobile" text size="small" @click="showTaskDrawer = true">
+            <el-icon><List /></el-icon>
+            <span class="ml-1">{{ pendingTaskCount }}</span>
+          </el-button>
+          <div v-else class="text-sm text-gray-500">
+            <span class="text-gray-400">您的权限</span>
+            <span class="ml-2 text-gray-700">{{ userStore.realname || '销售经理' }} · 完整权限</span>
+          </div>
         </div>
       </div>
 
       <!-- Messages -->
-      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-6">
+      <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-6">
         <template v-if="chatStore.messages.length === 0">
           <!-- Welcome Message -->
           <div class="welcome-message">
@@ -162,7 +177,8 @@
           >
             <div
               :class="[
-                'max-w-[70%] rounded-lg px-4 py-3',
+                'rounded-lg px-4 py-3',
+                isMobile ? 'max-w-[85%]' : 'max-w-[70%]',
                 message.role === 'user'
                   ? 'bg-primary-500 text-white'
                   : 'bg-gray-100 text-gray-800'
@@ -185,7 +201,7 @@
       </div>
 
       <!-- Quick Actions Bar -->
-      <div class="px-6 py-3 border-t border-gray-100 bg-gray-50">
+      <div class="px-4 md:px-6 py-3 border-t border-gray-100 bg-gray-50">
         <div class="text-xs text-gray-400 mb-2">快速操作：</div>
         <div class="flex flex-wrap gap-2">
           <el-button
@@ -203,8 +219,8 @@
       </div>
 
       <!-- Input Area -->
-      <div class="px-6 py-4 bg-white border-t border-gray-200">
-        <div class="flex items-center gap-3">
+      <div class="px-4 md:px-6 py-4 bg-white border-t border-gray-200">
+        <div class="flex items-center gap-2 md:gap-3">
           <el-button :icon="Upload" circle class="upload-btn" @click="handleUpload" />
           <el-input
             v-model="inputText"
@@ -225,8 +241,8 @@
       </div>
     </div>
 
-    <!-- Right Sidebar - Notifications & Tasks -->
-    <div class="w-80 border-l border-gray-200 bg-white flex flex-col">
+    <!-- Right Sidebar - Desktop only -->
+    <div v-if="!isMobile" class="w-80 border-l border-gray-200 bg-white flex flex-col">
       <!-- Notifications Section -->
       <div class="p-4 border-b border-gray-100">
         <div class="flex items-center justify-between mb-3">
@@ -309,6 +325,71 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile Task Drawer -->
+    <el-drawer
+      v-if="isMobile"
+      v-model="showTaskDrawer"
+      direction="rtl"
+      :size="300"
+      title="通知与任务"
+    >
+      <!-- Notifications -->
+      <div class="mb-6">
+        <div class="font-medium text-gray-800 mb-3">通知</div>
+        <div class="space-y-3">
+          <div
+            v-for="notification in notifications"
+            :key="notification.id"
+            class="flex items-start gap-2"
+          >
+            <span class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" :class="notification.color"></span>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm text-gray-700">{{ notification.content }}</div>
+              <div class="text-xs text-gray-400 mt-0.5">{{ notification.time }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tasks -->
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="font-medium text-gray-800">任务 ({{ pendingTaskCount }})</span>
+          <el-button text size="small" type="primary" @click="router.push('/task'); showTaskDrawer = false">
+            查看全部
+          </el-button>
+        </div>
+        <div v-if="taskStore.myTasks.length === 0" class="text-center py-4 text-gray-400 text-sm">
+          暂无待办任务
+        </div>
+        <div v-else class="space-y-3">
+          <div
+            v-for="task in displayTasks"
+            :key="task.taskId"
+            class="task-item cursor-pointer"
+            @click="handleTaskClick(task); showTaskDrawer = false"
+          >
+            <div class="flex items-start gap-2">
+              <el-icon class="mt-0.5 flex-shrink-0" :class="task.status === 'COMPLETED' ? 'text-green-500' : 'text-gray-400'">
+                <component :is="task.status === 'COMPLETED' ? CircleCheck : Clock" />
+              </el-icon>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm line-clamp-1" :class="task.status === 'COMPLETED' ? 'text-gray-400 line-through' : 'text-gray-700'">
+                  {{ task.title }}
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <el-tag :type="getPriorityType(task.priority)" size="small" class="priority-tag">
+                    {{ getPriorityLabel(task.priority) }}
+                  </el-tag>
+                  <span class="text-xs text-gray-400">{{ formatDate(task.dueDate) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -319,6 +400,7 @@ import { useChatStore } from '@/stores/chat'
 import { useTaskStore } from '@/stores/task'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
+import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {
   Plus,
@@ -333,7 +415,9 @@ import {
   CircleCheck,
   DataAnalysis,
   Clock,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  List
 } from '@element-plus/icons-vue'
 import type { Task, ChatSession } from '@/types/common'
 
@@ -342,9 +426,12 @@ const chatStore = useChatStore()
 const taskStore = useTaskStore()
 const agentStore = useAgentStore()
 const userStore = useUserStore()
+const { isMobile } = useResponsive()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const mobilePanel = ref<'sessions' | 'chat'>('sessions')
+const showTaskDrawer = ref(false)
 
 // Notifications mock data (in real app, fetch from API)
 const notifications = ref([
@@ -432,11 +519,17 @@ function handleUpload() {
 async function handleNewSession() {
   chatStore.clearMessages()
   await chatStore.startNewSession('新对话')
+  if (isMobile.value) {
+    mobilePanel.value = 'chat'
+  }
 }
 
 async function handleSelectSession(sessionId: string) {
   if (chatStore.currentSessionId === sessionId) return
   await chatStore.selectSession(sessionId)
+  if (isMobile.value) {
+    mobilePanel.value = 'chat'
+  }
 }
 
 async function handleDeleteSession(sessionId: string) {
@@ -468,6 +561,9 @@ function formatSessionTime(dateStr: string): string {
 
 function handleTaskClick(task: Task) {
   inputText.value = `帮我查看任务「${task.title}」的详情`
+  if (isMobile.value) {
+    mobilePanel.value = 'chat'
+  }
 }
 
 function formatTime(date: Date): string {

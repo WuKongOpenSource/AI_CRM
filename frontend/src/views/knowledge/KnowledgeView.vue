@@ -15,16 +15,16 @@
     </div>
 
     <!-- Filters -->
-    <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-4">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center gap-2 md:gap-4">
       <el-input
         v-model="queryParams.keyword"
         placeholder="搜索文件..."
         :prefix-icon="Search"
         clearable
-        class="w-64"
+        :class="isMobile ? 'flex-1' : 'w-64'"
         @change="handleSearch"
       />
-      <el-select v-model="queryParams.type" placeholder="文件类型" clearable class="w-32" @change="handleSearch">
+      <el-select v-model="queryParams.type" placeholder="类型" clearable :class="isMobile ? 'w-24' : 'w-32'" @change="handleSearch">
         <el-option label="会议记录" value="meeting" />
         <el-option label="邮件" value="email" />
         <el-option label="录音" value="recording" />
@@ -93,20 +93,21 @@
     </div>
 
     <!-- Pagination -->
-    <div class="px-4 py-3 border-t border-gray-200 flex justify-end">
+    <div class="px-4 py-3 border-t border-gray-200 flex justify-center md:justify-end">
       <el-pagination
         v-model:current-page="queryParams.page"
         v-model:page-size="queryParams.limit"
         :total="totalCount"
         :page-sizes="[12, 24, 48]"
-        layout="total, sizes, prev, pager, next"
+        :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next'"
+        :small="isMobile"
         @size-change="handleSearch"
         @current-change="handlePageChange"
       />
     </div>
 
     <!-- Upload Dialog -->
-    <el-dialog v-model="showUploadDialog" title="上传文件" width="500px">
+    <el-dialog v-model="showUploadDialog" title="上传文件" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
       <el-form :model="uploadForm" label-width="80px">
         <el-form-item label="文件">
           <span class="text-primary-500">{{ uploadingFile?.name }}</span>
@@ -135,6 +136,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useResponsive } from '@/composables/useResponsive'
 import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
 import {
@@ -143,6 +145,7 @@ import {
 } from '@element-plus/icons-vue'
 import type { Knowledge, KnowledgeQueryBO } from '@/types/common'
 
+const { isMobile } = useResponsive()
 const loading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)

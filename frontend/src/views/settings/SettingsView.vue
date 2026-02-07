@@ -1,20 +1,20 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50">
     <!-- Page Header -->
-    <div class="px-6 py-4 bg-white border-b border-gray-200">
+    <div class="px-4 md:px-6 py-4 bg-white border-b border-gray-200">
       <div class="flex items-start justify-between">
         <div>
           <h1 class="text-lg font-semibold">系统设置</h1>
-          <p class="text-sm text-gray-500 mt-1">管理系统配置和偏好设置</p>
+          <p class="text-sm text-gray-500 mt-1 hidden md:block">管理系统配置和偏好设置</p>
         </div>
-        <div class="text-sm text-gray-500">
+        <div class="text-sm text-gray-500 hidden md:block">
           您的权限: <span class="text-gray-700">{{ userStore.realname || '用户' }}，完整权限</span>
         </div>
       </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 overflow-auto p-6">
+    <div class="flex-1 overflow-auto p-3 md:p-6">
       <div class="bg-white rounded-lg shadow-sm">
         <!-- Card Header -->
         <div class="px-6 py-4 border-b border-gray-200">
@@ -152,31 +152,31 @@
               <!-- Profile Form -->
               <el-form :model="profileForm" label-position="top" class="mt-6">
                 <el-row :gutter="24">
-                  <el-col :span="12">
+                  <el-col :xs="24" :sm="12">
                     <el-form-item label="姓名">
                       <el-input v-model="profileForm.realname" placeholder="请输入姓名" />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :xs="24" :sm="12">
                     <el-form-item label="邮箱">
                       <el-input v-model="profileForm.email" placeholder="请输入邮箱" />
                     </el-form-item>
                   </el-col>
                 </el-row>
                 <el-row :gutter="24">
-                  <el-col :span="12">
+                  <el-col :xs="24" :sm="12">
                     <el-form-item label="电话">
                       <el-input v-model="profileForm.phone" placeholder="请输入电话" />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :xs="24" :sm="12">
                     <el-form-item label="部门">
                       <el-input v-model="profileForm.department" placeholder="请输入部门" />
                     </el-form-item>
                   </el-col>
                 </el-row>
                 <el-row :gutter="24">
-                  <el-col :span="12">
+                  <el-col :xs="24" :sm="12">
                     <el-form-item label="职位">
                       <el-input v-model="profileForm.position" placeholder="请输入职位" />
                     </el-form-item>
@@ -755,7 +755,8 @@
     <el-dialog
       v-model="showAgentDialog"
       :title="editingAgent ? '编辑智能体' : '添加智能体'"
-      width="500px"
+      :width="isMobile ? '95%' : '500px'"
+      :fullscreen="isMobile"
     >
       <el-form :model="agentForm" label-width="80px">
         <el-form-item label="名称">
@@ -781,7 +782,8 @@
     <el-dialog
       v-model="showFieldDialog"
       :title="editingField ? '编辑自定义字段' : '添加自定义字段'"
-      width="550px"
+      :width="isMobile ? '95%' : '550px'"
+      :fullscreen="isMobile"
     >
       <el-form :model="fieldForm" label-width="100px">
         <el-form-item label="字段标签" required>
@@ -848,6 +850,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useAgentStore } from '@/stores/agent'
+import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   User, UserFilled, Key, MagicStick, Plus, Promotion, Edit, Delete, Loading, Grid,
@@ -870,6 +873,7 @@ import type { MinioConsoleConfig } from '@/types/systemConfig'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
+const { isMobile } = useResponsive()
 
 // Tab state
 const activeTab = ref('profile')

@@ -2,9 +2,9 @@
   <div class="h-full flex flex-col bg-gray-50">
     <!-- Header -->
     <div class="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
-      <div class="flex items-center">
+      <div class="flex items-center min-w-0 flex-1">
         <el-button text :icon="ArrowLeft" @click="router.back()">返回</el-button>
-        <span class="ml-4 font-medium text-lg">{{ customer?.companyName || '客户详情' }}</span>
+        <span class="ml-2 md:ml-4 font-medium text-base md:text-lg truncate">{{ customer?.companyName || '客户详情' }}</span>
       </div>
       <el-popconfirm
         v-if="customer"
@@ -24,10 +24,10 @@
       <el-icon class="is-loading" :size="32"><Loading /></el-icon>
     </div>
 
-    <div v-else-if="customer" class="flex-1 overflow-auto p-4">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div v-else-if="customer" class="flex-1 overflow-auto p-3 md:p-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         <!-- Main Info -->
-        <div class="lg:col-span-2 space-y-4">
+        <div class="lg:col-span-2 space-y-3 md:space-y-4">
           <!-- Basic Info Card -->
           <el-card shadow="never">
             <template #header>
@@ -36,7 +36,7 @@
                 <el-button text type="primary" @click="handleEdit">编辑</el-button>
               </div>
             </template>
-            <el-descriptions :column="2" border>
+            <el-descriptions :column="isMobile ? 1 : 2" border>
               <el-descriptions-item label="公司名称">{{ customer.companyName }}</el-descriptions-item>
               <el-descriptions-item label="行业">{{ customer.industry || '-' }}</el-descriptions-item>
               <el-descriptions-item label="客户级别">
@@ -75,7 +75,7 @@
             <template #header>
               <span>扩展信息</span>
             </template>
-            <el-descriptions :column="2" border>
+            <el-descriptions :column="isMobile ? 1 : 2" border>
               <el-descriptions-item
                 v-for="field in customFields"
                 :key="field.fieldId"
@@ -229,7 +229,7 @@
     </div>
 
     <!-- Add Tag Dialog -->
-    <el-dialog v-model="showAddTagDialog" title="添加标签" width="400px">
+    <el-dialog v-model="showAddTagDialog" title="添加标签" :width="isMobile ? '90%' : '400px'">
       <el-input v-model="newTagName" placeholder="请输入标签名称" />
       <template #footer>
         <el-button @click="showAddTagDialog = false">取消</el-button>
@@ -238,7 +238,7 @@
     </el-dialog>
 
     <!-- Add Follow-up Dialog -->
-    <el-dialog v-model="showAddFollowUpDialog" title="添加跟进记录" width="500px">
+    <el-dialog v-model="showAddFollowUpDialog" title="添加跟进记录" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
       <el-form :model="followUpForm" label-width="80px">
         <el-form-item label="跟进类型">
           <el-select v-model="followUpForm.type" class="w-full">
@@ -269,7 +269,7 @@
     </el-dialog>
 
     <!-- Add Contact Dialog -->
-    <el-dialog v-model="showAddContactDialog" title="添加联系人" width="500px">
+    <el-dialog v-model="showAddContactDialog" title="添加联系人" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
       <el-form :model="contactForm" label-width="80px">
         <el-form-item label="姓名" required>
           <el-input v-model="contactForm.name" placeholder="请输入姓名" />
@@ -294,18 +294,18 @@
     </el-dialog>
 
     <!-- Edit Customer Dialog -->
-    <el-dialog v-model="showEditDialog" title="编辑客户信息" width="600px">
+    <el-dialog v-model="showEditDialog" title="编辑客户信息" :width="isMobile ? '95%' : '600px'" :fullscreen="isMobile">
       <el-form :model="editForm" label-width="100px">
         <el-form-item label="公司名称" required>
           <el-input v-model="editForm.companyName" placeholder="请输入公司名称" />
         </el-form-item>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="行业">
               <el-input v-model="editForm.industry" placeholder="请输入行业" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="客户级别">
               <el-select v-model="editForm.level" class="w-full">
                 <el-option label="A级" value="A" />
@@ -316,7 +316,7 @@
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="商机阶段">
               <el-select v-model="editForm.stage" class="w-full">
                 <el-option label="线索" value="lead" />
@@ -328,7 +328,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="报价金额">
               <el-input-number
                 v-model="editForm.quotation"
@@ -342,7 +342,7 @@
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="合同金额">
               <el-input-number
                 v-model="editForm.contractAmount"
@@ -354,7 +354,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="回款金额">
               <el-input-number
                 v-model="editForm.revenue"
@@ -397,6 +397,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
+import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, removeCustomerTag } from '@/api/customer'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
 import { addContact, queryContactPageList } from '@/api/contact'
@@ -410,6 +411,7 @@ import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 const route = useRoute()
 const router = useRouter()
 const customerStore = useCustomerStore()
+const { isMobile } = useResponsive()
 
 const loading = ref(false)
 const submitting = ref(false)

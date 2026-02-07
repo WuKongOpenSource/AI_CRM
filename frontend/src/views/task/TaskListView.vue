@@ -1,37 +1,37 @@
 <template>
   <div class="h-full flex flex-col bg-gray-50">
     <!-- Page Header -->
-    <div class="px-6 py-4 bg-white border-b border-gray-200">
+    <div class="px-4 md:px-6 py-4 bg-white border-b border-gray-200">
       <div class="flex items-start justify-between">
         <div>
           <h1 class="text-lg font-semibold">待办任务</h1>
-          <p class="text-sm text-gray-500 mt-1">AI自动生成的跟进任务和待办事项</p>
+          <p class="text-sm text-gray-500 mt-1 hidden md:block">AI自动生成的跟进任务和待办事项</p>
         </div>
-        <div class="text-sm text-gray-500">
+        <div class="text-sm text-gray-500 hidden md:block">
           您的权限: <span class="text-gray-700">{{ userStore.realname || '用户' }}，完整权限</span>
         </div>
       </div>
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 overflow-auto p-6">
+    <div class="flex-1 overflow-auto p-4 md:p-6">
       <!-- Section Header -->
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-medium">待办任务</h2>
-        <div class="flex items-center gap-4">
-          <div class="flex items-center text-primary-500">
+        <h2 class="text-base md:text-lg font-medium">待办任务</h2>
+        <div class="flex items-center gap-2 md:gap-4">
+          <div class="hidden md:flex items-center text-primary-500">
             <el-icon class="mr-1"><MagicStick /></el-icon>
             <span>AI已自动生成 {{ aiGeneratedCount }} 个任务</span>
           </div>
           <el-button type="primary" @click="handleAddTask">
             <el-icon class="mr-1"><Plus /></el-icon>
-            新建任务
+            <span>{{ isMobile ? '新建' : '新建任务' }}</span>
           </el-button>
         </div>
       </div>
 
       <!-- Status Filter Tabs -->
-      <div class="flex gap-3 mb-6">
+      <div class="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto">
         <el-button
           v-for="tab in statusTabs"
           :key="tab.value"
@@ -149,13 +149,14 @@
       </div>
 
       <!-- Pagination -->
-      <div v-if="taskStore.totalCount > (taskStore.queryParams.limit || 10)" class="mt-6 flex justify-center">
+      <div v-if="taskStore.totalCount > (taskStore.queryParams.limit || 10)" class="mt-4 md:mt-6 flex justify-center">
         <el-pagination
           v-model:current-page="taskStore.queryParams.page"
           v-model:page-size="taskStore.queryParams.limit"
           :total="taskStore.totalCount"
           :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
+          :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next'"
+          :small="isMobile"
           background
           @current-change="handlePageChange"
           @size-change="handleSizeChange"
@@ -164,7 +165,7 @@
     </div>
 
     <!-- Add/Edit Dialog -->
-    <el-dialog v-model="showAddDialog" :title="editingTask ? '编辑任务' : '新建任务'" width="500px">
+    <el-dialog v-model="showAddDialog" :title="editingTask ? '编辑任务' : '新建任务'" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="80px">
         <el-form-item label="任务标题" prop="title">
           <el-input v-model="formData.title" placeholder="请输入任务标题" />
@@ -173,7 +174,7 @@
           <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入任务描述" />
         </el-form-item>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="优先级">
               <el-select v-model="formData.priority" class="w-full">
                 <el-option label="高" value="HIGH" />
@@ -182,7 +183,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :sm="12">
             <el-form-item label="截止日期">
               <el-date-picker v-model="formData.dueDate" type="date" class="w-full" placeholder="选择日期" />
             </el-form-item>
@@ -205,7 +206,7 @@
     </el-dialog>
 
     <!-- Task Detail Dialog -->
-    <el-dialog v-model="showDetailDialog" title="任务详情" width="600px">
+    <el-dialog v-model="showDetailDialog" title="任务详情" :width="isMobile ? '95%' : '600px'" :fullscreen="isMobile">
       <template v-if="selectedTask">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="任务标题" :span="2">
@@ -249,12 +250,14 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useTaskStore } from '@/stores/task'
 import { useUserStore } from '@/stores/user'
+import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { Loading, List, MoreFilled, MagicStick, Calendar, User, Plus } from '@element-plus/icons-vue'
 import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
 
 const taskStore = useTaskStore()
 const userStore = useUserStore()
+const { isMobile } = useResponsive()
 
 const currentStatus = ref('all')
 const showAddDialog = ref(false)
