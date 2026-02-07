@@ -197,7 +197,7 @@ services:
     networks:
       - crm-network
   crm:
-    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260206
+    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260207
     container_name: crm
     platform: linux/amd64
     ports:
