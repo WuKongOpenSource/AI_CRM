@@ -91,6 +91,13 @@ public class KnowledgeController {
         return Result.ok(url);
     }
 
+    @PostMapping("/reparse/{id}")
+    @Operation(summary = "重新解析知识库文件")
+    public Result<String> reparse(@PathVariable("id") Long id) {
+        knowledgeService.reparseKnowledge(id);
+        return Result.ok();
+    }
+
     @PostMapping("/addTag")
     @Operation(summary = "添加标签")
     public Result<String> addTag(
