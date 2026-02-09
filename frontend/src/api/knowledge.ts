@@ -48,6 +48,13 @@ export function downloadKnowledge(id: string, filename: string): Promise<void> {
 }
 
 /**
+ * Reparse knowledge file
+ */
+export function reparseKnowledge(id: string): Promise<void> {
+  return post(`/knowledge/reparse/${id}`)
+}
+
+/**
  * Add knowledge tag
  */
 export function addKnowledgeTag(knowledgeId: string, tagName: string): Promise<void> {

@@ -56,6 +56,7 @@ export interface Knowledge {
   fileSize?: number
   summary?: string
   contentText?: string
+  weKnoraParseStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'unsupported'
   createUserId: string
   createUserName?: string
   createTime: string

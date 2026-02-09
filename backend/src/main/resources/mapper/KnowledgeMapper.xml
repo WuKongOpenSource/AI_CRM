@@ -13,6 +13,7 @@
             c.company_name AS customer_name,
             k.summary,
             k.status,
+            k.weknora_parse_status,
             k.upload_user_id,
             u.realname AS upload_user_name,
             k.create_time
@@ -49,6 +50,7 @@
             c.company_name AS customer_name,
             k.summary,
             k.status,
+            k.weknora_parse_status,
             k.upload_user_id,
             u.realname AS upload_user_name,
             k.create_time

@@ -49,6 +49,9 @@ public class KnowledgeVO {
     @Schema(description = "状态")
     private Integer status;
 
+    @Schema(description = "WeKnora 解析状态: pending, processing, completed, failed, unsupported")
+    private String weKnoraParseStatus;
+
     @Schema(description = "上传人ID")
     private Long uploadUserId;
 

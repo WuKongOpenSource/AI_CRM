@@ -187,6 +187,8 @@ CREATE TABLE crm_knowledge (
     content_text TEXT,
     status SMALLINT DEFAULT 1,
     upload_user_id BIGINT NOT NULL,
+    weknora_knowledge_id VARCHAR(100),
+    weknora_parse_status VARCHAR(20),
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (knowledge_id)
@@ -203,6 +205,7 @@ CREATE TRIGGER trg_knowledge_update_time
 COMMENT ON TABLE crm_knowledge IS '知识库项目表';
 COMMENT ON COLUMN crm_knowledge.type IS '类型: meeting, email, recording, document, proposal, contract';
 COMMENT ON COLUMN crm_knowledge.status IS '状态: 0-处理中, 1-正常, 2-处理失败';
+COMMENT ON COLUMN crm_knowledge.weknora_parse_status IS 'WeKnora解析状态: pending, processing, completed, failed, unsupported';
 
 -- ParadeDB BM25 全文搜索索引 (中文支持)
 -- 注意：需要先安装 pg_search 扩展

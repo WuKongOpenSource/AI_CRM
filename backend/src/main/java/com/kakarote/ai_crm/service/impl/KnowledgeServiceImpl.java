@@ -133,6 +133,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 updateById(knowledge);
                 log.info("WeKnora 上传成功: knowledgeId={}, weKnoraId={}, status={}",
                     knowledgeId, result.getId(), result.getParseStatus());
+
+                // 轮询等待 WeKnora 解析完成
+                String currentStatus = result.getParseStatus();
+                if ("pending".equals(currentStatus) || "processing".equals(currentStatus)) {
+                    pollWeKnoraParseStatus(knowledgeId, result.getId());
+                }
             }
         } catch (Exception e) {
             log.error("WeKnora 上传失败: knowledgeId={}, error={}", knowledgeId, e.getMessage(), e);
@@ -198,6 +204,81 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
         }
         return BeanUtil.copyProperties(knowledge, KnowledgeVO.class);
+    }
+
+    /**
+     * 轮询 WeKnora 解析状态，直到完成或失败
+     */
+    private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId) {
+        int maxAttempts = 60;
+        long intervalMs = 20000; // 20秒
+
+        for (int i = 0; i < maxAttempts; i++) {
+            try {
+                Thread.sleep(intervalMs);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+
+            try {
+                WeKnoraKnowledge detail = weKnoraClient.getKnowledgeDetail(weKnoraKnowledgeId);
+                if (detail == null) {
+                    log.warn("WeKnora 状态查询返回 null: weKnoraId={}", weKnoraKnowledgeId);
+                    continue;
+                }
+
+                String status = detail.getParseStatus();
+                log.debug("WeKnora 解析状态轮询: knowledgeId={}, attempt={}, status={}",
+                    knowledgeId, i + 1, status);
+
+                if ("completed".equals(status) || "failed".equals(status)) {
+                    Knowledge knowledge = getById(knowledgeId);
+                    if (knowledge != null) {
+                        knowledge.setWeKnoraParseStatus(status);
+                        updateById(knowledge);
+                        log.info("WeKnora 解析完成: knowledgeId={}, status={}", knowledgeId, status);
+                    }
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("WeKnora 状态查询异常: knowledgeId={}, error={}", knowledgeId, e.getMessage());
+            }
+        }
+
+        log.warn("WeKnora 解析状态轮询超时(20min): knowledgeId={}, weKnoraId={}", knowledgeId, weKnoraKnowledgeId);
+    }
+
+    @Override
+    public void reparseKnowledge(Long knowledgeId) {
+        Knowledge knowledge = getById(knowledgeId);
+        if (ObjectUtil.isNull(knowledge)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
+        }
+        if (!weKnoraClient.isEnabled()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeKnora 未启用");
+        }
+        if (!weKnoraClient.isSupportedFileType(knowledge.getName())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "该文件类型不支持 RAG 解析");
+        }
+
+        // 删除 WeKnora 中的旧记录（如果存在）
+        if (StrUtil.isNotEmpty(knowledge.getWeKnoraKnowledgeId())) {
+            try {
+                weKnoraClient.deleteKnowledge(knowledge.getWeKnoraKnowledgeId());
+                log.info("WeKnora 旧记录已删除: weKnoraId={}", knowledge.getWeKnoraKnowledgeId());
+            } catch (Exception e) {
+                log.warn("删除 WeKnora 旧记录失败: {}", e.getMessage());
+            }
+        }
+
+        // 重置状态
+        knowledge.setWeKnoraParseStatus("pending");
+        knowledge.setWeKnoraKnowledgeId(null);
+        updateById(knowledge);
+
+        // 重新异步上传（含轮询）
+        asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName());
     }
 
     @Override

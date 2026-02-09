@@ -65,6 +65,11 @@
                 <div class="text-xs text-gray-400 mt-1">
                   {{ getTypeLabel(item.type) }} · {{ formatFileSize(item.fileSize) }}
                 </div>
+                <div v-if="item.weKnoraParseStatus" class="mt-1">
+                  <el-tag :type="getParseStatusType(item.weKnoraParseStatus)" size="small" round>
+                    {{ getParseStatusLabel(item.weKnoraParseStatus) }}
+                  </el-tag>
+                </div>
               </div>
             </div>
             <el-dropdown trigger="click" @click.stop>
@@ -75,6 +80,9 @@
                 <el-dropdown-menu>
                   <el-dropdown-item @click="handleDownload(item)">
                     <el-icon><Download /></el-icon>下载
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="item.weKnoraParseStatus === 'failed'" @click="handleReparse(item)">
+                    <el-icon><RefreshRight /></el-icon>重新解析
                   </el-dropdown-item>
                   <el-dropdown-item divided @click="handleDelete(item)">
                     <span class="text-red-500"><el-icon><Delete /></el-icon>删除</span>
@@ -139,10 +147,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useResponsive } from '@/composables/useResponsive'
-import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge } from '@/api/knowledge'
+import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
 import {
-  Upload, Search, Loading, Folder, MoreFilled, Download, Delete,
+  Upload, Search, Loading, Folder, MoreFilled, Download, Delete, RefreshRight,
   Document, Memo, Headset, Files, Tickets
 } from '@element-plus/icons-vue'
 import type { Knowledge, KnowledgeQueryBO } from '@/types/common'
@@ -241,6 +249,16 @@ async function handleDownload(item: Knowledge) {
   }
 }
 
+async function handleReparse(item: Knowledge) {
+  try {
+    await reparseKnowledge(item.knowledgeId)
+    ElMessage.success('已提交重新解析')
+    fetchList()
+  } catch {
+    // error handled by axios interceptor
+  }
+}
+
 async function handleDelete(item: Knowledge) {
   try {
     await ElMessageBox.confirm(`确定要删除「${item.name}」吗？`, '提示', { type: 'warning' })
@@ -297,6 +315,28 @@ function formatFileSize(bytes?: number): string {
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('zh-CN')
+}
+
+function getParseStatusType(status?: string): 'success' | 'warning' | 'info' | 'danger' | '' {
+  switch (status) {
+    case 'completed': return 'success'
+    case 'processing': return ''
+    case 'pending': return 'warning'
+    case 'failed': return 'danger'
+    case 'unsupported': return 'info'
+    default: return 'info'
+  }
+}
+
+function getParseStatusLabel(status?: string): string {
+  const labels: Record<string, string> = {
+    completed: 'RAG 已就绪',
+    processing: 'RAG 解析中',
+    pending: 'RAG 排队中',
+    failed: 'RAG 解析失败',
+    unsupported: '不支持解析'
+  }
+  return labels[status || ''] || '未知状态'
 }
 </script>
 

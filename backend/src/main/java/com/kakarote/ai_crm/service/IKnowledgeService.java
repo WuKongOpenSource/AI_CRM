@@ -33,6 +33,11 @@ public interface IKnowledgeService extends IService<Knowledge> {
     KnowledgeVO getKnowledgeDetail(Long knowledgeId);
 
     /**
+     * 重新解析知识库文件
+     */
+    void reparseKnowledge(Long knowledgeId);
+
+    /**
      * 添加知识库标签
      */
     void addTag(Long knowledgeId, String tagName);
