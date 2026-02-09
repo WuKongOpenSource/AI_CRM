@@ -55,9 +55,9 @@ public class ChatController {
     }
 
     @PostMapping(value = "/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "发送消息（流式响应）")
+    @Operation(summary = "发送消息（流式响应，支持附件）")
     public Flux<ServerSentEvent<String>> send(@RequestBody ChatSendBO sendBO) {
-        return chatService.streamChat(sendBO.getSessionId(), sendBO.getContent())
+        return chatService.streamChat(sendBO)
             .filter(chunk -> chunk != null && !chunk.isEmpty())
             .map(chunk -> ServerSentEvent.<String>builder()
                 .data(chunk)
@@ -65,9 +65,9 @@ public class ChatController {
     }
 
     @PostMapping("/sendSync")
-    @Operation(summary = "发送消息（同步响应）")
+    @Operation(summary = "发送消息（同步响应，支持附件）")
     public Result<String> sendSync(@RequestBody ChatSendBO sendBO) {
-        String response = chatService.chat(sendBO.getSessionId(), sendBO.getContent());
+        String response = chatService.chat(sendBO);
         return Result.ok(response);
     }
 }

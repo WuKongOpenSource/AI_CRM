@@ -1,5 +1,5 @@
 import { post, get, getToken } from '@/utils/request'
-import type { ChatSession, ChatMessage } from '@/types/common'
+import type { ChatSession, ChatMessage, ChatAttachmentDTO } from '@/types/common'
 
 /**
  * Create chat session
@@ -42,7 +42,8 @@ export async function sendMessageStream(
   content: string,
   onChunk: (text: string) => void,
   onComplete?: () => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
+  attachments?: ChatAttachmentDTO[]
 ): Promise<void> {
   const token = getToken()
   const abortController = new AbortController()
@@ -88,7 +89,7 @@ export async function sendMessageStream(
         'Content-Type': 'application/json',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ sessionId, content }),
+      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined }),
       signal: abortController.signal
     })
 
@@ -194,6 +195,6 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string): Promise<string> {
-  return post('/chat/sendSync', { sessionId, content })
+export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[]): Promise<string> {
+  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined })
 }

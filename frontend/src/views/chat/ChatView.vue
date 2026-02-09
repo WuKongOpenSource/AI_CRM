@@ -187,6 +187,41 @@
               <div class="whitespace-pre-wrap" :class="{ 'streaming-cursor': message.isStreaming }">
                 {{ message.content || '...' }}
               </div>
+              <!-- Attachments display -->
+              <div v-if="message.attachments && message.attachments.length > 0" class="mt-2 space-y-2">
+                <div
+                  v-for="att in message.attachments"
+                  :key="att.id || att.fileName"
+                  class="attachment-item"
+                  :class="message.role === 'user' ? 'attachment-item--user' : 'attachment-item--assistant'"
+                >
+                  <template v-if="att.mimeType && att.mimeType.startsWith('image/')">
+                    <el-image
+                      :src="att.accessUrl"
+                      :preview-src-list="[att.accessUrl]"
+                      fit="cover"
+                      class="attachment-image rounded"
+                      :class="isMobile ? 'max-w-[200px]' : 'max-w-[300px]'"
+                      lazy
+                    />
+                    <div class="text-xs mt-1 opacity-70">{{ att.fileName }}</div>
+                  </template>
+                  <template v-else>
+                    <a
+                      :href="att.accessUrl"
+                      target="_blank"
+                      class="flex items-center gap-2 p-2 rounded border"
+                      :class="message.role === 'user' ? 'border-white/30 hover:bg-white/10' : 'border-gray-200 hover:bg-gray-50'"
+                    >
+                      <el-icon :size="20"><Document /></el-icon>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-sm truncate">{{ att.fileName }}</div>
+                        <div class="text-xs opacity-60">{{ formatFileSize(att.fileSize) }}</div>
+                      </div>
+                    </a>
+                  </template>
+                </div>
+              </div>
               <div
                 :class="[
                   'text-xs mt-2',
@@ -220,12 +255,38 @@
 
       <!-- Input Area -->
       <div class="px-4 md:px-6 py-4 bg-white border-t border-gray-200">
+        <!-- Selected files preview -->
+        <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
+          <div
+            v-for="(file, index) in selectedFiles"
+            :key="index"
+            class="selected-file-tag flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 rounded-lg text-sm text-gray-700"
+          >
+            <el-icon v-if="file.type.startsWith('image/')" :size="14" class="text-blue-500"><Picture /></el-icon>
+            <el-icon v-else :size="14" class="text-gray-400"><Document /></el-icon>
+            <span class="truncate max-w-[120px]">{{ file.name }}</span>
+            <span class="text-xs text-gray-400">{{ formatFileSize(file.size) }}</span>
+            <el-icon
+              :size="14"
+              class="cursor-pointer text-gray-400 hover:text-red-500 ml-0.5"
+              @click="removeSelectedFile(index)"
+            ><Close /></el-icon>
+          </div>
+        </div>
         <div class="flex items-center gap-2 md:gap-3">
-          <el-button :icon="Upload" circle class="upload-btn" @click="handleUpload" />
+          <input
+            ref="fileInputRef"
+            type="file"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml"
+            class="hidden"
+            @change="handleFileSelect"
+          />
+          <el-button :icon="Upload" circle class="upload-btn" @click="handleUpload" :disabled="isUploading" />
           <el-input
             v-model="inputText"
             placeholder="输入消息..."
-            :disabled="chatStore.isStreaming"
+            :disabled="chatStore.isStreaming || isUploading"
             @keydown.enter.exact.prevent="handleSend"
             class="flex-1"
           />
@@ -233,8 +294,8 @@
             type="primary"
             :icon="Promotion"
             circle
-            :loading="chatStore.isStreaming"
-            :disabled="!inputText.trim() || chatStore.isStreaming"
+            :loading="chatStore.isStreaming || isUploading"
+            :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
             @click="handleSend"
           />
         </div>
@@ -417,9 +478,11 @@ import {
   Clock,
   ArrowRight,
   ArrowLeft,
-  List
+  List,
+  Picture
 } from '@element-plus/icons-vue'
-import type { Task, ChatSession } from '@/types/common'
+import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import type { Task, ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 
 const router = useRouter()
 const chatStore = useChatStore()
@@ -432,6 +495,12 @@ const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
 const showTaskDrawer = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const selectedFiles = ref<File[]>([])
+const isUploading = ref(false)
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_FILE_COUNT = 5
 
 // Notifications mock data (in real app, fetch from API)
 const notifications = ref([
@@ -501,10 +570,57 @@ watch(
 
 async function handleSend() {
   const text = inputText.value.trim()
-  if (!text || chatStore.isStreaming) return
+  const hasFiles = selectedFiles.value.length > 0
+  if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
 
+  const content = text || '请分析这些文件'
   inputText.value = ''
-  await chatStore.sendMessage(text)
+
+  let attachmentDTOs: ChatAttachmentDTO[] | undefined
+  let attachmentVOs: ChatAttachmentVO[] | undefined
+
+  // Upload files to MinIO if any
+  if (hasFiles) {
+    isUploading.value = true
+    try {
+      const files = [...selectedFiles.value]
+      selectedFiles.value = []
+
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const presigned = await getPresignedUploadUrl(file.name, file.type)
+          await uploadToMinIO(file, presigned.uploadUrl)
+          return {
+            dto: {
+              fileName: file.name,
+              filePath: presigned.objectKey,
+              fileSize: file.size,
+              mimeType: file.type || 'application/octet-stream'
+            } as ChatAttachmentDTO,
+            vo: {
+              id: '',
+              fileName: file.name,
+              filePath: presigned.objectKey,
+              fileSize: file.size,
+              mimeType: file.type || 'application/octet-stream',
+              accessUrl: presigned.accessUrl
+            } as ChatAttachmentVO
+          }
+        })
+      )
+
+      attachmentDTOs = results.map(r => r.dto)
+      attachmentVOs = results.map(r => r.vo)
+    } catch (e) {
+      console.error('文件上传失败:', e)
+      ElMessage.error('文件上传失败，请重试')
+      isUploading.value = false
+      return
+    }
+    isUploading.value = false
+  }
+
+  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs)
 }
 
 function sendQuickMessage(text: string) {
@@ -513,7 +629,43 @@ function sendQuickMessage(text: string) {
 }
 
 function handleUpload() {
-  ElMessage.info('文件上传功能开发中')
+  fileInputRef.value?.click()
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+
+  const newFiles = Array.from(input.files)
+
+  // Validate file count
+  if (selectedFiles.value.length + newFiles.length > MAX_FILE_COUNT) {
+    ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
+    input.value = ''
+    return
+  }
+
+  // Validate file size
+  for (const file of newFiles) {
+    if (file.size > MAX_FILE_SIZE) {
+      ElMessage.warning(`文件"${file.name}"超过50MB限制`)
+      input.value = ''
+      return
+    }
+  }
+
+  selectedFiles.value.push(...newFiles)
+  input.value = '' // Reset input for re-selecting same file
+}
+
+function removeSelectedFile(index: number) {
+  selectedFiles.value.splice(index, 1)
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 async function handleNewSession() {
@@ -723,6 +875,20 @@ function getPriorityLabel(priority: string): string {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Attachment styles */
+.attachment-image {
+  max-height: 200px;
+  cursor: pointer;
+}
+
+.selected-file-tag {
+  transition: background-color 0.15s;
+}
+
+.selected-file-tag:hover {
+  background-color: #e5e7eb;
 }
 
 /* Streaming cursor */

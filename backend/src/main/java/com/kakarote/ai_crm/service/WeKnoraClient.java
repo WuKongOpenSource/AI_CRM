@@ -233,7 +233,6 @@ public class WeKnoraClient {
                             root.get("data"),
                             new TypeReference<List<WeKnoraChunk>>() {}
                     );
-                    // 按阈值过滤
                     double threshold = config.getSearch().getVectorThreshold();
                     int maxCount = config.getSearch().getMatchCount();
                     return chunks.stream()

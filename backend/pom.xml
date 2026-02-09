@@ -143,6 +143,17 @@
             <artifactId>transmittable-thread-local</artifactId>
             <version>2.14.5</version>
         </dependency>
+        <!-- Apache Tika 文档文本提取 -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>2.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>2.9.2</version>
+        </dependency>
         <!-- MinIO 对象存储 (S3 兼容，同时支持 RustFS) -->
         <dependency>
             <groupId>io.minio</groupId>

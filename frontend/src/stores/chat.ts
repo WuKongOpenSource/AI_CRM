@@ -8,7 +8,7 @@ import {
   sendMessageStream,
   sendMessageSync
 } from '@/api/chat'
-import type { ChatSession } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 
 interface LocalMessage {
   id: string
@@ -16,6 +16,7 @@ interface LocalMessage {
   content: string
   timestamp: Date
   isStreaming?: boolean
+  attachments?: ChatAttachmentVO[]
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -59,7 +60,8 @@ export const useChatStore = defineStore('chat', () => {
         role: m.role as 'user' | 'assistant',
         content: m.content,
         timestamp: new Date(m.createTime),
-        isStreaming: false
+        isStreaming: false,
+        attachments: m.attachments
       }))
     } finally {
       loading.value = false
@@ -75,7 +77,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessage(content: string): Promise<void> {
+  async function sendMessage(content: string, attachments?: ChatAttachmentDTO[], attachmentVOs?: ChatAttachmentVO[]): Promise<void> {
     if (!currentSessionId.value) {
       // Create new session if none exists
       await startNewSession('新对话')
@@ -86,7 +88,8 @@ export const useChatStore = defineStore('chat', () => {
       id: Date.now().toString(),
       role: 'user',
       content,
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachments: attachmentVOs
     }
     messages.value.push(userMessage)
 
@@ -132,7 +135,8 @@ export const useChatStore = defineStore('chat', () => {
             }
             lastMessage.isStreaming = false
           }
-        }
+        },
+        attachments
       )
     } catch (error) {
       // Error already handled by onError callback, but ensure message is marked as complete

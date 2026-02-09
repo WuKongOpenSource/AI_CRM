@@ -36,10 +36,10 @@ public interface IChatService {
     /**
      * 发送消息（流式响应）
      */
-    Flux<String> streamChat(Long sessionId, String content);
+    Flux<String> streamChat(ChatSendBO sendBO);
 
     /**
      * 发送消息（非流式响应）
      */
-    String chat(Long sessionId, String content);
+    String chat(ChatSendBO sendBO);
 }

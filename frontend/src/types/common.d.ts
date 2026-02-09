@@ -131,13 +131,30 @@ export interface ChatMessage {
   functionCall?: string
   functionResult?: string
   tokens?: number
+  attachments?: ChatAttachmentVO[]
   createTime: string
+}
+
+export interface ChatAttachmentVO {
+  id: string
+  fileName: string
+  filePath: string
+  fileSize: number
+  mimeType: string
+  accessUrl: string
+}
+
+export interface ChatAttachmentDTO {
+  fileName: string
+  filePath: string
+  fileSize: number
+  mimeType: string
 }
 
 export interface ChatSendBO {
   sessionId: string
   content: string
-  files?: File[]
+  attachments?: ChatAttachmentDTO[]
 }
 
 // Enum types

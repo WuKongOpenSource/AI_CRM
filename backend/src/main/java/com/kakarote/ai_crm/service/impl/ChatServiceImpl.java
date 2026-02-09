@@ -1,14 +1,18 @@
 package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.WeKnoraConfig;
+import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
+import com.kakarote.ai_crm.entity.PO.ChatAttachment;
 import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
@@ -16,27 +20,32 @@ import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.IChatAttachmentService;
 import com.kakarote.ai_crm.service.IChatService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.tika.Tika;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MimeType;
 import reactor.core.publisher.Flux;
 
+import java.io.InputStream;
+import java.net.URI;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * AI聊天服务实现 - 使用Spring AI ChatClient
@@ -55,10 +64,20 @@ public class ChatServiceImpl implements IChatService {
     private ChatMessageMapper chatMessageMapper;
 
     @Autowired
+    private IChatAttachmentService chatAttachmentService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @Autowired
     private WeKnoraClient weKnoraClient;
 
     @Autowired
     private WeKnoraConfig weKnoraConfig;
+
+    private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
+
+    private final Tika tika = new Tika();
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         你是一个AI驱动的CRM系统助手，帮助用户管理客户关系。
@@ -84,25 +103,19 @@ public class ChatServiceImpl implements IChatService {
 
     /**
      * 动态构建包含当前日期的 System Prompt
-     * 让 LLM 知道当前的实际日期，以正确处理"今天"、"本周"等时间表达
      */
     private String buildSystemPrompt() {
         LocalDate today = LocalDate.now();
         String dayOfWeek = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINESE);
-
-        // 构建本周每天的日期对照表
         String weekCalendar = buildWeekCalendar(today);
 
         return String.format(SYSTEM_PROMPT_TEMPLATE,
-            today.toString(),           // 如：2026-01-29
-            dayOfWeek,                  // 如：星期四
-            weekCalendar                // 本周日期对照表
+            today.toString(),
+            dayOfWeek,
+            weekCalendar
         );
     }
 
-    /**
-     * 构建本周日期对照表，明确每天对应的日期
-     */
     private String buildWeekCalendar(LocalDate today) {
         LocalDate monday = today.with(DayOfWeek.MONDAY);
         StringBuilder sb = new StringBuilder();
@@ -151,14 +164,11 @@ public class ChatServiceImpl implements IChatService {
         if (ObjectUtil.isNull(session)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "会话不存在");
         }
-        // Delete messages first
         chatMessageMapper.delete(
             new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getSessionId, sessionId)
         );
-        // Delete session
         chatSessionMapper.deleteById(sessionId);
-        // 清除 AI 上下文中该会话的数据
         AiContextHolder.clearSession(sessionId);
     }
 
@@ -169,51 +179,98 @@ public class ChatServiceImpl implements IChatService {
                 .eq(ChatMessage::getSessionId, sessionId)
                 .orderByAsc(ChatMessage::getCreateTime)
         );
-        return BeanUtil.copyToList(messages, ChatMessageVO.class);
+        List<ChatMessageVO> voList = BeanUtil.copyToList(messages, ChatMessageVO.class);
+
+        // 批量查询附件
+        List<Long> messageIds = messages.stream()
+                .map(ChatMessage::getMessageId)
+                .collect(Collectors.toList());
+        if (CollUtil.isNotEmpty(messageIds)) {
+            List<ChatAttachment> allAttachments = chatAttachmentService.getByMessageIds(messageIds);
+            Map<Long, List<ChatAttachment>> attachmentMap = allAttachments.stream()
+                    .collect(Collectors.groupingBy(ChatAttachment::getMessageId));
+
+            for (ChatMessageVO vo : voList) {
+                List<ChatAttachment> msgAttachments = attachmentMap.get(vo.getMessageId());
+                if (CollUtil.isNotEmpty(msgAttachments)) {
+                    vo.setAttachments(msgAttachments.stream().map(att -> {
+                        ChatMessageVO.AttachmentVO attVO = new ChatMessageVO.AttachmentVO();
+                        attVO.setId(att.getId());
+                        attVO.setFileName(att.getFileName());
+                        attVO.setFilePath(att.getFilePath());
+                        attVO.setFileSize(att.getFileSize());
+                        attVO.setMimeType(att.getMimeType());
+                        try {
+                            attVO.setAccessUrl(fileStorageService.getUrl(att.getFilePath()));
+                        } catch (Exception e) {
+                            log.warn("获取附件URL失败: {}", att.getFilePath(), e);
+                        }
+                        return attVO;
+                    }).collect(Collectors.toList()));
+                }
+            }
+        }
+
+        return voList;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Flux<String> streamChat(Long sessionId, String content) {
-        // 保存当前用户ID到AI上下文，供工具调用时使用
+    public Flux<String> streamChat(ChatSendBO sendBO) {
+        Long sessionId = sendBO.getSessionId();
+        String content = sendBO.getContent();
+        List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
+
         Long currentUserId = UserUtil.getUserIdOrNull();
         if (currentUserId != null) {
             AiContextHolder.setContext(sessionId, currentUserId);
             log.debug("设置 AI 上下文: sessionId={}, userId={}", sessionId, currentUserId);
         }
 
-        // Save user message
-        saveMessage(sessionId, "user", content);
+        Long messageId = saveMessage(sessionId, "user", content);
 
-        // Build conversation history
+        if (CollUtil.isNotEmpty(attachments)) {
+            chatAttachmentService.saveBatchAttachments(messageId, attachments);
+        }
+
         List<Message> history = buildMessageHistory(sessionId);
 
-        // Build RAG context if auto RAG is enabled
+        String attachmentContext = buildAttachmentContext(attachments);
         String ragContext = buildRagContext(content);
         String enhancedSystemPrompt = buildSystemPrompt() + ragContext;
 
-        // Use Sinks for collecting the streamed response
+        String enhancedContent = content;
+        if (StrUtil.isNotBlank(attachmentContext)) {
+            enhancedContent = content + "\n\n" + attachmentContext;
+        }
+
+        List<Media> mediaList = buildMediaList(attachments);
         StringBuilder fullResponse = new StringBuilder();
 
         log.debug("开始 AI 对话，启用工具调用...");
 
-        // 动态获取 ChatClient
         ChatClient chatClient = chatClientProvider.getChatClient();
 
-        return chatClient.prompt()
+        final String finalContent = enhancedContent;
+        ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
             .system(enhancedSystemPrompt)
-            .messages(history)
-            .user(content)
+            .messages(history);
+
+        if (CollUtil.isNotEmpty(mediaList)) {
+            requestSpec.user(u -> u.text(finalContent).media(mediaList.toArray(new Media[0])));
+        } else {
+            requestSpec.user(finalContent);
+        }
+
+        return requestSpec
             .stream()
             .chatResponse()
             .doOnNext(chatResponse -> {
-                // 处理每个 ChatResponse，包括工具调用结果
                 if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
                     String text = chatResponse.getResult().getOutput().getText();
                     if (text != null) {
                         fullResponse.append(text);
                     }
-                    // 记录工具调用信息
                     if (chatResponse.getResult().getOutput().getToolCalls() != null
                         && !chatResponse.getResult().getOutput().getToolCalls().isEmpty()) {
                         log.debug("工具调用: {}", chatResponse.getResult().getOutput().getToolCalls());
@@ -227,59 +284,67 @@ public class ChatServiceImpl implements IChatService {
                 return null;
             })
             .doOnComplete(() -> {
-                // Save assistant response after streaming completes
                 log.debug("AI 对话完成，响应长度: {}", fullResponse.length());
                 saveMessage(sessionId, "assistant", fullResponse.toString());
-                // Update session time
                 updateSessionTime(sessionId);
-                // 清除 AI 上下文
                 AiContextHolder.clear();
             })
             .doOnError(error -> {
-                // Save error message
                 log.error("AI 对话错误: {}", error.getMessage(), error);
                 saveMessage(sessionId, "assistant", "抱歉，处理您的请求时发生错误。请稍后重试。");
-                // 清除 AI 上下文
                 AiContextHolder.clear();
             });
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String chat(Long sessionId, String content) {
-        // 保存当前用户ID到AI上下文，供工具调用时使用
+    public String chat(ChatSendBO sendBO) {
+        Long sessionId = sendBO.getSessionId();
+        String content = sendBO.getContent();
+        List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
+
         Long currentUserId = UserUtil.getUserIdOrNull();
         if (currentUserId != null) {
             AiContextHolder.setContext(sessionId, currentUserId);
             log.debug("设置 AI 上下文: sessionId={}, userId={}", sessionId, currentUserId);
         }
 
-        // Save user message
-        saveMessage(sessionId, "user", content);
+        Long messageId = saveMessage(sessionId, "user", content);
 
-        // Build conversation history
+        if (CollUtil.isNotEmpty(attachments)) {
+            chatAttachmentService.saveBatchAttachments(messageId, attachments);
+        }
+
         List<Message> history = buildMessageHistory(sessionId);
 
-        // Build RAG context if auto RAG is enabled
+        String attachmentContext = buildAttachmentContext(attachments);
         String ragContext = buildRagContext(content);
         String enhancedSystemPrompt = buildSystemPrompt() + ragContext;
 
+        String enhancedContent = content;
+        if (StrUtil.isNotBlank(attachmentContext)) {
+            enhancedContent = content + "\n\n" + attachmentContext;
+        }
+
+        List<Media> mediaList = buildMediaList(attachments);
+
         try {
-            // 动态获取 ChatClient
             ChatClient chatClient = chatClientProvider.getChatClient();
 
-            // Call ChatClient
-            String response = chatClient.prompt()
+            final String finalContent = enhancedContent;
+            ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
                 .system(enhancedSystemPrompt)
-                .messages(history)
-                .user(content)
-                .call()
-                .content();
+                .messages(history);
 
-            // Save assistant response
+            if (CollUtil.isNotEmpty(mediaList)) {
+                requestSpec.user(u -> u.text(finalContent).media(mediaList.toArray(new Media[0])));
+            } else {
+                requestSpec.user(finalContent);
+            }
+
+            String response = requestSpec.call().content();
+
             saveMessage(sessionId, "assistant", response);
-
-            // Update session time
             updateSessionTime(sessionId);
 
             return response;
@@ -288,8 +353,138 @@ public class ChatServiceImpl implements IChatService {
             saveMessage(sessionId, "assistant", errorMsg);
             return errorMsg;
         } finally {
-            // 清除 AI 上下文
             AiContextHolder.clear();
+        }
+    }
+
+    /**
+     * 构建附件上下文信息（文本提取）
+     */
+    private String buildAttachmentContext(List<ChatSendBO.AttachmentDTO> attachments) {
+        if (CollUtil.isEmpty(attachments)) {
+            return "";
+        }
+
+        StringBuilder context = new StringBuilder();
+        context.append("[用户上传了以下文件]\n");
+
+        for (ChatSendBO.AttachmentDTO att : attachments) {
+            String mimeType = att.getMimeType();
+            String fileName = att.getFileName();
+
+            if (mimeType != null && mimeType.startsWith("image/")) {
+                context.append(String.format("- 图片: %s（已作为图片传入，请直接分析图片内容）\n", fileName));
+            } else if (isTextFile(mimeType, fileName)) {
+                String textContent = extractFileText(att.getFilePath());
+                if (StrUtil.isNotBlank(textContent)) {
+                    context.append(String.format("- 文本文件: %s，内容如下：\n```\n%s\n```\n", fileName, textContent));
+                } else {
+                    context.append(String.format("- 文本文件: %s（无法读取内容）\n", fileName));
+                }
+            } else if (isDocumentFile(mimeType, fileName)) {
+                String textContent = extractDocumentText(att.getFilePath());
+                if (StrUtil.isNotBlank(textContent)) {
+                    context.append(String.format("- 文档: %s，提取的文本内容如下：\n```\n%s\n```\n", fileName, textContent));
+                } else {
+                    context.append(String.format("- 文档: %s（无法提取文本内容）\n", fileName));
+                }
+            } else {
+                context.append(String.format("- 文件: %s（类型: %s）\n", fileName, mimeType));
+            }
+        }
+
+        return context.toString();
+    }
+
+    /**
+     * 构建图片 Media 列表（用于多模态模型）
+     */
+    private List<Media> buildMediaList(List<ChatSendBO.AttachmentDTO> attachments) {
+        if (CollUtil.isEmpty(attachments)) {
+            return Collections.emptyList();
+        }
+
+        List<Media> mediaList = new ArrayList<>();
+        for (ChatSendBO.AttachmentDTO att : attachments) {
+            if (att.getMimeType() != null && att.getMimeType().startsWith("image/")) {
+                try {
+                    String imageUrl = fileStorageService.getUrl(att.getFilePath());
+                    MimeType mimeType = MimeType.valueOf(att.getMimeType());
+                    Media media = Media.builder()
+                            .mimeType(mimeType)
+                            .data(URI.create(imageUrl).toURL())
+                            .build();
+                    mediaList.add(media);
+                    log.debug("添加图片媒体: {}", att.getFileName());
+                } catch (Exception e) {
+                    log.warn("构建图片媒体失败: {}", att.getFileName(), e);
+                }
+            }
+        }
+        return mediaList;
+    }
+
+    private boolean isTextFile(String mimeType, String fileName) {
+        if (mimeType != null && (mimeType.startsWith("text/") || "application/json".equals(mimeType))) {
+            return true;
+        }
+        if (fileName != null) {
+            String lower = fileName.toLowerCase();
+            return lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".csv")
+                    || lower.endsWith(".json") || lower.endsWith(".xml") || lower.endsWith(".yaml")
+                    || lower.endsWith(".yml") || lower.endsWith(".log");
+        }
+        return false;
+    }
+
+    private boolean isDocumentFile(String mimeType, String fileName) {
+        if (mimeType != null) {
+            if (mimeType.equals("application/pdf")
+                    || mimeType.equals("application/msword")
+                    || mimeType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                    || mimeType.equals("application/vnd.ms-excel")
+                    || mimeType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    || mimeType.equals("application/vnd.ms-powerpoint")
+                    || mimeType.equals("application/vnd.openxmlformats-officedocument.presentationml.presentation")) {
+                return true;
+            }
+        }
+        if (fileName != null) {
+            String lower = fileName.toLowerCase();
+            return lower.endsWith(".pdf") || lower.endsWith(".doc") || lower.endsWith(".docx")
+                    || lower.endsWith(".xls") || lower.endsWith(".xlsx")
+                    || lower.endsWith(".ppt") || lower.endsWith(".pptx");
+        }
+        return false;
+    }
+
+    private String extractFileText(String filePath) {
+        try (InputStream is = fileStorageService.getFileStream(filePath)) {
+            if (is == null) return null;
+            byte[] bytes = is.readNBytes(MAX_EXTRACTED_TEXT_LENGTH * 3);
+            String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+                text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(内容过长已截断)";
+            }
+            return text;
+        } catch (Exception e) {
+            log.warn("读取文本文件失败: {}", filePath, e);
+            return null;
+        }
+    }
+
+    private String extractDocumentText(String filePath) {
+        try (InputStream is = fileStorageService.getFileStream(filePath)) {
+            if (is == null) return null;
+            String text = tika.parseToString(is);
+            if (StrUtil.isBlank(text)) return null;
+            if (text.length() > MAX_EXTRACTED_TEXT_LENGTH) {
+                text = text.substring(0, MAX_EXTRACTED_TEXT_LENGTH) + "\n...(内容过长已截断)";
+            }
+            return text.trim();
+        } catch (Exception e) {
+            log.warn("Tika提取文档文本失败: {}", filePath, e);
+            return null;
         }
     }
 
@@ -298,7 +493,7 @@ public class ChatServiceImpl implements IChatService {
             new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getSessionId, sessionId)
                 .orderByAsc(ChatMessage::getCreateTime)
-                .last("LIMIT 20") // Limit context window
+                .last("LIMIT 20")
         );
 
         List<Message> messages = new ArrayList<>();
@@ -318,7 +513,7 @@ public class ChatServiceImpl implements IChatService {
         return messages;
     }
 
-    private void saveMessage(Long sessionId, String role, String content) {
+    private Long saveMessage(Long sessionId, String role, String content) {
         ChatMessage message = new ChatMessage();
         message.setSessionId(sessionId);
         message.setRole(role);
@@ -326,20 +521,16 @@ public class ChatServiceImpl implements IChatService {
         message.setCreateTime(new Date());
         chatMessageMapper.insert(message);
 
-        // 如果是用户消息，检查是否需要自动生成会话标题
         if ("user".equals(role)) {
             updateSessionTitleIfNeeded(sessionId, content);
         }
+
+        return message.getMessageId();
     }
 
-    /**
-     * 自动更新会话标题
-     * 当会话标题为"新对话"或空时，使用用户首条消息作为标题
-     */
     private void updateSessionTitleIfNeeded(Long sessionId, String userContent) {
         ChatSession session = chatSessionMapper.selectById(sessionId);
         if (session != null && ("新对话".equals(session.getTitle()) || session.getTitle() == null || session.getTitle().isEmpty())) {
-            // 截取用户消息前30个字符作为标题
             String title = userContent.length() > 30
                 ? userContent.substring(0, 30) + "..."
                 : userContent;
@@ -357,12 +548,7 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
-    /**
-     * 构建 RAG 上下文
-     * 当启用自动 RAG 时，使用用户问题检索相关文档片段并注入到 System Prompt
-     */
     private String buildRagContext(String query) {
-        // Check if auto RAG is enabled
         if (!weKnoraClient.isEnabled() || !weKnoraConfig.getSearch().isAutoRagEnabled()) {
             return "";
         }
