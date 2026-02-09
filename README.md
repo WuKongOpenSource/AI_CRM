@@ -187,3 +187,9 @@ http://localhost:8088/doc.html
 ## License
 
 MIT
+
+## 演示地址已经开放：
+网站：
+https://aicrm.5kcrm.cn
+帮助论坛：
+https://bbs.72crm.com#/forum/detail/2020712408698912768
