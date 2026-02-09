@@ -3,41 +3,52 @@ server {
     server_name localhost;
     # Default 50M, configured via MAX_FILE_SIZE_MB env var
     client_max_body_size ${MAX_FILE_SIZE};
-    
+
     # 安全头配置
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    
+
     # 错误日志配置
     error_log /var/log/nginx/error.log warn;
     access_log /var/log/nginx/access.log;
 
         # 前端静态文件
     location / {
-		proxy_buffering off; 
-		proxy_set_header Host $host;
-		proxy_set_header X-Real-IP $remote_addr;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_set_header X-Forwarded-Proto  $scheme;
-		proxy_connect_timeout 60;
-		proxy_send_timeout 300;
-		proxy_read_timeout 300;
-		proxy_pass  http://crm:8088/;
+      proxy_buffering off;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto  $scheme;
+      proxy_connect_timeout 60;
+      proxy_send_timeout 300;
+      proxy_read_timeout 300;
+      proxy_pass  http://crm:8088/;
     }
 
     location /crmapi/ {
-		proxy_buffering off; 
-		proxy_set_header Host $host;
-		proxy_set_header X-Real-IP $remote_addr;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_set_header X-Forwarded-Proto  $scheme;
-		proxy_connect_timeout 60;
-		proxy_send_timeout 300;
-		proxy_read_timeout 300;
-		proxy_pass  http://crm:8088/;
-
+      proxy_buffering off;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto  $scheme;
+      proxy_connect_timeout 60;
+      proxy_send_timeout 300;
+      proxy_read_timeout 300;
+      proxy_pass  http://crm:8088/;
+    }
+    location /s3/ {
+      proxy_buffering off;
+      # 此处修改为minio.endpoint相同的域名
+      proxy_set_header Host "minio:9000";
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto  $scheme;
+      proxy_connect_timeout 60;
+      proxy_send_timeout 300;
+      proxy_read_timeout 300;
+      proxy_pass  http://minio:9000/;
     }
     # 前端静态文件
     location /rag/ {
@@ -52,13 +63,13 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
+
         # 连接和重试配置
         proxy_connect_timeout 30s;                 # 连接超时时间
         proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
         proxy_next_upstream_tries 3;               # 重试次数
         proxy_next_upstream_timeout 30s;           # 重试超时时间
-        
+
         # SSE 相关配置
         proxy_http_version 1.1;                    # 使用 HTTP/1.1
         proxy_set_header Connection "";            # 禁用 Connection: close，保持连接打开
