@@ -48,18 +48,20 @@
         <div
           v-for="item in knowledgeList"
           :key="item.knowledgeId"
-          class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+          class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer overflow-hidden"
           @click="handleViewDetail(item)"
         >
-          <div class="flex items-start justify-between">
-            <div class="flex items-center">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center min-w-0 flex-1">
               <el-icon :size="32" :class="getTypeIconColor(item.type)">
                 <component :is="getTypeIcon(item.type)" />
               </el-icon>
               <div class="ml-3 flex-1 min-w-0">
-                <div class="font-medium text-gray-800 truncate" :title="item.name">
-                  {{ item.name }}
-                </div>
+                <el-tooltip :content="item.name" placement="top" :show-after="300" :disabled="!item.name || item.name.length < 20">
+                  <div class="font-medium text-gray-800 truncate">
+                    {{ item.name }}
+                  </div>
+                </el-tooltip>
                 <div class="text-xs text-gray-400 mt-1">
                   {{ getTypeLabel(item.type) }} · {{ formatFileSize(item.fileSize) }}
                 </div>
