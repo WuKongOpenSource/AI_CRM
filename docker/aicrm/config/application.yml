@@ -54,8 +54,11 @@ file:
 minio:
   # 是否启用 MinIO（设为 false 使用本地文件存储）
   enabled: true
-  # MinIO/RustFS 服务地址
+  # MinIO/RustFS 服务地址（内部，后端服务端操作用）
   endpoint: http://minio:9000
+  # 面向浏览器的外部访问地址（presigned URL 用，通过 nginx /s3/ 代理）
+  # 如果有域名，改为 http://yourdomain.com/s3
+  public-endpoint: http://${HOST_IP}/s3
   # Access Key
   access-key: minioadmin
   # Secret Key

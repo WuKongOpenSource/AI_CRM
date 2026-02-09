@@ -51,6 +51,13 @@ public class MinioConfig {
      */
     private int presignedExpiry = 3600;
 
+    /**
+     * 面向浏览器的外部访问地址（用于 presigned URL）
+     * 为空时 fallback 到 endpoint
+     * 示例：http://yourdomain.com/s3
+     */
+    private String publicEndpoint;
+
     @Bean
     @ConditionalOnProperty(name = "minio.enabled", havingValue = "true")
     public MinioClient minioClient() {

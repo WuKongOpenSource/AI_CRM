@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.MinioConfig;
@@ -124,14 +125,17 @@ public class MinioFileStorageService implements FileStorageService {
                                 .expiry(minioConfig.getPresignedExpiry(), TimeUnit.SECONDS)
                                 .build()
                 );
-                return url;
+                return toPublicUrl(url);
             } catch (Exception e) {
                 log.error("获取 MinIO 预签名 URL 失败: path={}, error={}", path, e.getMessage(), e);
                 throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "获取文件链接失败");
             }
         }
         // 非预签名模式，返回直接 URL（需要 bucket 设置为 public）
-        return minioConfig.getEndpoint() + "/" + minioConfig.getBucket() + "/" + path;
+        String baseUrl = StrUtil.isNotBlank(minioConfig.getPublicEndpoint())
+                ? minioConfig.getPublicEndpoint()
+                : minioConfig.getEndpoint();
+        return baseUrl + "/" + minioConfig.getBucket() + "/" + path;
     }
 
     @Override
@@ -177,7 +181,7 @@ public class MinioFileStorageService implements FileStorageService {
             log.info("生成预签名上传URL成功: bucket={}, path={}, expiry={}s",
                     minioConfig.getBucket(), path, expiry);
             return new PresignedUploadInfo(
-                    uploadUrl,
+                    toPublicUrl(uploadUrl),
                     "PUT",
                     minioConfig.getBucket(),
                     path,
@@ -187,5 +191,17 @@ public class MinioFileStorageService implements FileStorageService {
             log.error("生成预签名上传URL失败: path={}, error={}", path, e.getMessage(), e);
             throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "生成上传签名失败");
         }
+    }
+
+    /**
+     * 将 presigned URL 中的内部 endpoint 替换为外部 publicEndpoint
+     * 确保浏览器能访问该 URL
+     */
+    private String toPublicUrl(String internalUrl) {
+        String publicEp = minioConfig.getPublicEndpoint();
+        if (StrUtil.isBlank(publicEp)) {
+            return internalUrl;
+        }
+        return internalUrl.replace(minioConfig.getEndpoint(), publicEp);
     }
 }
