@@ -31,9 +31,10 @@
 | **🔗 无缝团队协作** | **信息实时同步**：客户动态、任务分配、知识更新均在团队内即时同步，促进高效协作。 |
 
 ### 🛠️ 技术栈
-**后端**: Java 21 + Spring Boot 3.x + Spring AI + PostgreSQL + Redis + MinIO
-**前端**: Vue 3 + TypeScript + Element Plus + Tailwind CSS
-**部署**: 支持 Docker Compose 一键部署，提供完整生产环境配置。
+
+- **后端**: Java 21 + Spring Boot 3.x + Spring AI + PostgreSQL + Redis + MinIO
+- **前端**: Vue 3 + TypeScript + Element Plus + Tailwind CSS
+- **部署**: 支持 Docker Compose 一键部署，提供完整生产环境配置。
 
 #### 后端技术栈明细
 | 技术 | 版本 | 说明 |
