@@ -112,7 +112,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 String passWord = bCryptPasswordEncoder.encode(updateBO.getPassword());
                 userEntity.setPassword(passWord);
             }
-            save(userEntity);
+            updateById(userEntity);
         }
     }
 
@@ -126,7 +126,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     public void setUserStatus(UserStatusBO userStatusBO) {
         List<ManagerUser> managerUserList = lambdaQuery().in(ManagerUser::getUserId, userStatusBO.getIds()).list();
         managerUserList.forEach(manageUserEntity -> manageUserEntity.setStatus(userStatusBO.getStatus()));
-        saveBatch(managerUserList);
+        updateBatchById(managerUserList);
     }
 
     /**
@@ -157,7 +157,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
         String passWord = bCryptPasswordEncoder.encode(newPassword);
         userEntity.setPassword(passWord);
-        save(userEntity);
+        updateById(userEntity);
     }
 
     @Override
