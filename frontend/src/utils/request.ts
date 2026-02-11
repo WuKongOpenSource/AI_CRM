@@ -10,7 +10,7 @@ let isRedirecting = false
 
 // Create axios instance
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/crmapi',
+  baseURL: import.meta.env.VITE_API_BASE_URL || `${import.meta.env.VITE_BASE_PATH || '/'}crmapi`,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

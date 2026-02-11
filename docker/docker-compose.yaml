@@ -9,6 +9,7 @@ services:
       - "${FRONTEND_PORT:-80}:80"
     environment:
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
+      - BASE_PATH=${CRM_BASE_PATH:-/}
     depends_on:
       app:
         condition: service_healthy
@@ -168,7 +169,7 @@ services:
       - crm-network
 
   minio:
-    image: minio/minio:RELEASE.2024-10-02T17-50-41Z
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/minio/minio:RELEASE.2024-10-02T17-50-41Z
     container_name: WeKnora-minio
     ports:
       - "${MINIO_PORT:-9000}:9000"
@@ -216,6 +217,7 @@ services:
       - LANGUAGE=zh_CN:zh
       - LC_ALL=zh_CN.UTF-8
       - HOST_IP=${HOST_IP}
+      - BASE_PATH=${CRM_BASE_PATH:-/}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/"]
       interval: 30s

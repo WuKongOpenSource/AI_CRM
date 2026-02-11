@@ -15,7 +15,7 @@ server {
     access_log /var/log/nginx/access.log;
 
         # 前端静态文件
-    location / {
+    location ${BASE_PATH} {
       proxy_buffering off;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
@@ -27,7 +27,7 @@ server {
       proxy_pass  http://crm:8088/;
     }
 
-    location /crmapi/ {
+    location ${BASE_PATH}crmapi/ {
       proxy_buffering off;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;

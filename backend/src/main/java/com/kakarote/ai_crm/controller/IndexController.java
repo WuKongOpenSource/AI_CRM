@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.controller;
 
+import cn.hutool.system.SystemUtil;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.config.security.service.TokenService;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
@@ -26,7 +27,8 @@ public class IndexController {
 
     @GetMapping(path = {"/", "/index"})
     public void index(HttpServletResponse response) throws Exception {
-        response.sendRedirect("/index.html");
+        String base_path = SystemUtil.get("BASE_PATH", "/");
+        response.sendRedirect(base_path + "index.html");
     }
 
     /**
