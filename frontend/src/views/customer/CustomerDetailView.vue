@@ -43,9 +43,36 @@
                 <el-tag :type="getLevelType(customer.level)">{{ customer.level }}级</el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="商机阶段">
-                <el-tag :color="getStageColor(customer.stage)" effect="light">
-                  {{ getStageLabel(customer.stage) }}
-                </el-tag>
+                <div class="flex items-center gap-2">
+                  <el-tag :color="getStageColor(customer.stage)" effect="light">
+                    {{ getStageLabel(customer.stage) }}
+                  </el-tag>
+                  <el-dropdown v-if="customer.stage !== 'closed' && customer.stage !== 'lost'" trigger="click" @command="handleStageChange">
+                    <el-button size="small" type="primary" plain>
+                      推进
+                      <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item
+                          v-if="getNextStage(customer.stage)"
+                          :command="getNextStage(customer.stage)"
+                          :style="{ fontWeight: 'bold' }"
+                        >
+                          推进到「{{ getStageLabelFull(getNextStage(customer.stage)!) }}」
+                        </el-dropdown-item>
+                        <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
+                        <el-dropdown-item
+                          v-for="opt in stageOptions.filter(s => s.value !== customer!.stage)"
+                          :key="opt.value"
+                          :command="opt.value"
+                        >
+                          {{ opt.label }}
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
               </el-descriptions-item>
               <el-descriptions-item label="地址">{{ customer.address || '-' }}</el-descriptions-item>
               <el-descriptions-item label="网站">{{ customer.website || '-' }}</el-descriptions-item>
@@ -205,13 +232,55 @@
           <!-- Stage Progress -->
           <el-card shadow="never">
             <template #header>商机进度</template>
-            <el-steps :active="getStageIndex(customer.stage)" direction="vertical" :space="50">
-              <el-step title="线索" />
-              <el-step title="已验证" />
-              <el-step title="方案阶段" />
-              <el-step title="商务谈判" />
-              <el-step title="已成交" />
-            </el-steps>
+            <div class="space-y-2">
+              <div
+                v-for="(stage, idx) in stageFlow"
+                :key="stage"
+                class="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
+                :class="{
+                  'bg-primary-50 border border-primary-200': customer.stage === stage,
+                  'bg-green-50': getStageIndex(customer.stage) > idx && customer.stage !== 'lost',
+                  'hover:bg-gray-100': customer.stage !== stage
+                }"
+                @click="handleStageChange(stage)"
+              >
+                <div
+                  class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  :class="{
+                    'bg-primary-500 text-white': customer.stage === stage,
+                    'bg-green-500 text-white': getStageIndex(customer.stage) > idx && customer.stage !== 'lost',
+                    'bg-gray-200 text-gray-500': getStageIndex(customer.stage) < idx || customer.stage === 'lost'
+                  }"
+                >
+                  <span v-if="getStageIndex(customer.stage) > idx && customer.stage !== 'lost'">&#10003;</span>
+                  <span v-else>{{ idx + 1 }}</span>
+                </div>
+                <span
+                  class="text-sm"
+                  :class="{
+                    'font-bold text-primary-600': customer.stage === stage,
+                    'text-green-600': getStageIndex(customer.stage) > idx && customer.stage !== 'lost',
+                    'text-gray-400': getStageIndex(customer.stage) < idx || customer.stage === 'lost'
+                  }"
+                >
+                  {{ getStageLabelFull(stage) }}
+                </span>
+              </div>
+            </div>
+            <div v-if="customer.stage === 'lost'" class="mt-3 p-2 bg-red-50 rounded-lg text-center">
+              <el-tag type="danger" effect="plain">已流失</el-tag>
+            </div>
+            <div v-if="customer.stage !== 'lost' && customer.stage !== 'closed'" class="mt-3">
+              <el-button
+                type="danger"
+                text
+                size="small"
+                class="w-full"
+                @click="handleStageChange('lost')"
+              >
+                标记为流失
+              </el-button>
+            </div>
           </el-card>
 
           <!-- Related Tasks -->
@@ -450,12 +519,12 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
-import { addCustomerTag, removeCustomerTag } from '@/api/customer'
+import { addCustomerTag, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
 import { addContact, updateContact, deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Loading, Delete } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Loading, Delete } from '@element-plus/icons-vue'
 import type { CustomerTag, FollowUp, CustomerUpdateBO, Contact } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
@@ -908,6 +977,37 @@ function getStageColor(stage: string): string {
 function getStageIndex(stage: string): number {
   const stages = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
   return stages.indexOf(stage)
+}
+
+const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
+const stageOptions = [
+  { value: 'lead', label: '线索' },
+  { value: 'qualified', label: '资格审查' },
+  { value: 'proposal', label: '方案报价' },
+  { value: 'negotiation', label: '谈判中' },
+  { value: 'closed', label: '已成交' },
+  { value: 'lost', label: '已流失' }
+]
+
+function getNextStage(current: string): string | null {
+  const idx = stageFlow.indexOf(current)
+  if (idx >= 0 && idx < stageFlow.length - 1) return stageFlow[idx + 1]
+  return null
+}
+
+function getStageLabelFull(stage: string): string {
+  return stageOptions.find(s => s.value === stage)?.label || stage
+}
+
+async function handleStageChange(newStage: string) {
+  if (!customer.value || customer.value.stage === newStage) return
+  try {
+    await updateCustomerStage(customer.value.customerId, newStage)
+    await customerStore.fetchCustomerDetail(customer.value.customerId)
+    ElMessage.success(`商机阶段已更新为「${getStageLabelFull(newStage)}」`)
+  } catch {
+    // Error handled by interceptor
+  }
 }
 
 function getFollowUpTypeLabel(type: string): string {

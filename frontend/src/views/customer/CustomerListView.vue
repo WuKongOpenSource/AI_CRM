@@ -124,6 +124,36 @@
                 </el-tag>
               </div>
               <div class="flex items-center gap-2 flex-shrink-0" @click.stop>
+                <el-dropdown
+                  v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
+                  trigger="click"
+                  size="small"
+                  @command="(stage: string) => handleAdvanceStage(customer.customerId, stage)"
+                >
+                  <el-button type="primary" text size="small" class="hidden md:inline-flex">
+                    推进
+                    <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        v-if="getNextStage(customer.stage)"
+                        :command="getNextStage(customer.stage)"
+                        :style="{ fontWeight: 'bold' }"
+                      >
+                        推进到「{{ allStageOptions.find(s => s.value === getNextStage(customer.stage))?.label }}」
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
+                      <el-dropdown-item
+                        v-for="opt in allStageOptions.filter(s => s.value !== customer.stage)"
+                        :key="opt.value"
+                        :command="opt.value"
+                      >
+                        {{ opt.label }}
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
                 <el-popconfirm
                   :title="`确定要删除客户「${customer.companyName}」吗？`"
                   confirm-button-text="删除"
@@ -440,7 +470,7 @@ import {
 import type { CustomerListVO, CustomerAddBO, CustomerStage } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { transferCustomer } from '@/api/customer'
+import { transferCustomer, updateCustomerStage } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 
@@ -762,6 +792,33 @@ function getStageLabel(stage: string): string {
 
 function getStageColor(stage: string): string {
   return stageColors[stage] || '#6b7280'
+}
+
+const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
+const allStageOptions = [
+  { value: 'lead', label: '线索' },
+  { value: 'qualified', label: '资格审查' },
+  { value: 'proposal', label: '方案报价' },
+  { value: 'negotiation', label: '谈判中' },
+  { value: 'closed', label: '已成交' },
+  { value: 'lost', label: '已流失' }
+]
+
+function getNextStage(current: string): string | null {
+  const idx = stageFlow.indexOf(current)
+  if (idx >= 0 && idx < stageFlow.length - 1) return stageFlow[idx + 1]
+  return null
+}
+
+async function handleAdvanceStage(customerId: string, newStage: string) {
+  try {
+    await updateCustomerStage(customerId, newStage)
+    await customerStore.fetchCustomerList(true)
+    try { await customerStore.fetchStatistics(); statistics.value = customerStore.statistics } catch { /* ignore */ }
+    ElMessage.success(`商机阶段已更新为「${allStageOptions.find(s => s.value === newStage)?.label || newStage}」`)
+  } catch {
+    // Error handled by interceptor
+  }
 }
 
 function getStagePercentage(count: number): number {
