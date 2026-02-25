@@ -103,20 +103,34 @@
                 :key="contact.contactId"
                 class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
               >
-                <div class="flex items-center">
-                  <el-avatar :size="40" class="bg-primary-100 text-primary-600">
+                <div class="flex items-center min-w-0 flex-1 cursor-pointer" @click="handleViewContact(contact)">
+                  <el-avatar :size="40" class="bg-primary-100 text-primary-600 flex-shrink-0">
                     {{ contact.name?.charAt(0) }}
                   </el-avatar>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0">
                     <div class="font-medium">
                       {{ contact.name }}
                       <el-tag v-if="contact.isPrimary" size="small" type="success" class="ml-2">主联系人</el-tag>
                     </div>
-                    <div class="text-sm text-gray-500">
+                    <div class="text-sm text-gray-500 truncate">
                       {{ contact.position || '' }}
                       <span v-if="contact.phone" class="ml-2">{{ contact.phone }}</span>
                     </div>
                   </div>
+                </div>
+                <div class="flex-shrink-0 ml-2">
+                  <el-button text size="small" type="primary" @click="handleEditContact(contact)">编辑</el-button>
+                  <el-button v-if="!contact.isPrimary" text size="small" @click="handleSetPrimary(contact.contactId)">设为主联系人</el-button>
+                  <el-popconfirm
+                    title="确定删除该联系人吗？"
+                    confirm-button-text="删除"
+                    cancel-button-text="取消"
+                    @confirm="handleDeleteContact(contact.contactId)"
+                  >
+                    <template #reference>
+                      <el-button text size="small" type="danger">删除</el-button>
+                    </template>
+                  </el-popconfirm>
                 </div>
               </div>
             </div>
@@ -268,8 +282,8 @@
       </template>
     </el-dialog>
 
-    <!-- Add Contact Dialog -->
-    <el-dialog v-model="showAddContactDialog" title="添加联系人" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
+    <!-- Add/Edit Contact Dialog -->
+    <el-dialog v-model="showAddContactDialog" :title="editingContact ? '编辑联系人' : '添加联系人'" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
       <el-form :model="contactForm" label-width="80px">
         <el-form-item label="姓名" required>
           <el-input v-model="contactForm.name" placeholder="请输入姓名" />
@@ -283,15 +297,53 @@
         <el-form-item label="邮箱">
           <el-input v-model="contactForm.email" placeholder="请输入邮箱" />
         </el-form-item>
+        <el-form-item label="微信">
+          <el-input v-model="contactForm.wechat" placeholder="请输入微信号" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="contactForm.notes" type="textarea" :rows="3" placeholder="请输入备注" />
+        </el-form-item>
         <el-form-item label="主联系人">
           <el-switch v-model="contactForm.isPrimary" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showAddContactDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitContact">添加</el-button>
+        <el-button type="primary" :loading="submitting" @click="handleSubmitContact">{{ editingContact ? '保存' : '添加' }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- Contact Detail Drawer -->
+    <el-drawer v-model="showContactDetail" title="联系人详情" :size="isMobile ? '100%' : '400px'">
+      <template v-if="currentContact">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="姓名">
+            {{ currentContact.name }}
+            <el-tag v-if="currentContact.isPrimary" size="small" type="success" class="ml-2">主联系人</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="职位">{{ currentContact.position || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="电话">{{ currentContact.phone || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="邮箱">{{ currentContact.email || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="微信">{{ currentContact.wechat || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="备注">{{ currentContact.notes || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ currentContact.createTime ? formatDateTime(currentContact.createTime) : '-' }}</el-descriptions-item>
+        </el-descriptions>
+        <div class="mt-4 flex gap-2">
+          <el-button type="primary" @click="handleEditContact(currentContact); showContactDetail = false">编辑</el-button>
+          <el-button v-if="!currentContact.isPrimary" @click="handleSetPrimary(currentContact.contactId); showContactDetail = false">设为主联系人</el-button>
+          <el-popconfirm
+            title="确定删除该联系人吗？"
+            confirm-button-text="删除"
+            cancel-button-text="取消"
+            @confirm="handleDeleteContact(currentContact!.contactId); showContactDetail = false"
+          >
+            <template #reference>
+              <el-button type="danger">删除</el-button>
+            </template>
+          </el-popconfirm>
+        </div>
+      </template>
+    </el-drawer>
 
     <!-- Edit Customer Dialog -->
     <el-dialog v-model="showEditDialog" title="编辑客户信息" :width="isMobile ? '95%' : '600px'" :fullscreen="isMobile">
@@ -400,7 +452,7 @@ import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, removeCustomerTag } from '@/api/customer'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
-import { addContact, queryContactPageList } from '@/api/contact'
+import { addContact, updateContact, deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Loading, Delete } from '@element-plus/icons-vue'
@@ -418,6 +470,9 @@ const submitting = ref(false)
 const showAddTagDialog = ref(false)
 const showAddFollowUpDialog = ref(false)
 const showAddContactDialog = ref(false)
+const showContactDetail = ref(false)
+const currentContact = ref<Contact | null>(null)
+const editingContact = ref<Contact | null>(null)
 const showEditDialog = ref(false)
 const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
@@ -473,6 +528,8 @@ const contactForm = reactive({
   position: '',
   phone: '',
   email: '',
+  wechat: '',
+  notes: '',
   isPrimary: false
 })
 
@@ -643,10 +700,64 @@ async function handleDeleteCustomer() {
   }
 }
 
+function resetContactForm() {
+  contactForm.name = ''
+  contactForm.position = ''
+  contactForm.phone = ''
+  contactForm.email = ''
+  contactForm.wechat = ''
+  contactForm.notes = ''
+  contactForm.isPrimary = false
+}
+
 function handleAddContact() {
   if (customer.value) {
+    editingContact.value = null
     contactForm.customerId = customer.value.customerId
+    resetContactForm()
     showAddContactDialog.value = true
+  }
+}
+
+function handleViewContact(contact: Contact) {
+  currentContact.value = contact
+  showContactDetail.value = true
+}
+
+function handleEditContact(contact: Contact) {
+  editingContact.value = contact
+  contactForm.customerId = contact.customerId
+  contactForm.name = contact.name || ''
+  contactForm.position = contact.position || ''
+  contactForm.phone = contact.phone || ''
+  contactForm.email = contact.email || ''
+  contactForm.wechat = contact.wechat || ''
+  contactForm.notes = contact.notes || ''
+  contactForm.isPrimary = !!contact.isPrimary
+  showAddContactDialog.value = true
+}
+
+async function handleDeleteContact(contactId: string) {
+  try {
+    await deleteContact(contactId)
+    if (customer.value) {
+      await fetchContacts(customer.value.customerId)
+    }
+    ElMessage.success('联系人已删除')
+  } catch {
+    // Error handled by interceptor
+  }
+}
+
+async function handleSetPrimary(contactId: string) {
+  try {
+    await setPrimaryContact(contactId)
+    if (customer.value) {
+      await fetchContacts(customer.value.customerId)
+    }
+    ElMessage.success('已设为主联系人')
+  } catch {
+    // Error handled by interceptor
   }
 }
 
@@ -745,19 +856,24 @@ async function handleSubmitContact() {
       position: contactForm.position,
       phone: contactForm.phone,
       email: contactForm.email,
+      wechat: contactForm.wechat,
+      notes: contactForm.notes,
       isPrimary: contactForm.isPrimary ? 1 : 0
     }
-    await addContact(submitData as any)
-    // Refresh contacts list with pagination, reset to first page
-    await fetchContacts(contactForm.customerId, true)
+
+    if (editingContact.value) {
+      await updateContact({ ...submitData, contactId: editingContact.value.contactId } as any)
+      ElMessage.success('联系人更新成功')
+    } else {
+      await addContact(submitData as any)
+      ElMessage.success('联系人添加成功')
+    }
+
+    // Refresh contacts list with pagination
+    await fetchContacts(contactForm.customerId, !editingContact.value)
     showAddContactDialog.value = false
-    // Reset form
-    contactForm.name = ''
-    contactForm.position = ''
-    contactForm.phone = ''
-    contactForm.email = ''
-    contactForm.isPrimary = false
-    ElMessage.success('联系人添加成功')
+    editingContact.value = null
+    resetContactForm()
   } catch {
     // Error already handled by request interceptor
   } finally {
