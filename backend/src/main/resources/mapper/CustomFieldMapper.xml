@@ -12,6 +12,19 @@
         WHERE ${idColumn} = #{entityId}
     </select>
 
+    <!-- 批量查询实体的自定义字段值 -->
+    <select id="getBatchCustomFieldValues" resultType="map">
+        SELECT ${idColumn} AS entity_id
+        <foreach collection="columns" item="col">
+            , ${col}
+        </foreach>
+        FROM ${tableName}
+        WHERE ${idColumn} IN
+        <foreach collection="entityIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
     <!-- 更新实体的自定义字段值 -->
     <update id="updateCustomFieldValues">
         UPDATE ${tableName}

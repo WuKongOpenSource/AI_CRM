@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.entity.VO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
@@ -65,6 +66,19 @@ public class CustomerListVO {
 
     @Schema(description = "主联系人电话")
     private String primaryContactPhone;
+
+    @Schema(description = "主联系人职位")
+    private String primaryContactPosition;
+
+    @Schema(description = "联系人数量")
+    private Integer contactCount;
+
+    @Schema(description = "标签名称逗号分隔(内部字段)")
+    private String tagNames;
+
+    @Schema(description = "团队成员姓名列表")
+    @TableField(exist = false)
+    private List<String> teamMemberNames;
 
     @Schema(description = "创建时间")
     private Date createTime;

@@ -91,4 +91,13 @@ public interface ICustomFieldService extends IService<CustomField> {
      * @param values     自定义字段值Map（fieldName -> value）
      */
     void updateCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
+
+    /**
+     * 批量获取实体的自定义字段值
+     *
+     * @param entityType 实体类型
+     * @param entityIds  实体ID列表
+     * @return entityId -> (fieldName -> value)
+     */
+    Map<Long, Map<String, Object>> getBatchCustomFieldValues(String entityType, List<Long> entityIds);
 }

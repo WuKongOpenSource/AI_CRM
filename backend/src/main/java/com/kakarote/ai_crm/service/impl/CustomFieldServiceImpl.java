@@ -300,6 +300,57 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         baseMapper.updateCustomFieldValues(tableName, idColumn, entityId, columnValues);
     }
 
+    @Override
+    public Map<Long, Map<String, Object>> getBatchCustomFieldValues(String entityType, List<Long> entityIds) {
+        if (entityIds == null || entityIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<CustomFieldVO> fields = getEnabledFieldsByEntity(entityType);
+        if (fields.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        String tableName = dynamicSchemaService.getTableName(entityType);
+        String idColumn = dynamicSchemaService.getIdColumnName(entityType);
+
+        // 过滤掉数据库中不存在的列（只检查一次）
+        List<String> columnNames = new ArrayList<>();
+        Map<String, String> columnToField = new HashMap<>();
+        for (CustomFieldVO field : fields) {
+            if (dynamicSchemaService.columnExists(tableName, field.getColumnName())) {
+                columnNames.add(field.getColumnName());
+                columnToField.put(field.getColumnName(), field.getFieldName());
+            }
+        }
+
+        if (columnNames.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 一次批量查询
+        List<Map<String, Object>> rows = baseMapper.getBatchCustomFieldValues(tableName, idColumn, entityIds, columnNames);
+
+        // 按entityId分组，列名转字段名
+        Map<Long, Map<String, Object>> result = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            Object idObj = row.get("entity_id");
+            if (idObj == null) continue;
+            Long entityId = Long.valueOf(idObj.toString());
+
+            Map<String, Object> fieldValues = new HashMap<>();
+            for (Map.Entry<String, String> entry : columnToField.entrySet()) {
+                Object value = row.get(entry.getKey());
+                if (value != null) {
+                    fieldValues.put(entry.getValue(), value);
+                }
+            }
+            result.put(entityId, fieldValues);
+        }
+
+        return result;
+    }
+
     /**
      * 将PO列表转换为VO列表
      */
