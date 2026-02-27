@@ -60,13 +60,30 @@
     <div class="px-4 md:px-6 py-3 bg-white flex items-center gap-2 md:gap-4">
       <el-input
         v-model="customerStore.queryParams.keyword"
-        placeholder="搜索客户..."
+        placeholder="搜索客户公司或联系人..."
         :prefix-icon="Search"
         clearable
         class="flex-1"
         :class="{ 'max-w-md': !isMobile }"
         @change="handleSearch"
       />
+      <!-- View mode toggle - desktop only -->
+      <el-button-group v-if="!isMobile" class="flex-shrink-0">
+        <el-button
+          :type="viewMode === 'card' ? 'primary' : 'default'"
+          @click="viewMode = 'card'"
+        >
+          <el-icon class="mr-1"><Grid /></el-icon>
+          卡片
+        </el-button>
+        <el-button
+          :type="viewMode === 'table' ? 'primary' : 'default'"
+          @click="viewMode = 'table'"
+        >
+          <el-icon class="mr-1"><Tickets /></el-icon>
+          表格
+        </el-button>
+      </el-button-group>
       <div v-if="!isMobile" class="flex-1"></div>
       <el-button v-if="!isMobile" :icon="Filter">筛选</el-button>
       <el-button v-if="!isMobile" :icon="Download" @click="handleExport" :loading="exporting">导出</el-button>
@@ -95,177 +112,328 @@
     <div class="flex-1 flex overflow-hidden">
       <!-- Left: Customer Card List -->
       <div ref="scrollContainer" class="flex-1 overflow-auto p-4 md:p-6" v-loading="customerStore.loading">
-        <div class="space-y-4">
-          <div
-            v-for="customer in customerStore.customerList"
-            :key="customer.customerId"
-            class="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
-            @click="handleRowClick(customer)"
-          >
-            <!-- Row 1: Company name + Level + Stage + Actions -->
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 hidden md:flex">
-                  <el-icon class="text-primary-500 text-xl"><OfficeBuilding /></el-icon>
-                </div>
-                <span class="font-medium text-base truncate">{{ customer.companyName }}</span>
-                <el-tag :type="getLevelType(customer.level)" size="small" round class="flex-shrink-0">
-                  {{ customer.level }}级
-                </el-tag>
-                <el-tag
-                  size="small"
-                  round
-                  class="flex-shrink-0"
-                  :style="{
-                    backgroundColor: getStageColor(customer.stage) + '20',
-                    color: getStageColor(customer.stage),
-                    borderColor: getStageColor(customer.stage)
-                  }"
-                >
-                  {{ getStageLabel(customer.stage) }}
-                </el-tag>
-              </div>
-              <div class="flex items-center gap-2 flex-shrink-0" @click.stop>
-                <el-dropdown
-                  v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
-                  trigger="click"
-                  size="small"
-                  @command="(stage: string) => handleAdvanceStage(customer.customerId, stage)"
-                >
-                  <el-button type="primary" text size="small" class="hidden md:inline-flex">
-                    推进
-                    <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item
-                        v-if="getNextStage(customer.stage)"
-                        :command="getNextStage(customer.stage)"
-                        :style="{ fontWeight: 'bold' }"
-                      >
-                        推进到「{{ allStageOptions.find(s => s.value === getNextStage(customer.stage))?.label }}」
-                      </el-dropdown-item>
-                      <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
-                      <el-dropdown-item
-                        v-for="opt in allStageOptions.filter(s => s.value !== customer.stage)"
-                        :key="opt.value"
-                        :command="opt.value"
-                      >
-                        {{ opt.label }}
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-                <el-button type="primary" text size="small" :icon="Edit" class="hidden md:inline-flex" @click="handleEdit(customer)">编辑</el-button>
-                <el-icon class="text-gray-400"><ArrowRight /></el-icon>
-              </div>
-            </div>
 
-            <!-- Row 2: Industry + Contact count + Last contact time -->
-            <div class="mt-3 flex items-center text-sm text-gray-500 gap-4">
-              <span class="flex items-center gap-1">
-                <el-icon><OfficeBuilding /></el-icon>
-                {{ customer.industry || '未分类' }}
-              </span>
-              <span class="flex items-center gap-1">
-                <el-icon><User /></el-icon>
-                {{ customer.contactCount || 0 }}个联系人
-              </span>
-              <span class="flex items-center gap-1">
-                <el-icon><Calendar /></el-icon>
-                {{ formatRelativeTime(customer.lastContactTime) }}
-              </span>
-            </div>
-
-            <!-- Row 3: Primary contact -->
-            <div v-if="customer.primaryContactName" class="mt-3 text-sm text-gray-600">
-              主要联系人:
-              <span class="inline-flex items-center gap-1">
-                <el-icon><User /></el-icon>
-                {{ customer.primaryContactName }}
-                <span v-if="customer.primaryContactPosition" class="text-gray-400">·{{ customer.primaryContactPosition }}</span>
-              </span>
-            </div>
-
-            <!-- Row 4: Tags -->
-            <div v-if="customer.tags?.length" class="mt-3 flex gap-2 flex-wrap">
-              <el-tag
-                v-for="tag in customer.tags"
-                :key="tag"
-                size="small"
-                effect="plain"
-                class="!bg-gray-50"
-              >
-                {{ tag }}
-              </el-tag>
-            </div>
-
-            <!-- Row 5: Owner + Financial info -->
-            <div class="mt-3 flex items-center justify-between">
-              <div class="flex items-center text-sm text-gray-500">
-                <span>负责人:</span>
-                <el-popover trigger="click" :width="220" @show="loadUserList">
-                  <template #reference>
-                    <div class="flex items-center cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 transition-colors" @click.stop>
-                      <el-avatar :size="24" class="mx-2 bg-primary-100 text-primary-600">
-                        {{ customer.ownerName?.charAt(0) || '?' }}
-                      </el-avatar>
-                      <span class="text-gray-700 hover:text-primary-600">{{ customer.ownerName }}</span>
-                    </div>
-                  </template>
-                  <div>
-                    <el-input v-model="ownerSearch" placeholder="搜索用户" size="small" clearable class="mb-2" :prefix-icon="Search" />
-                    <div class="max-h-48 overflow-auto">
-                      <div
-                        v-for="u in filteredUserList"
-                        :key="u.userId"
-                        class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
-                        :class="{ 'bg-primary-50': String(u.userId) === String(customer.ownerId) }"
-                        @click="handleTransfer(customer, u)"
-                      >
-                        <el-avatar :size="24" class="bg-primary-100 text-primary-600 flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</el-avatar>
-                        <span class="text-sm truncate">{{ u.realname }}</span>
-                        <el-icon v-if="String(u.userId) === String(customer.ownerId)" class="ml-auto text-primary-500"><Select /></el-icon>
-                      </div>
-                      <div v-if="filteredUserList.length === 0" class="text-center text-sm text-gray-400 py-3">
-                        无匹配用户
-                      </div>
-                    </div>
+        <!-- ===== Card View ===== -->
+        <template v-if="viewMode === 'card' || isMobile">
+          <div class="space-y-4">
+            <div
+              v-for="customer in customerStore.customerList"
+              :key="customer.customerId"
+              class="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
+              @click="handleRowClick(customer)"
+            >
+              <!-- Row 1: Company name + Level + Stage + Actions -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                  <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 hidden md:flex">
+                    <el-icon class="text-primary-500 text-xl"><OfficeBuilding /></el-icon>
                   </div>
-                </el-popover>
+                  <span class="font-medium text-base truncate">{{ customer.companyName }}</span>
+                  <el-tag :type="getLevelType(customer.level)" size="small" round class="flex-shrink-0">
+                    {{ customer.level }}级
+                  </el-tag>
+                  <el-tag
+                    size="small"
+                    round
+                    class="flex-shrink-0"
+                    :style="{
+                      backgroundColor: getStageColor(customer.stage) + '20',
+                      color: getStageColor(customer.stage),
+                      borderColor: getStageColor(customer.stage)
+                    }"
+                  >
+                    {{ getStageLabel(customer.stage) }}
+                  </el-tag>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0" @click.stop>
+                  <el-dropdown
+                    v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
+                    trigger="click"
+                    size="small"
+                    @command="(stage: string) => handleAdvanceStage(customer.customerId, stage)"
+                  >
+                    <el-button type="primary" text size="small" class="hidden md:inline-flex">
+                      推进
+                      <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item
+                          v-if="getNextStage(customer.stage)"
+                          :command="getNextStage(customer.stage)"
+                          :style="{ fontWeight: 'bold' }"
+                        >
+                          推进到「{{ allStageOptions.find(s => s.value === getNextStage(customer.stage))?.label }}」
+                        </el-dropdown-item>
+                        <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
+                        <el-dropdown-item
+                          v-for="opt in allStageOptions.filter(s => s.value !== customer.stage)"
+                          :key="opt.value"
+                          :command="opt.value"
+                        >
+                          {{ opt.label }}
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                  <el-button type="primary" text size="small" :icon="Edit" class="hidden md:inline-flex" @click="handleEdit(customer)">编辑</el-button>
+                  <el-icon class="text-gray-400"><ArrowRight /></el-icon>
+                </div>
               </div>
-              <div class="text-right text-sm space-y-1">
-                <div v-if="customer.quotation" class="text-gray-500">
-                  报价金额 <span class="text-primary-600 font-medium">{{ formatMoney(customer.quotation) }}</span>
+
+              <!-- Row 2: Industry + Contact count + Last contact time -->
+              <div class="mt-3 flex items-center text-sm text-gray-500 gap-4">
+                <span class="flex items-center gap-1">
+                  <el-icon><OfficeBuilding /></el-icon>
+                  {{ customer.industry || '未分类' }}
+                </span>
+                <span class="flex items-center gap-1">
+                  <el-icon><User /></el-icon>
+                  {{ customer.contactCount || 0 }}个联系人
+                </span>
+                <span class="flex items-center gap-1">
+                  <el-icon><Calendar /></el-icon>
+                  {{ formatRelativeTime(customer.lastContactTime) }}
+                </span>
+              </div>
+
+              <!-- Row 3: Primary contact -->
+              <div v-if="customer.primaryContactName" class="mt-3 text-sm text-gray-600 flex items-center flex-wrap gap-x-3">
+                <span>主要联系人:</span>
+                <span class="inline-flex items-center gap-1">
+                  <el-icon><User /></el-icon>
+                  {{ customer.primaryContactName }}
+                  <span v-if="customer.primaryContactPosition" class="text-gray-400">·{{ customer.primaryContactPosition }}</span>
+                </span>
+                <span v-if="customer.primaryContactPhone" class="inline-flex items-center gap-1 text-gray-500">
+                  <el-icon><Phone /></el-icon>
+                  {{ customer.primaryContactPhone }}
+                </span>
+              </div>
+
+              <!-- Row 4: Tags -->
+              <div v-if="customer.tags?.length" class="mt-3 flex gap-2 flex-wrap">
+                <el-tag
+                  v-for="tag in customer.tags"
+                  :key="tag"
+                  size="small"
+                  effect="plain"
+                  class="!bg-gray-50"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
+
+              <!-- Row 5: Owner + Financial info -->
+              <div class="mt-3 flex items-center justify-between">
+                <div class="flex items-center text-sm text-gray-500">
+                  <span>负责人:</span>
+                  <el-popover trigger="click" :width="220" @show="loadUserList">
+                    <template #reference>
+                      <div class="flex items-center cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 transition-colors" @click.stop>
+                        <el-avatar :size="24" class="mx-2 bg-primary-100 text-primary-600">
+                          {{ customer.ownerName?.charAt(0) || '?' }}
+                        </el-avatar>
+                        <span class="text-gray-700 hover:text-primary-600">{{ customer.ownerName }}</span>
+                      </div>
+                    </template>
+                    <div>
+                      <el-input v-model="ownerSearch" placeholder="搜索用户" size="small" clearable class="mb-2" :prefix-icon="Search" />
+                      <div class="max-h-48 overflow-auto">
+                        <div
+                          v-for="u in filteredUserList"
+                          :key="u.userId"
+                          class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
+                          :class="{ 'bg-primary-50': String(u.userId) === String(customer.ownerId) }"
+                          @click="handleTransfer(customer, u)"
+                        >
+                          <el-avatar :size="24" class="bg-primary-100 text-primary-600 flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</el-avatar>
+                          <span class="text-sm truncate">{{ u.realname }}</span>
+                          <el-icon v-if="String(u.userId) === String(customer.ownerId)" class="ml-auto text-primary-500"><Select /></el-icon>
+                        </div>
+                        <div v-if="filteredUserList.length === 0" class="text-center text-sm text-gray-400 py-3">
+                          无匹配用户
+                        </div>
+                      </div>
+                    </div>
+                  </el-popover>
                 </div>
-                <div v-if="customer.contractAmount" class="text-gray-500">
-                  合同金额 <span class="text-primary-600 font-medium">{{ formatMoney(customer.contractAmount) }}</span>
-                </div>
-                <div v-if="customer.revenue" class="text-gray-500">
-                  回款金额 <span class="text-green-600 font-medium">{{ formatMoney(customer.revenue) }}</span>
+                <div class="text-right text-sm space-y-1">
+                  <div v-if="customer.quotation" class="text-gray-500">
+                    报价金额 <span class="text-primary-600 font-medium">{{ formatMoney(customer.quotation) }}</span>
+                  </div>
+                  <div v-if="customer.contractAmount" class="text-gray-500">
+                    合同金额 <span class="text-primary-600 font-medium">{{ formatMoney(customer.contractAmount) }}</span>
+                  </div>
+                  <div v-if="customer.revenue" class="text-gray-500">
+                    回款金额 <span class="text-green-600 font-medium">{{ formatMoney(customer.revenue) }}</span>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Empty State (card) -->
+            <div v-if="!customerStore.loading && customerStore.customerList.length === 0" class="text-center py-12 text-gray-500">
+              <el-icon class="text-4xl mb-2"><Document /></el-icon>
+              <p>暂无客户数据</p>
             </div>
           </div>
 
-          <!-- Empty State -->
+          <!-- Infinite scroll trigger (card only) -->
+          <div
+            v-if="customerStore.hasMore && customerStore.customerList.length > 0"
+            ref="loadMoreTrigger"
+            class="flex justify-center py-4"
+          >
+            <el-icon v-if="customerStore.loading" class="is-loading text-gray-400" :size="24"><Loading /></el-icon>
+            <span v-else class="text-sm text-gray-400">向下滚动加载更多</span>
+          </div>
+        </template>
+
+        <!-- ===== Table View ===== -->
+        <template v-else>
+          <el-table
+            :data="customerStore.customerList"
+            stripe
+            border
+            style="width: 100%"
+            @row-click="handleRowClick"
+            :row-style="{ cursor: 'pointer' }"
+            :header-cell-style="{ backgroundColor: '#f5f7fa', color: '#606266' }"
+          >
+            <el-table-column prop="companyName" label="客户名称" min-width="160" fixed="left" show-overflow-tooltip>
+              <template #default="{ row }">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded bg-primary-50 flex items-center justify-center flex-shrink-0">
+                    <el-icon class="text-primary-500"><OfficeBuilding /></el-icon>
+                  </div>
+                  <span class="font-medium">{{ row.companyName }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="industry" label="行业" width="120" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.industry || '未分类' }}</template>
+            </el-table-column>
+            <el-table-column prop="level" label="级别" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getLevelType(row.level)" size="small" round>{{ row.level }}级</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="stage" label="阶段" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  size="small"
+                  round
+                  :style="{
+                    backgroundColor: getStageColor(row.stage) + '20',
+                    color: getStageColor(row.stage),
+                    borderColor: getStageColor(row.stage)
+                  }"
+                >
+                  {{ getStageLabel(row.stage) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="ownerName" label="负责人" width="100" show-overflow-tooltip>
+              <template #default="{ row }">
+                <div class="flex items-center gap-1">
+                  <el-avatar :size="22" class="bg-primary-100 text-primary-600 flex-shrink-0">{{ row.ownerName?.charAt(0) || '?' }}</el-avatar>
+                  <span>{{ row.ownerName }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="团队成员" width="120" show-overflow-tooltip>
+              <template #default="{ row }">
+                <template v-if="row.teamMemberNames?.length">
+                  <div class="flex items-center gap-0.5">
+                    <el-avatar
+                      v-for="(name, idx) in row.teamMemberNames.slice(0, 3)"
+                      :key="idx"
+                      :size="22"
+                      class="bg-blue-100 text-blue-600 flex-shrink-0"
+                      :style="idx > 0 ? { marginLeft: '-4px' } : {}"
+                    >{{ name?.charAt(0) || '?' }}</el-avatar>
+                  </div>
+                </template>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="主要联系人" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <template v-if="row.primaryContactName">
+                  <div>
+                    {{ row.primaryContactName }}
+                    <span v-if="row.primaryContactPosition" class="text-gray-400 text-xs">·{{ row.primaryContactPosition }}</span>
+                  </div>
+                  <div v-if="row.primaryContactPhone" class="text-xs text-gray-500 flex items-center gap-1">
+                    <el-icon :size="12"><Phone /></el-icon>
+                    {{ row.primaryContactPhone }}
+                  </div>
+                </template>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="contactCount" label="联系人数" width="90" align="center">
+              <template #default="{ row }">{{ row.contactCount || 0 }}</template>
+            </el-table-column>
+            <el-table-column label="标签" min-width="150">
+              <template #default="{ row }">
+                <template v-if="row.tags?.length">
+                  <el-tag
+                    v-for="tag in row.tags.slice(0, 3)"
+                    :key="tag"
+                    size="small"
+                    effect="plain"
+                    class="mr-1 mb-0.5"
+                  >{{ tag }}</el-tag>
+                  <span v-if="row.tags.length > 3" class="text-xs text-gray-400">+{{ row.tags.length - 3 }}</span>
+                </template>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="quotation" label="报价金额" width="110" align="right">
+              <template #default="{ row }">
+                <span v-if="row.quotation" class="text-primary-600">{{ formatMoney(row.quotation) }}</span>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="contractAmount" label="合同金额" width="110" align="right">
+              <template #default="{ row }">
+                <span v-if="row.contractAmount" class="text-primary-600">{{ formatMoney(row.contractAmount) }}</span>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="revenue" label="回款金额" width="110" align="right">
+              <template #default="{ row }">
+                <span v-if="row.revenue" class="text-green-600">{{ formatMoney(row.revenue) }}</span>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="source" label="客户来源" width="100" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.source || '-' }}</template>
+            </el-table-column>
+            <!-- Dynamic custom field columns -->
+            <el-table-column
+              v-for="field in listCustomFields"
+              :key="field.fieldId"
+              :label="field.fieldLabel"
+              width="120"
+              show-overflow-tooltip
+            >
+              <template #default="{ row }">
+                {{ row.customFields?.[field.fieldName] ?? '-' }}
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- Empty State (table) -->
           <div v-if="!customerStore.loading && customerStore.customerList.length === 0" class="text-center py-12 text-gray-500">
             <el-icon class="text-4xl mb-2"><Document /></el-icon>
             <p>暂无客户数据</p>
           </div>
-        </div>
+        </template>
 
-        <!-- Infinite scroll trigger -->
-        <div
-          v-if="customerStore.hasMore && customerStore.customerList.length > 0"
-          ref="loadMoreTrigger"
-          class="flex justify-center py-4"
-        >
-          <el-icon v-if="customerStore.loading" class="is-loading text-gray-400" :size="24"><Loading /></el-icon>
-          <span v-else class="text-sm text-gray-400">向下滚动加载更多</span>
-        </div>
-
-        <!-- Pagination -->
+        <!-- Pagination (shared) -->
         <div v-if="customerStore.totalCount > 0" class="mt-4 flex justify-center pb-4">
           <el-pagination
             v-model:current-page="customerStore.queryParams.page"
@@ -593,7 +761,10 @@ import {
   Loading,
   Select,
   Download,
-  Upload
+  Upload,
+  Grid,
+  Tickets,
+  Phone
 } from '@element-plus/icons-vue'
 import type { CustomerListVO, CustomerAddBO, CustomerStage, CustomerImportPreview, CustomerImportRow, CustomerImportResult } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
@@ -614,6 +785,7 @@ const formRef = ref<FormInstance>()
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
 const customFieldValues = ref<Record<string, any>>({})
 const listCustomFields = ref<CustomField[]>([])
+const viewMode = ref<'card' | 'table'>('card')
 const currentStage = ref('')
 const statistics = ref<any>(null)
 const loadMoreTrigger = ref<HTMLElement>()

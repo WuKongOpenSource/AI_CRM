@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.service.IContactService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
     @Autowired
     private ICustomFieldService customFieldService;
 
+    @Autowired
+    @Lazy
+    private CustomerServiceImpl customerService;
+
     @Override
     public Long addContact(ContactAddBO contactAddBO) {
         Contact contact = BeanUtil.copyProperties(contactAddBO, Contact.class);
@@ -38,6 +43,8 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
             contact.setIsPrimary(0);
         }
         save(contact);
+        // 同步客户冗余字段
+        customerService.syncContactCache(contact.getCustomerId());
         return contact.getContactId();
     }
 
@@ -55,6 +62,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         if (contactUpdateBO.getCustomFields() != null && !contactUpdateBO.getCustomFields().isEmpty()) {
             customFieldService.updateCustomFieldValues("contact", contactUpdateBO.getContactId(), contactUpdateBO.getCustomFields());
         }
+        // 如果是主联系人，同步冗余字段
+        if (contact.getIsPrimary() != null && contact.getIsPrimary() == 1) {
+            customerService.syncContactCache(contact.getCustomerId());
+        }
     }
 
     @Override
@@ -63,7 +74,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         if (ObjectUtil.isNull(contact)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "联系人不存在");
         }
+        Long customerId = contact.getCustomerId();
         removeById(contactId);
+        // 同步客户冗余字段
+        customerService.syncContactCache(customerId);
     }
 
     @Override
@@ -102,6 +116,8 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         // Set this one as primary
         contact.setIsPrimary(1);
         updateById(contact);
+        // 同步客户冗余字段
+        customerService.syncContactCache(contact.getCustomerId());
     }
 
     @Override

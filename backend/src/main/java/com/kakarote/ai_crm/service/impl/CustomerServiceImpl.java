@@ -12,15 +12,9 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.*;
-import com.kakarote.ai_crm.entity.PO.Contact;
-import com.kakarote.ai_crm.entity.PO.Customer;
-import com.kakarote.ai_crm.entity.PO.CustomerTag;
-import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.PO.*;
 import com.kakarote.ai_crm.entity.VO.*;
-import com.kakarote.ai_crm.mapper.ContactMapper;
-import com.kakarote.ai_crm.mapper.CustomerMapper;
-import com.kakarote.ai_crm.mapper.CustomerTagMapper;
-import com.kakarote.ai_crm.mapper.TaskMapper;
+import com.kakarote.ai_crm.mapper.*;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -60,6 +54,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Autowired
     private ICustomFieldService customFieldService;
 
+    @Autowired
+    private CustomerTeamMapper customerTeamMapper;
+
+    @Autowired
+    private ManageUserMapper manageUserMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addCustomer(CustomerAddBO customerAddBO) {
@@ -86,6 +86,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             contact.setIsPrimary(1);
             contact.setStatus(1);
             contactMapper.insert(contact);
+            // 同步冗余字段
+            syncContactCache(customer.getCustomerId());
         }
 
         // Save custom fields
@@ -131,13 +133,57 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         BasePage<CustomerListVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
 
-        // Populate custom fields for each customer in the list
         List<CustomerListVO> records = page.getRecords();
-        if (records != null && !records.isEmpty()) {
-            for (CustomerListVO record : records) {
-                Map<String, Object> customFields = customFieldService.getCustomFieldValues("customer", record.getCustomerId());
-                record.setCustomFields(customFields);
+        if (records == null || records.isEmpty()) {
+            return page;
+        }
+
+        List<Long> customerIds = records.stream().map(CustomerListVO::getCustomerId).toList();
+
+        // 1. tagNames -> tags 列表
+        for (CustomerListVO record : records) {
+            if (StrUtil.isNotEmpty(record.getTagNames())) {
+                record.setTags(Arrays.asList(record.getTagNames().split(",")));
+            } else {
+                record.setTags(Collections.emptyList());
             }
+        }
+
+        // 2. 批量加载自定义字段（1-2条SQL代替N+1）
+        try {
+            Map<Long, Map<String, Object>> cfMap = customFieldService.getBatchCustomFieldValues("customer", customerIds);
+            for (CustomerListVO record : records) {
+                record.setCustomFields(cfMap.getOrDefault(record.getCustomerId(), Collections.emptyMap()));
+            }
+        } catch (Exception e) {
+            log.warn("批量加载自定义字段失败: {}", e.getMessage());
+        }
+
+        // 3. 批量加载团队成员姓名
+        try {
+            List<CustomerTeam> teamList = customerTeamMapper.selectList(
+                new LambdaQueryWrapper<CustomerTeam>()
+                    .in(CustomerTeam::getCustomerId, customerIds)
+                    .eq(CustomerTeam::getRole, "member")
+            );
+            if (!teamList.isEmpty()) {
+                Set<Long> userIds = teamList.stream().map(CustomerTeam::getUserId).collect(Collectors.toSet());
+                List<ManagerUser> users = manageUserMapper.selectBatchIds(userIds);
+                Map<Long, String> userNameMap = users.stream()
+                    .collect(Collectors.toMap(ManagerUser::getUserId, ManagerUser::getRealname, (a, b) -> a));
+
+                Map<Long, List<String>> teamMap = teamList.stream()
+                    .collect(Collectors.groupingBy(
+                        CustomerTeam::getCustomerId,
+                        Collectors.mapping(t -> userNameMap.getOrDefault(t.getUserId(), ""), Collectors.toList())
+                    ));
+
+                for (CustomerListVO record : records) {
+                    record.setTeamMemberNames(teamMap.getOrDefault(record.getCustomerId(), Collections.emptyList()));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("批量加载团队成员失败: {}", e.getMessage());
         }
 
         return page;
@@ -239,11 +285,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         tag.setTagName(tagName);
         tag.setColor(StrUtil.isEmpty(color) ? "#3b82f6" : color);
         customerTagMapper.insert(tag);
+        // 同步冗余字段
+        syncTagCache(customerId);
     }
 
     @Override
     public void removeTag(Long customerId, Long tagId) {
         customerTagMapper.deleteById(tagId);
+        // 同步冗余字段
+        syncTagCache(customerId);
     }
 
     @Override
@@ -910,5 +960,48 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             .count());
 
         return stats;
+    }
+
+    // ==================== 冗余字段同步 ====================
+
+    /**
+     * 同步客户的主联系人信息和联系人数量到客户表
+     */
+    public void syncContactCache(Long customerId) {
+        Contact primary = contactMapper.selectOne(
+            new LambdaQueryWrapper<Contact>()
+                .eq(Contact::getCustomerId, customerId)
+                .eq(Contact::getIsPrimary, 1)
+                .eq(Contact::getStatus, 1)
+                .last("LIMIT 1")
+        );
+        Long count = contactMapper.selectCount(
+            new LambdaQueryWrapper<Contact>()
+                .eq(Contact::getCustomerId, customerId)
+                .eq(Contact::getStatus, 1)
+        );
+        lambdaUpdate()
+            .eq(Customer::getCustomerId, customerId)
+            .set(Customer::getPrimaryContactName, primary != null ? primary.getName() : null)
+            .set(Customer::getPrimaryContactPhone, primary != null ? primary.getPhone() : null)
+            .set(Customer::getPrimaryContactPosition, primary != null ? primary.getPosition() : null)
+            .set(Customer::getContactCount, count.intValue())
+            .update();
+    }
+
+    /**
+     * 同步客户的标签名称到客户表
+     */
+    public void syncTagCache(Long customerId) {
+        List<CustomerTag> tags = customerTagMapper.selectList(
+            new LambdaQueryWrapper<CustomerTag>().eq(CustomerTag::getCustomerId, customerId)
+        );
+        String tagNames = tags.stream()
+            .map(CustomerTag::getTagName)
+            .collect(Collectors.joining(","));
+        lambdaUpdate()
+            .eq(Customer::getCustomerId, customerId)
+            .set(Customer::getTagNames, tagNames)
+            .update();
     }
 }

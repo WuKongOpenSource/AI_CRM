@@ -18,8 +18,11 @@
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
-            (SELECT name FROM crm_contact WHERE customer_id = c.customer_id AND is_primary = 1 LIMIT 1) AS primary_contact_name,
-            (SELECT phone FROM crm_contact WHERE customer_id = c.customer_id AND is_primary = 1 LIMIT 1) AS primary_contact_phone
+            c.primary_contact_name,
+            c.primary_contact_phone,
+            c.primary_contact_position,
+            c.contact_count,
+            c.tag_names
         FROM crm_customer c
         LEFT JOIN manager_user u ON c.owner_id = u.user_id
         WHERE c.status = 1

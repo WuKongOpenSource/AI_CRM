@@ -112,6 +112,36 @@ public class Customer implements Serializable {
     private String remark;
 
     /**
+     * 主联系人姓名(冗余)
+     */
+    @Schema(description = "主联系人姓名(冗余)")
+    private String primaryContactName;
+
+    /**
+     * 主联系人电话(冗余)
+     */
+    @Schema(description = "主联系人电话(冗余)")
+    private String primaryContactPhone;
+
+    /**
+     * 主联系人职位(冗余)
+     */
+    @Schema(description = "主联系人职位(冗余)")
+    private String primaryContactPosition;
+
+    /**
+     * 联系人数量(冗余)
+     */
+    @Schema(description = "联系人数量(冗余)")
+    private Integer contactCount;
+
+    /**
+     * 标签名称逗号分隔(冗余)
+     */
+    @Schema(description = "标签名称逗号分隔(冗余)")
+    private String tagNames;
+
+    /**
      * 状态: 0-禁用, 1-正常
      */
     @Schema(description = "状态: 0-禁用, 1-正常")

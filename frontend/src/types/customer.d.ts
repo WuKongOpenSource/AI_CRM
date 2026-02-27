@@ -33,6 +33,9 @@ export interface CustomerListVO extends Customer {
   primaryContactName?: string
   primaryContactPhone?: string
   primaryContactPosition?: string
+  // Team & source
+  teamMemberNames?: string[]
+  source?: string
 }
 
 export interface CustomerDetailVO extends Customer {
