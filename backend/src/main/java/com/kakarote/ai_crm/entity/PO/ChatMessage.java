@@ -51,6 +51,18 @@ public class ChatMessage implements Serializable {
     private Integer tokensUsed;
 
     /**
+     * 输入token数
+     */
+    @Schema(description = "输入token数")
+    private Integer promptTokens;
+
+    /**
+     * 输出token数
+     */
+    @Schema(description = "输出token数")
+    private Integer completionTokens;
+
+    /**
      * 使用的模型
      */
     @Schema(description = "使用的模型")

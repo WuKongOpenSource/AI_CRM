@@ -45,6 +45,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -246,6 +247,10 @@ public class ChatServiceImpl implements IChatService {
 
         List<Media> mediaList = buildMediaList(attachments);
         StringBuilder fullResponse = new StringBuilder();
+        AtomicReference<Integer> promptTokensRef = new AtomicReference<>(0);
+        AtomicReference<Integer> completionTokensRef = new AtomicReference<>(0);
+        AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
+        AtomicReference<String> modelNameRef = new AtomicReference<>(null);
 
         log.debug("开始 AI 对话，启用工具调用...");
 
@@ -276,6 +281,18 @@ public class ChatServiceImpl implements IChatService {
                         log.debug("工具调用: {}", chatResponse.getResult().getOutput().getToolCalls());
                     }
                 }
+                // 捕获 token 用量（通常在最后一个 chunk 中携带）
+                if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                    var usage = chatResponse.getMetadata().getUsage();
+                    if (usage.getPromptTokens() > 0 || usage.getCompletionTokens() > 0) {
+                        promptTokensRef.set(usage.getPromptTokens());
+                        completionTokensRef.set(usage.getCompletionTokens());
+                        totalTokensRef.set(usage.getTotalTokens());
+                    }
+                }
+                if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getModel() != null) {
+                    modelNameRef.set(chatResponse.getMetadata().getModel());
+                }
             })
             .mapNotNull(chatResponse -> {
                 if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
@@ -284,8 +301,11 @@ public class ChatServiceImpl implements IChatService {
                 return null;
             })
             .doOnComplete(() -> {
-                log.debug("AI 对话完成，响应长度: {}", fullResponse.length());
-                saveMessage(sessionId, "assistant", fullResponse.toString());
+                log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
+                    fullResponse.length(), promptTokensRef.get(), completionTokensRef.get(), totalTokensRef.get());
+                saveMessage(sessionId, "assistant", fullResponse.toString(),
+                    promptTokensRef.get(), completionTokensRef.get(),
+                    totalTokensRef.get(), modelNameRef.get());
                 updateSessionTime(sessionId);
                 AiContextHolder.clear();
             })
@@ -342,9 +362,22 @@ public class ChatServiceImpl implements IChatService {
                 requestSpec.user(finalContent);
             }
 
-            String response = requestSpec.call().content();
+            var chatResponse = requestSpec.call().chatResponse();
+            String response = chatResponse.getResult().getOutput().getText();
 
-            saveMessage(sessionId, "assistant", response);
+            int promptTokens = 0, completionTokens = 0, totalTokens = 0;
+            String modelName = null;
+            if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                var usage = chatResponse.getMetadata().getUsage();
+                promptTokens = usage.getPromptTokens();
+                completionTokens = usage.getCompletionTokens();
+                totalTokens = usage.getTotalTokens();
+            }
+            if (chatResponse.getMetadata() != null) {
+                modelName = chatResponse.getMetadata().getModel();
+            }
+
+            saveMessage(sessionId, "assistant", response, promptTokens, completionTokens, totalTokens, modelName);
             updateSessionTime(sessionId);
 
             return response;
@@ -518,6 +551,27 @@ public class ChatServiceImpl implements IChatService {
         message.setSessionId(sessionId);
         message.setRole(role);
         message.setContent(content);
+        message.setCreateTime(new Date());
+        chatMessageMapper.insert(message);
+
+        if ("user".equals(role)) {
+            updateSessionTitleIfNeeded(sessionId, content);
+        }
+
+        return message.getMessageId();
+    }
+
+    private Long saveMessage(Long sessionId, String role, String content,
+                             Integer promptTokens, Integer completionTokens,
+                             Integer totalTokens, String modelName) {
+        ChatMessage message = new ChatMessage();
+        message.setSessionId(sessionId);
+        message.setRole(role);
+        message.setContent(content);
+        message.setPromptTokens(promptTokens != null ? promptTokens : 0);
+        message.setCompletionTokens(completionTokens != null ? completionTokens : 0);
+        message.setTokensUsed(totalTokens != null ? totalTokens : 0);
+        message.setModelName(modelName);
         message.setCreateTime(new Date());
         chatMessageMapper.insert(message);
 
