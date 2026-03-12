@@ -11,6 +11,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false }
   },
   {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/login/RegisterView.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     children: [
@@ -22,13 +28,13 @@ const routes: RouteRecordRaw[] = [
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/chat/ChatView.vue'),
-        meta: { title: 'AI 助手', icon: 'ChatDotRound' }
+        meta: { title: 'AI 助手', icon: 'auto_awesome' }
       },
       {
         path: 'customer',
         name: 'CustomerList',
         component: () => import('@/views/customer/CustomerListView.vue'),
-        meta: { title: '客户管理', icon: 'User' }
+        meta: { title: '客户管理', icon: 'group' }
       },
       {
         path: 'customer/:id',
@@ -40,19 +46,25 @@ const routes: RouteRecordRaw[] = [
         path: 'task',
         name: 'TaskList',
         component: () => import('@/views/task/TaskListView.vue'),
-        meta: { title: '任务管理', icon: 'List' }
+        meta: { title: '任务管理', icon: 'task_alt' }
+      },
+      {
+        path: 'calendar',
+        name: 'Calendar',
+        component: () => import('@/views/calendar/CalendarView.vue'),
+        meta: { title: '日程安排', icon: 'calendar_today' }
       },
       {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/KnowledgeView.vue'),
-        meta: { title: '知识库', icon: 'Document' }
+        meta: { title: '知识库', icon: 'menu_book' }
       },
       {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsView.vue'),
-        meta: { title: '系统设置', icon: 'Setting' }
+        meta: { title: '系统设置', icon: 'settings' }
       }
     ]
   },
@@ -74,7 +86,7 @@ router.beforeEach(async (to, _from, next) => {
 
   if (requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.name === 'Login' && token) {
+  } else if ((to.name === 'Login' || to.name === 'Register') && token) {
     // 用户已登录访问登录页，检查是否有 redirect 参数
     let redirect = to.query.redirect as string
     if (redirect) {

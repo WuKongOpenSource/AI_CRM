@@ -93,6 +93,21 @@ export function deleteUsers(userIds: (number | string)[]): Promise<void> {
 }
 
 /**
+ * Register
+ */
+export interface RegisterParams {
+  email: string
+  password: string
+  verificationCode: string
+  companyName: string
+  realname?: string
+}
+
+export function register(params: RegisterParams): Promise<string> {
+  return post<string>('/auth/register', params)
+}
+
+/**
  * Get OIDC session token for MinIO SSO
  */
 export function getOidcSessionToken(): Promise<{ sessionToken: string }> {

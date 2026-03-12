@@ -1,603 +1,499 @@
 <template>
-  <div class="h-full flex flex-col bg-gray-50">
+  <div class="flex flex-col gap-6 px-6 py-6">
     <!-- Header -->
-    <div class="px-4 md:px-6 py-4 bg-white border-b border-gray-200">
-      <div class="flex items-start justify-between">
-        <div>
-          <h1 class="text-lg font-semibold text-gray-900">客户管理</h1>
-          <p class="text-sm text-gray-500 mt-1 hidden md:block">查看和管理所有客户信息与商机</p>
-        </div>
-        <div class="text-sm text-gray-500 hidden md:block">
-          您的权限: <span class="text-gray-700">{{ userStore.realname || '销售经理' }}，完整权限</span>
-        </div>
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-2xl font-bold text-slate-900">客户列表</h2>
+        <p class="text-sm text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
       </div>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="px-4 md:px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 bg-gray-50">
-      <!-- 总客户数 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-500">总客户数</span>
-          <el-icon class="text-gray-400 text-lg"><User /></el-icon>
-        </div>
-        <div class="mt-2 text-2xl font-semibold">{{ statistics?.totalCustomers || customerStore.totalCount }}</div>
-        <div class="mt-1 text-xs text-gray-500">活跃客户</div>
-      </div>
-
-      <!-- 总报价金额 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-500">总报价金额</span>
-          <el-icon class="text-green-500 text-lg"><TrendCharts /></el-icon>
-        </div>
-        <div class="mt-2 text-2xl font-semibold text-green-600">{{ formatMoney(totalQuotation) }}</div>
-        <div class="mt-1 text-xs text-green-500">↑12% 本月</div>
-      </div>
-
-      <!-- 总回款金额 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-500">总回款金额</span>
-          <el-icon class="text-orange-500 text-lg"><Coin /></el-icon>
-        </div>
-        <div class="mt-2 text-2xl font-semibold text-orange-600">{{ formatMoney(totalRevenue) }}</div>
-        <div class="mt-1 text-xs text-orange-500">已回款</div>
-      </div>
-
-      <!-- 成交转化率 -->
-      <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-gray-500">成交转化率</span>
-          <el-icon class="text-primary-500 text-lg"><Aim /></el-icon>
-        </div>
-        <div class="mt-2 text-2xl font-semibold">{{ conversionRate }}%</div>
-        <div class="mt-1 text-xs text-gray-500">{{ closedCount }}个已成交</div>
-      </div>
-    </div>
-
-    <!-- Search and Filter Bar -->
-    <div class="px-4 md:px-6 py-3 bg-white flex items-center gap-2 md:gap-4">
-      <el-input
-        v-model="customerStore.queryParams.keyword"
-        placeholder="搜索客户公司或联系人..."
-        :prefix-icon="Search"
-        clearable
-        class="flex-1"
-        :class="{ 'max-w-md': !isMobile }"
-        @change="handleSearch"
-      />
-      <!-- View mode toggle - desktop only -->
-      <el-button-group v-if="!isMobile" class="flex-shrink-0">
-        <el-button
-          :type="viewMode === 'card' ? 'primary' : 'default'"
-          @click="viewMode = 'card'"
-        >
-          <el-icon class="mr-1"><Grid /></el-icon>
-          卡片
-        </el-button>
-        <el-button
-          :type="viewMode === 'table' ? 'primary' : 'default'"
-          @click="viewMode = 'table'"
-        >
-          <el-icon class="mr-1"><Tickets /></el-icon>
-          表格
-        </el-button>
-      </el-button-group>
-      <div v-if="!isMobile" class="flex-1"></div>
-      <el-button v-if="!isMobile" :icon="Filter">筛选</el-button>
-      <el-button v-if="!isMobile" :icon="Download" @click="handleExport" :loading="exporting">导出</el-button>
-      <el-button v-if="!isMobile" :icon="Upload" @click="showImportDialog = true">导入</el-button>
-      <el-button type="primary" :icon="Plus" @click="showAddDialog = true">
-        <span v-if="!isMobile">添加客户</span>
-      </el-button>
-    </div>
-
-    <!-- Stage Tabs -->
-    <div class="px-4 md:px-6 py-3 bg-white flex gap-2 flex-wrap border-b border-gray-200 overflow-x-auto">
-      <el-button
-        v-for="tab in stageTabs"
-        :key="tab.value"
-        :type="currentStage === tab.value ? 'primary' : 'default'"
-        :plain="currentStage !== tab.value"
-        round
-        size="small"
-        @click="handleStageFilter(tab.value)"
-      >
-        {{ tab.label }} ({{ tab.count }})
-      </el-button>
-    </div>
-
-    <!-- Main Content Area -->
-    <div class="flex-1 flex overflow-hidden">
-      <!-- Left: Customer Card List -->
-      <div ref="scrollContainer" class="flex-1 overflow-auto p-4 md:p-6" v-loading="customerStore.loading">
-
-        <!-- ===== Card View ===== -->
-        <template v-if="viewMode === 'card' || isMobile">
-          <div class="space-y-4">
-            <div
-              v-for="customer in customerStore.customerList"
-              :key="customer.customerId"
-              class="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
-              @click="handleRowClick(customer)"
-            >
-              <!-- Row 1: Company name + Level + Stage + Actions -->
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                  <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 hidden md:flex">
-                    <el-icon class="text-primary-500 text-xl"><OfficeBuilding /></el-icon>
-                  </div>
-                  <span class="font-medium text-base truncate">{{ customer.companyName }}</span>
-                  <el-tag :type="getLevelType(customer.level)" size="small" round class="flex-shrink-0">
-                    {{ customer.level }}级
-                  </el-tag>
-                  <el-tag
-                    size="small"
-                    round
-                    class="flex-shrink-0"
-                    :style="{
-                      backgroundColor: getStageColor(customer.stage) + '20',
-                      color: getStageColor(customer.stage),
-                      borderColor: getStageColor(customer.stage)
-                    }"
-                  >
-                    {{ getStageLabel(customer.stage) }}
-                  </el-tag>
-                </div>
-                <div class="flex items-center gap-2 flex-shrink-0" @click.stop>
-                  <el-dropdown
-                    v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
-                    trigger="click"
-                    size="small"
-                    @command="(stage: string) => handleAdvanceStage(customer.customerId, stage)"
-                  >
-                    <el-button type="primary" text size="small" class="hidden md:inline-flex">
-                      推进
-                      <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item
-                          v-if="getNextStage(customer.stage)"
-                          :command="getNextStage(customer.stage)"
-                          :style="{ fontWeight: 'bold' }"
-                        >
-                          推进到「{{ allStageOptions.find(s => s.value === getNextStage(customer.stage))?.label }}」
-                        </el-dropdown-item>
-                        <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
-                        <el-dropdown-item
-                          v-for="opt in allStageOptions.filter(s => s.value !== customer.stage)"
-                          :key="opt.value"
-                          :command="opt.value"
-                        >
-                          {{ opt.label }}
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
-                  <el-button type="primary" text size="small" :icon="Edit" class="hidden md:inline-flex" @click="handleEdit(customer)">编辑</el-button>
-                  <el-icon class="text-gray-400"><ArrowRight /></el-icon>
-                </div>
-              </div>
-
-              <!-- Row 2: Industry + Contact count + Last contact time -->
-              <div class="mt-3 flex items-center text-sm text-gray-500 gap-4">
-                <span class="flex items-center gap-1">
-                  <el-icon><OfficeBuilding /></el-icon>
-                  {{ customer.industry || '未分类' }}
-                </span>
-                <span class="flex items-center gap-1">
-                  <el-icon><User /></el-icon>
-                  {{ customer.contactCount || 0 }}个联系人
-                </span>
-                <span class="flex items-center gap-1">
-                  <el-icon><Calendar /></el-icon>
-                  {{ formatRelativeTime(customer.lastContactTime) }}
-                </span>
-              </div>
-
-              <!-- Row 3: Primary contact -->
-              <div v-if="customer.primaryContactName" class="mt-3 text-sm text-gray-600 flex items-center flex-wrap gap-x-3">
-                <span>主要联系人:</span>
-                <span class="inline-flex items-center gap-1">
-                  <el-icon><User /></el-icon>
-                  {{ customer.primaryContactName }}
-                  <span v-if="customer.primaryContactPosition" class="text-gray-400">·{{ customer.primaryContactPosition }}</span>
-                </span>
-                <span v-if="customer.primaryContactPhone" class="inline-flex items-center gap-1 text-gray-500">
-                  <el-icon><Phone /></el-icon>
-                  {{ customer.primaryContactPhone }}
-                </span>
-              </div>
-
-              <!-- Row 4: Tags -->
-              <div v-if="customer.tags?.length" class="mt-3 flex gap-2 flex-wrap">
-                <el-tag
-                  v-for="tag in customer.tags"
-                  :key="tag"
-                  size="small"
-                  effect="plain"
-                  class="!bg-gray-50"
-                >
-                  {{ tag }}
-                </el-tag>
-              </div>
-
-              <!-- Row 5: Owner + Financial info -->
-              <div class="mt-3 flex items-center justify-between">
-                <div class="flex items-center text-sm text-gray-500">
-                  <span>负责人:</span>
-                  <el-popover trigger="click" :width="220" @show="loadUserList">
-                    <template #reference>
-                      <div class="flex items-center cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 transition-colors" @click.stop>
-                        <el-avatar :size="24" class="mx-2 bg-primary-100 text-primary-600">
-                          {{ customer.ownerName?.charAt(0) || '?' }}
-                        </el-avatar>
-                        <span class="text-gray-700 hover:text-primary-600">{{ customer.ownerName }}</span>
-                      </div>
-                    </template>
-                    <div>
-                      <el-input v-model="ownerSearch" placeholder="搜索用户" size="small" clearable class="mb-2" :prefix-icon="Search" />
-                      <div class="max-h-48 overflow-auto">
-                        <div
-                          v-for="u in filteredUserList"
-                          :key="u.userId"
-                          class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 transition-colors"
-                          :class="{ 'bg-primary-50': String(u.userId) === String(customer.ownerId) }"
-                          @click="handleTransfer(customer, u)"
-                        >
-                          <el-avatar :size="24" class="bg-primary-100 text-primary-600 flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</el-avatar>
-                          <span class="text-sm truncate">{{ u.realname }}</span>
-                          <el-icon v-if="String(u.userId) === String(customer.ownerId)" class="ml-auto text-primary-500"><Select /></el-icon>
-                        </div>
-                        <div v-if="filteredUserList.length === 0" class="text-center text-sm text-gray-400 py-3">
-                          无匹配用户
-                        </div>
-                      </div>
-                    </div>
-                  </el-popover>
-                </div>
-                <div class="text-right text-sm space-y-1">
-                  <div v-if="customer.quotation" class="text-gray-500">
-                    报价金额 <span class="text-primary-600 font-medium">{{ formatMoney(customer.quotation) }}</span>
-                  </div>
-                  <div v-if="customer.contractAmount" class="text-gray-500">
-                    合同金额 <span class="text-primary-600 font-medium">{{ formatMoney(customer.contractAmount) }}</span>
-                  </div>
-                  <div v-if="customer.revenue" class="text-gray-500">
-                    回款金额 <span class="text-green-600 font-medium">{{ formatMoney(customer.revenue) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Empty State (card) -->
-            <div v-if="!customerStore.loading && customerStore.customerList.length === 0" class="text-center py-12 text-gray-500">
-              <el-icon class="text-4xl mb-2"><Document /></el-icon>
-              <p>暂无客户数据</p>
-            </div>
-          </div>
-
-          <!-- Infinite scroll trigger (card only) -->
-          <div
-            v-if="customerStore.hasMore && customerStore.customerList.length > 0"
-            ref="loadMoreTrigger"
-            class="flex justify-center py-4"
-          >
-            <el-icon v-if="customerStore.loading" class="is-loading text-gray-400" :size="24"><Loading /></el-icon>
-            <span v-else class="text-sm text-gray-400">向下滚动加载更多</span>
-          </div>
-        </template>
-
-        <!-- ===== Table View ===== -->
-        <template v-else>
-          <el-table
-            :data="customerStore.customerList"
-            stripe
-            border
-            style="width: 100%"
-            @row-click="handleRowClick"
-            :row-style="{ cursor: 'pointer' }"
-            :header-cell-style="{ backgroundColor: '#f5f7fa', color: '#606266' }"
-          >
-            <el-table-column prop="companyName" label="客户名称" min-width="160" fixed="left" show-overflow-tooltip>
-              <template #default="{ row }">
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 rounded bg-primary-50 flex items-center justify-center flex-shrink-0">
-                    <el-icon class="text-primary-500"><OfficeBuilding /></el-icon>
-                  </div>
-                  <span class="font-medium">{{ row.companyName }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="industry" label="行业" width="120" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.industry || '未分类' }}</template>
-            </el-table-column>
-            <el-table-column prop="level" label="级别" width="80" align="center">
-              <template #default="{ row }">
-                <el-tag :type="getLevelType(row.level)" size="small" round>{{ row.level }}级</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="stage" label="阶段" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag
-                  size="small"
-                  round
-                  :style="{
-                    backgroundColor: getStageColor(row.stage) + '20',
-                    color: getStageColor(row.stage),
-                    borderColor: getStageColor(row.stage)
-                  }"
-                >
-                  {{ getStageLabel(row.stage) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="ownerName" label="负责人" width="100" show-overflow-tooltip>
-              <template #default="{ row }">
-                <div class="flex items-center gap-1">
-                  <el-avatar :size="22" class="bg-primary-100 text-primary-600 flex-shrink-0">{{ row.ownerName?.charAt(0) || '?' }}</el-avatar>
-                  <span>{{ row.ownerName }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="团队成员" width="120" show-overflow-tooltip>
-              <template #default="{ row }">
-                <template v-if="row.teamMemberNames?.length">
-                  <div class="flex items-center gap-0.5">
-                    <el-avatar
-                      v-for="(name, idx) in row.teamMemberNames.slice(0, 3)"
-                      :key="idx"
-                      :size="22"
-                      class="bg-blue-100 text-blue-600 flex-shrink-0"
-                      :style="idx > 0 ? { marginLeft: '-4px' } : {}"
-                    >{{ name?.charAt(0) || '?' }}</el-avatar>
-                  </div>
-                </template>
-                <span v-else class="text-gray-400">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="主要联系人" min-width="180" show-overflow-tooltip>
-              <template #default="{ row }">
-                <template v-if="row.primaryContactName">
-                  <div>
-                    {{ row.primaryContactName }}
-                    <span v-if="row.primaryContactPosition" class="text-gray-400 text-xs">·{{ row.primaryContactPosition }}</span>
-                  </div>
-                  <div v-if="row.primaryContactPhone" class="text-xs text-gray-500 flex items-center gap-1">
-                    <el-icon :size="12"><Phone /></el-icon>
-                    {{ row.primaryContactPhone }}
-                  </div>
-                </template>
-                <span v-else class="text-gray-400">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="contactCount" label="联系人数" width="90" align="center">
-              <template #default="{ row }">{{ row.contactCount || 0 }}</template>
-            </el-table-column>
-            <el-table-column label="标签" min-width="150">
-              <template #default="{ row }">
-                <template v-if="row.tags?.length">
-                  <el-tag
-                    v-for="tag in row.tags.slice(0, 3)"
-                    :key="tag"
-                    size="small"
-                    effect="plain"
-                    class="mr-1 mb-0.5"
-                  >{{ tag }}</el-tag>
-                  <span v-if="row.tags.length > 3" class="text-xs text-gray-400">+{{ row.tags.length - 3 }}</span>
-                </template>
-                <span v-else class="text-gray-400">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="quotation" label="报价金额" width="110" align="right">
-              <template #default="{ row }">
-                <span v-if="row.quotation" class="text-primary-600">{{ formatMoney(row.quotation) }}</span>
-                <span v-else class="text-gray-400">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="contractAmount" label="合同金额" width="110" align="right">
-              <template #default="{ row }">
-                <span v-if="row.contractAmount" class="text-primary-600">{{ formatMoney(row.contractAmount) }}</span>
-                <span v-else class="text-gray-400">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="revenue" label="回款金额" width="110" align="right">
-              <template #default="{ row }">
-                <span v-if="row.revenue" class="text-green-600">{{ formatMoney(row.revenue) }}</span>
-                <span v-else class="text-gray-400">-</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="source" label="客户来源" width="100" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.source || '-' }}</template>
-            </el-table-column>
-            <!-- Dynamic custom field columns -->
-            <el-table-column
-              v-for="field in listCustomFields"
-              :key="field.fieldId"
-              :label="field.fieldLabel"
-              width="120"
-              show-overflow-tooltip
-            >
-              <template #default="{ row }">
-                {{ row.customFields?.[field.fieldName] ?? '-' }}
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- Empty State (table) -->
-          <div v-if="!customerStore.loading && customerStore.customerList.length === 0" class="text-center py-12 text-gray-500">
-            <el-icon class="text-4xl mb-2"><Document /></el-icon>
-            <p>暂无客户数据</p>
-          </div>
-        </template>
-
-        <!-- Pagination (shared) -->
-        <div v-if="customerStore.totalCount > 0" class="mt-4 flex justify-center pb-4">
-          <el-pagination
-            v-model:current-page="customerStore.queryParams.page"
-            v-model:page-size="customerStore.queryParams.limit"
-            :total="customerStore.totalCount"
-            :page-sizes="[10, 20, 50]"
-            :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next'"
-            :small="isMobile"
-            background
-            @current-change="handlePageChange"
-            @size-change="handleSizeChange"
+      <div class="flex items-center gap-3 flex-wrap">
+        <!-- Search -->
+        <div class="relative group flex items-center">
+          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">search</span>
+          <input
+            v-model="customerStore.queryParams.keyword"
+            type="text"
+            placeholder="搜索客户名称、联系人..."
+            class="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm w-full sm:w-80 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all shadow-sm"
+            @keydown.enter="handleSearch"
+            @change="handleSearch"
           />
         </div>
+        <!-- Import/Export - desktop only -->
+        <div v-if="!isMobile" class="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
+          <button class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5" @click="showImportDialog = true">
+            <span class="material-symbols-outlined text-[16px]">upload</span>
+            导入
+          </button>
+          <button class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5" :disabled="exporting" @click="handleExport">
+            <span class="material-symbols-outlined text-[16px]">download</span>
+            导出
+          </button>
+        </div>
+        <!-- Add Customer -->
+        <button
+          class="px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+          @click="showAddDialog = true"
+        >
+          <span class="material-symbols-outlined text-sm">person_add</span>
+          <span v-if="!isMobile">新增客户</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content: Table + AI Sidebar -->
+    <div class="flex flex-col xl:flex-row gap-6 items-start relative">
+      <!-- Table Area -->
+      <div class="flex-1 min-w-0 w-full space-y-6">
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm" v-loading="customerStore.loading">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200">
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">公司名称</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">客户级别</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">联系人</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">电话</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">行业</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">商机阶段</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">报价金额</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">最后跟进</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">负责人</th>
+                  <th v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    {{ field.fieldLabel }}
+                  </th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr
+                  v-for="customer in customerStore.customerList"
+                  :key="customer.customerId"
+                  class="hover:bg-blue-50 transition-colors group cursor-pointer"
+                  @click="handleRowClick(customer)"
+                >
+                  <!-- Company Name -->
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center gap-3">
+                      <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
+                        {{ customer.companyName?.charAt(0) || '?' }}
+                      </div>
+                      <span class="text-sm font-semibold text-slate-900 group-hover:text-primary truncate max-w-[200px] block transition-colors">{{ customer.companyName }}</span>
+                    </div>
+                  </td>
+
+                  <!-- Level -->
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span v-if="customer.level"
+                      class="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-bold"
+                      :class="{
+                        'bg-emerald-50 text-emerald-600': customer.level === 'A',
+                        'bg-blue-50 text-blue-600': customer.level === 'B',
+                        'bg-slate-100 text-slate-500': customer.level === 'C'
+                      }"
+                    >{{ customer.level }}级</span>
+                    <span v-else class="text-slate-300">-</span>
+                  </td>
+
+                  <!-- Contact -->
+                  <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                    <div v-if="customer.primaryContactName">
+                      <div>{{ customer.primaryContactName }}</div>
+                      <div v-if="customer.primaryContactPosition" class="text-[10px] text-slate-400">{{ customer.primaryContactPosition }}</div>
+                    </div>
+                    <span v-else class="text-slate-300">-</span>
+                  </td>
+
+                  <!-- Phone -->
+                  <td class="px-6 py-4 text-sm text-slate-600 font-mono whitespace-nowrap">
+                    {{ customer.primaryContactPhone || '-' }}
+                  </td>
+
+                  <!-- Industry -->
+                  <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                    {{ customer.industry || '-' }}
+                  </td>
+
+                  <!-- Stage Badge -->
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      :class="getStageBadgeClass(customer.stage)"
+                    >
+                      <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(customer.stage)"></span>
+                      {{ getStageLabel(customer.stage) }}
+                    </span>
+                  </td>
+
+                  <!-- Quotation -->
+                  <td class="px-6 py-4 text-sm font-medium text-slate-900 whitespace-nowrap">
+                    {{ customer.quotation ? formatMoney(customer.quotation) : '-' }}
+                  </td>
+
+                  <!-- Last Contact -->
+                  <td class="px-6 py-4 text-sm text-slate-500 whitespace-nowrap">
+                    {{ formatRelativeTime(customer.lastContactTime) }}
+                  </td>
+
+                  <!-- Owner -->
+                  <td class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                    <div class="flex items-center gap-2" @click.stop>
+                      <div class="size-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                        {{ customer.ownerName?.charAt(0) || '?' }}
+                      </div>
+                      <el-popover trigger="click" :width="220" @show="loadUserList">
+                        <template #reference>
+                          <span class="cursor-pointer hover:text-primary transition-colors truncate max-w-[100px] inline-block align-middle">{{ customer.ownerName || '-' }}</span>
+                        </template>
+                        <div>
+                          <el-input v-model="ownerSearch" placeholder="搜索用户" size="small" clearable class="mb-2" />
+                          <div class="max-h-48 overflow-auto">
+                            <div
+                              v-for="u in filteredUserList"
+                              :key="u.userId"
+                              class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-100 transition-colors"
+                              :class="{ 'bg-primary/5': String(u.userId) === String(customer.ownerId) }"
+                              @click="handleTransfer(customer, u)"
+                            >
+                              <div class="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0">{{ u.realname?.charAt(0) || '?' }}</div>
+                              <span class="text-sm truncate">{{ u.realname }}</span>
+                              <span v-if="String(u.userId) === String(customer.ownerId)" class="material-symbols-outlined ml-auto text-primary text-sm">check</span>
+                            </div>
+                            <div v-if="filteredUserList.length === 0" class="text-center text-sm text-slate-400 py-3">无匹配用户</div>
+                          </div>
+                        </div>
+                      </el-popover>
+                    </div>
+                  </td>
+
+                  <!-- Custom Fields -->
+                  <td v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                    {{ customer.customFields?.[field.fieldName] ?? '-' }}
+                  </td>
+
+                  <!-- Actions -->
+                  <td class="px-6 py-4 text-right whitespace-nowrap" @click.stop>
+                    <div class="flex items-center justify-end gap-2">
+                      <button
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                        @click="handleAiFollowUp(customer)"
+                      >
+                        <span class="material-symbols-outlined text-sm">smart_toy</span>
+                        AI 跟进
+                      </button>
+                      <button
+                        v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                        @click="handleEdit(customer)"
+                      >
+                        <span class="material-symbols-outlined text-sm">edit</span>
+                        编辑
+                      </button>
+                      <el-dropdown
+                        v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
+                        trigger="click"
+                        size="small"
+                        @command="(stage: string) => handleAdvanceStage(customer.customerId, stage)"
+                      >
+                        <button class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
+                          <span class="material-symbols-outlined text-lg">more_vert</span>
+                        </button>
+                        <template #dropdown>
+                          <el-dropdown-menu>
+                            <el-dropdown-item
+                              v-if="getNextStage(customer.stage)"
+                              :command="getNextStage(customer.stage)"
+                              style="font-weight: bold"
+                            >
+                              推进到「{{ allStageOptions.find(s => s.value === getNextStage(customer.stage))?.label }}」
+                            </el-dropdown-item>
+                            <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
+                            <el-dropdown-item
+                              v-for="opt in allStageOptions.filter(s => s.value !== customer.stage)"
+                              :key="opt.value"
+                              :command="opt.value"
+                            >{{ opt.label }}</el-dropdown-item>
+                          </el-dropdown-menu>
+                        </template>
+                      </el-dropdown>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Empty State -->
+            <div v-if="!customerStore.loading && customerStore.customerList.length === 0" class="text-center py-16">
+              <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
+                <span class="material-symbols-outlined text-4xl">group</span>
+              </div>
+              <p class="text-slate-400 text-sm font-medium">暂无客户数据</p>
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="customerStore.totalCount > 0" class="px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200">
+            <span class="text-xs text-slate-500">
+              共 {{ customerStore.totalCount }} 条客户数据
+            </span>
+            <div class="flex items-center gap-1">
+              <button
+                class="size-8 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50"
+                :disabled="(customerStore.queryParams.page || 1) <= 1"
+                @click="handlePageChange((customerStore.queryParams.page || 1) - 1)"
+              >
+                <span class="material-symbols-outlined text-lg">chevron_left</span>
+              </button>
+              <button
+                v-for="pageNum in visiblePages"
+                :key="pageNum"
+                class="size-8 flex items-center justify-center rounded border text-xs font-bold"
+                :class="pageNum === (customerStore.queryParams.page || 1)
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                @click="handlePageChange(pageNum)"
+              >{{ pageNum }}</button>
+              <span v-if="totalPages > 5" class="px-1 text-slate-400 text-xs">...</span>
+              <button
+                class="size-8 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50"
+                :disabled="(customerStore.queryParams.page || 1) >= totalPages"
+                @click="handlePageChange((customerStore.queryParams.page || 1) + 1)"
+              >
+                <span class="material-symbols-outlined text-lg">chevron_right</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Right: Sidebar - desktop only -->
-      <div v-if="!isMobile" class="w-80 border-l border-gray-200 bg-white overflow-auto flex-shrink-0">
-        <!-- Funnel Chart -->
-        <div class="p-4 border-b border-gray-200">
-          <h3 class="font-medium flex items-center gap-2">
-            <el-icon class="text-primary-500"><DataAnalysis /></el-icon>
-            商机漏斗
-          </h3>
-          <div class="mt-4 space-y-3">
-            <div
-              v-for="stage in funnelStages"
-              :key="stage.value"
-              class="flex items-center gap-2"
-            >
-              <span
-                class="w-2 h-2 rounded-full flex-shrink-0"
-                :style="{ backgroundColor: stage.color }"
-              ></span>
-              <span class="text-sm text-gray-600 flex-1">{{ stage.label }}</span>
-              <span class="text-sm font-medium w-6 text-right">{{ stage.count }}</span>
-              <div class="w-20 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  class="h-full rounded-full transition-all"
-                  :style="{
-                    width: getStagePercentage(stage.count) + '%',
-                    backgroundColor: stage.color
-                  }"
-                ></div>
-              </div>
-            </div>
+      <!-- AI Insight Sidebar -->
+      <div v-if="!isMobile" class="w-80 shrink-0 space-y-4">
+        <div class="flex items-center gap-2 px-1 mb-2">
+          <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI 智能洞察预警</h3>
+          <span class="size-2 rounded-full bg-primary animate-pulse"></span>
+        </div>
+
+        <!-- High Potential Warning -->
+        <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="material-symbols-outlined text-primary text-xl">auto_awesome</span>
+            <h3 class="text-sm font-bold text-slate-900">高潜力客户预警</h3>
+          </div>
+          <p class="text-xs text-slate-500 leading-relaxed">发现 {{ negotiationCount }} 位客户近期成交概率显著提升，建议优先跟进。</p>
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-[10px] font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">{{ negotiationCount }} 位待处理</span>
+            <span class="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-sm">arrow_forward</span>
           </div>
         </div>
 
-        <!-- Recent Activities -->
-        <div class="p-4 border-b border-gray-200">
-          <h3 class="font-medium flex items-center gap-2">
-            <el-icon class="text-orange-500"><Bell /></el-icon>
-            最近动态
-          </h3>
-          <div class="mt-4 space-y-4">
-            <div
-              v-for="(activity, index) in recentActivities"
-              :key="index"
-              class="flex items-start gap-2"
-            >
-              <span
-                class="w-2 h-2 rounded-full mt-2 flex-shrink-0"
-                :class="activity.color"
-              ></span>
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-gray-800 truncate">{{ activity.companyName }}</div>
-                <div class="text-xs text-gray-500 truncate">{{ activity.description }}</div>
-                <div class="text-xs text-gray-400 mt-1">{{ activity.user }} · {{ activity.time }}</div>
-              </div>
-            </div>
-            <div v-if="recentActivities.length === 0" class="text-center text-sm text-gray-400 py-4">
-              暂无动态
-            </div>
+        <!-- Auto Follow-up -->
+        <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="material-symbols-outlined text-indigo-600 text-xl">mark_email_unread</span>
+            <h3 class="text-sm font-bold text-slate-900">自动化跟进生成</h3>
+          </div>
+          <p class="text-xs text-slate-500 leading-relaxed">有 {{ overdueCount }} 个客户超过7天未跟进，建议尽快安排跟进计划。</p>
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ overdueCount }} 个待跟进</span>
+            <span class="material-symbols-outlined text-slate-300 group-hover:text-indigo-600 transition-colors text-sm">arrow_forward</span>
           </div>
         </div>
 
-        <!-- AI Insights -->
-        <div class="p-4">
-          <h3 class="font-medium flex items-center gap-2">
-            <el-icon class="text-primary-500"><MagicStick /></el-icon>
-            AI智能洞察
-          </h3>
-          <div class="mt-4 space-y-3">
-            <div class="p-3 bg-primary-50 rounded-lg text-sm">
-              <div class="text-primary-700 font-medium">客户跟进提醒</div>
-              <div class="text-primary-600 mt-1">有 {{ overdueCount }} 个客户超过7天未跟进，建议尽快安排跟进计划</div>
-            </div>
-            <div class="p-3 bg-green-50 rounded-lg text-sm">
-              <div class="text-green-700 font-medium">成交机会</div>
-              <div class="text-green-600 mt-1">谈判中的客户转化率较高，当前有 {{ negotiationCount }} 个客户处于谈判阶段</div>
-            </div>
+        <!-- Forecast Update -->
+        <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="material-symbols-outlined text-emerald-600 text-xl">insights</span>
+            <h3 class="text-sm font-bold text-slate-900">成交预测更新</h3>
           </div>
+          <p class="text-xs text-slate-500 leading-relaxed">当前成交转化率 {{ conversionRate }}%，共 {{ closedCount }} 个客户已成交。</p>
+          <div class="mt-3 flex items-center justify-between">
+            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ conversionRate }}% 转化率</span>
+            <span class="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors text-sm">arrow_forward</span>
+          </div>
+        </div>
+
+        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
+          <p class="text-[10px] text-slate-400 leading-relaxed text-center italic">
+            AI 助手正在实时分析您的客户数据，预警信息将在此处即时更新。
+          </p>
         </div>
       </div>
     </div>
 
-    <!-- Add/Edit Dialog -->
-    <el-dialog
-      v-model="showAddDialog"
-      :title="editingCustomer ? '编辑客户' : '新建客户'"
-      :width="isMobile ? '95%' : '600px'"
-      :fullscreen="isMobile"
-    >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="80px">
-        <el-form-item label="公司名称" prop="companyName">
-          <el-input v-model="formData.companyName" placeholder="请输入公司名称" />
-        </el-form-item>
-        <el-form-item label="行业" prop="industry">
-          <el-input v-model="formData.industry" placeholder="请输入行业" />
-        </el-form-item>
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="客户级别" prop="level">
-              <el-select v-model="formData.level" class="w-full">
-                <el-option label="A级客户" value="A" />
-                <el-option label="B级客户" value="B" />
-                <el-option label="C级客户" value="C" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="商机阶段" prop="stage">
-              <el-select v-model="formData.stage" class="w-full">
-                <el-option label="线索" value="lead" />
-                <el-option label="资格审查" value="qualified" />
-                <el-option label="方案报价" value="proposal" />
-                <el-option label="谈判中" value="negotiation" />
-                <el-option label="已成交" value="closed" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-divider content-position="left">联系人信息</el-divider>
-        <el-form-item label="联系人" prop="contactName">
-          <el-input v-model="formData.contactName" placeholder="联系人姓名" />
-        </el-form-item>
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="电话" prop="contactPhone">
-              <el-input v-model="formData.contactPhone" placeholder="联系电话" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="邮箱" prop="contactEmail">
-              <el-input v-model="formData.contactEmail" placeholder="邮箱地址" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+    <!-- Add/Edit Modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="showAddDialog" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showAddDialog = false" />
 
-        <!-- Dynamic Custom Fields -->
-        <DynamicFieldForm
-          ref="dynamicFieldFormRef"
-          entity-type="customer"
-          v-model="customFieldValues"
-          title="扩展信息"
-        />
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
-          {{ editingCustomer ? '保存' : '创建' }}
-        </el-button>
-      </template>
-    </el-dialog>
+          <!-- Modal Container -->
+          <div :class="[
+            'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col',
+            isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
+          ]">
+            <!-- Header -->
+            <div class="bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
+              <div class="flex items-center gap-3 sm:gap-4">
+                <div class="size-10 sm:size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                  <span class="material-symbols-outlined">person_add</span>
+                </div>
+                <div>
+                  <h2 class="text-lg sm:text-xl font-bold text-slate-900">{{ editingCustomer ? '编辑客户' : '新增客户' }}</h2>
+                  <p class="text-xs text-slate-500">填写客户基本信息和联系方式</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 sm:gap-3">
+                <button @click="showAddDialog = false" class="px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors">
+                  取消
+                </button>
+                <button @click="handleSubmit" :disabled="submitting" class="px-5 sm:px-8 py-2 sm:py-2.5 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50">
+                  <span v-if="submitting" class="size-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <span v-else class="material-symbols-outlined text-sm">save</span>
+                  {{ editingCustomer ? '保存' : '创建客户' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left Column: Form -->
+                <div class="lg:col-span-7 space-y-5">
+                  <!-- Basic Information -->
+                  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                    <h3 class="text-xs font-bold text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-wider">
+                      <span class="w-1 h-3 bg-primary rounded-full"></span>
+                      基础信息
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                      <div class="md:col-span-2 space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">公司名称 <span class="text-red-400">*</span></label>
+                        <input
+                          v-model="formData.companyName"
+                          placeholder="请输入公司全称"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        />
+                      </div>
+                      <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">所属行业</label>
+                        <input
+                          v-model="formData.industry"
+                          placeholder="例如：互联网 / 科技"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        />
+                      </div>
+                      <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">客户级别</label>
+                        <select
+                          v-model="formData.level"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none"
+                        >
+                          <option value="A">A级客户</option>
+                          <option value="B">B级客户</option>
+                          <option value="C">C级客户</option>
+                        </select>
+                      </div>
+                      <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">商机阶段</label>
+                        <select
+                          v-model="formData.stage"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none"
+                        >
+                          <option value="lead">线索</option>
+                          <option value="qualified">资格审查</option>
+                          <option value="proposal">方案报价</option>
+                          <option value="negotiation">谈判中</option>
+                          <option value="closed">已成交</option>
+                        </select>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Contact Information -->
+                  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                    <h3 class="text-xs font-bold text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-wider">
+                      <span class="w-1 h-3 bg-indigo-500 rounded-full"></span>
+                      联系人信息
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                      <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">主要联系人</label>
+                        <input
+                          v-model="formData.contactName"
+                          placeholder="请输入联系人姓名"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        />
+                      </div>
+                      <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">手机号码</label>
+                        <input
+                          v-model="formData.contactPhone"
+                          placeholder="请输入联系电话"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        />
+                      </div>
+                      <div class="space-y-1.5 md:col-span-2">
+                        <label class="text-[10px] font-bold text-slate-500 uppercase ml-1">电子邮箱</label>
+                        <input
+                          v-model="formData.contactEmail"
+                          placeholder="请输入邮箱地址"
+                          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Dynamic Custom Fields -->
+                  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+                    <DynamicFieldForm
+                      ref="dynamicFieldFormRef"
+                      entity-type="customer"
+                      v-model="customFieldValues"
+                      title="扩展信息"
+                    />
+                  </section>
+                </div>
+
+                <!-- Right Column: AI Placeholder + Tips -->
+                <div class="lg:col-span-5 space-y-5" :class="{ 'hidden': isMobile }">
+                  <!-- AI Waiting Placeholder -->
+                  <div class="bg-white rounded-2xl border border-slate-200 border-dashed p-8 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center">
+                    <div class="size-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto">
+                      <span class="material-symbols-outlined text-slate-300 text-2xl">psychology</span>
+                    </div>
+                    <div>
+                      <h4 class="text-xs font-bold text-slate-900">AI 智能分析</h4>
+                      <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        保存客户后，AI 将自动为您提供<br/>客户洞察与跟进建议。
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Quick Tips -->
+                  <div class="p-5 bg-primary/5 rounded-2xl border border-primary/10">
+                    <h4 class="text-[10px] font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <span class="material-symbols-outlined text-sm">lightbulb</span>
+                      小提示
+                    </h4>
+                    <p class="text-[10px] text-slate-600 leading-relaxed">
+                      创建客户后，您可以在 AI 助手中使用智能跟进功能，自动生成拜访记录和跟进计划。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- Import Dialog -->
     <el-dialog
@@ -617,14 +513,14 @@
           :on-change="handleImportFileChange"
           drag
         >
-          <el-icon class="text-4xl text-gray-400 mb-2"><Upload /></el-icon>
-          <div class="text-gray-600">将 Excel 文件拖到此处，或<em class="text-primary-500">点击上传</em></div>
+          <span class="material-symbols-outlined text-4xl text-slate-400 mb-2">upload_file</span>
+          <div class="text-slate-600">将 Excel 文件拖到此处，或<em class="text-primary">点击上传</em></div>
           <template #tip>
-            <div class="text-xs text-gray-400 mt-2">支持 .xlsx / .xls 格式，表头需包含「公司名称」列</div>
+            <div class="text-xs text-slate-400 mt-2">支持 .xlsx / .xls 格式，表头需包含「公司名称」列</div>
             <div class="mt-2">
-              <el-button type="primary" link size="small" @click.stop="handleDownloadTemplate">
-                <el-icon class="mr-1"><Download /></el-icon>下载导入模板
-              </el-button>
+              <button class="text-primary text-sm font-medium hover:underline" @click.stop="handleDownloadTemplate">
+                下载导入模板
+              </button>
             </div>
           </template>
         </el-upload>
@@ -632,15 +528,13 @@
 
       <!-- Step 2: Preview -->
       <div v-if="importStep === 2">
-        <!-- Statistics -->
         <div class="flex gap-4 mb-4 flex-wrap">
-          <el-tag>总计 {{ importPreview!.totalRows }} 行</el-tag>
-          <el-tag type="success">有效 {{ importPreview!.validRows }} 行</el-tag>
-          <el-tag v-if="importPreview!.duplicateRows > 0" type="warning">重复 {{ importPreview!.duplicateRows }} 行</el-tag>
-          <el-tag v-if="importPreview!.errorRows > 0" type="danger">错误 {{ importPreview!.errorRows }} 行</el-tag>
+          <span class="text-xs font-bold px-2 py-1 bg-slate-100 rounded">总计 {{ importPreview!.totalRows }} 行</span>
+          <span class="text-xs font-bold px-2 py-1 bg-emerald-50 text-emerald-600 rounded">有效 {{ importPreview!.validRows }} 行</span>
+          <span v-if="importPreview!.duplicateRows > 0" class="text-xs font-bold px-2 py-1 bg-amber-50 text-amber-600 rounded">重复 {{ importPreview!.duplicateRows }} 行</span>
+          <span v-if="importPreview!.errorRows > 0" class="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded">错误 {{ importPreview!.errorRows }} 行</span>
         </div>
 
-        <!-- Global duplicate handling -->
         <div v-if="importPreview!.duplicateRows > 0" class="mb-4 p-3 bg-yellow-50 rounded-lg">
           <span class="text-sm text-yellow-700 mr-3">重复行统一处理：</span>
           <el-radio-group v-model="globalDuplicateMode" @change="applyGlobalDuplicateMode">
@@ -649,7 +543,6 @@
           </el-radio-group>
         </div>
 
-        <!-- Data table -->
         <el-table
           :data="importPreview!.rows"
           :max-height="400"
@@ -665,21 +558,18 @@
           <el-table-column label="联系人" prop="contactName" width="90" />
           <el-table-column label="状态" width="150">
             <template #default="{ row }">
-              <el-tag v-if="row.errors && row.errors.length > 0" type="danger" size="small">
-                {{ row.errors[0] }}
-              </el-tag>
+              <span v-if="row.errors && row.errors.length > 0" class="text-xs font-bold px-2 py-0.5 bg-red-50 text-red-600 rounded">{{ row.errors[0] }}</span>
               <template v-else-if="row.duplicate">
                 <el-radio-group v-model="row.handleMode" size="small">
                   <el-radio value="skip">跳过</el-radio>
                   <el-radio value="overwrite">覆盖</el-radio>
                 </el-radio-group>
               </template>
-              <el-tag v-else type="success" size="small">正常</el-tag>
+              <span v-else class="text-xs font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">正常</span>
             </template>
           </el-table-column>
         </el-table>
 
-        <!-- Global errors -->
         <div v-if="importPreview!.errors && importPreview!.errors.length > 0" class="mt-3">
           <el-alert
             v-for="(err, idx) in importPreview!.errors"
@@ -694,12 +584,12 @@
 
       <!-- Step 3: Result -->
       <div v-if="importStep === 3" class="text-center py-6">
-        <el-icon class="text-5xl text-green-500 mb-3"><Select /></el-icon>
-        <h3 class="text-lg font-medium mb-4">导入完成</h3>
+        <span class="material-symbols-outlined text-5xl text-green-500 mb-3">check_circle</span>
+        <h3 class="text-lg font-bold mb-4">导入完成</h3>
         <div class="flex justify-center gap-6 text-sm">
-          <div>新增 <span class="text-primary-600 font-bold text-lg">{{ importResult!.imported }}</span> 条</div>
+          <div>新增 <span class="text-primary font-bold text-lg">{{ importResult!.imported }}</span> 条</div>
           <div>更新 <span class="text-orange-500 font-bold text-lg">{{ importResult!.updated }}</span> 条</div>
-          <div>跳过 <span class="text-gray-500 font-bold text-lg">{{ importResult!.skipped }}</span> 条</div>
+          <div>跳过 <span class="text-slate-500 font-bold text-lg">{{ importResult!.skipped }}</span> 条</div>
         </div>
         <div v-if="importResult!.errors && importResult!.errors.length > 0" class="mt-4 text-left">
           <el-alert
@@ -716,81 +606,53 @@
       <template #footer>
         <template v-if="importStep === 1">
           <el-button @click="showImportDialog = false">取消</el-button>
-          <el-button type="primary" :loading="importLoading" :disabled="!importFile" @click="handleImportPreview">
-            解析文件
-          </el-button>
+          <el-button type="primary" :loading="importLoading" :disabled="!importFile" @click="handleImportPreview">解析文件</el-button>
         </template>
         <template v-else-if="importStep === 2">
           <el-button @click="importStep = 1">上一步</el-button>
-          <el-button type="primary" :loading="importLoading" @click="handleImportConfirm">
-            确认导入
-          </el-button>
+          <el-button type="primary" :loading="importLoading" @click="handleImportConfirm">确认导入</el-button>
         </template>
         <template v-else>
           <el-button type="primary" @click="showImportDialog = false">完成</el-button>
         </template>
       </template>
     </el-dialog>
+
+    <!-- AI Follow-up Drawer -->
+    <AiFollowUpDrawer
+      v-model="showAiFollowUpDrawer"
+      :customer="aiFollowUpCustomer"
+      @saved="handleAiFollowUpSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
-import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
-import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadInstance, UploadFile } from 'element-plus'
-import {
-  Plus,
-  Search,
-  Filter,
-  User,
-  Calendar,
-  OfficeBuilding,
-  ArrowRight,
-  TrendCharts,
-  Coin,
-  Aim,
-  DataAnalysis,
-  Bell,
-  MagicStick,
-  Document,
-  Edit,
-  Loading,
-  Select,
-  Download,
-  Upload,
-  Grid,
-  Tickets,
-  Phone
-} from '@element-plus/icons-vue'
-import type { CustomerListVO, CustomerAddBO, CustomerStage, CustomerImportPreview, CustomerImportRow, CustomerImportResult } from '@/types/customer'
+import type { CustomerListVO, CustomerAddBO, CustomerImportPreview, CustomerImportRow, CustomerImportResult } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { transferCustomer, updateCustomerStage, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
+import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 
 const router = useRouter()
 const customerStore = useCustomerStore()
-const userStore = useUserStore()
 const { isMobile } = useResponsive()
 
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)
 const submitting = ref(false)
-const formRef = ref<FormInstance>()
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
 const customFieldValues = ref<Record<string, any>>({})
 const listCustomFields = ref<CustomField[]>([])
-const viewMode = ref<'card' | 'table'>('card')
-const currentStage = ref('')
 const statistics = ref<any>(null)
-const loadMoreTrigger = ref<HTMLElement>()
-const scrollContainer = ref<HTMLElement>()
-let observer: IntersectionObserver | null = null
 
 // Import/Export state
 const exporting = ref(false)
@@ -802,6 +664,19 @@ const importPreview = ref<CustomerImportPreview | null>(null)
 const importResult = ref<CustomerImportResult | null>(null)
 const globalDuplicateMode = ref('')
 const importUploadRef = ref<UploadInstance>()
+
+// AI Follow-up Drawer
+const showAiFollowUpDrawer = ref(false)
+const aiFollowUpCustomer = ref<CustomerListVO | null>(null)
+
+function handleAiFollowUp(customer: CustomerListVO) {
+  aiFollowUpCustomer.value = customer
+  showAiFollowUpDrawer.value = true
+}
+
+function handleAiFollowUpSaved() {
+  customerStore.fetchCustomerList(true)
+}
 
 // Owner transfer
 const userList = ref<any[]>([])
@@ -826,75 +701,41 @@ const formData = reactive<CustomerAddBO>({
   contactEmail: ''
 })
 
-const formRules: FormRules = {
-  companyName: [{ required: true, message: '请输入公司名称', trigger: 'blur' }]
-}
 
-// Stage color mapping
-const stageColors: Record<string, string> = {
-  lead: '#6b7280',
-  qualified: '#3b82f6',
-  proposal: '#f59e0b',
-  negotiation: '#8b5cf6',
-  closed: '#22c55e',
-  lost: '#ef4444'
-}
-
-// Computed: Stage tabs with counts
-const stageTabs = computed(() => {
-  const counts = getStageCounts()
-  return [
-    { value: '', label: '全部', count: customerStore.totalCount },
-    { value: 'lead', label: '线索', count: counts.lead },
-    { value: 'qualified', label: '资格审查', count: counts.qualified },
-    { value: 'proposal', label: '方案报价', count: counts.proposal },
-    { value: 'negotiation', label: '谈判中', count: counts.negotiation },
-    { value: 'closed', label: '已成交', count: counts.closed },
-    { value: 'lost', label: '已流失', count: counts.lost }
-  ]
+// Pagination
+const totalPages = computed(() => {
+  return Math.ceil(customerStore.totalCount / (customerStore.queryParams.limit || 10))
 })
 
-// Computed: Funnel stages for sidebar
-const funnelStages = computed(() => {
-  const counts = getStageCounts()
-  return [
-    { value: 'lead', label: '线索', count: counts.lead, color: stageColors.lead },
-    { value: 'qualified', label: '资格审查', count: counts.qualified, color: stageColors.qualified },
-    { value: 'proposal', label: '方案报价', count: counts.proposal, color: stageColors.proposal },
-    { value: 'negotiation', label: '谈判中', count: counts.negotiation, color: stageColors.negotiation },
-    { value: 'closed', label: '已成交', count: counts.closed, color: stageColors.closed },
-    { value: 'lost', label: '已流失', count: counts.lost, color: stageColors.lost }
-  ]
+const visiblePages = computed(() => {
+  const total = totalPages.value
+  const current = customerStore.queryParams.page || 1
+  const pages: number[] = []
+  const maxVisible = 5
+  let start = Math.max(1, current - Math.floor(maxVisible / 2))
+  const end = Math.min(total, start + maxVisible - 1)
+  start = Math.max(1, end - maxVisible + 1)
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
 })
 
-// Computed: Total quotation
-const totalQuotation = computed(() => {
-  return customerStore.customerList.reduce((sum, c) => sum + (c.quotation || 0), 0)
-})
-
-// Computed: Total revenue
-const totalRevenue = computed(() => {
-  return statistics.value?.totalRevenue || customerStore.customerList.reduce((sum, c) => sum + (c.revenue || 0), 0)
-})
-
-// Computed: Closed count
+// Computed
 const closedCount = computed(() => {
   return customerStore.customerList.filter(c => c.stage === 'closed').length
 })
 
-// Computed: Conversion rate
 const conversionRate = computed(() => {
   const total = customerStore.totalCount
   if (total === 0) return '0.0'
   return ((closedCount.value / total) * 100).toFixed(1)
 })
 
-// Computed: Negotiation count
 const negotiationCount = computed(() => {
   return customerStore.customerList.filter(c => c.stage === 'negotiation').length
 })
 
-// Computed: Overdue count (customers not contacted in 7 days)
 const overdueCount = computed(() => {
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
@@ -904,66 +745,7 @@ const overdueCount = computed(() => {
   }).length
 })
 
-// Computed: Recent activities (mock data based on customers)
-const recentActivities = computed(() => {
-  return customerStore.customerList.slice(0, 3).map((c, i) => ({
-    companyName: c.companyName,
-    description: `联系人${c.primaryContactName || '未知'} - ${getActivityType(i)}`,
-    user: c.ownerName || '系统',
-    time: formatRelativeTime(c.lastContactTime),
-    color: i === 0 ? 'bg-green-500' : i === 1 ? 'bg-blue-500' : 'bg-orange-500'
-  }))
-})
-
-// Helper: Get stage counts from statistics or customer list
-function getStageCounts() {
-  if (statistics.value?.customersByStage) {
-    const counts: Record<string, number> = {
-      lead: 0, qualified: 0, proposal: 0, negotiation: 0, closed: 0, lost: 0
-    }
-    statistics.value.customersByStage.forEach((s: any) => {
-      counts[s.stage] = s.count
-    })
-    return counts
-  }
-  // Fallback: count from current list (may not be accurate for filtered data)
-  const counts: Record<string, number> = {
-    lead: 0, qualified: 0, proposal: 0, negotiation: 0, closed: 0, lost: 0
-  }
-  customerStore.customerList.forEach(c => {
-    if (c.stage && counts[c.stage] !== undefined) {
-      counts[c.stage]++
-    }
-  })
-  return counts
-}
-
-// Helper: Get activity type text
-function getActivityType(index: number): string {
-  const types = ['提交了产品方案', '完成了产品演示', '签署了合作合同']
-  return types[index % types.length]
-}
-
-// Setup IntersectionObserver for infinite scroll
-function setupObserver() {
-  observer?.disconnect()
-  if (loadMoreTrigger.value) {
-    observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && customerStore.hasMore && !customerStore.loading) {
-        customerStore.loadMore()
-      }
-    }, { threshold: 0.1 })
-    observer.observe(loadMoreTrigger.value)
-  }
-}
-
-// Re-observe when the trigger element appears/disappears
-watch(() => customerStore.hasMore, () => {
-  nextTick(() => setupObserver())
-})
-
 onMounted(async () => {
-  // Load custom fields that should be shown in list
   try {
     const allFields = await getEnabledFieldsByEntity('customer')
     listCustomFields.value = allFields.filter(f => f.isShowInList)
@@ -971,21 +753,14 @@ onMounted(async () => {
     // Error handled by interceptor
   }
 
-  // Load statistics
   try {
     await customerStore.fetchStatistics()
     statistics.value = customerStore.statistics
   } catch {
-    // Statistics loading failed, continue with list
+    // Statistics loading failed
   }
 
   await customerStore.fetchCustomerList(true)
-  nextTick(() => setupObserver())
-})
-
-onUnmounted(() => {
-  observer?.disconnect()
-  observer = null
 })
 
 function handleSearch() {
@@ -994,24 +769,10 @@ function handleSearch() {
 }
 
 function handlePageChange(page: number) {
+  if (page < 1 || page > totalPages.value) return
   if (customerStore.queryParams.page === page) return
   customerStore.queryParams.page = page
-  customerStore.fetchCustomerList(false)  // Replace with current page data
-  scrollContainer.value?.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function handleSizeChange(size: number) {
-  customerStore.queryParams.limit = size
-  customerStore.queryParams.page = 1
-  customerStore.fetchCustomerList(false)  // Replace with new page
-  scrollContainer.value?.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function handleStageFilter(stage: string) {
-  currentStage.value = stage
-  customerStore.queryParams.stage = (stage || undefined) as CustomerStage | undefined
-  customerStore.queryParams.page = 1
-  customerStore.fetchCustomerList(true)
+  customerStore.fetchCustomerList(false)
 }
 
 function handleRowClick(row: CustomerListVO) {
@@ -1034,10 +795,11 @@ function handleEdit(row: CustomerListVO) {
 }
 
 async function handleSubmit() {
-  if (!formRef.value) return
-  await formRef.value.validate()
+  if (!formData.companyName?.trim()) {
+    ElMessage.warning('请输入公司名称')
+    return
+  }
 
-  // Validate custom fields
   if (dynamicFieldFormRef.value) {
     const missingFields = dynamicFieldFormRef.value.getRequiredFieldLabels()
     if (missingFields.length > 0) {
@@ -1083,15 +845,6 @@ function resetForm() {
   customFieldValues.value = {}
 }
 
-function getLevelType(level: string): 'success' | 'primary' | 'info' {
-  switch (level) {
-    case 'A': return 'success'
-    case 'B': return 'primary'
-    case 'C': return 'info'
-    default: return 'info'
-  }
-}
-
 function getStageLabel(stage: string): string {
   const labels: Record<string, string> = {
     lead: '线索',
@@ -1104,8 +857,28 @@ function getStageLabel(stage: string): string {
   return labels[stage] || stage
 }
 
-function getStageColor(stage: string): string {
-  return stageColors[stage] || '#6b7280'
+function getStageBadgeClass(stage: string): string {
+  const classes: Record<string, string> = {
+    lead: 'bg-slate-100 text-slate-800',
+    qualified: 'bg-blue-100 text-blue-800',
+    proposal: 'bg-amber-100 text-amber-800',
+    negotiation: 'bg-purple-100 text-purple-800',
+    closed: 'bg-green-100 text-green-800',
+    lost: 'bg-red-100 text-red-800'
+  }
+  return classes[stage] || 'bg-slate-100 text-slate-800'
+}
+
+function getStageDotClass(stage: string): string {
+  const classes: Record<string, string> = {
+    lead: 'bg-slate-400',
+    qualified: 'bg-blue-500',
+    proposal: 'bg-amber-500',
+    negotiation: 'bg-purple-500',
+    closed: 'bg-green-500',
+    lost: 'bg-red-500'
+  }
+  return classes[stage] || 'bg-slate-400'
 }
 
 const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
@@ -1135,12 +908,6 @@ async function handleAdvanceStage(customerId: string, newStage: string) {
   }
 }
 
-function getStagePercentage(count: number): number {
-  const total = customerStore.totalCount
-  if (total === 0) return 0
-  return Math.min(100, (count / total) * 100)
-}
-
 function formatMoney(value: number | undefined): string {
   if (!value) return '¥0'
   if (value >= 10000) {
@@ -1149,7 +916,17 @@ function formatMoney(value: number | undefined): string {
   return `¥${value.toLocaleString()}`
 }
 
-function formatDate(dateStr: string): string {
+function formatRelativeTime(dateStr: string | undefined): string {
+  if (!dateStr) return '暂无'
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+
+  if (diff < 0) return '刚刚'
+  if (diff < 1) return '刚刚'
+  if (diff < 24) return `${diff}小时前`
+  const days = Math.floor(diff / 24)
+  if (days < 30) return `${days}天前`
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
@@ -1178,20 +955,6 @@ async function handleTransfer(customer: CustomerListVO, user: any) {
   } catch {
     // Cancelled or error handled
   }
-}
-
-function formatRelativeTime(dateStr: string | undefined): string {
-  if (!dateStr) return '暂无'
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-
-  if (diff < 0) return '刚刚'
-  if (diff < 1) return '刚刚'
-  if (diff < 24) return `${diff}小时前`
-  const days = Math.floor(diff / 24)
-  if (days < 30) return `${days}天前`
-  return formatDate(dateStr)
 }
 
 // ==================== Import / Export ====================
@@ -1247,7 +1010,6 @@ async function handleImportPreview() {
   try {
     importPreview.value = await importCustomerPreview(importFile.value)
     importStep.value = 2
-    // Default duplicate handling to 'skip'
     if (importPreview.value.rows) {
       importPreview.value.rows.forEach(row => {
         if (row.duplicate && !row.handleMode) {
@@ -1283,7 +1045,6 @@ async function handleImportConfirm() {
   try {
     importResult.value = await confirmCustomerImport(importPreview.value.rows)
     importStep.value = 3
-    // Refresh customer list
     await customerStore.fetchCustomerList(true)
     try { await customerStore.fetchStatistics(); statistics.value = customerStore.statistics } catch { /* ignore */ }
   } catch {

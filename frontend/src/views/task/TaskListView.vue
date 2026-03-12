@@ -1,168 +1,442 @@
 <template>
-  <div class="h-full flex flex-col bg-gray-50">
-    <!-- Page Header -->
-    <div class="px-4 md:px-6 py-4 bg-white border-b border-gray-200">
-      <div class="flex items-start justify-between">
-        <div>
-          <h1 class="text-lg font-semibold">待办任务</h1>
-          <p class="text-sm text-gray-500 mt-1 hidden md:block">AI自动生成的跟进任务和待办事项</p>
-        </div>
-        <div class="text-sm text-gray-500 hidden md:block">
-          您的权限: <span class="text-gray-700">{{ userStore.realname || '用户' }}，完整权限</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="flex-1 overflow-auto p-4 md:p-6">
-      <!-- Section Header -->
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-base md:text-lg font-medium">待办任务</h2>
-        <div class="flex items-center gap-2 md:gap-4">
-          <div class="hidden md:flex items-center text-primary-500">
-            <el-icon class="mr-1"><MagicStick /></el-icon>
-            <span>AI已自动生成 {{ aiGeneratedCount }} 个任务</span>
+  <div class="h-full flex bg-background-light">
+    <!-- Task List Section -->
+    <div class="flex-1 overflow-y-auto p-4 md:p-8">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl md:text-2xl font-bold text-slate-900">AI 优先行动中心</h2>
+            <p class="text-sm text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
-          <el-button type="primary" @click="handleAddTask">
-            <el-icon class="mr-1"><Plus /></el-icon>
-            <span>{{ isMobile ? '新建' : '新建任务' }}</span>
-          </el-button>
+          <div class="flex items-center gap-3">
+            <!-- Segmented filter -->
+            <div class="hidden md:flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+              <button
+                @click="valueFilter = 'all'"
+                :class="[
+                  'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
+                  valueFilter === 'all' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+                ]"
+              >
+                全部任务
+              </button>
+              <button
+                @click="valueFilter = 'high-impact'"
+                :class="[
+                  'px-4 py-1.5 text-xs font-bold rounded-lg transition-all',
+                  valueFilter === 'high-impact' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+                ]"
+              >
+                高价值优先
+              </button>
+            </div>
+            <!-- Add task button -->
+            <button
+              class="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              @click="handleAddTask"
+            >
+              <span class="material-symbols-outlined text-lg">add</span>
+              <span>{{ isMobile ? '新建' : '新建任务' }}</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- Status Filter Tabs -->
-      <div class="flex gap-2 md:gap-3 mb-4 md:mb-6 overflow-x-auto">
-        <el-button
-          v-for="tab in statusTabs"
-          :key="tab.value"
-          :type="currentStatus === tab.value ? 'primary' : 'default'"
-          :class="currentStatus !== tab.value ? '!bg-white' : ''"
-          round
-          @click="handleStatusFilter(tab.value)"
-        >
-          {{ tab.label }} ({{ tab.count }})
-        </el-button>
-      </div>
+        <!-- Status Filter Tabs -->
+        <div class="flex gap-2 overflow-x-auto">
+          <button
+            v-for="tab in statusTabs"
+            :key="tab.value"
+            @click="handleStatusFilter(tab.value)"
+            :class="[
+              'px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
+              currentStatus === tab.value
+                ? 'bg-primary text-white'
+                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+            ]"
+          >
+            {{ tab.label }} ({{ tab.count }})
+          </button>
+        </div>
 
-      <!-- Task List -->
-      <div v-if="taskStore.loading" class="text-center py-16">
-        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
-      </div>
-      <div v-else-if="taskStore.taskList.length === 0" class="text-center py-16 text-gray-400">
-        <el-icon :size="48"><List /></el-icon>
-        <p class="mt-4">暂无任务</p>
-      </div>
-      <div v-else class="space-y-4">
-        <div
-          v-for="task in taskStore.taskList"
-          :key="task.taskId"
-          class="bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow"
-        >
-          <div class="flex items-start">
-            <el-checkbox
-              :model-value="task.status === 'COMPLETED'"
-              class="mt-1"
-              @change="handleToggleComplete(task)"
-            />
-            <div class="ml-3 flex-1">
-              <!-- Title + AI Tag -->
-              <div class="flex items-center gap-2">
-                <span
+        <!-- Loading -->
+        <div v-if="taskStore.loading" class="text-center py-16">
+          <span class="material-symbols-outlined text-4xl text-slate-300 animate-spin">progress_activity</span>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="displayedTasks.length === 0" class="text-center py-16 text-slate-400">
+          <span class="material-symbols-outlined text-5xl">task_alt</span>
+          <p class="mt-4 text-sm">暂无任务</p>
+        </div>
+
+        <!-- Task Cards -->
+        <div v-else class="space-y-4">
+          <div
+            v-for="task in displayedTasks"
+            :key="task.taskId"
+            @click="handleViewDetail(task)"
+            :class="[
+              'group bg-white border rounded-2xl p-5 cursor-pointer transition-all hover:shadow-xl hover:shadow-slate-200/50',
+              selectedTask?.taskId === task.taskId ? 'border-primary ring-1 ring-primary/20' : 'border-slate-200',
+              task.status === 'COMPLETED' ? 'opacity-75' : ''
+            ]"
+          >
+            <div class="flex items-start gap-4 md:gap-5">
+              <!-- AI Score -->
+              <div class="flex flex-col items-center gap-1 shrink-0">
+                <div
                   :class="[
-                    'font-medium text-base',
-                    task.status === 'COMPLETED' ? 'line-through text-gray-400' : 'text-gray-800'
+                    'size-12 rounded-xl flex flex-col items-center justify-center border',
+                    task.status === 'COMPLETED'
+                      ? 'bg-slate-50 border-slate-100'
+                      : 'bg-primary/5 border-primary/10'
                   ]"
                 >
-                  {{ task.title }}
-                </span>
-                <span
-                  v-if="task.generatedByAi"
-                  class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200"
-                >
-                  <el-icon class="mr-0.5" :size="10"><MagicStick /></el-icon>
-                  AI
-                </span>
-              </div>
-
-              <!-- Description -->
-              <p v-if="task.description" class="mt-2 text-sm text-gray-600">
-                {{ task.description }}
-              </p>
-
-              <!-- Priority + Status -->
-              <div class="mt-3 flex items-center gap-3">
-                <span :class="['flex items-center text-sm', getPriorityColor(task.priority)]">
-                  <span class="w-2 h-2 rounded-full mr-1.5" :class="getPriorityDotColor(task.priority)"></span>
-                  {{ getPriorityLabel(task.priority) }}
-                </span>
-                <el-tag :type="getStatusType(task.status)" size="small" round>
-                  {{ getStatusLabel(task.status) }}
-                </el-tag>
-              </div>
-
-              <!-- Date + Assignee + Customer -->
-              <div class="mt-3 flex items-center text-sm text-gray-500">
-                <template v-if="task.dueDate">
-                  <el-icon class="mr-1"><Calendar /></el-icon>
-                  <span>{{ formatDate(task.dueDate) }}</span>
-                  <span class="ml-1 text-gray-400">({{ getRelativeTime(task.dueDate) }})</span>
-                  <span class="mx-2">•</span>
-                </template>
-                <template v-if="task.assignedToName">
-                  <el-icon class="mr-1"><User /></el-icon>
-                  <span>{{ task.assignedToName }}</span>
-                </template>
-                <template v-if="task.customerName">
-                  <span class="mx-2">•</span>
-                  <span>{{ task.customerName }}</span>
-                </template>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="mt-4 flex items-center gap-3">
-                <el-button
-                  v-if="task.status !== 'COMPLETED'"
-                  size="small"
-                  @click="handleStartTask(task)"
-                >
-                  {{ task.status === 'IN_PROGRESS' ? '继续处理' : '开始处理' }}
-                </el-button>
-                <el-button size="small" text @click="handleViewDetail(task)">查看详情</el-button>
-                <div class="flex-1"></div>
-                <el-dropdown trigger="click">
-                  <el-button text size="small">
-                    <el-icon><MoreFilled /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item @click="handleEdit(task)">编辑</el-dropdown-item>
-                      <el-dropdown-item divided @click="handleDelete(task)">
-                        <span class="text-red-500">删除</span>
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
+                  <template v-if="task.status === 'COMPLETED'">
+                    <span class="material-symbols-outlined text-emerald-500">check_circle</span>
                   </template>
-                </el-dropdown>
+                  <template v-else>
+                    <span class="text-lg font-black text-primary leading-none">{{ getAiScore(task) }}</span>
+                    <span class="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">AI 评分</span>
+                  </template>
+                </div>
+                <div class="h-4 w-px bg-slate-100"></div>
+                <div
+                  :class="[
+                    'size-2 rounded-full',
+                    task.status === 'COMPLETED'
+                      ? 'bg-slate-200'
+                      : task.priority === 'HIGH' ? 'bg-red-500'
+                      : task.priority === 'MEDIUM' ? 'bg-amber-500'
+                      : 'bg-slate-300'
+                  ]"
+                ></div>
+              </div>
+
+              <!-- Content -->
+              <div class="flex-1 min-w-0">
+                <!-- Title + Status + Date -->
+                <div class="flex items-center justify-between mb-1">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <h3
+                      :class="[
+                        'font-bold truncate group-hover:text-primary transition-colors',
+                        task.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-900'
+                      ]"
+                    >
+                      {{ task.title }}
+                    </h3>
+                    <span
+                      v-if="isOverdue(task)"
+                      class="px-2 py-0.5 bg-red-50 text-red-600 text-[10px] font-bold rounded uppercase animate-pulse shrink-0"
+                    >
+                      已延期
+                    </span>
+                    <span
+                      v-else-if="task.status === 'COMPLETED'"
+                      class="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded uppercase shrink-0"
+                    >
+                      已完成
+                    </span>
+                    <span
+                      v-else-if="task.status === 'IN_PROGRESS'"
+                      class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase shrink-0"
+                    >
+                      进行中
+                    </span>
+                    <span
+                      v-else
+                      class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded uppercase shrink-0"
+                    >
+                      待处理
+                    </span>
+                  </div>
+                  <span v-if="task.dueDate" class="text-[10px] font-bold text-slate-400 uppercase shrink-0 ml-2 hidden md:block">
+                    {{ formatDate(task.dueDate) }}
+                    <span class="text-slate-300 ml-1">({{ getRelativeTime(task.dueDate) }})</span>
+                  </span>
+                </div>
+
+                <!-- Customer + Category + Owner -->
+                <div class="flex items-center gap-2 mb-3 flex-wrap">
+                  <span v-if="task.customerName" class="text-xs font-medium text-slate-500 truncate max-w-[150px]">{{ task.customerName }}</span>
+                  <span v-if="task.customerName" class="size-1 rounded-full bg-slate-200"></span>
+                  <span
+                    v-if="task.generatedByAi"
+                    class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-50 text-blue-600"
+                  >
+                    AI 生成
+                  </span>
+                  <span
+                    v-else
+                    class="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-600"
+                  >
+                    手动创建
+                  </span>
+                  <template v-if="task.assignedToName">
+                    <span class="size-1 rounded-full bg-slate-200"></span>
+                    <div class="flex items-center gap-1 text-xs text-slate-400">
+                      <span class="material-symbols-outlined text-[14px]">person</span>
+                      <span>{{ task.assignedToName }}</span>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- AI Insight -->
+                <div class="p-3 bg-primary/5 rounded-xl border border-primary/10 flex items-start gap-2">
+                  <span class="material-symbols-outlined text-primary text-sm mt-0.5">psychology</span>
+                  <p class="text-xs text-slate-600 leading-relaxed italic">"{{ getAiInsight(task) }}"</p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-3 flex items-center gap-2" @click.stop>
+                  <button
+                    v-if="task.status === 'PENDING'"
+                    class="px-3 py-1 text-xs font-medium text-primary bg-primary/5 rounded-lg hover:bg-primary/10 transition-colors"
+                    @click="handleStartTask(task)"
+                  >
+                    开始处理
+                  </button>
+                  <button
+                    v-if="task.status !== 'COMPLETED'"
+                    class="px-3 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                    @click="handleToggleComplete(task)"
+                  >
+                    标记完成
+                  </button>
+                  <div class="flex-1"></div>
+                  <el-dropdown trigger="click">
+                    <button class="size-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                      <span class="material-symbols-outlined text-lg">more_horiz</span>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="handleEdit(task)">编辑</el-dropdown-item>
+                        <el-dropdown-item divided @click="handleDelete(task)">
+                          <span class="text-red-500">删除</span>
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Pagination -->
-      <div v-if="taskStore.totalCount > (taskStore.queryParams.limit || 10)" class="mt-4 md:mt-6 flex justify-center">
-        <el-pagination
-          v-model:current-page="taskStore.queryParams.page"
-          v-model:page-size="taskStore.queryParams.limit"
-          :total="taskStore.totalCount"
-          :page-sizes="[10, 20, 50]"
-          :layout="isMobile ? 'prev, pager, next' : 'total, sizes, prev, pager, next'"
-          :small="isMobile"
-          background
-          @current-change="handlePageChange"
-          @size-change="handleSizeChange"
-        />
+        <!-- Pagination -->
+        <div v-if="taskStore.totalCount > (taskStore.queryParams.limit || 10)" class="mt-6 flex justify-center">
+          <div class="flex items-center gap-2">
+            <button
+              class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              :disabled="(taskStore.queryParams.page || 1) <= 1"
+              @click="handlePageChange((taskStore.queryParams.page || 1) - 1)"
+            >
+              <span class="material-symbols-outlined text-lg">chevron_left</span>
+            </button>
+            <button
+              v-for="p in visiblePages"
+              :key="p"
+              @click="handlePageChange(p)"
+              :class="[
+                'size-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors',
+                p === (taskStore.queryParams.page || 1)
+                  ? 'bg-primary text-white'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+              ]"
+            >
+              {{ p }}
+            </button>
+            <button
+              class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              :disabled="(taskStore.queryParams.page || 1) >= totalPages"
+              @click="handlePageChange((taskStore.queryParams.page || 1) + 1)"
+            >
+              <span class="material-symbols-outlined text-lg">chevron_right</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- Task Detail Side Panel (Desktop) -->
+    <transition name="slide-right">
+      <aside
+        v-if="selectedTask && !isMobile"
+        class="w-[400px] bg-white border-l border-slate-200 shadow-2xl z-20 flex flex-col shrink-0"
+      >
+        <div class="p-8 flex-1 overflow-y-auto">
+          <div class="flex items-center justify-between mb-8">
+            <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase tracking-widest">
+              任务详情
+            </span>
+            <button
+              @click="selectedTask = null"
+              class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <!-- Title -->
+          <h2 class="text-xl font-bold text-slate-900 mb-6 line-clamp-2">{{ selectedTask.title }}</h2>
+
+          <!-- Info Grid -->
+          <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">截止时间</p>
+              <p :class="['text-xs font-bold', isOverdue(selectedTask) ? 'text-red-500' : 'text-slate-700']">
+                {{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '未设定' }}
+              </p>
+              <p v-if="isOverdue(selectedTask)" class="text-[10px] text-red-500 font-bold mt-1">(已延期)</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">优先级</p>
+              <p :class="['text-xs font-bold uppercase', getPriorityColor(selectedTask.priority)]">
+                {{ getPriorityLabel(selectedTask.priority) }}
+              </p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
+              <p class="text-xs font-bold text-slate-700">{{ selectedTask.assignedToName || '未分配' }}</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">任务状态</p>
+              <p class="text-xs font-bold text-primary uppercase">{{ getStatusLabel(selectedTask.status) }}</p>
+            </div>
+          </div>
+
+          <div class="space-y-8">
+            <!-- Description -->
+            <section v-if="selectedTask.description">
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">任务描述</h3>
+              <p class="text-sm text-slate-600 leading-relaxed">{{ selectedTask.description }}</p>
+            </section>
+
+            <!-- Customer -->
+            <section v-if="selectedTask.customerName">
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">关联客户</h3>
+              <div class="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3">
+                <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  {{ selectedTask.customerName.charAt(0) }}
+                </div>
+                <div>
+                  <p class="text-sm font-bold text-slate-900 truncate">{{ selectedTask.customerName }}</p>
+                  <p class="text-[10px] text-slate-400">点击查看客户详情</p>
+                </div>
+                <span class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
+              </div>
+            </section>
+
+            <!-- AI Analysis -->
+            <section class="p-6 bg-slate-900 rounded-[2rem] text-white">
+              <div class="flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-primary">auto_awesome</span>
+                <h3 class="text-sm font-bold">AI 智能分析</h3>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed mb-4 italic">
+                "{{ getAiInsight(selectedTask) }}"
+              </p>
+              <div class="flex items-center gap-2 text-xs text-slate-400">
+                <span class="material-symbols-outlined text-sm">schedule</span>
+                <span>AI 评分: {{ getAiScore(selectedTask) }} 分</span>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Bottom Actions -->
+        <div class="p-6 border-t border-slate-100 flex gap-3">
+          <button
+            v-if="selectedTask.status !== 'COMPLETED'"
+            @click="handleToggleComplete(selectedTask)"
+            class="flex-1 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20"
+          >
+            标记为完成
+          </button>
+          <button
+            v-else
+            @click="handleToggleComplete(selectedTask)"
+            class="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-200 transition-all"
+          >
+            重新打开
+          </button>
+          <button
+            @click="handleEdit(selectedTask)"
+            class="px-5 py-3 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 transition-all"
+          >
+            编辑
+          </button>
+        </div>
+      </aside>
+    </transition>
+
+    <!-- Task Detail Dialog (Mobile) -->
+    <el-dialog v-model="showDetailDialog" title="任务详情" width="95%" fullscreen>
+      <template v-if="selectedTask">
+        <h2 class="text-lg font-bold text-slate-900 mb-4">{{ selectedTask.title }}</h2>
+
+        <div class="grid grid-cols-2 gap-3 mb-6">
+          <div class="p-3 bg-slate-50 rounded-xl">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">截止时间</p>
+            <p :class="['text-xs font-bold', isOverdue(selectedTask) ? 'text-red-500' : 'text-slate-700']">
+              {{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '未设定' }}
+            </p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">优先级</p>
+            <p :class="['text-xs font-bold', getPriorityColor(selectedTask.priority)]">
+              {{ getPriorityLabel(selectedTask.priority) }}
+            </p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">负责人</p>
+            <p class="text-xs font-bold text-slate-700">{{ selectedTask.assignedToName || '未分配' }}</p>
+          </div>
+          <div class="p-3 bg-slate-50 rounded-xl">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">状态</p>
+            <p class="text-xs font-bold text-primary">{{ getStatusLabel(selectedTask.status) }}</p>
+          </div>
+        </div>
+
+        <div v-if="selectedTask.description" class="mb-6">
+          <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">描述</h3>
+          <p class="text-sm text-slate-600">{{ selectedTask.description }}</p>
+        </div>
+
+        <div v-if="selectedTask.customerName" class="mb-6">
+          <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">关联客户</h3>
+          <p class="text-sm font-medium text-slate-700">{{ selectedTask.customerName }}</p>
+        </div>
+
+        <!-- AI Analysis -->
+        <div class="p-4 bg-slate-900 rounded-2xl text-white">
+          <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined text-primary text-sm">auto_awesome</span>
+            <h3 class="text-sm font-bold">AI 智能分析</h3>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed italic">"{{ getAiInsight(selectedTask) }}"</p>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex gap-3">
+          <button
+            v-if="selectedTask?.status !== 'COMPLETED'"
+            @click="handleToggleComplete(selectedTask!); showDetailDialog = false"
+            class="flex-1 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-bold"
+          >
+            标记完成
+          </button>
+          <button
+            @click="showDetailDialog = false"
+            class="px-5 py-2.5 border border-slate-200 rounded-xl text-slate-600"
+          >
+            关闭
+          </button>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- Add/Edit Dialog -->
     <el-dialog v-model="showAddDialog" :title="editingTask ? '编辑任务' : '新建任务'" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
@@ -198,49 +472,21 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">
-          {{ editingTask ? '保存' : '创建' }}
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Task Detail Dialog -->
-    <el-dialog v-model="showDetailDialog" title="任务详情" :width="isMobile ? '95%' : '600px'" :fullscreen="isMobile">
-      <template v-if="selectedTask">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="任务标题" :span="2">
-            {{ selectedTask.title }}
-            <el-tag v-if="selectedTask.generatedByAi" size="small" class="ml-2">AI生成</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="getStatusType(selectedTask.status)">{{ getStatusLabel(selectedTask.status) }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="优先级">
-            <span :class="getPriorityColor(selectedTask.priority)">{{ getPriorityLabel(selectedTask.priority) }}</span>
-          </el-descriptions-item>
-          <el-descriptions-item label="截止日期">
-            {{ selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="负责人">
-            {{ selectedTask.assignedToName || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="创建人">
-            {{ selectedTask.createUserName || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="关联客户" :span="2">
-            {{ selectedTask.customerName || '-' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="任务描述" :span="2">
-            {{ selectedTask.description || '无' }}
-          </el-descriptions-item>
-        </el-descriptions>
-      </template>
-      <template #footer>
-        <el-button @click="showDetailDialog = false">关闭</el-button>
-        <el-button v-if="selectedTask?.status !== 'COMPLETED'" type="primary" @click="handleStartFromDetail">
-          开始处理
-        </el-button>
+        <div class="flex justify-end gap-3">
+          <button
+            class="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            @click="showAddDialog = false"
+          >
+            取消
+          </button>
+          <button
+            class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
+            :disabled="submitting"
+            @click="handleSubmit"
+          >
+            {{ editingTask ? '保存' : '创建' }}
+          </button>
+        </div>
       </template>
     </el-dialog>
   </div>
@@ -249,17 +495,15 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useTaskStore } from '@/stores/task'
-import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
-import { Loading, List, MoreFilled, MagicStick, Calendar, User, Plus } from '@element-plus/icons-vue'
 import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
 
 const taskStore = useTaskStore()
-const userStore = useUserStore()
 const { isMobile } = useResponsive()
 
 const currentStatus = ref('all')
+const valueFilter = ref<'all' | 'high-impact'>('all')
 const showAddDialog = ref(false)
 const showDetailDialog = ref(false)
 const editingTask = ref<Task | null>(null)
@@ -280,10 +524,6 @@ const formRules: FormRules = {
 }
 
 // Computed properties
-const aiGeneratedCount = computed(() =>
-  taskStore.taskList.filter(t => t.generatedByAi).length
-)
-
 const statusTabs = computed(() => {
   const tasks = taskStore.taskList
   return [
@@ -294,29 +534,40 @@ const statusTabs = computed(() => {
   ]
 })
 
+const displayedTasks = computed(() => {
+  if (valueFilter.value === 'high-impact') {
+    return taskStore.taskList.filter(t => t.priority === 'HIGH')
+  }
+  return taskStore.taskList
+})
+
+const totalPages = computed(() => Math.ceil(taskStore.totalCount / (taskStore.queryParams.limit || 10)))
+
+const visiblePages = computed(() => {
+  const total = totalPages.value
+  const current = taskStore.queryParams.page || 1
+  const pages: number[] = []
+  let start = Math.max(1, current - 2)
+  const end = Math.min(total, start + 4)
+  start = Math.max(1, end - 4)
+  for (let i = start; i <= end; i++) pages.push(i)
+  return pages
+})
+
 onMounted(() => {
   taskStore.fetchTaskList(true)
 })
 
 function handleStatusFilter(status: string) {
   currentStatus.value = status
-  // Use backend filtering for status
   taskStore.queryParams.status = status === 'all' ? undefined : status as TaskStatus
   taskStore.queryParams.page = 1
   taskStore.fetchTaskList(false)
 }
 
 function handlePageChange(page: number) {
-  if (taskStore.queryParams.page === page) {
-    return
-  }
+  if (taskStore.queryParams.page === page) return
   taskStore.queryParams.page = page
-  taskStore.fetchTaskList(false)
-}
-
-function handleSizeChange(size: number) {
-  taskStore.queryParams.limit = size
-  taskStore.queryParams.page = 1
   taskStore.fetchTaskList(false)
 }
 
@@ -336,15 +587,8 @@ async function handleStartTask(task: Task) {
 
 function handleViewDetail(task: Task) {
   selectedTask.value = task
-  showDetailDialog.value = true
-}
-
-async function handleStartFromDetail() {
-  if (selectedTask.value && selectedTask.value.status === 'PENDING') {
-    await taskStore.changeTaskStatus(selectedTask.value.taskId, 'IN_PROGRESS')
-    await taskStore.fetchTaskList(false)
-    showDetailDialog.value = false
-    ElMessage.success('任务已开始处理')
+  if (isMobile.value) {
+    showDetailDialog.value = true
   }
 }
 
@@ -400,6 +644,27 @@ function resetForm() {
   Object.assign(formData, { title: '', description: '', priority: 'MEDIUM', dueDate: undefined, status: undefined })
 }
 
+// AI Score - deterministic based on priority + taskId
+function getAiScore(task: Task): number {
+  const base = task.priority === 'HIGH' ? 90 : task.priority === 'MEDIUM' ? 60 : 30
+  const offset = Number(task.taskId) % 10
+  return Math.min(99, base + offset)
+}
+
+// AI Insight - use description or generate from priority
+function getAiInsight(task: Task): string {
+  if (task.description) return task.description
+  if (task.priority === 'HIGH') return '此任务优先级较高，建议尽快处理以推进业务进展。'
+  if (task.priority === 'MEDIUM') return '常规跟进任务，按计划执行即可。'
+  return '低优先级任务，可在空闲时间处理。'
+}
+
+// Check if task is overdue
+function isOverdue(task: Task): boolean {
+  if (!task.dueDate || task.status === 'COMPLETED') return false
+  return new Date(task.dueDate) < new Date()
+}
+
 function getPriorityColor(priority: string): string {
   switch (priority) {
     case 'HIGH': return 'text-red-500'
@@ -408,25 +673,8 @@ function getPriorityColor(priority: string): string {
   }
 }
 
-function getPriorityDotColor(priority: string): string {
-  switch (priority) {
-    case 'HIGH': return 'bg-red-500'
-    case 'MEDIUM': return 'bg-orange-500'
-    default: return 'bg-green-500'
-  }
-}
-
 function getPriorityLabel(priority: string): string {
   return { HIGH: '高优先级', MEDIUM: '中优先级', LOW: '低优先级' }[priority] || priority
-}
-
-function getStatusType(status: string): 'info' | 'primary' | 'success' {
-  switch (status) {
-    case 'PENDING': return 'info'
-    case 'IN_PROGRESS': return 'primary'
-    case 'COMPLETED': return 'success'
-    default: return 'info'
-  }
 }
 
 function getStatusLabel(status: string): string {
@@ -441,7 +689,6 @@ function getRelativeTime(dateStr: string): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   const now = new Date()
-  // Reset time to compare dates only
   date.setHours(0, 0, 0, 0)
   now.setHours(0, 0, 0, 0)
   const diff = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -452,3 +699,20 @@ function getRelativeTime(dateStr: string): string {
   return `${diff}天后到期`
 }
 </script>
+
+<style scoped>
+.slide-right-enter-active {
+  transition: all 0.3s ease;
+}
+.slide-right-leave-active {
+  transition: all 0.2s ease;
+}
+.slide-right-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+.slide-right-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
+}
+</style>

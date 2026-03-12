@@ -79,6 +79,15 @@ export interface KnowledgeQueryBO {
   limit?: number
 }
 
+export interface KnowledgeAiAnalyzeVO {
+  coreHighlights: string
+  talkingPoints: string[]
+  relatedEntities: Array<{
+    name: string
+    type: string
+  }>
+}
+
 // AI Agent types
 export interface AiAgent {
   agentId: string

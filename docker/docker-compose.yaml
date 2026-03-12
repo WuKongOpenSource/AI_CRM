@@ -225,6 +225,29 @@ services:
       retries: 3
     networks:
       - crm-network
+  # 可选：kkFileView 文档在线预览服务
+  # 支持 PDF/Word/Excel/PPT 等文件在线预览
+  # 如不需要可注释掉此服务，前端会自动降级为文本预览
+  kkfileview:
+    image: keking/kkfileview:4.4.0-beta
+    container_name: kkfileview
+    ports:
+      - "${KKFILEVIEW_PORT:-8012}:8012"
+    environment:
+      - KK_OFFICE_PREVIEW_TYPE=office
+      - KK_MEDIA_CONVERT_DISABLE=true
+      - KK_CACHE_CLEAN_CRON=0 */30 * * * ?
+      - KK_BASE_URL=http://${HOST_IP}:${KKFILEVIEW_PORT:-8012}
+    volumes:
+      - kkfileview-cache:/opt/kkFileView-4.4.0-beta/file
+    networks:
+      - crm-network
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - kkfileview
+
 networks:
   crm-network:
     driver: bridge
@@ -233,3 +256,4 @@ volumes:
   postgres-data:
   data-files:
   minio_data:
+  kkfileview-cache:

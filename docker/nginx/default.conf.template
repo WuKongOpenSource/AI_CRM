@@ -80,6 +80,19 @@ server {
         proxy_send_timeout 3600s;                  # 增加发送超时时间
     }
 
+    # kkFileView 文档在线预览服务（可选）
+    location /kkfileview/ {
+        proxy_pass http://kkfileview:8012/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60;
+        proxy_send_timeout 300;
+        proxy_read_timeout 300;
+        client_max_body_size 100m;
+    }
+
     # 错误页面
     error_page 500 502 503 504 /50x.html;
     location = /50x.html {

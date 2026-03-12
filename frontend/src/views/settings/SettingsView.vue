@@ -1,152 +1,78 @@
 <template>
-  <div class="h-full flex flex-col bg-gray-50">
-    <!-- Page Header -->
-    <div class="px-4 md:px-6 py-4 bg-white border-b border-gray-200">
-      <div class="flex items-start justify-between">
-        <div>
-          <h1 class="text-lg font-semibold">系统设置</h1>
-          <p class="text-sm text-gray-500 mt-1 hidden md:block">管理系统配置和偏好设置</p>
-        </div>
-        <div class="text-sm text-gray-500 hidden md:block">
-          您的权限: <span class="text-gray-700">{{ userStore.realname || '用户' }}，完整权限</span>
-        </div>
+  <div class="flex flex-col h-full bg-background-light">
+    <!-- Settings Header / Tabs -->
+    <div class="bg-white border-b border-slate-200 px-4 md:px-8">
+      <div class="flex items-center gap-4 md:gap-8 overflow-x-auto">
+        <button
+          @click="activeTab = 'team'"
+          :class="[
+            'py-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap',
+            activeTab === 'team' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
+          ]"
+        >
+          组织员工管理
+        </button>
+        <button
+          @click="activeTab = 'role'"
+          :class="[
+            'py-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap',
+            activeTab === 'role' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
+          ]"
+        >
+          角色权限管理
+        </button>
+        <button
+          @click="activeTab = 'profile'"
+          :class="[
+            'py-4 text-sm font-bold transition-all border-b-2 whitespace-nowrap',
+            isSystemTab ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'
+          ]"
+        >
+          系统参数设置
+        </button>
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="flex-1 overflow-auto p-3 md:p-6">
-      <div class="bg-white rounded-lg shadow-sm">
-        <!-- Card Header -->
-        <div class="px-6 py-4 border-b border-gray-200">
-          <div class="flex items-center">
-            <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center mr-3">
-              <el-icon :size="20" class="text-primary-500"><Setting /></el-icon>
-            </div>
-            <div>
-              <h2 class="text-base font-medium">系统设置</h2>
-              <p class="text-sm text-gray-500">管理系统配置和偏好设置</p>
+    <!-- Content Area -->
+    <div class="flex-1 overflow-auto">
+      <div class="p-4 md:p-6">
+          <!-- System Sub-tabs (v-show so it doesn't break v-if/v-else-if chain) -->
+          <div v-show="isSystemTab" class="max-w-4xl mx-auto mb-6">
+            <div class="flex gap-2 overflow-x-auto">
+              <button
+                v-for="st in systemSubTabs"
+                :key="st.value"
+                @click="activeTab = st.value"
+                :class="[
+                  'px-4 py-1.5 text-xs font-bold rounded-full transition-all whitespace-nowrap',
+                  activeTab === st.value
+                    ? 'bg-primary text-white'
+                    : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                ]"
+              >
+                {{ st.label }}
+              </button>
             </div>
           </div>
-        </div>
 
-        <!-- Tab Navigation -->
-        <el-tabs v-model="activeTab" class="settings-tabs">
-          <el-tab-pane name="profile">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><User /></el-icon>
+          <!-- Profile Section -->
+          <div v-if="activeTab === 'profile'" class="max-w-4xl mx-auto space-y-8">
+            <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 class="text-base font-bold mb-6 flex items-center gap-2">
+                <span class="w-1 h-4 bg-primary rounded-full"></span>
                 个人资料
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="team">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><UserFilled /></el-icon>
-                团队管理
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="role">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Key /></el-icon>
-                角色权限
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="stage">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><TrendCharts /></el-icon>
-                商机阶段
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="agent">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><MagicStick /></el-icon>
-                智能体
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="notification">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Bell /></el-icon>
-                通知设置
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="data">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Coin /></el-icon>
-                数据管理
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="api">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Connection /></el-icon>
-                API/AI
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="storage">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Box /></el-icon>
-                对象存储
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="weknora">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Reading /></el-icon>
-                知识库服务
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="customField">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Grid /></el-icon>
-                自定义字段
-              </span>
-            </template>
-          </el-tab-pane>
-          <el-tab-pane name="workflow">
-            <template #label>
-              <span class="flex items-center gap-1.5">
-                <el-icon><Share /></el-icon>
-                工作流
-              </span>
-            </template>
-          </el-tab-pane>
-        </el-tabs>
-
-        <!-- Tab Content -->
-        <div class="p-6">
-          <!-- Profile Tab -->
-          <div v-if="activeTab === 'profile'" class="space-y-6">
-            <!-- Profile Card -->
-            <el-card shadow="never" class="!border-gray-200">
+              </h3>
               <!-- Avatar Section -->
-              <div class="flex items-center justify-between pb-6 border-b border-gray-200">
+              <div class="flex items-center justify-between pb-6 border-b border-slate-200">
                 <div class="flex items-center">
-                  <el-avatar :size="80" class="bg-primary-500 text-2xl font-medium">
+                  <div class="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold">
                     {{ profileForm.realname?.charAt(0) || userStore.realname?.charAt(0) || 'U' }}
-                  </el-avatar>
+                  </div>
                   <div class="ml-4">
-                    <div class="text-xl font-medium">{{ profileForm.realname || userStore.realname }}</div>
-                    <div class="text-gray-500">{{ profileForm.position || '员工' }}</div>
+                    <div class="text-xl font-bold text-slate-900">{{ profileForm.realname || userStore.realname }}</div>
+                    <div class="text-sm text-slate-500">{{ profileForm.position || '员工' }}</div>
                   </div>
                 </div>
-                <el-button>更换头像</el-button>
               </div>
 
               <!-- Profile Form -->
@@ -183,20 +109,20 @@
                   </el-col>
                 </el-row>
                 <div class="flex gap-3 pt-4">
-                  <el-button type="primary" :loading="savingProfile" @click="handleSaveProfile">
-                    <el-icon class="mr-1"><Document /></el-icon>
-                    保存更改
-                  </el-button>
-                  <el-button @click="resetProfileForm">取消</el-button>
+                  <button class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50" :disabled="savingProfile" @click="handleSaveProfile">
+                    {{ savingProfile ? '保存中...' : '保存更改' }}
+                  </button>
+                  <button class="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors" @click="resetProfileForm">取消</button>
                 </div>
               </el-form>
-            </el-card>
+            </section>
 
-            <!-- Password Change Card -->
-            <el-card shadow="never" class="!border-gray-200">
-              <template #header>
-                <span class="font-medium">密码修改</span>
-              </template>
+            <!-- Password Change Section -->
+            <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 class="text-base font-bold mb-6 flex items-center gap-2">
+                <span class="w-1 h-4 bg-primary rounded-full"></span>
+                密码修改
+              </h3>
               <el-form :model="passwordForm" label-position="top" class="max-w-md">
                 <el-form-item label="当前密码">
                   <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入当前密码" />
@@ -207,152 +133,229 @@
                 <el-form-item label="确认密码">
                   <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
                 </el-form-item>
-                <el-button type="primary" :loading="submitting" @click="handleChangePassword">修改密码</el-button>
+                <button class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50" :disabled="submitting" @click="handleChangePassword">
+                  {{ submitting ? '修改中...' : '修改密码' }}
+                </button>
               </el-form>
-            </el-card>
+            </section>
+
           </div>
 
           <!-- Team Management Tab -->
           <div v-else-if="activeTab === 'team'">
-            <div class="flex gap-6" :class="{ 'flex-col': isMobile }" style="min-height: 500px">
-              <!-- Left: Department Tree -->
-              <div v-if="!isMobile" class="w-72 shrink-0 border-r border-gray-200 pr-4">
-                <div class="mb-3">
-                  <h4 class="font-medium text-base">组织架构</h4>
-                  <p class="text-xs text-gray-400 mt-1">查看和管理组织架构</p>
+            <div class="flex h-full bg-slate-50/50" :class="{ 'flex-col': isMobile }" style="min-height: 500px">
+              <!-- Left Sidebar: Department Tree -->
+              <div v-if="!isMobile" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col rounded-l-2xl">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-lg">account_tree</span>
+                    组织架构
+                  </h3>
+                  <button
+                    @click="handleAddDept(0)"
+                    class="size-8 flex items-center justify-center bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-all"
+                    title="添加一级部门"
+                  >
+                    <span class="material-symbols-outlined text-sm">add</span>
+                  </button>
                 </div>
-                <el-button class="w-full mb-3" @click="handleAddDept(0)">
-                  <el-icon class="mr-1"><Plus /></el-icon>
-                  添加部门
-                </el-button>
-                <div v-if="loadingDeptTree" class="text-center py-8">
-                  <el-icon class="is-loading"><Loading /></el-icon>
+                <div class="flex-1 overflow-y-auto p-4">
+                  <div v-if="loadingDeptTree" class="text-center py-8">
+                    <span class="material-symbols-outlined text-slate-300 animate-spin">progress_activity</span>
+                  </div>
+                  <el-tree
+                    v-else
+                    ref="deptTreeRef"
+                    :data="deptTree"
+                    :props="{ label: 'deptName', children: 'children' }"
+                    node-key="deptId"
+                    highlight-current
+                    default-expand-all
+                    :expand-on-click-node="false"
+                    @node-click="handleDeptClick"
+                  >
+                    <template #default="{ data }">
+                      <div class="group flex items-center justify-between w-full pr-1 overflow-hidden">
+                        <span class="flex items-center gap-2 text-sm min-w-0 overflow-hidden">
+                          <span class="material-symbols-outlined text-base opacity-60 shrink-0">
+                            {{ data.children && data.children.length > 0 ? 'folder_open' : 'description' }}
+                          </span>
+                          <span class="font-medium truncate">{{ data.deptName }}</span>
+                        </span>
+                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <button
+                            @click.stop="handleDeptCommand('addChild', data)"
+                            class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
+                            title="添加子部门"
+                          >
+                            <span class="material-symbols-outlined text-sm">add</span>
+                          </button>
+                          <button
+                            @click.stop="handleDeptCommand('edit', data)"
+                            class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
+                            title="编辑"
+                          >
+                            <span class="material-symbols-outlined text-sm">edit</span>
+                          </button>
+                          <button
+                            @click.stop="handleDeptCommand('delete', data)"
+                            class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-red-500"
+                            title="删除"
+                          >
+                            <span class="material-symbols-outlined text-sm">delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </el-tree>
                 </div>
-                <el-tree
-                  v-else
-                  ref="deptTreeRef"
-                  :data="deptTree"
-                  :props="{ label: 'deptName', children: 'children' }"
-                  node-key="deptId"
-                  highlight-current
-                  default-expand-all
-                  :expand-on-click-node="false"
-                  @node-click="handleDeptClick"
-                >
-                  <template #default="{ data }">
-                    <div class="flex items-center justify-between w-full pr-1">
-                      <span class="flex items-center gap-1.5 text-sm">
-                        <el-icon class="text-gray-400"><OfficeBuilding /></el-icon>
-                        {{ data.deptName }}
-                        <span class="text-xs text-gray-400">{{ data.userCount }}人</span>
-                      </span>
-                      <el-dropdown trigger="click" @command="(cmd: string) => handleDeptCommand(cmd, data)">
-                        <el-icon class="text-gray-400 cursor-pointer hover:text-primary-500" @click.stop><MoreFilled /></el-icon>
-                        <template #dropdown>
-                          <el-dropdown-menu>
-                            <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                            <el-dropdown-item command="addChild">添加子部门</el-dropdown-item>
-                            <el-dropdown-item command="delete" divided>
-                              <span class="text-red-500">删除</span>
-                            </el-dropdown-item>
-                          </el-dropdown-menu>
-                        </template>
-                      </el-dropdown>
-                    </div>
-                  </template>
-                </el-tree>
               </div>
 
               <!-- Mobile: Department selector -->
-              <div v-if="isMobile" class="flex items-center gap-2 mb-2">
-                <el-button @click="showDeptDrawer = true">
-                  <el-icon class="mr-1"><OfficeBuilding /></el-icon>
-                  {{ selectedDept ? selectedDept.deptName : '选择部门' }}
-                </el-button>
-                <el-button type="primary" size="small" @click="showAddMemberDialog = true" :disabled="!selectedDept">
-                  <el-icon class="mr-1"><Plus /></el-icon>
+              <div v-if="isMobile" class="flex items-center gap-2 mb-3">
+                <button @click="showDeptDrawer = true" class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm max-w-[200px]">
+                  <span class="material-symbols-outlined text-slate-400 text-base">account_tree</span>
+                  <span class="truncate">{{ selectedDept ? selectedDept.deptName : '选择部门' }}</span>
+                </button>
+                <button
+                  @click="showAddMemberDialog = true"
+                  :disabled="!selectedDept"
+                  class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold flex items-center gap-1 hover:bg-primary/90 transition-all disabled:opacity-50"
+                >
+                  <span class="material-symbols-outlined text-sm">person_add</span>
                   添加成员
-                </el-button>
+                </button>
               </div>
 
-              <!-- Right: Member List -->
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between mb-4">
-                  <div>
-                    <h4 class="font-medium text-base">
-                      {{ selectedDept ? selectedDept.deptName : '全部成员' }}
-                    </h4>
-                    <p class="text-xs text-gray-400 mt-1">管理组织内的成员和权限</p>
+              <!-- Right Content: Employee List -->
+              <div class="flex-1 overflow-y-auto" :class="isMobile ? '' : 'p-8'">
+                <div class="max-w-6xl mx-auto w-full space-y-6">
+                  <!-- Header -->
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h2 class="text-2xl font-bold text-slate-900 truncate">
+                        {{ selectedDept ? selectedDept.deptName : '组织员工管理' }}
+                      </h2>
+                      <p class="text-sm text-slate-500 mt-1">管理您的团队成员、部门分配及账号状态</p>
+                    </div>
+                    <button
+                      v-if="!isMobile"
+                      @click="showAddMemberDialog = true"
+                      :disabled="!selectedDept"
+                      class="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <span class="material-symbols-outlined text-sm">person_add</span>
+                      添加员工
+                    </button>
                   </div>
-                  <el-button v-if="!isMobile" type="primary" @click="showAddMemberDialog = true" :disabled="!selectedDept">
-                    <el-icon class="mr-1"><Plus /></el-icon>
-                    添加成员
-                  </el-button>
-                </div>
 
-                <div v-if="loadingMembers" class="text-center py-8">
-                  <el-icon class="is-loading"><Loading /></el-icon>
-                </div>
-                <div v-else-if="memberList.length === 0" class="text-center py-16 text-gray-400">
-                  <el-icon :size="32" class="mb-2"><User /></el-icon>
-                  <p>{{ selectedDept ? '该部门暂无成员' : '请先选择一个部门' }}</p>
-                </div>
-                <div v-else class="space-y-3">
-                  <div
-                    v-for="member in memberList"
-                    :key="member.userId"
-                    class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div class="flex items-center gap-3 flex-1 min-w-0">
-                      <el-avatar :size="40" class="shrink-0" :class="getAvatarColor(member.realname)">
-                        {{ member.realname?.charAt(0) || '?' }}
-                      </el-avatar>
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2 flex-wrap">
-                          <span class="font-medium">{{ member.realname || member.username }}</span>
-                          <el-tag
-                            :type="member.status === 1 ? 'success' : member.status === 0 ? 'danger' : 'info'"
-                            size="small"
-                          >
-                            {{ member.status === 1 ? '活跃' : member.status === 0 ? '禁用' : '未激活' }}
-                          </el-tag>
-                        </div>
-                        <div class="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                          <span v-if="member.email" class="flex items-center gap-1">
-                            <el-icon :size="12"><Message /></el-icon>
-                            {{ member.email }}
-                          </span>
-                          <span v-if="member.mobile" class="flex items-center gap-1">
-                            <el-icon :size="12"><Phone /></el-icon>
-                            {{ member.mobile }}
-                          </span>
-                          <span v-if="selectedDept" class="flex items-center gap-1">
-                            <el-icon :size="12"><OfficeBuilding /></el-icon>
-                            {{ selectedDept.deptName }}
-                          </span>
-                          <span class="flex items-center gap-1">
-                            <el-icon :size="12"><Calendar /></el-icon>
-                            加入于 {{ formatDate(member.createTime) }}
-                          </span>
-                          <span v-if="member.post" class="flex items-center gap-1">
-                            <el-icon :size="12"><UserFilled /></el-icon>
-                            {{ member.post }}
-                          </span>
-                        </div>
-                        <div v-if="member.roleNames && member.roleNames.length" class="flex flex-wrap gap-1 mt-1">
-                          <el-tag v-for="rn in member.roleNames" :key="rn" size="small" type="warning">{{ rn }}</el-tag>
-                        </div>
+                  <!-- Stats Cards -->
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                    <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">总员工数</p>
+                      <p class="text-2xl md:text-3xl font-black text-slate-900">{{ memberList.length }}</p>
+                    </div>
+                    <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">活跃账号</p>
+                      <p class="text-2xl md:text-3xl font-black text-emerald-500">{{ memberList.filter(m => m.status === 1).length }}</p>
+                    </div>
+                    <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">待激活</p>
+                      <p class="text-2xl md:text-3xl font-black text-amber-500">{{ memberList.filter(m => m.status !== 1 && m.status !== 0).length }}</p>
+                    </div>
+                    <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm">
+                      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">部门数量</p>
+                      <p class="text-2xl md:text-3xl font-black text-primary">{{ countDepts(deptTree) }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Employee Table -->
+                  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div v-if="loadingMembers" class="text-center py-16">
+                      <span class="material-symbols-outlined text-slate-300 text-3xl animate-spin">progress_activity</span>
+                    </div>
+                    <template v-else-if="memberList.length === 0">
+                      <div class="text-center py-16 text-slate-400">
+                        <span class="material-symbols-outlined text-3xl mb-2 opacity-50">group_off</span>
+                        <p class="text-sm">{{ selectedDept ? '该部门暂无成员' : '请先选择一个部门' }}</p>
                       </div>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0 ml-2">
-                      <el-button text @click="handleEditMember(member)">
-                        <el-icon><Edit /></el-icon>
-                        编辑
-                      </el-button>
-                      <el-button text :type="member.status === 1 ? 'danger' : 'success'" @click="handleToggleStatus(member)">
-                        {{ member.status === 1 ? '禁用' : '启用' }}
-                      </el-button>
-                    </div>
+                    </template>
+                    <template v-else>
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                          <thead>
+                            <tr class="border-b border-slate-100">
+                              <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">员工</th>
+                              <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">部门</th>
+                              <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">角色</th>
+                              <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">联系方式</th>
+                              <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">状态</th>
+                              <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-slate-50">
+                            <tr
+                              v-for="member in memberList"
+                              :key="member.userId"
+                              class="hover:bg-slate-50/50 transition-colors group"
+                            >
+                              <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                  <div class="size-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm" :class="getAvatarColor(member.realname)">
+                                    {{ (member.realname || member.username || '?').charAt(0) }}
+                                  </div>
+                                  <div>
+                                    <p class="text-sm font-bold text-slate-900">{{ member.realname || member.username }}</p>
+                                    <p class="text-[10px] text-slate-400">{{ member.email || '' }}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td class="px-6 py-4">
+                                <p class="text-sm text-slate-700">{{ selectedDept?.deptName || '-' }}</p>
+                              </td>
+                              <td class="px-6 py-4">
+                                <div class="flex flex-wrap gap-1">
+                                  <span v-for="rn in (member.roleNames || [])" :key="rn" class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold">{{ rn }}</span>
+                                  <span v-if="!member.roleNames || member.roleNames.length === 0" class="text-sm text-slate-400">-</span>
+                                </div>
+                              </td>
+                              <td class="px-6 py-4">
+                                <div>
+                                  <p v-if="member.mobile" class="text-sm text-slate-700">{{ member.mobile }}</p>
+                                  <p v-if="member.post" class="text-xs text-slate-400">{{ member.post }}</p>
+                                </div>
+                              </td>
+                              <td class="px-6 py-4">
+                                <span :class="[
+                                  'px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest',
+                                  member.status === 1 ? 'bg-emerald-50 text-emerald-600' : member.status === 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'
+                                ]">
+                                  {{ member.status === 1 ? '活跃' : member.status === 0 ? '禁用' : '未激活' }}
+                                </span>
+                              </td>
+                              <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    @click="handleEditMember(member)"
+                                    class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-primary transition-all"
+                                    title="编辑"
+                                  >
+                                    <span class="material-symbols-outlined text-sm">edit</span>
+                                  </button>
+                                  <button
+                                    @click="handleToggleStatus(member)"
+                                    class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-amber-500 transition-all"
+                                    :title="member.status === 1 ? '停用' : '启用'"
+                                  >
+                                    <span class="material-symbols-outlined text-sm">{{ member.status === 1 ? 'block' : 'check_circle' }}</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -366,10 +369,10 @@
               direction="ltr"
               size="80%"
             >
-              <el-button class="w-full mb-3" @click="handleAddDept(0)">
-                <el-icon class="mr-1"><Plus /></el-icon>
+              <button class="w-full mb-3 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/20 transition-all" @click="handleAddDept(0)">
+                <span class="material-symbols-outlined text-sm">add</span>
                 添加部门
-              </el-button>
+              </button>
               <el-tree
                 :data="deptTree"
                 :props="{ label: 'deptName', children: 'children' }"
@@ -380,24 +383,33 @@
                 @node-click="(data: any) => { handleDeptClick(data); showDeptDrawer = false }"
               >
                 <template #default="{ data }">
-                  <div class="flex items-center justify-between w-full pr-1">
-                    <span class="flex items-center gap-1.5 text-sm">
-                      <el-icon class="text-gray-400"><OfficeBuilding /></el-icon>
-                      {{ data.deptName }}
-                      <span class="text-xs text-gray-400">{{ data.userCount }}人</span>
+                  <div class="group flex items-center justify-between w-full pr-1 overflow-hidden">
+                    <span class="flex items-center gap-2 text-sm min-w-0 overflow-hidden">
+                      <span class="material-symbols-outlined text-base opacity-60 shrink-0">
+                        {{ data.children && data.children.length > 0 ? 'folder_open' : 'description' }}
+                      </span>
+                      <span class="font-medium truncate">{{ data.deptName }}</span>
                     </span>
-                    <el-dropdown trigger="click" @command="(cmd: string) => handleDeptCommand(cmd, data)">
-                      <el-icon class="text-gray-400 cursor-pointer hover:text-primary-500" @click.stop><MoreFilled /></el-icon>
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item command="edit">编辑</el-dropdown-item>
-                          <el-dropdown-item command="addChild">添加子部门</el-dropdown-item>
-                          <el-dropdown-item command="delete" divided>
-                            <span class="text-red-500">删除</span>
-                          </el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        @click.stop="handleDeptCommand('addChild', data)"
+                        class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
+                      >
+                        <span class="material-symbols-outlined text-sm">add</span>
+                      </button>
+                      <button
+                        @click.stop="handleDeptCommand('edit', data)"
+                        class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
+                      >
+                        <span class="material-symbols-outlined text-sm">edit</span>
+                      </button>
+                      <button
+                        @click.stop="handleDeptCommand('delete', data)"
+                        class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-red-500"
+                      >
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </div>
                   </div>
                 </template>
               </el-tree>
@@ -405,65 +417,93 @@
           </div>
 
           <!-- Role Permission Tab -->
-          <div v-else-if="activeTab === 'role'">
-            <div class="flex items-center justify-between mb-4">
-              <div>
-                <h3 class="font-medium text-base">角色权限</h3>
-                <p class="text-xs text-gray-400 mt-1">管理不同角色的系统权限</p>
-              </div>
-              <el-button type="primary" @click="handleAddRole">
-                <el-icon class="mr-1"><Plus /></el-icon>
-                创建角色
-              </el-button>
-            </div>
-
-            <div v-if="loadingRoles" class="text-center py-8">
-              <el-icon class="is-loading"><Loading /></el-icon>
-            </div>
-
-            <div v-else-if="roleList.length === 0" class="text-center py-8 text-gray-400">
-              暂无角色，请创建
-            </div>
-
-            <div v-else class="space-y-4">
-              <el-card v-for="role in roleList" :key="role.roleId" shadow="hover" class="!border-gray-200">
-                <div class="flex items-start gap-3">
-                  <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center shrink-0">
-                    <el-icon :size="20" class="text-primary-500"><Key /></el-icon>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between">
-                      <div>
-                        <span class="font-medium text-base">{{ role.roleName }}</span>
-                        <p class="text-sm text-gray-500 mt-0.5">{{ role.description || '暂无描述' }}</p>
-                      </div>
-                      <div class="flex items-center gap-1 shrink-0">
-                        <el-button text size="small" @click="handleEditRole(role)">
-                          <el-icon class="mr-0.5"><Edit /></el-icon> 编辑
-                        </el-button>
-                        <el-button text size="small" type="danger" @click="handleDeleteRole(role)">
-                          <el-icon><Delete /></el-icon>
-                        </el-button>
-                      </div>
-                    </div>
-                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                      <div class="flex items-center gap-4">
-                        <span class="text-sm text-gray-500">用户数量</span>
-                        <el-tag size="small" round>{{ role.userCount }} 人</el-tag>
-                        <el-button size="small" link type="primary" @click="handleManageUsers(role)">
-                          <el-icon class="mr-0.5"><UserFilled /></el-icon> 管理用户
-                        </el-button>
-                      </div>
-                      <div>
-                        <span class="text-sm text-gray-500 mr-2">权限配置</span>
-                        <el-button size="small" @click="handleManagePermissions(role)">
-                          <el-icon class="mr-0.5"><Setting /></el-icon> 管理权限
-                        </el-button>
-                      </div>
-                    </div>
-                  </div>
+          <div v-else-if="activeTab === 'role'" class="bg-slate-50/50 -m-4 md:-m-6 p-4 md:p-8">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+              <!-- Header -->
+              <div class="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+                <div>
+                  <h2 class="text-lg font-bold text-slate-900">角色列表</h2>
+                  <p class="text-sm text-slate-500 mt-1">管理系统角色，并为不同角色分配功能权限与数据范围。</p>
                 </div>
-              </el-card>
+                <button
+                  @click="handleAddRole"
+                  class="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
+                >
+                  <span class="material-symbols-outlined text-sm">add</span>
+                  新增角色
+                </button>
+              </div>
+
+              <!-- Table -->
+              <div class="flex-1 overflow-auto p-6">
+                <div v-if="loadingRoles" class="text-center py-16">
+                  <span class="material-symbols-outlined text-slate-300 text-3xl animate-spin">progress_activity</span>
+                </div>
+                <div v-else-if="roleList.length === 0" class="text-center py-16 text-slate-400">
+                  <span class="material-symbols-outlined text-3xl mb-2 opacity-50">admin_panel_settings</span>
+                  <p class="text-sm">暂无角色，请创建</p>
+                </div>
+                <table v-else class="w-full text-left text-sm">
+                  <thead class="bg-slate-50/80 border-b border-slate-100 text-slate-500">
+                    <tr>
+                      <th class="px-6 py-4 font-bold rounded-tl-xl">角色名称</th>
+                      <th class="px-6 py-4 font-bold">角色描述</th>
+                      <th class="px-6 py-4 font-bold">成员数量</th>
+                      <th class="px-6 py-4 font-bold text-right rounded-tr-xl">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-50">
+                    <tr v-for="role in roleList" :key="role.roleId" class="hover:bg-slate-50/80 transition-colors group">
+                      <td class="px-6 py-4">
+                        <div class="flex items-center gap-2">
+                          <span class="font-bold text-slate-900">{{ role.roleName }}</span>
+                          <span v-if="role.realm === 'super_admin'" class="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-md uppercase tracking-wider">系统预设</span>
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 text-slate-500 whitespace-normal min-w-[200px]">
+                        {{ role.description || '暂无描述' }}
+                      </td>
+                      <td class="px-6 py-4">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-medium">
+                          <span class="material-symbols-outlined text-[14px]">group</span>
+                          {{ role.userCount }} 人
+                        </span>
+                      </td>
+                      <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-3">
+                          <button
+                            @click="openRoleDrawer(role, 'members')"
+                            class="text-primary hover:text-primary/80 font-bold transition-colors text-xs flex items-center gap-1"
+                          >
+                            <span class="material-symbols-outlined text-[14px]">manage_accounts</span>
+                            管理用户
+                          </button>
+                          <button
+                            @click="openRoleDrawer(role, 'permissions')"
+                            class="text-primary hover:text-primary/80 font-bold transition-colors text-xs flex items-center gap-1"
+                          >
+                            <span class="material-symbols-outlined text-[14px]">admin_panel_settings</span>
+                            管理权限
+                          </button>
+                          <button
+                            @click="handleEditRole(role)"
+                            class="text-slate-400 hover:text-primary font-bold transition-colors text-xs"
+                          >
+                            编辑
+                          </button>
+                          <button
+                            v-if="role.realm !== 'super_admin'"
+                            @click="handleDeleteRole(role)"
+                            class="text-slate-400 hover:text-red-600 font-bold transition-colors text-xs"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -479,20 +519,20 @@
             <div v-if="agentStore.loading" class="text-center py-8">
               <el-icon class="is-loading"><Loading /></el-icon>
             </div>
-            <div v-else-if="agentStore.allAgents.length === 0" class="text-center py-8 text-gray-400">
+            <div v-else-if="agentStore.allAgents.length === 0" class="text-center py-8 text-slate-400">
               暂无智能体
             </div>
             <div v-else class="space-y-3">
               <div
                 v-for="agent in agentStore.allAgents"
                 :key="agent.agentId"
-                class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
               >
                 <div class="flex items-center">
-                  <el-icon :size="24" class="text-primary-500"><Promotion /></el-icon>
+                  <el-icon :size="24" class="text-primary"><Promotion /></el-icon>
                   <div class="ml-3">
                     <div class="font-medium">{{ agent.label }}</div>
-                    <div class="text-sm text-gray-500 truncate max-w-md">{{ agent.prompt }}</div>
+                    <div class="text-sm text-slate-500 truncate max-w-md">{{ agent.prompt }}</div>
                   </div>
                 </div>
                 <div class="flex items-center gap-3">
@@ -531,14 +571,14 @@
             <div v-if="loadingFields" class="text-center py-8">
               <el-icon class="is-loading"><Loading /></el-icon>
             </div>
-            <div v-else-if="customFields.length === 0" class="text-center py-8 text-gray-400">
+            <div v-else-if="customFields.length === 0" class="text-center py-8 text-slate-400">
               暂无自定义字段
             </div>
             <div v-else class="space-y-3">
               <div
                 v-for="field in customFields"
                 :key="field.fieldId"
-                class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
               >
                 <div class="flex items-center flex-1">
                   <div class="mr-4">
@@ -546,7 +586,7 @@
                       {{ field.fieldLabel }}
                       <el-tag v-if="field.isRequired" size="small" type="danger" class="ml-2">必填</el-tag>
                     </div>
-                    <div class="text-sm text-gray-500 mt-1">
+                    <div class="text-sm text-slate-500 mt-1">
                       <span>标识: {{ field.fieldName }}</span>
                       <el-tag size="small" class="ml-2">{{ getFieldTypeLabel(field.fieldType) }}</el-tag>
                       <span v-if="field.options && field.options.length > 0" class="ml-2">
@@ -582,7 +622,7 @@
 
           <!-- API/AI Tab -->
           <div v-else-if="activeTab === 'api'" class="space-y-6">
-            <el-card shadow="never" class="!border-gray-200">
+            <el-card shadow="never" class="!border-slate-200">
               <template #header>
                 <div class="flex items-center justify-between">
                   <span class="font-medium">AI 大模型配置</span>
@@ -617,7 +657,7 @@
                   >
                     <template #prepend>URL</template>
                   </el-input>
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     OpenAI 兼容接口的基础 URL，末尾不要加斜杠
                   </div>
                 </el-form-item>
@@ -658,7 +698,7 @@
                     >
                       <template #title>
                         {{ connectionTestResult.success ? '连接成功' : '连接失败' }}
-                        <span class="text-gray-500 ml-2">
+                        <span class="text-slate-500 ml-2">
                           ({{ connectionTestResult.responseTime }}ms)
                         </span>
                       </template>
@@ -684,7 +724,7 @@
                       :value="model"
                     />
                   </el-select>
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     可以从列表选择或直接输入自定义模型名称
                   </div>
                 </el-form-item>
@@ -709,7 +749,7 @@
                       class="w-24"
                     />
                   </div>
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     值越低回复越确定，值越高回复越有创造性。推荐值：0.7
                   </div>
                 </el-form-item>
@@ -723,13 +763,13 @@
                     :step="100"
                     class="w-full"
                   />
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     单次对话允许的最大 Token 数量，包括输入和输出
                   </div>
                 </el-form-item>
 
                 <!-- 操作按钮 -->
-                <div class="flex gap-3 pt-4 border-t border-gray-200">
+                <div class="flex gap-3 pt-4 border-t border-slate-200">
                   <el-button
                     type="primary"
                     :loading="savingAiConfig"
@@ -744,11 +784,11 @@
             </el-card>
 
             <!-- 配置说明卡片 -->
-            <el-card shadow="never" class="!border-gray-200">
+            <el-card shadow="never" class="!border-slate-200">
               <template #header>
                 <span class="font-medium">配置说明</span>
               </template>
-              <div class="text-sm text-gray-600 space-y-2">
+              <div class="text-sm text-slate-600 space-y-2">
                 <p><strong>OpenAI:</strong> 使用 OpenAI 官方 API，需要有效的 API Key</p>
                 <p><strong>阿里云 DashScope:</strong> 使用阿里云通义千问系列模型，API 地址为 https://dashscope.aliyuncs.com/compatible-mode/</p>
                 <p><strong>自定义:</strong> 任何 OpenAI 兼容的 API 服务，如 LocalAI、Ollama 等</p>
@@ -758,7 +798,7 @@
 
           <!-- Object Storage Tab -->
           <div v-else-if="activeTab === 'storage'" class="space-y-6">
-            <el-card shadow="never" class="!border-gray-200">
+            <el-card shadow="never" class="!border-slate-200">
               <template #header>
                 <div class="flex items-center justify-between">
                   <span class="font-medium">MinIO 对象存储</span>
@@ -771,13 +811,13 @@
                 <el-icon class="is-loading"><Loading /></el-icon>
               </div>
               <div v-else class="space-y-6">
-                <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
                   <div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
                     <el-icon :size="24" class="text-orange-500"><Box /></el-icon>
                   </div>
                   <div class="flex-1">
                     <div class="font-medium">MinIO 管理控制台</div>
-                    <div class="text-sm text-gray-500 mt-1">
+                    <div class="text-sm text-slate-500 mt-1">
                       {{ minioConfig.consoleUrl || '未配置' }}
                     </div>
                   </div>
@@ -798,7 +838,7 @@
                   </template>
                 </el-alert>
 
-                <div class="text-sm text-gray-500">
+                <div class="text-sm text-slate-500">
                   <p class="mb-2"><strong>说明：</strong></p>
                   <ul class="list-disc list-inside space-y-1">
                     <li>MinIO 提供 S3 兼容的对象存储服务</li>
@@ -812,7 +852,7 @@
 
           <!-- WeKnora Knowledge Service Tab -->
           <div v-else-if="activeTab === 'weknora'" class="space-y-6">
-            <el-card shadow="never" class="!border-gray-200">
+            <el-card shadow="never" class="!border-slate-200">
               <template #header>
                 <div class="flex items-center justify-between">
                   <span class="font-medium">WeKnora 知识库服务配置</span>
@@ -830,7 +870,7 @@
                 <el-form-item label="启用 WeKnora">
                   <div class="flex items-center gap-4">
                     <el-switch v-model="weknoraConfigForm.enabled" />
-                    <span class="text-sm text-gray-500">
+                    <span class="text-sm text-slate-500">
                       {{ weknoraConfigForm.enabled ? '已启用 - 文档将同步到知识库' : '已禁用 - 仅使用本地存储' }}
                     </span>
                   </div>
@@ -845,7 +885,7 @@
                   >
                     <template #prepend>URL</template>
                   </el-input>
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     WeKnora 服务的 API 地址，末尾不要加斜杠
                   </div>
                 </el-form-item>
@@ -888,7 +928,7 @@
                     >
                       <template #title>
                         {{ weknoraConnectionTestResult.success ? '连接成功' : '连接失败' }}
-                        <span class="text-gray-500 ml-2">
+                        <span class="text-slate-500 ml-2">
                           ({{ weknoraConnectionTestResult.responseTime }}ms)
                         </span>
                       </template>
@@ -906,7 +946,7 @@
                     placeholder="请输入知识库 ID"
                     :disabled="!weknoraConfigForm.enabled"
                   />
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     CRM 文档将上传到此知识库，可从 WeKnora 管理界面获取
                   </div>
                 </el-form-item>
@@ -923,7 +963,7 @@
                     :disabled="!weknoraConfigForm.enabled"
                     class="w-full"
                   />
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     语义搜索返回的最大文档片段数量
                   </div>
                 </el-form-item>
@@ -950,7 +990,7 @@
                       class="w-24"
                     />
                   </div>
-                  <div class="text-xs text-gray-400 mt-1">
+                  <div class="text-xs text-slate-400 mt-1">
                     只返回相似度高于此阈值的结果，值越高匹配越精确
                   </div>
                 </el-form-item>
@@ -962,14 +1002,14 @@
                       v-model="weknoraConfigForm.autoRagEnabled"
                       :disabled="!weknoraConfigForm.enabled"
                     />
-                    <span class="text-sm text-gray-500">
+                    <span class="text-sm text-slate-500">
                       {{ weknoraConfigForm.autoRagEnabled ? '启用 - 每次对话自动检索相关文档' : '禁用 - 需手动触发知识库搜索' }}
                     </span>
                   </div>
                 </el-form-item>
 
                 <!-- 操作按钮 -->
-                <div class="flex gap-3 pt-4 border-t border-gray-200">
+                <div class="flex gap-3 pt-4 border-t border-slate-200">
                   <el-button
                     type="primary"
                     :loading="savingWeknoraConfig"
@@ -984,11 +1024,11 @@
             </el-card>
 
             <!-- 配置说明卡片 -->
-            <el-card shadow="never" class="!border-gray-200">
+            <el-card shadow="never" class="!border-slate-200">
               <template #header>
                 <span class="font-medium">配置说明</span>
               </template>
-              <div class="text-sm text-gray-600 space-y-2">
+              <div class="text-sm text-slate-600 space-y-2">
                 <p><strong>WeKnora:</strong> 基于向量数据库的知识库服务，支持文档语义搜索和 RAG（检索增强生成）</p>
                 <p><strong>自动 RAG:</strong> 启用后，AI 对话时会自动检索知识库中的相关文档，提供更准确的回答</p>
                 <p><strong>相似度阈值:</strong> 用于过滤低相关性的搜索结果，建议设置在 0.5-0.7 之间</p>
@@ -997,12 +1037,11 @@
           </div>
 
           <!-- Placeholder for other tabs -->
-          <div v-else class="text-center py-16 text-gray-400">
+          <div v-else class="text-center py-16 text-slate-400">
             <el-icon :size="48" class="mb-4"><Tools /></el-icon>
             <p class="text-lg">功能开发中</p>
             <p class="text-sm mt-2">该模块正在建设中，敬请期待</p>
           </div>
-        </div>
       </div>
     </div>
 
@@ -1117,7 +1156,7 @@
         </el-form-item>
         <el-form-item v-if="!editingField" label="字段标识" required>
           <el-input v-model="fieldForm.fieldName" placeholder="英文标识，如：contractType" />
-          <div class="text-xs text-gray-400 mt-1">只能包含字母、数字、下划线，以字母开头</div>
+          <div class="text-xs text-slate-400 mt-1">只能包含字母、数字、下划线，以字母开头</div>
         </el-form-item>
         <el-form-item v-if="!editingField" label="字段类型" required>
           <el-select v-model="fieldForm.fieldType" class="w-full" @change="handleFieldTypeChange">
@@ -1191,107 +1230,203 @@
       </template>
     </el-dialog>
 
-    <!-- Permission Config Drawer -->
-    <el-drawer
-      v-model="showPermissionDrawer"
-      :title="'权限配置 - ' + (permissionRole?.roleName || '')"
-      :size="isMobile ? '100%' : '600px'"
-      direction="rtl"
-    >
-      <div v-if="loadingPermissions" class="text-center py-8">
-        <el-icon class="is-loading"><Loading /></el-icon>
-      </div>
-      <div v-else class="space-y-6">
-        <div v-for="moduleGroup in permissionList" :key="moduleGroup.module">
-          <h4 class="font-medium text-base mb-1">{{ moduleGroup.moduleName }}</h4>
-          <p class="text-xs text-gray-400 mb-3">配置用户在{{ moduleGroup.moduleName }}的操作权限和数据范围</p>
-          <div class="space-y-3">
-            <div
-              v-for="action in moduleGroup.actions"
-              :key="action.action"
-              class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-            >
-              <div class="flex items-center gap-3 flex-1">
-                <el-switch v-model="action.enabled" />
-                <div>
-                  <span class="font-medium text-sm">{{ action.actionName }}</span>
-                  <p class="text-xs text-gray-400 mt-0.5">允许{{ action.actionName }}{{ moduleGroup.moduleName.replace('管理', '') }}</p>
+    <!-- Combined Role Drawer (Members + Permissions) -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="showRoleDrawer" class="fixed inset-0 z-[100]">
+          <!-- Backdrop -->
+          <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="showRoleDrawer = false" />
+
+          <!-- Drawer Panel -->
+          <Transition
+            enter-active-class="transition duration-300 ease-out"
+            enter-from-class="translate-x-full"
+            enter-to-class="translate-x-0"
+            leave-active-class="transition duration-200 ease-in"
+            leave-from-class="translate-x-0"
+            leave-to-class="translate-x-full"
+          >
+            <div v-if="showRoleDrawer" class="fixed inset-y-0 right-0 w-full max-w-3xl bg-slate-50 shadow-2xl flex flex-col">
+              <!-- Drawer Header -->
+              <div class="bg-white px-8 pt-8 pb-0 border-b border-slate-200 shrink-0">
+                <div class="flex items-start justify-between mb-6">
+                  <div>
+                    <div class="flex items-center gap-3 mb-2">
+                      <h2 class="text-2xl font-bold text-slate-900">{{ roleDrawerRole?.roleName }}</h2>
+                      <span v-if="roleDrawerRole?.realm === 'super_admin'" class="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-md uppercase tracking-wider border border-slate-200">
+                        系统预设角色
+                      </span>
+                    </div>
+                    <p class="text-sm text-slate-500">{{ roleDrawerRole?.description || '暂无描述' }}</p>
+                  </div>
+                  <button
+                    @click="showRoleDrawer = false"
+                    class="size-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors"
+                  >
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex gap-8 relative">
+                  <button
+                    @click="roleDrawerTab = 'members'"
+                    :class="[
+                      'pb-4 text-sm font-bold transition-colors relative',
+                      roleDrawerTab === 'members' ? 'text-primary' : 'text-slate-500 hover:text-slate-800'
+                    ]"
+                  >
+                    角色成员
+                    <span class="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">{{ roleDrawerRole?.userCount || 0 }}</span>
+                    <div v-if="roleDrawerTab === 'members'" class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
+                  </button>
+                  <button
+                    @click="roleDrawerTab = 'permissions'"
+                    :class="[
+                      'pb-4 text-sm font-bold transition-colors relative',
+                      roleDrawerTab === 'permissions' ? 'text-primary' : 'text-slate-500 hover:text-slate-800'
+                    ]"
+                  >
+                    权限配置
+                    <div v-if="roleDrawerTab === 'permissions'" class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
+                  </button>
                 </div>
               </div>
-              <el-select
-                v-if="action.hasScopeOption"
-                v-model="action.dataScope"
-                :disabled="!action.enabled"
-                placeholder="数据范围"
-                size="small"
-                style="width: 160px"
-              >
-                <el-option
-                  v-for="opt in dataScopeOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
+
+              <!-- Drawer Content -->
+              <div class="flex-1 overflow-y-auto p-8">
+                <!-- Members Tab -->
+                <div v-if="roleDrawerTab === 'members'" class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                  <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
+                    <div class="relative">
+                      <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+                      <input
+                        v-model="roleUserSearch"
+                        type="text"
+                        placeholder="搜索成员姓名或邮箱..."
+                        class="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white outline-none w-72 transition-all"
+                      />
+                    </div>
+                    <button
+                      @click="showAddRoleUserDialog = true"
+                      class="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
+                    >
+                      <span class="material-symbols-outlined text-sm">person_add</span>
+                      添加成员
+                    </button>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <div v-if="loadingRoleUsers" class="text-center py-16">
+                      <span class="material-symbols-outlined text-slate-300 text-3xl animate-spin">progress_activity</span>
+                    </div>
+                    <table v-else-if="filteredRoleUsers.length > 0" class="w-full text-left text-sm">
+                      <thead class="bg-slate-50/50 border-b border-slate-100 text-slate-500">
+                        <tr>
+                          <th class="px-6 py-4 font-bold">成员信息</th>
+                          <th class="px-6 py-4 font-bold">邮箱</th>
+                          <th class="px-6 py-4 font-bold text-right">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-50">
+                        <tr v-for="user in filteredRoleUsers" :key="user.userId" class="hover:bg-slate-50/80 transition-colors group">
+                          <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                              <div class="size-9 rounded-full flex items-center justify-center text-white font-bold shadow-sm border border-white/20" :class="getAvatarColor(user.realname || user.username)">
+                                {{ (user.realname || user.username || '?').charAt(0) }}
+                              </div>
+                              <div class="font-bold text-slate-900">{{ user.realname || user.username }}</div>
+                            </div>
+                          </td>
+                          <td class="px-6 py-4 text-slate-500">{{ user.email || '-' }}</td>
+                          <td class="px-6 py-4 text-right">
+                            <button
+                              @click="handleRemoveRoleUser(user)"
+                              class="text-slate-400 hover:text-red-600 font-medium transition-colors p-2 rounded-lg hover:bg-red-50 opacity-0 group-hover:opacity-100"
+                            >
+                              <span class="material-symbols-outlined text-sm">person_remove</span>
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <div v-else class="py-10 text-center text-slate-400">
+                      <span class="material-symbols-outlined text-3xl mb-2 opacity-50">group_off</span>
+                      <p class="text-xs">暂无成员</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Permissions Tab -->
+                <div v-else-if="roleDrawerTab === 'permissions'" class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                  <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                    <div>
+                      <h3 class="text-base font-bold text-slate-900">功能权限配置</h3>
+                      <p class="text-xs text-slate-500 mt-1">配置该角色在各个业务模块中的操作权限及数据可见范围。</p>
+                    </div>
+                    <button
+                      @click="handleSavePermissions"
+                      :disabled="savingPermissions"
+                      class="bg-primary text-white px-5 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 disabled:opacity-50"
+                    >
+                      <span v-if="savingPermissions" class="size-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                      <span v-else class="material-symbols-outlined text-sm">save</span>
+                      保存配置
+                    </button>
+                  </div>
+                  <div v-if="loadingPermissions" class="text-center py-16">
+                    <span class="material-symbols-outlined text-slate-300 text-3xl animate-spin">progress_activity</span>
+                  </div>
+                  <div v-else class="p-6 space-y-6 bg-slate-50/30">
+                    <div v-for="moduleGroup in permissionList" :key="moduleGroup.module" class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:border-primary/30 transition-colors">
+                      <div class="bg-slate-50/80 px-6 py-4 flex items-center justify-between border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                          <span class="text-sm font-bold text-slate-900">{{ moduleGroup.moduleName }}</span>
+                        </div>
+                        <span class="text-xs font-medium text-slate-400">{{ moduleGroup.actions.filter((a: any) => a.enabled).length }}/{{ moduleGroup.actions.length }} 已启用</span>
+                      </div>
+                      <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div v-for="action in moduleGroup.actions" :key="action.action" class="flex flex-col gap-3">
+                          <label class="flex items-center gap-3 text-sm text-slate-700 cursor-pointer hover:text-primary transition-colors font-bold group/action">
+                            <div class="relative flex items-center">
+                              <input type="checkbox" v-model="action.enabled" class="peer sr-only" />
+                              <div class="w-4 h-4 border-2 border-slate-300 rounded peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center group-hover/action:border-primary/50">
+                                <span class="material-symbols-outlined text-white text-[12px]" :class="action.enabled ? 'opacity-100' : 'opacity-0'">check</span>
+                              </div>
+                            </div>
+                            {{ action.actionName }}
+                          </label>
+                          <div v-if="action.hasScopeOption" class="pl-7">
+                            <div class="relative">
+                              <select
+                                v-model="action.dataScope"
+                                :disabled="!action.enabled"
+                                class="w-full appearance-none text-xs bg-slate-50 border border-slate-200 rounded-lg pl-3 pr-8 py-2 focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white text-slate-700 outline-none transition-all font-medium cursor-pointer hover:border-slate-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <option v-for="opt in dataScopeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                              </select>
+                              <span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">
+                                expand_more
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          </Transition>
         </div>
-      </div>
-      <template #footer>
-        <el-button @click="showPermissionDrawer = false">取消</el-button>
-        <el-button type="primary" :loading="savingPermissions" @click="handleSavePermissions">保存配置</el-button>
-      </template>
-    </el-drawer>
-
-    <!-- Manage Users Drawer -->
-    <el-drawer
-      v-model="showRoleUsersDrawer"
-      :title="'管理用户 - ' + (roleUsersRole?.roleName || '')"
-      :size="isMobile ? '100%' : '500px'"
-      direction="rtl"
-    >
-      <div class="mb-4">
-        <el-input
-          v-model="roleUserSearch"
-          placeholder="搜索用户..."
-          clearable
-          class="mb-3"
-        />
-        <el-button type="primary" class="w-full" @click="showAddRoleUserDialog = true">
-          <el-icon class="mr-1"><Plus /></el-icon>
-          添加用户
-        </el-button>
-      </div>
-
-      <p class="text-sm text-gray-500 mb-3">当前用户 ({{ filteredRoleUsers.length }})</p>
-
-      <div v-if="loadingRoleUsers" class="text-center py-8">
-        <el-icon class="is-loading"><Loading /></el-icon>
-      </div>
-      <div v-else-if="filteredRoleUsers.length === 0" class="text-center py-8 text-gray-400">
-        暂无用户
-      </div>
-      <div v-else class="space-y-2">
-        <div
-          v-for="user in filteredRoleUsers"
-          :key="user.userId"
-          class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-        >
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium" :class="getAvatarColor(user.realname || user.username)">
-              {{ (user.realname || user.username || '?').charAt(0) }}
-            </div>
-            <div>
-              <div class="font-medium text-sm">{{ user.realname || user.username }}</div>
-              <div class="text-xs text-gray-400">{{ user.email || '' }}</div>
-            </div>
-          </div>
-          <el-button text type="danger" size="small" @click="handleRemoveRoleUser(user)">
-            <el-icon><Delete /></el-icon>
-          </el-button>
-        </div>
-      </div>
-    </el-drawer>
+      </Transition>
+    </Teleport>
 
     <!-- Add User to Role Dialog -->
     <el-dialog
@@ -1306,7 +1441,7 @@
         <div
           v-for="user in availableUsersForRole"
           :key="user.userId"
-          class="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+          class="flex items-center justify-between p-2 hover:bg-slate-50 rounded cursor-pointer"
           @click="toggleSelectUser(user.userId)"
         >
           <div class="flex items-center gap-2">
@@ -1316,9 +1451,9 @@
             </div>
             <span class="text-sm">{{ user.realname || user.username }}</span>
           </div>
-          <span class="text-xs text-gray-400">{{ user.email || '' }}</span>
+          <span class="text-xs text-slate-400">{{ user.email || '' }}</span>
         </div>
-        <div v-if="availableUsersForRole.length === 0" class="text-center py-4 text-gray-400 text-sm">
+        <div v-if="availableUsersForRole.length === 0" class="text-center py-4 text-slate-400 text-sm">
           没有可添加的用户
         </div>
       </div>
@@ -1339,9 +1474,8 @@ import { useAgentStore } from '@/stores/agent'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  User, UserFilled, Key, MagicStick, Plus, Promotion, Edit, Delete, Loading, Grid,
-  Setting, Bell, Coin, Connection, Share, TrendCharts, Document, Tools, View, Hide, Box, Link, Reading,
-  OfficeBuilding, MoreFilled, Message, Phone, Calendar
+  Plus, Promotion, Edit, Delete, Loading,
+  Connection, Document, Tools, View, Hide, Box, Link
 } from '@element-plus/icons-vue'
 import type { AiAgent } from '@/types/common'
 import type { CustomField, EntityType, FieldType, FieldOption } from '@/types/customField'
@@ -1367,7 +1501,17 @@ const agentStore = useAgentStore()
 const { isMobile } = useResponsive()
 
 // Tab state
-const activeTab = ref('profile')
+const activeTab = ref('team')
+const systemTabs = ['profile', 'api', 'agent', 'storage', 'weknora', 'customField']
+const isSystemTab = computed(() => systemTabs.includes(activeTab.value))
+const systemSubTabs = [
+  { value: 'profile', label: '个人资料' },
+  { value: 'api', label: 'AI/API 配置' },
+  { value: 'agent', label: '智能体' },
+  { value: 'storage', label: '对象存储' },
+  { value: 'weknora', label: '知识库服务' },
+  { value: 'customField', label: '自定义字段' }
+]
 
 // Profile form
 const savingProfile = ref(false)
@@ -1513,15 +1657,18 @@ const savingRole = ref(false)
 const editingRole = ref<RoleVO | null>(null)
 const roleForm = reactive({ roleName: '', description: '' })
 
-// Permission drawer state
-const showPermissionDrawer = ref(false)
+// Combined role drawer state
+const showRoleDrawer = ref(false)
+const roleDrawerRole = ref<RoleVO | null>(null)
+const roleDrawerTab = ref<'members' | 'permissions'>('members')
+
+// Permission state (used inside drawer)
 const permissionRole = ref<RoleVO | null>(null)
 const permissionList = ref<RolePermissionVO[]>([])
 const loadingPermissions = ref(false)
 const savingPermissions = ref(false)
 
-// Role users drawer state
-const showRoleUsersDrawer = ref(false)
+// Role users state (used inside drawer)
 const roleUsersRole = ref<RoleVO | null>(null)
 const roleUsers = ref<any[]>([])
 const loadingRoleUsers = ref(false)
@@ -1573,9 +1720,13 @@ function getAvatarColor(name: string): string {
   return avatarColors[index]
 }
 
-function formatDate(date: string | Date | undefined): string {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('zh-CN')
+function countDepts(tree: any[]): number {
+  let count = 0
+  for (const node of tree) {
+    count++
+    if (node.children) count += countDepts(node.children)
+  }
+  return count
 }
 
 // 预设的 AI 服务提供商
@@ -2195,6 +2346,26 @@ function formatTime(time: string | undefined): string {
 }
 
 // 监听 tab 切换，懒加载配置
+// Watch drawer tab switching to load data
+watch(roleDrawerTab, async (newTab) => {
+  if (!showRoleDrawer.value || !roleDrawerRole.value) return
+  if (newTab === 'members') {
+    roleUsersRole.value = roleDrawerRole.value
+    roleUserSearch.value = ''
+    await loadRoleUsers()
+  } else if (newTab === 'permissions') {
+    permissionRole.value = roleDrawerRole.value
+    loadingPermissions.value = true
+    try {
+      permissionList.value = await getRolePermissions(roleDrawerRole.value.roleId)
+    } catch {
+      // handled
+    } finally {
+      loadingPermissions.value = false
+    }
+  }
+})
+
 watch(activeTab, async (newTab) => {
   if (newTab === 'team') {
     await loadDeptTree()
@@ -2215,7 +2386,7 @@ watch(activeTab, async (newTab) => {
   if (newTab === 'weknora' && !weknoraConfigLoaded.value) {
     await loadWeknoraConfig()
   }
-})
+}, { immediate: true })
 
 // MinIO methods
 async function loadMinioConfig() {
@@ -2389,17 +2560,25 @@ async function handleDeleteRole(role: RoleVO) {
   }
 }
 
-// Permission methods
-async function handleManagePermissions(role: RoleVO) {
-  permissionRole.value = role
-  showPermissionDrawer.value = true
-  loadingPermissions.value = true
-  try {
-    permissionList.value = await getRolePermissions(role.roleId)
-  } catch {
-    // handled
-  } finally {
-    loadingPermissions.value = false
+// Combined drawer opener
+async function openRoleDrawer(role: RoleVO, tab: 'members' | 'permissions') {
+  roleDrawerRole.value = role
+  roleDrawerTab.value = tab
+  showRoleDrawer.value = true
+  if (tab === 'members') {
+    roleUsersRole.value = role
+    roleUserSearch.value = ''
+    await loadRoleUsers()
+  } else {
+    permissionRole.value = role
+    loadingPermissions.value = true
+    try {
+      permissionList.value = await getRolePermissions(role.roleId)
+    } catch {
+      // handled
+    } finally {
+      loadingPermissions.value = false
+    }
   }
 }
 
@@ -2420,7 +2599,7 @@ async function handleSavePermissions() {
   try {
     await saveRolePermissions({ roleId: permissionRole.value.roleId, permissions })
     ElMessage.success('权限配置保存成功')
-    showPermissionDrawer.value = false
+    showRoleDrawer.value = false
   } catch {
     // handled
   } finally {
@@ -2429,13 +2608,6 @@ async function handleSavePermissions() {
 }
 
 // Role users methods
-async function handleManageUsers(role: RoleVO) {
-  roleUsersRole.value = role
-  roleUserSearch.value = ''
-  showRoleUsersDrawer.value = true
-  await loadRoleUsers()
-}
-
 async function loadRoleUsers() {
   if (!roleUsersRole.value) return
   loadingRoleUsers.value = true
@@ -2501,25 +2673,6 @@ watch(showAddRoleUserDialog, async (val) => {
 </script>
 
 <style scoped>
-.settings-tabs :deep(.el-tabs__header) {
-  margin-bottom: 0;
-  padding: 0 24px;
-}
-
-.settings-tabs :deep(.el-tabs__nav-wrap::after) {
-  height: 1px;
-}
-
-.settings-tabs :deep(.el-tabs__item) {
-  height: 50px;
-  line-height: 50px;
-  padding: 0 16px;
-}
-
-.settings-tabs :deep(.el-tabs__content) {
-  display: none;
-}
-
 /* Department tree styles */
 :deep(.el-tree-node__content) {
   height: 36px;

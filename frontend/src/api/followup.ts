@@ -29,3 +29,25 @@ export function deleteFollowUp(followUpId: string): Promise<void> {
 export function queryFollowUpPageList(query: FollowUpQueryBO): Promise<PageResult<FollowUp>> {
   return post('/followup/queryPageList', query)
 }
+
+/**
+ * AI parse follow-up content
+ */
+export interface AiFollowUpParseBO {
+  content: string
+  customerName?: string
+  customerId?: string
+}
+
+export interface AiFollowUpParseVO {
+  summary: string
+  type: string
+  followTime: string
+  nextFollowTime: string
+  keyPoints: string[]
+  todos: string[]
+}
+
+export function aiParseFollowUp(data: AiFollowUpParseBO): Promise<AiFollowUpParseVO> {
+  return post('/followup/ai-parse', data)
+}
