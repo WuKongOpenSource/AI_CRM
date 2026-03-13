@@ -311,7 +311,7 @@
                 <span class="material-symbols-outlined text-primary">hub</span>
                 关联业务模块
               </h3>
-              <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">5个模块</span>
+              <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">3个模块</span>
             </div>
 
             <!-- Contacts Module -->
@@ -383,8 +383,8 @@
               </div>
             </section>
 
-            <!-- Opportunities Module -->
-            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <!-- Opportunities Module (hidden) -->
+            <!-- <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
               <div class="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
                 <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary text-lg">monetization_on</span>
@@ -394,10 +394,10 @@
               <div class="p-4">
                 <p class="py-6 text-center text-[10px] text-slate-400">暂无关联商机</p>
               </div>
-            </section>
+            </section> -->
 
-            <!-- Contracts Module -->
-            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <!-- Contracts Module (hidden) -->
+            <!-- <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
               <div class="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
                 <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary text-lg">assignment</span>
@@ -407,7 +407,7 @@
               <div class="p-4">
                 <p class="py-6 text-center text-[10px] text-slate-400">暂无合同记录</p>
               </div>
-            </section>
+            </section> -->
 
             <!-- Tasks Module -->
             <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
