@@ -75,7 +75,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 允许异步 dispatch（流式响应需要）
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
-                        .requestMatchers("/login", "/auth/login").anonymous() // 允许匿名访问
+                        .requestMatchers("/login", "/auth/login", "/auth/register").anonymous() // 允许匿名访问
                         .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
                         .requestMatchers("/index.html", "/doc.html", "/swagger-resources/**", "/webjars/**", "/v3/api-docs/**", "/instrument/callback").anonymous()
                         .requestMatchers("/api/enum/**").permitAll() // 枚举值接口允许访问

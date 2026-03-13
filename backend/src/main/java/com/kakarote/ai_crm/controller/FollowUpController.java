@@ -3,7 +3,9 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,5 +53,11 @@ public class FollowUpController {
     public Result<String> delete(@PathVariable("id") Long id) {
         followUpService.deleteFollowUp(id);
         return Result.ok();
+    }
+
+    @PostMapping("/ai-parse")
+    @Operation(summary = "AI 解析跟进内容")
+    public Result<FollowUpAiParseVO> aiParse(@Valid @RequestBody FollowUpAiParseBO parseBO) {
+        return Result.ok(followUpService.aiParseFollowUp(parseBO));
     }
 }

@@ -36,7 +36,11 @@ public enum SystemCodeEnum implements ResultCode {
 
     SYSTEM_NO_SUCH_PARAMENT_ERROR(1004, "参数不存在!"),
 
-    SYSTEM_OLD_PASSWORD_ERROR(1005, "原密码不正确")
+    SYSTEM_OLD_PASSWORD_ERROR(1005, "原密码不正确"),
+
+    SYSTEM_EMAIL_ALREADY_REGISTERED(1006, "该邮箱已被注册"),
+
+    SYSTEM_VERIFICATION_CODE_ERROR(1007, "验证码不正确")
 
     ;
 

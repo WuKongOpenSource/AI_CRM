@@ -2,7 +2,9 @@ package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
@@ -15,8 +17,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -105,5 +109,21 @@ public class KnowledgeController {
             @Parameter(description = "标签名称") @RequestParam String tagName) {
         knowledgeService.addTag(knowledgeId, tagName);
         return Result.ok();
+    }
+
+    @PostMapping("/{id}/ai-analyze")
+    @Operation(summary = "AI分析文档内容")
+    public Result<KnowledgeAiAnalyzeVO> aiAnalyze(@PathVariable("id") Long id) {
+        return Result.ok(knowledgeService.aiAnalyzeDocument(id));
+    }
+
+    @PostMapping(value = "/{id}/ask", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "向AI提问文档内容（流式响应）")
+    public Flux<ServerSentEvent<String>> askDocument(
+            @PathVariable("id") Long id,
+            @RequestBody KnowledgeAskBO askBO) {
+        return knowledgeService.askDocumentQuestion(id, askBO)
+                .filter(chunk -> chunk != null && !chunk.isEmpty())
+                .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build());
     }
 }

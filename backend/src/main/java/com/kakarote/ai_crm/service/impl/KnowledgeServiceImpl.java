@@ -7,12 +7,18 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
@@ -22,12 +28,16 @@ import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import reactor.core.publisher.Flux;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +46,8 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 知识库服务实现
@@ -55,6 +67,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private DynamicChatClientProvider chatClientProvider;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -302,5 +319,190 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         tag.setKnowledgeId(knowledgeId);
         tag.setTagName(tagName);
         knowledgeTagMapper.insert(tag);
+    }
+
+    // ==================== AI 文档分析 ====================
+
+    private static final String AI_ANALYZE_PROMPT_TEMPLATE = """
+        你是一个专业的 CRM 助手。请分析以下知识库文档，提取关键信息并以 JSON 格式返回。
+
+        文档名称: %s
+        文档类型: %s
+        文档摘要: %s
+
+        文档内容:
+        %s
+
+        请严格按以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
+        {
+          "coreHighlights": "文档核心内容的精炼总结（2-3句话，突出关键信息和价值点）",
+          "talkingPoints": ["基于文档内容的销售话术建议1", "话术建议2", "话术建议3"],
+          "relatedEntities": [{"name": "相关的客户或商机名称", "type": "customer 或 opportunity"}]
+        }
+
+        注意：
+        - coreHighlights 应该是对文档最重要内容的高度概括
+        - talkingPoints 应该是3-5条可以在销售场景中使用的话术建议
+        - relatedEntities 从文档中提取提到的客户名称、公司名称或商机/项目名称
+        """;
+
+    private static final String DOC_QA_SYSTEM_PROMPT_TEMPLATE = """
+        你是一个专业的文档问答助手。请基于以下文档内容回答用户的问题。
+
+        文档名称: %s
+        文档类型: %s
+
+        文档内容:
+        %s
+
+        请用中文回答，回答要准确、简洁。如果文档中没有相关信息，请如实说明。
+        """;
+
+    @Override
+    public KnowledgeAiAnalyzeVO aiAnalyzeDocument(Long knowledgeId) {
+        Knowledge knowledge = getById(knowledgeId);
+        if (ObjectUtil.isNull(knowledge)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
+        }
+
+        String contentText = StrUtil.blankToDefault(knowledge.getContentText(), "");
+        // 截断过长的内容
+        if (contentText.length() > 4000) {
+            contentText = contentText.substring(0, 4000) + "...";
+        }
+
+        String summary = StrUtil.blankToDefault(knowledge.getSummary(), "无");
+        String prompt = String.format(AI_ANALYZE_PROMPT_TEMPLATE,
+                knowledge.getName(),
+                StrUtil.blankToDefault(knowledge.getType(), "document"),
+                summary,
+                contentText);
+
+        try {
+            String response = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
+
+            log.info("AI 文档分析原始响应: {}", response);
+            return parseAnalyzeResponse(response, knowledge);
+        } catch (Exception e) {
+            log.error("AI 文档分析失败，返回默认值", e);
+            return buildFallbackAnalyzeResult(knowledge);
+        }
+    }
+
+    private KnowledgeAiAnalyzeVO parseAnalyzeResponse(String response, Knowledge knowledge) {
+        try {
+            // Strip markdown code block markers if present
+            String json = response.trim();
+            if (json.startsWith("```")) {
+                json = json.replaceFirst("```(?:json)?\\s*", "");
+                json = json.replaceFirst("\\s*```$", "");
+            }
+
+            JsonNode root = objectMapper.readTree(json);
+            KnowledgeAiAnalyzeVO vo = new KnowledgeAiAnalyzeVO();
+
+            // 核心提炼
+            if (root.has("coreHighlights") && !root.get("coreHighlights").isNull()) {
+                vo.setCoreHighlights(root.get("coreHighlights").asText());
+            } else {
+                vo.setCoreHighlights(StrUtil.blankToDefault(knowledge.getSummary(), "暂无摘要"));
+            }
+
+            // 推荐话术
+            List<String> talkingPoints = new ArrayList<>();
+            if (root.has("talkingPoints") && root.get("talkingPoints").isArray()) {
+                root.get("talkingPoints").forEach(n -> talkingPoints.add(n.asText()));
+            }
+            vo.setTalkingPoints(talkingPoints);
+
+            // 关联实体
+            List<KnowledgeAiAnalyzeVO.RelatedEntity> entities = new ArrayList<>();
+            if (root.has("relatedEntities") && root.get("relatedEntities").isArray()) {
+                root.get("relatedEntities").forEach(n -> {
+                    KnowledgeAiAnalyzeVO.RelatedEntity entity = new KnowledgeAiAnalyzeVO.RelatedEntity();
+                    entity.setName(n.has("name") ? n.get("name").asText() : "");
+                    entity.setType(n.has("type") ? n.get("type").asText() : "");
+                    if (StrUtil.isNotBlank(entity.getName())) {
+                        entities.add(entity);
+                    }
+                });
+            }
+            vo.setRelatedEntities(entities);
+
+            return vo;
+        } catch (Exception e) {
+            log.warn("AI 文档分析 JSON 解析失败: {}", e.getMessage());
+            return buildFallbackAnalyzeResult(knowledge);
+        }
+    }
+
+    private KnowledgeAiAnalyzeVO buildFallbackAnalyzeResult(Knowledge knowledge) {
+        KnowledgeAiAnalyzeVO vo = new KnowledgeAiAnalyzeVO();
+        vo.setCoreHighlights(StrUtil.blankToDefault(knowledge.getSummary(), "暂无摘要"));
+        vo.setTalkingPoints(List.of());
+        vo.setRelatedEntities(List.of());
+        return vo;
+    }
+
+    @Override
+    public Flux<String> askDocumentQuestion(Long knowledgeId, KnowledgeAskBO askBO) {
+        Knowledge knowledge = getById(knowledgeId);
+        if (ObjectUtil.isNull(knowledge)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
+        }
+
+        // 设置 AI 上下文
+        Long currentUserId = UserUtil.getUserIdOrNull();
+        Long currentTenantId = UserUtil.getTenantId();
+        if (currentUserId != null) {
+            AiContextHolder.setContext(knowledgeId, currentUserId, currentTenantId);
+        }
+
+        // 构建文档内容上下文
+        String contentText = StrUtil.blankToDefault(knowledge.getContentText(), "");
+        if (contentText.length() > 4000) {
+            contentText = contentText.substring(0, 4000) + "...";
+        }
+
+        String systemPrompt = String.format(DOC_QA_SYSTEM_PROMPT_TEMPLATE,
+                knowledge.getName(),
+                StrUtil.blankToDefault(knowledge.getType(), "document"),
+                contentText);
+
+        // 构建对话历史
+        List<Message> history = new ArrayList<>();
+        if (askBO.getHistory() != null) {
+            for (KnowledgeAskBO.ChatHistoryItem item : askBO.getHistory()) {
+                if ("user".equals(item.getRole())) {
+                    history.add(new UserMessage(item.getContent()));
+                } else if ("assistant".equals(item.getRole())) {
+                    history.add(new AssistantMessage(item.getContent()));
+                }
+            }
+        }
+
+        // 流式调用
+        return chatClientProvider.getChatClient()
+                .prompt()
+                .system(systemPrompt)
+                .messages(history)
+                .user(askBO.getQuestion())
+                .stream()
+                .chatResponse()
+                .mapNotNull(chatResponse -> {
+                    if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
+                        return chatResponse.getResult().getOutput().getText();
+                    }
+                    return null;
+                })
+                .doOnComplete(AiContextHolder::clear)
+                .doOnError(error -> {
+                    log.error("文档问答错误: {}", error.getMessage(), error);
+                    AiContextHolder.clear();
+                });
     }
 }
