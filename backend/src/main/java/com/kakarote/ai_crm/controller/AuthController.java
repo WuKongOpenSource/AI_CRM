@@ -10,6 +10,8 @@ import com.kakarote.ai_crm.entity.BO.LoginUserBO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.RegistrationService;
+import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,6 +54,16 @@ public class AuthController {
 
     @Autowired
     private OidcConfig oidcConfig;
+
+    @Autowired
+    private RegistrationService registrationService;
+
+    @PostMapping("/register")
+    @Operation(summary = "用户注册")
+    public Result<String> register(@Valid @RequestBody RegisterBO registerBO) {
+        registrationService.register(registerBO);
+        return Result.ok("注册成功");
+    }
 
     @PostMapping("/login")
     @Operation(summary = "用户登录")
