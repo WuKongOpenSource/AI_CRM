@@ -21,12 +21,6 @@ public class WeKnoraKnowledge {
     private String id;
 
     /**
-     * 租户 ID
-     */
-    @JsonProperty("tenant_id")
-    private Long tenantId;
-
-    /**
      * 所属知识库 ID
      */
     @JsonProperty("knowledge_base_id")

@@ -28,6 +28,7 @@ import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -68,6 +69,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Autowired
     private FileStorageService fileStorageService;
 
+    @Lazy
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
 
@@ -457,9 +459,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
         // 设置 AI 上下文
         Long currentUserId = UserUtil.getUserIdOrNull();
-        Long currentTenantId = UserUtil.getTenantId();
         if (currentUserId != null) {
-            AiContextHolder.setContext(knowledgeId, currentUserId, currentTenantId);
+            AiContextHolder.setContext(knowledgeId, currentUserId);
         }
 
         // 构建文档内容上下文
