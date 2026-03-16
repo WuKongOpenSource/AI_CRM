@@ -535,15 +535,26 @@ onMounted(async () => {
   ])
 })
 
-// Auto scroll to bottom when new messages arrive
+// Auto scroll to bottom when new messages arrive or during streaming
+let scrollTimer: ReturnType<typeof setTimeout> | null = null
+function scrollToBottom() {
+  if (scrollTimer) return
+  scrollTimer = setTimeout(() => {
+    scrollTimer = null
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  }, 100)
+}
+
 watch(
-  () => chatStore.messages.length,
   () => {
-    nextTick(() => {
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-      }
-    })
+    const msgs = chatStore.messages
+    const last = msgs[msgs.length - 1]
+    return { length: msgs.length, content: last?.content?.length ?? 0 }
+  },
+  () => {
+    nextTick(scrollToBottom)
   }
 )
 
