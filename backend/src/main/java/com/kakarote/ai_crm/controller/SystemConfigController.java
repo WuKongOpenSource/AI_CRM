@@ -3,10 +3,12 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.config.OidcConfig;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
 import com.kakarote.ai_crm.service.ISystemConfigService;
@@ -129,5 +131,20 @@ public class SystemConfigController {
     @Operation(summary = "测试WeKnora连接")
     public Result<WeKnoraConnectionTestVO> testWeKnoraConnection(@Valid @RequestBody WeKnoraConfigUpdateBO configBO) {
         return Result.ok(systemConfigService.testWeKnoraConnection(configBO));
+    }
+
+    // ==================== 企业信息配置接口 ====================
+
+    @GetMapping("/enterprise")
+    @Operation(summary = "获取企业信息配置")
+    public Result<EnterpriseConfigVO> getEnterpriseConfig() {
+        return Result.ok(systemConfigService.getEnterpriseConfig());
+    }
+
+    @PostMapping("/enterprise/update")
+    @Operation(summary = "更新企业信息配置")
+    public Result<String> updateEnterpriseConfig(@Valid @RequestBody EnterpriseConfigUpdateBO updateBO) {
+        systemConfigService.updateEnterpriseConfig(updateBO);
+        return Result.ok();
     }
 }

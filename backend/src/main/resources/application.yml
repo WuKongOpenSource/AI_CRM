@@ -64,7 +64,7 @@ minio:
   endpoint: http://192.168.1.170:9000
   # 面向浏览器的外部访问地址（presigned URL 用，通过 nginx /s3/ 代理）
   # 如果有域名，改为 http://yourdomain.com/s3
-  public-endpoint: http://${HOST_IP}/s3
+  public-endpoint: http://192.168.1.170:9000
   # Access Key
   access-key: minioadmin
   # Secret Key

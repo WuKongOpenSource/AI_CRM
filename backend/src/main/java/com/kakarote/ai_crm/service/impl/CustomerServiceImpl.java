@@ -30,6 +30,7 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
@@ -68,6 +69,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private ManageUserMapper manageUserMapper;
 
     @Autowired
+    @Lazy
     private DynamicChatClientProvider chatClientProvider;
 
     @Autowired

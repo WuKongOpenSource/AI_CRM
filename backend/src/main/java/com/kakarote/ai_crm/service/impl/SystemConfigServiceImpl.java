@@ -5,13 +5,16 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -41,6 +44,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private static final String CACHE_KEY_PREFIX = "system:config:";
     private static final String AI_CONFIG_TYPE = "ai";
     private static final String WEKNORA_CONFIG_TYPE = "weknora";
+    private static final String ENTERPRISE_CONFIG_TYPE = "enterprise";
     private static final long CACHE_EXPIRE_MINUTES = 30;
 
     /**
@@ -59,6 +63,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     // 从 application.yml 读取默认值，确保与 DynamicChatClientProvider 一致
     @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/}")
@@ -525,5 +532,49 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             return message.substring(0, 100) + "...";
         }
         return message;
+    }
+
+    @Override
+    public EnterpriseConfigVO getEnterpriseConfig() {
+        Map<String, String> configs = getConfigsByType(ENTERPRISE_CONFIG_TYPE);
+
+        EnterpriseConfigVO vo = new EnterpriseConfigVO();
+        vo.setName(configs.getOrDefault("enterprise_name", null));
+
+        String logo = configs.getOrDefault("enterprise_logo", null);
+        vo.setLogo(logo);
+        if (StrUtil.isNotBlank(logo)) {
+            vo.setLogoUrl(fileStorageService.getUrl(logo));
+        }
+
+        // 获取最近更新时间
+        SystemConfig latestConfig = lambdaQuery()
+                .eq(SystemConfig::getConfigType, ENTERPRISE_CONFIG_TYPE)
+                .orderByDesc(SystemConfig::getUpdateTime)
+                .last("LIMIT 1")
+                .one();
+        if (latestConfig != null) {
+            vo.setUpdateTime(latestConfig.getUpdateTime());
+        }
+
+        return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateEnterpriseConfig(EnterpriseConfigUpdateBO updateBO) {
+        Map<String, String> configs = new HashMap<>();
+
+        if (updateBO.getName() != null) {
+            configs.put("enterprise_name", updateBO.getName());
+        }
+        if (updateBO.getLogo() != null) {
+            configs.put("enterprise_logo", updateBO.getLogo());
+        }
+
+        if (!configs.isEmpty()) {
+            updateConfigsWithType(configs, ENTERPRISE_CONFIG_TYPE);
+            log.info("企业信息配置已更新");
+        }
     }
 }

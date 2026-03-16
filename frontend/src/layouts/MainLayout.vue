@@ -4,11 +4,14 @@
     <aside v-if="!isMobile" class="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
       <!-- Logo -->
       <div class="p-6 flex items-center gap-3">
-        <div class="size-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
+        <div v-if="enterpriseStore.hasLogo" class="size-10 rounded-xl overflow-hidden shadow-lg">
+          <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
+        </div>
+        <div v-else class="size-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
           <span class="material-symbols-outlined text-2xl">rocket_launch</span>
         </div>
         <div>
-          <h1 class="text-slate-900 font-bold text-lg leading-tight">Nexus AI</h1>
+          <h1 class="text-slate-900 font-bold text-lg leading-tight">{{ enterpriseStore.displayName }}</h1>
           <p class="text-slate-500 text-[10px] uppercase tracking-widest">AI CRM System</p>
         </div>
       </div>
@@ -76,10 +79,13 @@
         <span class="material-symbols-outlined">menu</span>
       </button>
       <div class="flex items-center gap-2">
-        <div class="size-7 bg-primary rounded-lg flex items-center justify-center text-white">
+        <div v-if="enterpriseStore.hasLogo" class="size-7 rounded-lg overflow-hidden">
+          <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
+        </div>
+        <div v-else class="size-7 bg-primary rounded-lg flex items-center justify-center text-white">
           <span class="material-symbols-outlined text-sm">rocket_launch</span>
         </div>
-        <span class="text-sm font-bold text-slate-900">Nexus AI</span>
+        <span class="text-sm font-bold text-slate-900">{{ enterpriseStore.displayName }}</span>
       </div>
       <button @click="handleLogout" class="size-10 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg">
         <span class="material-symbols-outlined text-sm">logout</span>
@@ -94,11 +100,14 @@
       <Transition name="drawer-panel">
         <aside v-if="isMobile && drawerVisible" class="fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101]">
           <div class="p-6 flex items-center gap-3">
-            <div class="size-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
+            <div v-if="enterpriseStore.hasLogo" class="size-10 rounded-xl overflow-hidden shadow-lg">
+              <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
+            </div>
+            <div v-else class="size-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
               <span class="material-symbols-outlined text-2xl">rocket_launch</span>
             </div>
             <div>
-              <h1 class="text-slate-900 font-bold text-lg leading-tight">Nexus AI</h1>
+              <h1 class="text-slate-900 font-bold text-lg leading-tight">{{ enterpriseStore.displayName }}</h1>
               <p class="text-slate-500 text-[10px] uppercase tracking-widest">AI CRM System</p>
             </div>
           </div>
@@ -178,9 +187,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { ElMessageBox } from 'element-plus'
@@ -190,7 +200,10 @@ import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const enterpriseStore = useEnterpriseStore()
 const { isMobile } = useResponsive()
+
+onMounted(() => enterpriseStore.loadConfig())
 
 const drawerVisible = ref(false)
 const showUserMenu = ref(false)

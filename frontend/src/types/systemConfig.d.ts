@@ -92,3 +92,21 @@ export interface WeKnoraConnectionTestResult {
   message: string
   knowledgeCount?: number
 }
+
+/**
+ * 企业信息配置
+ */
+export interface EnterpriseConfig {
+  name: string | null
+  logo: string | null
+  logoUrl: string | null
+  updateTime?: string
+}
+
+/**
+ * 企业信息配置更新参数
+ */
+export interface EnterpriseConfigUpdateBO {
+  name?: string
+  logo?: string
+}

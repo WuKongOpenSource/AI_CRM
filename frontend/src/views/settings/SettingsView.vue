@@ -620,6 +620,84 @@
             </div>
           </div>
 
+          <!-- Enterprise Info Tab -->
+          <div v-else-if="activeTab === 'enterprise'" class="max-w-4xl mx-auto space-y-8">
+            <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 class="text-base font-bold mb-6 flex items-center gap-2">
+                <span class="w-1 h-4 bg-primary rounded-full"></span>
+                企业信息
+                <el-tag v-if="enterpriseForm.updateTime" size="small" type="info" class="ml-auto font-normal">
+                  最后更新: {{ enterpriseForm.updateTime }}
+                </el-tag>
+              </h3>
+
+              <!-- Logo Upload -->
+              <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-2">企业 Logo</label>
+                <div class="flex items-center gap-6">
+                  <div
+                    @click="triggerLogoUpload"
+                    class="size-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all overflow-hidden"
+                    :class="{ '!border-solid !border-slate-200': enterpriseForm.logoUrl }"
+                  >
+                    <img
+                      v-if="enterpriseForm.logoUrl"
+                      :src="enterpriseForm.logoUrl"
+                      class="w-full h-full object-cover"
+                      alt="企业Logo"
+                    />
+                    <div v-else class="text-center">
+                      <el-icon :size="24" class="text-slate-400"><Upload /></el-icon>
+                      <p class="text-[10px] text-slate-400 mt-1">上传Logo</p>
+                    </div>
+                  </div>
+                  <div class="text-xs text-slate-500">
+                    <p>建议尺寸: 200x200px</p>
+                    <p>支持 JPG、PNG 格式</p>
+                    <el-button
+                      v-if="enterpriseForm.logoUrl"
+                      text
+                      type="danger"
+                      size="small"
+                      @click="removeLogo"
+                    >
+                      移除 Logo
+                    </el-button>
+                  </div>
+                </div>
+                <input
+                  ref="logoInputRef"
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg"
+                  class="hidden"
+                  @change="handleLogoChange"
+                />
+              </div>
+
+              <!-- Enterprise Name -->
+              <el-form label-position="top">
+                <el-form-item label="企业名称">
+                  <el-input
+                    v-model="enterpriseForm.name"
+                    placeholder="请输入企业名称"
+                    maxlength="50"
+                    show-word-limit
+                  />
+                </el-form-item>
+              </el-form>
+
+              <div class="flex justify-end pt-4 border-t border-slate-100">
+                <el-button
+                  type="primary"
+                  @click="saveEnterpriseConfig"
+                  :loading="savingEnterprise"
+                >
+                  保存设置
+                </el-button>
+              </div>
+            </section>
+          </div>
+
           <!-- API/AI Tab -->
           <div v-else-if="activeTab === 'api'" class="space-y-6">
             <el-card shadow="never" class="!border-slate-200">
@@ -1475,7 +1553,7 @@ import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus, Promotion, Edit, Delete, Loading,
-  Connection, Document, Tools, View, Hide, Box, Link
+  Connection, Document, Tools, View, Hide, Box, Link, Upload
 } from '@element-plus/icons-vue'
 import type { AiAgent } from '@/types/common'
 import type { CustomField, EntityType, FieldType, FieldOption } from '@/types/customField'
@@ -1491,21 +1569,25 @@ import {
 import { getLoginUserDetail, updateProfile, changePassword, queryUserList, addUser, updateUserInfo } from '@/api/auth'
 import { queryDeptTree as fetchDeptTree, addDept, updateDept, deleteDept } from '@/api/dept'
 import type { DeptVO } from '@/types/dept'
-import { getAiConfig, updateAiConfig, testAiConnection, getMinioConsoleUrl, getMinioSsoUrl, getWeKnoraConfig, updateWeKnoraConfig, testWeKnoraConnection } from '@/api/systemConfig'
+import { getAiConfig, updateAiConfig, testAiConnection, getMinioConsoleUrl, getMinioSsoUrl, getWeKnoraConfig, updateWeKnoraConfig, testWeKnoraConnection, getEnterpriseConfig, updateEnterpriseConfig } from '@/api/systemConfig'
+import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { useEnterpriseStore } from '@/stores/enterprise'
 import type { MinioConsoleConfig } from '@/types/systemConfig'
 import { queryRoleList, addRole, updateRole, deleteRole as deleteRoleApi, getRolePermissions, saveRolePermissions, addUsersToRole, removeUserFromRole } from '@/api/role'
 import type { RoleVO, RolePermissionVO, PermItem } from '@/types/role'
 
 const userStore = useUserStore()
+const enterpriseStore = useEnterpriseStore()
 const agentStore = useAgentStore()
 const { isMobile } = useResponsive()
 
 // Tab state
 const activeTab = ref('team')
-const systemTabs = ['profile', 'api', 'agent', 'storage', 'weknora', 'customField']
+const systemTabs = ['profile', 'enterprise', 'api', 'agent', 'storage', 'weknora', 'customField']
 const isSystemTab = computed(() => systemTabs.includes(activeTab.value))
 const systemSubTabs = [
   { value: 'profile', label: '个人资料' },
+  { value: 'enterprise', label: '企业信息' },
   { value: 'api', label: 'AI/API 配置' },
   { value: 'agent', label: '智能体' },
   { value: 'storage', label: '对象存储' },
@@ -1557,6 +1639,17 @@ const fieldForm = reactive({
   isSearchable: false,
   isShowInList: true,
   options: [] as FieldOption[]
+})
+
+// Enterprise config state
+const savingEnterprise = ref(false)
+const enterpriseConfigLoaded = ref(false)
+const logoInputRef = ref<HTMLInputElement | null>(null)
+const enterpriseForm = reactive({
+  name: '',
+  logo: '',
+  logoUrl: '',
+  updateTime: ''
 })
 
 // Field type labels
@@ -2386,6 +2479,9 @@ watch(activeTab, async (newTab) => {
   if (newTab === 'weknora' && !weknoraConfigLoaded.value) {
     await loadWeknoraConfig()
   }
+  if (newTab === 'enterprise' && !enterpriseConfigLoaded.value) {
+    await loadEnterpriseConfig()
+  }
 }, { immediate: true })
 
 // MinIO methods
@@ -2498,6 +2594,83 @@ async function handleSaveWeknoraConfig() {
     // Error handled by interceptor
   } finally {
     savingWeknoraConfig.value = false
+  }
+}
+
+// ========== Enterprise Config Methods ==========
+
+async function loadEnterpriseConfig() {
+  try {
+    const config = await getEnterpriseConfig()
+    Object.assign(enterpriseForm, {
+      name: config.name || '',
+      logo: config.logo || '',
+      logoUrl: config.logoUrl || '',
+      updateTime: config.updateTime || ''
+    })
+    enterpriseConfigLoaded.value = true
+  } catch {
+    // Error handled by interceptor
+  }
+}
+
+function triggerLogoUpload() {
+  logoInputRef.value?.click()
+}
+
+async function handleLogoChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  // 验证文件类型和大小
+  if (!['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+    ElMessage.warning('仅支持 JPG、PNG 格式')
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    ElMessage.warning('图片大小不能超过 2MB')
+    return
+  }
+
+  try {
+    const presigned = await getPresignedUploadUrl(file.name, file.type)
+    await uploadToMinIO(file, presigned.uploadUrl)
+    enterpriseForm.logo = presigned.objectKey
+    enterpriseForm.logoUrl = presigned.accessUrl
+    ElMessage.success('Logo 上传成功')
+  } catch {
+    ElMessage.error('Logo 上传失败')
+  } finally {
+    // 重置 input 以允许重复选择同一文件
+    input.value = ''
+  }
+}
+
+function removeLogo() {
+  enterpriseForm.logo = ''
+  enterpriseForm.logoUrl = ''
+}
+
+async function saveEnterpriseConfig() {
+  savingEnterprise.value = true
+  try {
+    await updateEnterpriseConfig({
+      name: enterpriseForm.name,
+      logo: enterpriseForm.logo
+    })
+    ElMessage.success('企业信息保存成功')
+    // 更新全局 store
+    enterpriseStore.updateLocal({
+      name: enterpriseForm.name || null,
+      logo: enterpriseForm.logo || null,
+      logoUrl: enterpriseForm.logoUrl || null
+    })
+    await loadEnterpriseConfig()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    savingEnterprise.value = false
   }
 }
 

@@ -3,6 +3,8 @@ import type {
   AiConfig,
   AiConfigUpdateBO,
   AiConnectionTestResult,
+  EnterpriseConfig,
+  EnterpriseConfigUpdateBO,
   MinioConsoleConfig,
   WeKnoraConfig,
   WeKnoraConfigUpdateBO,
@@ -79,4 +81,20 @@ export function updateWeKnoraConfig(data: WeKnoraConfigUpdateBO): Promise<void> 
  */
 export function testWeKnoraConnection(data: WeKnoraConfigUpdateBO): Promise<WeKnoraConnectionTestResult> {
   return post('/systemConfig/weknora/test', data)
+}
+
+// ==================== 企业信息配置接口 ====================
+
+/**
+ * 获取企业信息配置
+ */
+export function getEnterpriseConfig(): Promise<EnterpriseConfig> {
+  return get('/systemConfig/enterprise')
+}
+
+/**
+ * 更新企业信息配置
+ */
+export function updateEnterpriseConfig(data: EnterpriseConfigUpdateBO): Promise<void> {
+  return post('/systemConfig/enterprise/update', data)
 }
