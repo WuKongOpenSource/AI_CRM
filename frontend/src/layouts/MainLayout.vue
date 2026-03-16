@@ -232,20 +232,12 @@ function isActive(routePath: string) {
 }
 
 function navigateTo(path: string) {
-  if (path === '/chat') {
-    openChatDrawer()
-  } else {
-    router.push(path)
-  }
+  router.push(path)
   showUserMenu.value = false
 }
 
 function mobileNavigate(path: string) {
-  if (path === '/chat') {
-    openChatDrawer()
-  } else {
-    router.push(path)
-  }
+  router.push(path)
   drawerVisible.value = false
 }
 
