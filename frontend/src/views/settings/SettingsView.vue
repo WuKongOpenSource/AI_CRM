@@ -218,7 +218,7 @@
                   <span class="truncate">{{ selectedDept ? selectedDept.deptName : '选择部门' }}</span>
                 </button>
                 <button
-                  @click="showAddMemberDialog = true"
+                  @click="resetMemberForm(); showAddMemberDialog = true"
                   :disabled="!selectedDept"
                   class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold flex items-center gap-1 hover:bg-primary/90 transition-all disabled:opacity-50"
                 >

@@ -169,8 +169,11 @@
       </main>
     </div>
 
-    <!-- Floating Action Button (shown on non-chat pages) -->
-    <FloatingActionButton v-if="route.path !== '/chat'" />
+    <!-- Floating Action Button (shown on non-chat pages, hidden when drawer is open) -->
+    <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
+
+    <!-- AI Chat Drawer -->
+    <AiChatDrawer />
   </div>
 </template>
 
@@ -179,8 +182,10 @@ import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
+import { useChatDrawer } from '@/composables/useChatDrawer'
 import { ElMessageBox } from 'element-plus'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
+import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -189,6 +194,7 @@ const { isMobile } = useResponsive()
 
 const drawerVisible = ref(false)
 const showUserMenu = ref(false)
+const { openChatDrawer, isOpen: chatDrawerOpen } = useChatDrawer()
 
 const mainNavItems = [
   { icon: 'auto_awesome', label: 'AI 助手', route: '/chat', fill: false },
@@ -213,12 +219,20 @@ function isActive(routePath: string) {
 }
 
 function navigateTo(path: string) {
-  router.push(path)
+  if (path === '/chat') {
+    openChatDrawer()
+  } else {
+    router.push(path)
+  }
   showUserMenu.value = false
 }
 
 function mobileNavigate(path: string) {
-  router.push(path)
+  if (path === '/chat') {
+    openChatDrawer()
+  } else {
+    router.push(path)
+  }
   drawerVisible.value = false
 }
 

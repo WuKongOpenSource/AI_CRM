@@ -29,19 +29,24 @@ public class UserUtil {
     }
 
     public static Long getUserId() {
-        // 优先从 AI 上下文获取用户ID（用于工具调用线程）
+        // 优先从 SecurityContext 获取（正常 HTTP 请求线程）
+        try {
+            Authentication auth = getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof LoginUser loginUser) {
+                return loginUser.getUser().getUserId();
+            }
+        } catch (Exception ignored) {
+        }
+
+        // 回退到 AI 上下文（工具调用线程没有 SecurityContext）
         Long aiContextUserId = AiContextHolder.getCurrentUserId();
         if (aiContextUserId != null) {
-            log.info("从 AiContextHolder 获取用户ID: {}", aiContextUserId);
+            log.debug("从 AiContextHolder 获取用户ID: {}", aiContextUserId);
             return aiContextUserId;
         }
 
-        try {
-            return getLoginUser().getUser().getUserId();
-        } catch (Exception e) {
-            log.error("无法获取用户ID, AiContext sessionId: {}", AiContextHolder.getCurrentSessionId());
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR);
-        }
+        log.error("无法获取用户ID, AiContext sessionId: {}", AiContextHolder.getCurrentSessionId());
+        throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR);
     }
 
     /**

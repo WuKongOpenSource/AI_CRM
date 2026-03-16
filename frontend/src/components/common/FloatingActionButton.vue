@@ -11,11 +11,11 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useChatDrawer } from '@/composables/useChatDrawer'
 
-const router = useRouter()
+const { openChatDrawer } = useChatDrawer()
 
 function handleClick() {
-  router.push('/chat')
+  openChatDrawer()
 }
 </script>

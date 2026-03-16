@@ -75,9 +75,9 @@ public class ContextPropagationConfig {
 
         @Override
         public void setValue() {
-            // 当上下文需要被清除时调用
-            // 不执行任何操作，让 Reactor 流结束时自然清理
-            log.trace("Context Propagation setValue() 调用, 线程: {}",
+            // 当上下文需要被清除时调用，必须清理 ThreadLocal 防止线程复用时泄露
+            AiContextHolder.clear();
+            log.trace("Context Propagation setValue() 清除上下文, 线程: {}",
                 Thread.currentThread().getName());
         }
     }

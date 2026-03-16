@@ -244,11 +244,11 @@
     <!-- Add Schedule Dialog -->
     <el-dialog
       v-model="showAddDialog"
-      width="640px"
+      width="680px"
       :show-close="false"
       destroy-on-close
-      align-center
-      class="!rounded-2xl !p-0 overflow-hidden"
+      top="6vh"
+      class="!rounded-2xl !p-0 overflow-hidden schedule-dialog"
     >
       <template #header>
         <div class="flex items-center justify-between">
@@ -602,5 +602,13 @@ const aiSuggestions = [
 .slide-right-leave-to {
   transform: translateX(100%);
   opacity: 0;
+}
+</style>
+
+<style>
+.schedule-dialog .el-dialog__body {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0;
 }
 </style>

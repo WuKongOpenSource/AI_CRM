@@ -11,10 +11,14 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.entity.BO.*;
 import com.kakarote.ai_crm.entity.PO.*;
 import com.kakarote.ai_crm.entity.VO.*;
 import com.kakarote.ai_crm.mapper.*;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -24,12 +28,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
+import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -59,6 +66,47 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private ManageUserMapper manageUserMapper;
+
+    @Autowired
+    private DynamicChatClientProvider chatClientProvider;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final String AI_CUSTOMER_PARSE_PROMPT = """
+        你是一个专业的 CRM 助手。请从以下输入（文字描述、名片信息、邮件内容等）中提取客户信息，并进行智能分析。
+
+        如果提供了图片（如名片），请结合图片内容和文字进行分析。
+
+        输入内容:
+        %s
+
+        请严格按以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
+        {
+          "companyName": "公司名称",
+          "industry": "行业（如：互联网、金融、制造业等）",
+          "level": "客户级别，只能是 A、B 或 C（根据公司规模和潜力判断，大公司或明确需求为A，中等为B，其他为C）",
+          "stage": "商机阶段，只能是以下之一: lead, qualified, proposal, negotiation, closed（默认 lead）",
+          "source": "客户来源（如：线上广告、朋友介绍、展会等，若无法判断则留空）",
+          "remark": "备注信息（补充描述）",
+          "contactName": "联系人姓名",
+          "contactPhone": "联系电话",
+          "contactEmail": "电子邮箱",
+          "contactPosition": "联系人职位",
+          "score": 潜力评分(0-100的整数，根据公司规模、需求匹配度、行业前景综合评估),
+          "tags": ["标签1", "标签2", "标签3"],
+          "summary": "客户分析摘要（1-2句话，分析该客户的价值和特点）",
+          "nextStep": "建议的下一步行动（具体可执行的建议）",
+          "keyPoints": ["关键要点1", "关键要点2"]
+        }
+
+        注意：
+        1. 无法从输入中提取的字段请留空字符串或空数组
+        2. tags 请生成3-5个关键词标签
+        3. score 请根据信息丰富度和客户质量给出合理评分
+        """;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -1003,5 +1051,106 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             .eq(Customer::getCustomerId, customerId)
             .set(Customer::getTagNames, tagNames)
             .update();
+    }
+
+    // ==================== AI 智能录入 ====================
+
+    @Override
+    public CustomerAiParseVO aiParseCustomer(CustomerAiParseBO parseBO) {
+        String prompt = String.format(AI_CUSTOMER_PARSE_PROMPT, parseBO.getContent());
+
+        try {
+            String response;
+
+            if (StrUtil.isNotEmpty(parseBO.getImageObjectKey())) {
+                // Multimodal: text + image
+                String imageUrl = fileStorageService.getUrl(parseBO.getImageObjectKey());
+                String mimeTypeStr = StrUtil.blankToDefault(parseBO.getImageMimeType(), "image/png");
+                MimeType mimeType = MimeType.valueOf(mimeTypeStr);
+                Media media = Media.builder()
+                        .mimeType(mimeType)
+                        .data(URI.create(imageUrl).toURL())
+                        .build();
+
+                response = chatClientProvider.getChatClient()
+                        .prompt()
+                        .user(u -> u.text(prompt).media(media))
+                        .call()
+                        .content();
+            } else {
+                // Text only
+                response = chatClientProvider.getChatClient()
+                        .prompt()
+                        .user(prompt)
+                        .call()
+                        .content();
+            }
+
+            log.info("AI 客户录入解析原始响应: {}", response);
+            return parseCustomerAiResponse(response);
+        } catch (Exception e) {
+            log.error("AI 客户录入解析失败", e);
+            return buildFallbackCustomerResult();
+        }
+    }
+
+    private CustomerAiParseVO parseCustomerAiResponse(String response) {
+        try {
+            // Strip markdown code block markers if present
+            String json = response.trim();
+            if (json.startsWith("```")) {
+                json = json.replaceFirst("```(?:json)?\\s*", "");
+                json = json.replaceFirst("\\s*```$", "");
+            }
+
+            JsonNode root = objectMapper.readTree(json);
+            CustomerAiParseVO vo = new CustomerAiParseVO();
+            vo.setCompanyName(getJsonText(root, "companyName"));
+            vo.setIndustry(getJsonText(root, "industry"));
+            vo.setLevel(getJsonText(root, "level"));
+            vo.setStage(getJsonText(root, "stage"));
+            vo.setSource(getJsonText(root, "source"));
+            vo.setRemark(getJsonText(root, "remark"));
+            vo.setContactName(getJsonText(root, "contactName"));
+            vo.setContactPhone(getJsonText(root, "contactPhone"));
+            vo.setContactEmail(getJsonText(root, "contactEmail"));
+            vo.setContactPosition(getJsonText(root, "contactPosition"));
+            vo.setSummary(getJsonText(root, "summary"));
+            vo.setNextStep(getJsonText(root, "nextStep"));
+
+            if (root.has("score") && !root.get("score").isNull()) {
+                vo.setScore(root.get("score").asInt(50));
+            }
+
+            vo.setTags(getJsonStringList(root, "tags"));
+            vo.setKeyPoints(getJsonStringList(root, "keyPoints"));
+
+            return vo;
+        } catch (Exception e) {
+            log.warn("AI 客户录入响应 JSON 解析失败: {}", e.getMessage());
+            return buildFallbackCustomerResult();
+        }
+    }
+
+    private String getJsonText(JsonNode root, String field) {
+        if (root.has(field) && !root.get(field).isNull()) {
+            return root.get(field).asText();
+        }
+        return null;
+    }
+
+    private List<String> getJsonStringList(JsonNode root, String field) {
+        List<String> result = new ArrayList<>();
+        if (root.has(field) && root.get(field).isArray()) {
+            root.get(field).forEach(n -> result.add(n.asText()));
+        }
+        return result;
+    }
+
+    private CustomerAiParseVO buildFallbackCustomerResult() {
+        CustomerAiParseVO vo = new CustomerAiParseVO();
+        vo.setTags(List.of());
+        vo.setKeyPoints(List.of());
+        return vo;
     }
 }

@@ -48,11 +48,11 @@
                   <div class="flex items-center gap-4">
                     <div class="flex items-center gap-1">
                       <span class="text-slate-400">联系人:</span>
-                      <span class="text-slate-600 font-medium">{{ primaryContact?.name || '未设置' }}</span>
+                      <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
                     </div>
                     <div class="flex items-center gap-1">
                       <span class="text-slate-400">手机:</span>
-                      <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '未填写' }}</span>
+                      <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
                     </div>
                     <div class="flex items-center gap-1">
                       <span class="text-slate-400">状态:</span>
@@ -132,11 +132,11 @@
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">所属行业</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.industry || '未填写' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.industry || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户来源</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.source || '未填写' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.source || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户级别</p>
@@ -151,23 +151,23 @@
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">主要联系人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.name || '未设置' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.name || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">联系电话</p>
-                  <p class="text-sm text-slate-900 font-medium font-mono px-2 py-1 -ml-2 truncate">{{ primaryContact?.phone || '未填写' }}</p>
+                  <p class="text-sm text-slate-900 font-medium font-mono px-2 py-1 -ml-2 truncate">{{ primaryContact?.phone || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">电子邮箱</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.email || '未填写' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ primaryContact?.email || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">客户地址</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.address || '未填写' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.address || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">公司网站</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '未填写' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>

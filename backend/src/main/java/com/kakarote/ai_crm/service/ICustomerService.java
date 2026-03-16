@@ -3,12 +3,14 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.CustomerAddBO;
+import com.kakarote.ai_crm.entity.BO.CustomerAiParseBO;
 import com.kakarote.ai_crm.entity.BO.CustomerExportBO;
 import com.kakarote.ai_crm.entity.BO.CustomerImportBO;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.CustomerTransferBO;
 import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerImportPreviewVO;
 import com.kakarote.ai_crm.entity.VO.CustomerImportResultVO;
@@ -93,4 +95,9 @@ public interface ICustomerService extends IService<Customer> {
      * 确认导入
      */
     CustomerImportResultVO confirmImport(List<CustomerImportBO> rows);
+
+    /**
+     * AI智能录入解析客户信息
+     */
+    CustomerAiParseVO aiParseCustomer(CustomerAiParseBO parseBO);
 }

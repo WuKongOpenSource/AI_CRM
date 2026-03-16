@@ -110,3 +110,34 @@ export function importCustomerPreview(file: File): Promise<CustomerImportPreview
 export function confirmCustomerImport(rows: CustomerImportRow[]): Promise<CustomerImportResult> {
   return post('/customer/import/confirm', rows)
 }
+
+/**
+ * AI smart input - parse customer info
+ */
+export interface CustomerAiParseBO {
+  content: string
+  imageObjectKey?: string
+  imageMimeType?: string
+}
+
+export interface CustomerAiParseVO {
+  companyName?: string
+  industry?: string
+  level?: string
+  stage?: string
+  source?: string
+  remark?: string
+  contactName?: string
+  contactPhone?: string
+  contactEmail?: string
+  contactPosition?: string
+  score?: number
+  tags?: string[]
+  summary?: string
+  nextStep?: string
+  keyPoints?: string[]
+}
+
+export function aiParseCustomer(data: CustomerAiParseBO): Promise<CustomerAiParseVO> {
+  return post('/customer/ai-parse', data)
+}

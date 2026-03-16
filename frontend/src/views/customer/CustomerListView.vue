@@ -347,7 +347,7 @@
                 </div>
                 <div>
                   <h2 class="text-lg sm:text-xl font-bold text-slate-900">{{ editingCustomer ? '编辑客户' : '新增客户' }}</h2>
-                  <p class="text-xs text-slate-500">填写客户基本信息和联系方式</p>
+                  <p class="text-xs text-slate-500">{{ editingCustomer ? '修改客户基本信息和联系方式' : '使用 AI 智能录入或手动填写客户信息' }}</p>
                 </div>
               </div>
               <div class="flex items-center gap-2 sm:gap-3">
@@ -367,6 +367,74 @@
               <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <!-- Left Column: Form -->
                 <div class="lg:col-span-7 space-y-5">
+                  <!-- AI 智能录入 (only in create mode) -->
+                  <section v-if="!editingCustomer" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary text-lg">auto_awesome</span>
+                        <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">AI 智能录入</h3>
+                      </div>
+                      <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">粘贴名片、邮件或简介</span>
+                    </div>
+                    <div class="p-4 space-y-3">
+                      <div class="relative">
+                        <textarea
+                          v-model="aiInputText"
+                          class="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-primary/50 outline-none resize-none transition-all"
+                          placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
+                          @paste="handleAiPaste"
+                        />
+                        <!-- Image preview inside textarea area -->
+                        <div v-if="aiImagePreview" class="absolute right-3 bottom-3">
+                          <div class="relative group">
+                            <img :src="aiImagePreview" alt="名片图片" class="h-16 w-24 object-cover rounded-lg border-2 border-primary shadow-lg" />
+                            <button
+                              @click="removeAiImage"
+                              class="absolute -top-2 -right-2 size-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+                            >
+                              <span class="material-symbols-outlined text-[12px] font-bold">close</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="flex justify-end items-center gap-3">
+                        <span v-if="aiImagePreview && !aiParsing" class="text-[10px] text-primary font-bold flex items-center gap-1 animate-pulse">
+                          <span class="material-symbols-outlined text-sm">image</span>
+                          检测到名片图片，点击智能提取
+                        </span>
+                        <button
+                          @click="handleAiExtract"
+                          :disabled="aiParsing || (!aiInputText.trim() && !aiImageFile)"
+                          :class="[
+                            'flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all',
+                            aiParsing
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                              : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-900/10'
+                          ]"
+                        >
+                          <template v-if="aiParsing">
+                            <span class="size-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
+                            解析中...
+                          </template>
+                          <template v-else>
+                            <span class="material-symbols-outlined text-sm">psychology</span>
+                            智能提取
+                          </template>
+                        </button>
+                      </div>
+
+                      <!-- Mobile AI result summary -->
+                      <div v-if="isMobile && aiParseResult" class="p-3 bg-primary/5 rounded-xl border border-primary/10 text-xs text-slate-600 space-y-1">
+                        <div v-if="aiParseResult.score != null" class="font-bold text-primary">潜力评分: {{ aiParseResult.score }}/100</div>
+                        <div v-if="aiParseResult.summary">{{ aiParseResult.summary }}</div>
+                        <div v-if="aiParseResult.tags?.length" class="flex flex-wrap gap-1 mt-1">
+                          <span v-for="tag in aiParseResult.tags" :key="tag" class="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded-full">{{ tag }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
                   <!-- Basic Information -->
                   <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
                     <h3 class="text-xs font-bold text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-wider">
@@ -414,6 +482,14 @@
                           <option value="closed">已成交</option>
                         </select>
                       </div>
+                      <!-- Dynamic Custom Fields (inline in same grid) -->
+                      <DynamicFieldForm
+                        ref="dynamicFieldFormRef"
+                        entity-type="customer"
+                        v-model="customFieldValues"
+                        :show-divider="false"
+                        native-style
+                      />
                     </div>
                   </section>
 
@@ -450,29 +526,72 @@
                       </div>
                     </div>
                   </section>
-
-                  <!-- Dynamic Custom Fields -->
-                  <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
-                    <DynamicFieldForm
-                      ref="dynamicFieldFormRef"
-                      entity-type="customer"
-                      v-model="customFieldValues"
-                      title="扩展信息"
-                    />
-                  </section>
                 </div>
 
-                <!-- Right Column: AI Placeholder + Tips -->
+                <!-- Right Column: AI Insights -->
                 <div class="lg:col-span-5 space-y-5" :class="{ 'hidden': isMobile }">
-                  <!-- AI Waiting Placeholder -->
-                  <div class="bg-white rounded-2xl border border-slate-200 border-dashed p-8 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center">
+                  <!-- AI Insights (shown after parse) -->
+                  <template v-if="aiParseResult">
+                    <!-- AI Score Card -->
+                    <div v-if="aiParseResult.score != null" class="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden">
+                      <div class="relative z-10">
+                        <div class="flex items-center justify-between mb-4">
+                          <span class="text-[9px] font-bold text-primary uppercase tracking-widest">AI 潜力评分</span>
+                          <span class="material-symbols-outlined text-primary text-lg">verified</span>
+                        </div>
+                        <div class="flex items-baseline gap-2 mb-1">
+                          <span class="text-5xl font-black">{{ aiParseResult.score }}</span>
+                          <span class="text-lg text-slate-400">/ 100</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-4">基于行业匹配度、需求迫切度及规模评估</p>
+                        <div v-if="aiParseResult.tags?.length" class="flex flex-wrap gap-1.5">
+                          <span v-for="tag in aiParseResult.tags" :key="tag" class="px-2 py-0.5 bg-white/10 rounded-md text-[9px] font-bold uppercase tracking-wider">{{ tag }}</span>
+                        </div>
+                      </div>
+                      <div class="absolute -right-8 -bottom-8 size-32 bg-primary/20 rounded-full blur-3xl"></div>
+                    </div>
+
+                    <!-- AI Analysis Card -->
+                    <div v-if="aiParseResult.summary || aiParseResult.nextStep" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+                      <div v-if="aiParseResult.summary">
+                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <span class="material-symbols-outlined text-sm text-primary">analytics</span>
+                          AI 深度分析
+                        </h4>
+                        <p class="text-xs text-slate-700 leading-relaxed">{{ aiParseResult.summary }}</p>
+                      </div>
+                      <div v-if="aiParseResult.nextStep" :class="{ 'pt-4 border-t border-slate-100': aiParseResult.summary }">
+                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <span class="material-symbols-outlined text-sm text-primary">rocket_launch</span>
+                          建议下一步行动
+                        </h4>
+                        <p class="text-xs text-slate-700 leading-relaxed">{{ aiParseResult.nextStep }}</p>
+                      </div>
+                    </div>
+
+                    <!-- Key Points -->
+                    <div v-if="aiParseResult.keyPoints?.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                      <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sm text-primary">checklist</span>
+                        关键要点
+                      </h4>
+                      <ul class="space-y-2">
+                        <li v-for="(point, i) in aiParseResult.keyPoints" :key="i" class="text-xs text-slate-700 flex items-start gap-2 leading-relaxed">
+                          <span class="text-primary mt-0.5 shrink-0">•</span> {{ point }}
+                        </li>
+                      </ul>
+                    </div>
+                  </template>
+
+                  <!-- Default placeholder (no AI result yet) -->
+                  <div v-else class="bg-white rounded-2xl border border-slate-200 border-dashed p-8 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center">
                     <div class="size-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto">
                       <span class="material-symbols-outlined text-slate-300 text-2xl">psychology</span>
                     </div>
                     <div>
-                      <h4 class="text-xs font-bold text-slate-900">AI 智能分析</h4>
+                      <h4 class="text-xs font-bold text-slate-900">等待 AI 分析</h4>
                       <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">
-                        保存客户后，AI 将自动为您提供<br/>客户洞察与跟进建议。
+                        录入客户信息或使用智能提取后，AI 将在此为您提供<br/>深度洞察与潜力评估。
                       </p>
                     </div>
                   </div>
@@ -484,7 +603,7 @@
                       小提示
                     </h4>
                     <p class="text-[10px] text-slate-600 leading-relaxed">
-                      创建客户后，您可以在 AI 助手中使用智能跟进功能，自动生成拜访记录和跟进计划。
+                      您可以直接粘贴该客户的 LinkedIn 简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
                     </p>
                   </div>
                 </div>
@@ -634,10 +753,12 @@ import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadInstance, UploadFile } from 'element-plus'
-import type { CustomerListVO, CustomerAddBO, CustomerImportPreview, CustomerImportRow, CustomerImportResult } from '@/types/customer'
+import type { CustomerListVO, CustomerAddBO, CustomerImportPreview, CustomerImportRow, CustomerImportResult, CustomerLevel, CustomerStage } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { transferCustomer, updateCustomerStage, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport } from '@/api/customer'
+import { transferCustomer, updateCustomerStage, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport, aiParseCustomer } from '@/api/customer'
+import type { CustomerAiParseVO } from '@/api/customer'
+import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { queryUserList } from '@/api/auth'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -665,6 +786,13 @@ const importResult = ref<CustomerImportResult | null>(null)
 const globalDuplicateMode = ref('')
 const importUploadRef = ref<UploadInstance>()
 
+// AI Smart Input state
+const aiInputText = ref('')
+const aiParsing = ref(false)
+const aiParseResult = ref<CustomerAiParseVO | null>(null)
+const aiImageFile = ref<File | null>(null)
+const aiImagePreview = ref<string | null>(null)
+
 // AI Follow-up Drawer
 const showAiFollowUpDrawer = ref(false)
 const aiFollowUpCustomer = ref<CustomerListVO | null>(null)
@@ -676,6 +804,74 @@ function handleAiFollowUp(customer: CustomerListVO) {
 
 function handleAiFollowUpSaved() {
   customerStore.fetchCustomerList(true)
+}
+
+// AI Smart Input handlers
+function handleAiPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+      const file = items[i].getAsFile()
+      if (file) {
+        aiImageFile.value = file
+        aiImagePreview.value = URL.createObjectURL(file)
+      }
+    }
+  }
+}
+
+function removeAiImage() {
+  if (aiImagePreview.value) {
+    URL.revokeObjectURL(aiImagePreview.value)
+  }
+  aiImageFile.value = null
+  aiImagePreview.value = null
+}
+
+async function handleAiExtract() {
+  if (aiParsing.value) return
+  if (!aiInputText.value.trim() && !aiImageFile.value) {
+    ElMessage.warning('请输入文本或粘贴图片')
+    return
+  }
+
+  aiParsing.value = true
+  try {
+    let imageObjectKey: string | undefined
+    let imageMimeType: string | undefined
+
+    // Upload image to MinIO if present
+    if (aiImageFile.value) {
+      const presigned = await getPresignedUploadUrl(aiImageFile.value.name, aiImageFile.value.type)
+      await uploadToMinIO(aiImageFile.value, presigned.uploadUrl)
+      imageObjectKey = presigned.objectKey
+      imageMimeType = aiImageFile.value.type
+    }
+
+    const result = await aiParseCustomer({
+      content: aiInputText.value.trim() || '请从图片中提取客户信息',
+      imageObjectKey,
+      imageMimeType
+    })
+
+    aiParseResult.value = result
+
+    // Auto-fill form fields with extracted data
+    if (result.companyName) formData.companyName = result.companyName
+    if (result.industry) formData.industry = result.industry
+    if (result.level && ['A', 'B', 'C'].includes(result.level)) formData.level = result.level as CustomerLevel
+    if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed'].includes(result.stage)) formData.stage = result.stage as CustomerStage
+    if (result.contactName) formData.contactName = result.contactName
+    if (result.contactPhone) formData.contactPhone = result.contactPhone
+    if (result.contactEmail) formData.contactEmail = result.contactEmail
+
+    ElMessage.success('AI 提取完成，信息已自动填充')
+  } catch (err: any) {
+    ElMessage.error('AI 解析失败: ' + (err.message || '未知错误'))
+  } finally {
+    aiParsing.value = false
+  }
 }
 
 // Owner transfer
@@ -843,6 +1039,11 @@ function resetForm() {
     contactEmail: ''
   })
   customFieldValues.value = {}
+  // Reset AI state
+  aiInputText.value = ''
+  aiParsing.value = false
+  aiParseResult.value = null
+  removeAiImage()
 }
 
 function getStageLabel(stage: string): string {

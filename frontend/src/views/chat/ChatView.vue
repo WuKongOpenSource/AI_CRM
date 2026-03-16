@@ -55,7 +55,7 @@
             <button
               v-for="session in groupedSessions.today"
               :key="session.sessionId"
-              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative"
+              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative min-w-0 overflow-hidden"
               :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId
                 ? 'bg-white shadow-sm border border-slate-200'
                 : 'hover:bg-slate-100/50 border border-transparent'"
@@ -79,7 +79,7 @@
             <button
               v-for="session in groupedSessions.yesterday"
               :key="session.sessionId"
-              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative"
+              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative min-w-0 overflow-hidden"
               :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId
                 ? 'bg-white shadow-sm border border-slate-200'
                 : 'hover:bg-slate-100/50 border border-transparent'"
@@ -103,7 +103,7 @@
             <button
               v-for="session in groupedSessions.earlier"
               :key="session.sessionId"
-              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative"
+              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative min-w-0 overflow-hidden"
               :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId
                 ? 'bg-white shadow-sm border border-slate-200'
                 : 'hover:bg-slate-100/50 border border-transparent'"

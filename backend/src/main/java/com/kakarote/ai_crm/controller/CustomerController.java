@@ -3,11 +3,13 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.CustomerAddBO;
+import com.kakarote.ai_crm.entity.BO.CustomerAiParseBO;
 import com.kakarote.ai_crm.entity.BO.CustomerExportBO;
 import com.kakarote.ai_crm.entity.BO.CustomerImportBO;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.CustomerTransferBO;
 import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerImportPreviewVO;
 import com.kakarote.ai_crm.entity.VO.CustomerImportResultVO;
@@ -132,5 +134,11 @@ public class CustomerController {
     @Operation(summary = "确认导入")
     public Result<CustomerImportResultVO> confirmImport(@RequestBody List<CustomerImportBO> rows) {
         return Result.ok(customerService.confirmImport(rows));
+    }
+
+    @PostMapping("/ai-parse")
+    @Operation(summary = "AI 智能录入解析客户信息")
+    public Result<CustomerAiParseVO> aiParse(@Valid @RequestBody CustomerAiParseBO parseBO) {
+        return Result.ok(customerService.aiParseCustomer(parseBO));
     }
 }
