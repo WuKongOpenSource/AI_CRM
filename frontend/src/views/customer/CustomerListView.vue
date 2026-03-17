@@ -50,7 +50,7 @@
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-slate-50 border-b border-slate-200">
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">公司名称</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap sticky left-0 z-20 bg-slate-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">公司名称</th>
                   <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">客户级别</th>
                   <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">联系人</th>
                   <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">电话</th>
@@ -62,7 +62,7 @@
                   <th v-for="field in listCustomFields" :key="field.fieldId" class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                     {{ field.fieldLabel }}
                   </th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right">操作</th>
+                  <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-right sticky right-0 z-20 bg-slate-50 shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
@@ -73,7 +73,7 @@
                   @click="handleRowClick(customer)"
                 >
                   <!-- Company Name -->
-                  <td class="px-6 py-4 whitespace-nowrap">
+                  <td class="px-6 py-4 whitespace-nowrap sticky left-0 z-10 bg-white group-hover:bg-blue-50 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                     <div class="flex items-center gap-3">
                       <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs">
                         {{ customer.companyName?.charAt(0) || '?' }}
@@ -172,51 +172,14 @@
                   </td>
 
                   <!-- Actions -->
-                  <td class="px-6 py-4 text-right whitespace-nowrap" @click.stop>
-                    <div class="flex items-center justify-end gap-2">
-                      <button
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
-                        @click="handleAiFollowUp(customer)"
-                      >
-                        <span class="material-symbols-outlined text-sm">smart_toy</span>
-                        AI 跟进
-                      </button>
-                      <button
-                        v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
-                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
-                        @click="handleEdit(customer)"
-                      >
-                        <span class="material-symbols-outlined text-sm">edit</span>
-                        编辑
-                      </button>
-                      <el-dropdown
-                        v-if="customer.stage !== 'closed' && customer.stage !== 'lost'"
-                        trigger="click"
-                        size="small"
-                        @command="(stage: string) => handleAdvanceStage(customer.customerId, stage)"
-                      >
-                        <button class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
-                          <span class="material-symbols-outlined text-lg">more_vert</span>
-                        </button>
-                        <template #dropdown>
-                          <el-dropdown-menu>
-                            <el-dropdown-item
-                              v-if="getNextStage(customer.stage)"
-                              :command="getNextStage(customer.stage)"
-                              style="font-weight: bold"
-                            >
-                              推进到「{{ allStageOptions.find(s => s.value === getNextStage(customer.stage))?.label }}」
-                            </el-dropdown-item>
-                            <el-dropdown-item v-if="getNextStage(customer.stage)" divided />
-                            <el-dropdown-item
-                              v-for="opt in allStageOptions.filter(s => s.value !== customer.stage)"
-                              :key="opt.value"
-                              :command="opt.value"
-                            >{{ opt.label }}</el-dropdown-item>
-                          </el-dropdown-menu>
-                        </template>
-                      </el-dropdown>
-                    </div>
+                  <td class="px-6 py-4 text-right whitespace-nowrap sticky right-0 z-10 bg-white group-hover:bg-blue-50 transition-colors shadow-[-2px_0_5px_-2px_rgba(0,0,0,0.1)]" @click.stop>
+                    <button
+                      class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                      @click="handleAiFollowUp(customer)"
+                    >
+                      <span class="material-symbols-outlined text-sm">smart_toy</span>
+                      AI 跟进
+                    </button>
                   </td>
                 </tr>
               </tbody>
