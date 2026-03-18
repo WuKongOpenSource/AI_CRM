@@ -1681,6 +1681,9 @@
       direction="rtl"
       :size="isMobile ? '100%' : '400px'"
       :with-header="false"
+      :modal="isMobile"
+      :lock-scroll="isMobile"
+      :modal-penetrable="!isMobile"
       class="employee-detail-drawer"
     >
       <div v-if="detailMember" class="h-full flex flex-col bg-white shadow-2xl">
