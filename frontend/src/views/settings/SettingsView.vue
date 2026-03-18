@@ -744,6 +744,15 @@
                     show-word-limit
                   />
                 </el-form-item>
+                <el-form-item label="企业说明">
+                  <el-input
+                    v-model="enterpriseForm.description"
+                    placeholder="请输入企业说明（显示在侧边栏企业名称下方）"
+                    maxlength="50"
+                    show-word-limit
+                  />
+                  <div class="text-xs text-slate-400 mt-1">侧边栏最多显示12个字符，超出部分将以省略号显示</div>
+                </el-form-item>
               </el-form>
 
               <div class="flex justify-end pt-4 border-t border-slate-100">
@@ -1723,7 +1732,7 @@
               </div>
               <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">登录账号</p>
-                <p class="text-sm font-bold text-slate-700">@{{ detailMember.username }}</p>
+                <p class="text-sm font-bold text-slate-700">{{ detailMember.username }}</p>
               </div>
               <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">直属上级</p>
@@ -1913,6 +1922,7 @@ const enterpriseForm = reactive({
   name: '',
   logo: '',
   logoUrl: '',
+  description: '',
   updateTime: ''
 })
 
@@ -2981,6 +2991,7 @@ async function loadEnterpriseConfig() {
       name: config.name || '',
       logo: config.logo || '',
       logoUrl: config.logoUrl || '',
+      description: config.description || '',
       updateTime: config.updateTime || ''
     })
     enterpriseConfigLoaded.value = true
@@ -3032,14 +3043,16 @@ async function saveEnterpriseConfig() {
   try {
     await updateEnterpriseConfig({
       name: enterpriseForm.name,
-      logo: enterpriseForm.logo
+      logo: enterpriseForm.logo,
+      description: enterpriseForm.description
     })
     ElMessage.success('企业信息保存成功')
     // 更新全局 store
     enterpriseStore.updateLocal({
       name: enterpriseForm.name || null,
       logo: enterpriseForm.logo || null,
-      logoUrl: enterpriseForm.logoUrl || null
+      logoUrl: enterpriseForm.logoUrl || null,
+      description: enterpriseForm.description || null
     })
     await loadEnterpriseConfig()
   } catch {

@@ -100,6 +100,7 @@ export interface EnterpriseConfig {
   name: string | null
   logo: string | null
   logoUrl: string | null
+  description: string | null
   updateTime?: string
 }
 
@@ -109,4 +110,5 @@ export interface EnterpriseConfig {
 export interface EnterpriseConfigUpdateBO {
   name?: string
   logo?: string
+  description?: string
 }

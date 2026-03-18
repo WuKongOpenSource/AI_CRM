@@ -17,4 +17,7 @@ public class EnterpriseConfigUpdateBO implements Serializable {
 
     @Schema(description = "企业Logo（MinIO objectKey）")
     private String logo;
+
+    @Schema(description = "企业说明")
+    private String description;
 }

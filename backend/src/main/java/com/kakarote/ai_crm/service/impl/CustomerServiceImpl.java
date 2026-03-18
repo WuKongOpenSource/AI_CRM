@@ -458,10 +458,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         // 5b. 合并多联系人客户的客户列单元格
         Sheet exportSheet = writer.getSheet();
+        Workbook wb = writer.getWorkbook();
         if (!mergeRanges.isEmpty()) {
-            CellStyle mergedStyle = writer.getWorkbook().createCellStyle();
-            mergedStyle.setVerticalAlignment(VerticalAlignment.CENTER);
-
             for (int[] range : mergeRanges) {
                 int firstRow = range[0];
                 int lastRow = firstRow + range[1] - 1;
@@ -469,12 +467,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 // 合并客户列 (0–10)
                 for (int col = 0; col <= CUSTOMER_COL_END; col++) {
                     exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
-                    applyMergedStyle(exportSheet, firstRow, col, mergedStyle);
+                    applyCenteredStyle(exportSheet, wb, firstRow, col);
                 }
                 // 合并自定义字段列 (16+)
                 for (int col = CUSTOM_FIELD_COL_START; col <= CUSTOM_FIELD_COL_END; col++) {
                     exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
-                    applyMergedStyle(exportSheet, firstRow, col, mergedStyle);
+                    applyCenteredStyle(exportSheet, wb, firstRow, col);
                 }
             }
         }
@@ -535,13 +533,16 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return row;
     }
 
-    private void applyMergedStyle(Sheet sheet, int rowIdx, int colIdx, CellStyle style) {
+    private void applyCenteredStyle(Sheet sheet, Workbook wb, int rowIdx, int colIdx) {
         Row row = sheet.getRow(rowIdx);
-        if (row != null) {
-            Cell cell = row.getCell(colIdx);
-            if (cell == null) cell = row.createCell(colIdx);
-            cell.setCellStyle(style);
-        }
+        if (row == null) return;
+        Cell cell = row.getCell(colIdx);
+        if (cell == null) cell = row.createCell(colIdx);
+        CellStyle newStyle = wb.createCellStyle();
+        newStyle.cloneStyleFrom(cell.getCellStyle());
+        newStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        newStyle.setAlignment(HorizontalAlignment.CENTER);
+        cell.setCellStyle(newStyle);
     }
 
     // ==================== 导入模板 ====================
