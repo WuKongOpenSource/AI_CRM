@@ -16,8 +16,11 @@ public class ManageUserVO {
     @Schema(description = "用户名")
     private String username;
 
-    @Schema(description = "头像")
+    @Schema(description = "头像objectKey")
     private String img;
+
+    @Schema(description = "头像访问URL")
+    private String imgUrl;
 
     @Schema(description = "创建时间")
     private Date createTime;

@@ -32,7 +32,7 @@ export function getLoginUserDetail(): Promise<UserInfo> {
 /**
  * Update user profile
  */
-export function updateProfile(data: { realname?: string; mobile?: string }): Promise<void> {
+export function updateProfile(data: { userId: string | number; realname?: string; mobile?: string; email?: string; post?: string; img?: string }): Promise<void> {
   return post('/managerUser/updateUser', data)
 }
 
@@ -109,6 +109,13 @@ export interface RegisterParams {
 
 export function register(params: RegisterParams): Promise<string> {
   return post<string>('/auth/register', params)
+}
+
+/**
+ * 获取当前用户权限树
+ */
+export function getUserAuth(): Promise<Record<string, any>> {
+  return post<Record<string, any>>('/managerRole/auth')
 }
 
 /**

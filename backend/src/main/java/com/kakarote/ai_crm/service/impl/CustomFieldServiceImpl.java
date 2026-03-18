@@ -356,7 +356,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
      */
     private List<CustomFieldVO> convertToVO(List<CustomField> fields) {
         return fields.stream().map(field -> {
-            CustomFieldVO vo = BeanUtil.copyProperties(field, CustomFieldVO.class);
+            CustomFieldVO vo = BeanUtil.copyProperties(field, CustomFieldVO.class,"options");
             vo.setIsRequired(field.getIsRequired() != null && field.getIsRequired() == 1);
             vo.setIsSearchable(field.getIsSearchable() != null && field.getIsSearchable() == 1);
             vo.setIsShowInList(field.getIsShowInList() != null && field.getIsShowInList() == 1);

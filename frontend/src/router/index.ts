@@ -28,43 +28,43 @@ const routes: RouteRecordRaw[] = [
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/chat/ChatView.vue'),
-        meta: { title: 'AI 助手', icon: 'auto_awesome' }
+        meta: { title: 'AI 助手', icon: 'auto_awesome', permission: 'chat' }
       },
       {
         path: 'customer',
         name: 'CustomerList',
         component: () => import('@/views/customer/CustomerListView.vue'),
-        meta: { title: '客户管理', icon: 'group' }
+        meta: { title: '客户管理', icon: 'group', permission: 'customer' }
       },
       {
         path: 'customer/:id',
         name: 'CustomerDetail',
         component: () => import('@/views/customer/CustomerDetailView.vue'),
-        meta: { title: '客户详情', hidden: true }
+        meta: { title: '客户详情', hidden: true, permission: 'customer' }
       },
       {
         path: 'task',
         name: 'TaskList',
         component: () => import('@/views/task/TaskListView.vue'),
-        meta: { title: '任务管理', icon: 'task_alt' }
+        meta: { title: '任务管理', icon: 'task_alt', permission: 'task' }
       },
       {
         path: 'calendar',
         name: 'Calendar',
         component: () => import('@/views/calendar/CalendarView.vue'),
-        meta: { title: '日程安排', icon: 'calendar_today' }
+        meta: { title: '日程安排', icon: 'calendar_today', permission: 'schedule' }
       },
       {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/KnowledgeView.vue'),
-        meta: { title: '知识库', icon: 'menu_book' }
+        meta: { title: '知识库', icon: 'menu_book', permission: 'knowledge' }
       },
       {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/settings/SettingsView.vue'),
-        meta: { title: '系统设置', icon: 'settings' }
+        meta: { title: '系统设置', icon: 'settings', permission: ['user', 'role', 'config', 'dept', 'customField'] }
       }
     ]
   },
@@ -120,6 +120,18 @@ router.beforeEach(async (to, _from, next) => {
         // token 失效，跳转登录页
         console.error('Failed to fetch user info:', e)
         next({ name: 'Login', query: { redirect: to.fullPath } })
+        return
+      }
+    }
+    // 权限检查
+    const permission = to.meta.permission as string | string[] | undefined
+    if (permission) {
+      const hasAccess = Array.isArray(permission)
+        ? permission.some(p => userStore.hasPermission(p))
+        : (permission === 'chat' || userStore.hasPermission(permission))
+      if (!hasAccess) {
+        // 无权限，重定向到 AI 助手
+        next({ name: 'Chat' })
         return
       }
     }

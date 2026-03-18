@@ -33,6 +33,8 @@ export interface UserInfo {
   username: string
   realname: string
   avatar?: string
+  img?: string
+  imgUrl?: string
   roles: string[]
   mobile?: string
   email?: string

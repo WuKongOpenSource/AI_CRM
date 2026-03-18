@@ -65,8 +65,18 @@
               <!-- Avatar Section -->
               <div class="flex items-center justify-between pb-6 border-b border-slate-200">
                 <div class="flex items-center">
-                  <div class="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold">
-                    {{ profileForm.realname?.charAt(0) || userStore.realname?.charAt(0) || 'U' }}
+                  <div class="relative group cursor-pointer" @click="avatarInputRef?.click()">
+                    <div v-if="avatarPreviewUrl || profileForm.imgUrl" class="size-16 rounded-2xl overflow-hidden">
+                      <img :src="avatarPreviewUrl || profileForm.imgUrl" class="w-full h-full object-cover" alt="avatar" />
+                    </div>
+                    <div v-else class="size-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-2xl font-bold">
+                      {{ profileForm.realname?.charAt(0) || userStore.realname?.charAt(0) || 'U' }}
+                    </div>
+                    <div class="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span v-if="avatarUploading" class="material-symbols-outlined text-white text-xl animate-spin">progress_activity</span>
+                      <span v-else class="material-symbols-outlined text-white text-xl">photo_camera</span>
+                    </div>
+                    <input ref="avatarInputRef" type="file" accept="image/*" class="hidden" @change="handleAvatarChange" />
                   </div>
                   <div class="ml-4">
                     <div class="text-xl font-bold text-slate-900">{{ profileForm.realname || userStore.realname }}</div>
@@ -1781,12 +1791,17 @@ const systemSubTabs = [
 // Profile form
 const savingProfile = ref(false)
 const profileForm = reactive({
+  img: '',
+  imgUrl: '',
   realname: '',
   email: '',
   phone: '',
   department: '',
   position: ''
 })
+const avatarUploading = ref(false)
+const avatarInputRef = ref<HTMLInputElement | null>(null)
+const avatarPreviewUrl = ref('')
 
 // Password form
 const passwordForm = reactive({
@@ -2048,6 +2063,8 @@ onMounted(async () => {
   // Load user detail info from API
   try {
     const detail = await getLoginUserDetail()
+    profileForm.img = detail.img || ''
+    profileForm.imgUrl = (detail as any).imgUrl || ''
     profileForm.realname = detail.realname || ''
     profileForm.email = detail.email || ''
     profileForm.phone = detail.mobile || ''
@@ -2070,8 +2087,37 @@ onMounted(async () => {
 })
 
 // Profile methods
+async function handleAvatarChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning('图片大小不能超过5MB')
+    return
+  }
+  avatarUploading.value = true
+  try {
+    const presigned = await getPresignedUploadUrl(file.name, file.type)
+    await uploadToMinIO(file, presigned.uploadUrl)
+    profileForm.img = presigned.objectKey
+    avatarPreviewUrl.value = presigned.accessUrl
+    ElMessage.success('头像上传成功，点击保存更改生效')
+  } catch {
+    ElMessage.error('头像上传失败')
+  } finally {
+    avatarUploading.value = false
+    if (avatarInputRef.value) avatarInputRef.value.value = ''
+  }
+}
+
 function resetProfileForm() {
   const info = userStore.userInfo as any
+  profileForm.img = info?.img || ''
+  profileForm.imgUrl = info?.imgUrl || ''
+  avatarPreviewUrl.value = ''
   profileForm.realname = userStore.realname || ''
   profileForm.email = info?.email || ''
   profileForm.phone = info?.mobile || ''
@@ -2083,10 +2129,16 @@ async function handleSaveProfile() {
   savingProfile.value = true
   try {
     await updateProfile({
+      userId: userStore.userId,
+      img: profileForm.img,
       realname: profileForm.realname,
-      mobile: profileForm.phone
+      mobile: profileForm.phone,
+      email: profileForm.email,
+      post: profileForm.position
     })
     await userStore.fetchUserInfo()
+    avatarPreviewUrl.value = ''
+    profileForm.imgUrl = userStore.userInfo?.imgUrl || ''
     ElMessage.success('个人资料保存成功')
   } catch {
     // Error handled by interceptor
@@ -2099,6 +2151,10 @@ async function handleSaveProfile() {
 async function handleChangePassword() {
   if (!passwordForm.oldPassword || !passwordForm.newPassword) {
     ElMessage.warning('请填写完整信息')
+    return
+  }
+  if (passwordForm.newPassword.length < 6) {
+    ElMessage.warning('密码至少6位')
     return
   }
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -2695,6 +2751,7 @@ watch(roleDrawerTab, async (newTab) => {
 watch(activeTab, async (newTab) => {
   if (newTab === 'team') {
     await loadDeptTree()
+    loadMembers()
     // 预加载角色列表，供编辑成员时选择
     if (allRoleOptions.value.length === 0) {
       try { allRoleOptions.value = await queryRoleList() } catch { /* ignore */ }

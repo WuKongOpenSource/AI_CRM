@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin, logout as apiLogout, getUserInfo as apiGetUserInfo, updateProfile as apiUpdateProfile } from '@/api/auth'
+import { login as apiLogin, logout as apiLogout, getUserInfo as apiGetUserInfo, updateProfile as apiUpdateProfile, getUserAuth as apiGetUserAuth } from '@/api/auth'
 import { setToken, removeToken, getToken } from '@/utils/request'
 import type { UserInfo, LoginParams } from '@/types/api'
 
@@ -8,12 +8,23 @@ export const useUserStore = defineStore('user', () => {
   // State
   const token = ref<string | null>(getToken())
   const userInfo = ref<UserInfo | null>(null)
+  const permissions = ref<Record<string, any>>({})
 
   // Getters
   const isLoggedIn = computed(() => !!token.value)
   const username = computed(() => userInfo.value?.username || '')
   const realname = computed(() => userInfo.value?.realname || '')
   const userId = computed(() => userInfo.value?.userId || '')
+  const avatar = computed(() => userInfo.value?.imgUrl || '')
+
+  /**
+   * 检查用户是否拥有某个模块的权限
+   */
+  function hasPermission(module: string): boolean {
+    // 权限树为空时（未加载）不限制
+    if (!permissions.value || Object.keys(permissions.value).length === 0) return true
+    return !!permissions.value[module]
+  }
 
   // Actions
   async function login(params: LoginParams): Promise<void> {
@@ -29,6 +40,7 @@ export const useUserStore = defineStore('user', () => {
     } finally {
       token.value = null
       userInfo.value = null
+      permissions.value = {}
       removeToken()
     }
   }
@@ -37,13 +49,15 @@ export const useUserStore = defineStore('user', () => {
     if (!token.value) return null
 
     try {
-      const info = await apiGetUserInfo()
+      const [info, auth] = await Promise.all([apiGetUserInfo(), apiGetUserAuth()])
       userInfo.value = info
+      permissions.value = auth || {}
       return info
     } catch (error) {
       // Token might be invalid
       token.value = null
       userInfo.value = null
+      permissions.value = {}
       removeToken()
       throw error
     }
@@ -56,10 +70,11 @@ export const useUserStore = defineStore('user', () => {
   function resetState(): void {
     token.value = null
     userInfo.value = null
+    permissions.value = {}
     removeToken()
   }
 
-  async function updateProfile(data: { realname?: string; mobile?: string }): Promise<void> {
+  async function updateProfile(data: Parameters<typeof apiUpdateProfile>[0]): Promise<void> {
     await apiUpdateProfile(data)
     // Refresh user info after update
     await fetchUserInfo()
@@ -69,17 +84,20 @@ export const useUserStore = defineStore('user', () => {
     // State
     token,
     userInfo,
+    permissions,
     // Getters
     isLoggedIn,
     username,
     realname,
     userId,
+    avatar,
     // Actions
     login,
     logout,
     fetchUserInfo,
     setUserInfo,
     resetState,
-    updateProfile
+    updateProfile,
+    hasPermission
   }
 })

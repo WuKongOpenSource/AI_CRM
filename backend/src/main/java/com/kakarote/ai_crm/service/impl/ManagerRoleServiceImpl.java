@@ -146,9 +146,13 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
             return redis.get(cacheKey);
         }
         List<ManagerMenu> managerMenus = menuService.queryMenuList(userId);
-        List<ManagerMenu> menus = menuService.list();
-        for (ManagerMenu menu : menus) {
-            if (Objects.equals(0L, menu.getParentId())) {
+        // 收集用户有权限的菜单的 parentId，只添加对应的父模块
+        Set<Long> parentIds = managerMenus.stream()
+                .map(ManagerMenu::getParentId)
+                .collect(Collectors.toSet());
+        List<ManagerMenu> allMenus = menuService.list();
+        for (ManagerMenu menu : allMenus) {
+            if (Objects.equals(0L, menu.getParentId()) && parentIds.contains(menu.getMenuId())) {
                 managerMenus.add(menu);
             }
         }

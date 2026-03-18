@@ -34,7 +34,11 @@ public class CustomerTools {
             @ToolParam(description = "联系人姓名", required = false) String contactName,
             @ToolParam(description = "联系人电话", required = false) String contactPhone,
             @ToolParam(description = "联系人邮箱", required = false) String contactEmail,
-            @ToolParam(description = "联系人职位", required = false) String contactPosition) {
+            @ToolParam(description = "联系人职位", required = false) String contactPosition,
+            @ToolParam(description = "地址", required = false) String address,
+            @ToolParam(description = "网站", required = false) String website,
+            @ToolParam(description = "备注", required = false) String remark,
+            @ToolParam(description = "报价金额", required = false) String quotation) {
 
         log.info("【Tool调用】createCustomer 被调用: companyName={}, industry={}, level={}",
             companyName, industry, level);
@@ -48,6 +52,22 @@ public class CustomerTools {
             bo.setContactPhone(contactPhone);
             bo.setContactEmail(contactEmail);
             bo.setContactPosition(contactPosition);
+            if (address != null && !address.isEmpty() && !"null".equalsIgnoreCase(address)) {
+                bo.setAddress(address);
+            }
+            if (website != null && !website.isEmpty() && !"null".equalsIgnoreCase(website)) {
+                bo.setWebsite(website);
+            }
+            if (remark != null && !remark.isEmpty() && !"null".equalsIgnoreCase(remark)) {
+                bo.setRemark(remark);
+            }
+            if (quotation != null && !quotation.isEmpty() && !"null".equalsIgnoreCase(quotation)) {
+                try {
+                    bo.setQuotation(new BigDecimal(quotation));
+                } catch (NumberFormatException e) {
+                    log.warn("报价金额格式无效: {}", quotation);
+                }
+            }
 
             Long customerId = customerService.addCustomer(bo);
 

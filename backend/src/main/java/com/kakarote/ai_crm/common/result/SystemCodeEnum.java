@@ -40,7 +40,11 @@ public enum SystemCodeEnum implements ResultCode {
 
     SYSTEM_EMAIL_ALREADY_REGISTERED(1006, "该邮箱已被注册"),
 
-    SYSTEM_VERIFICATION_CODE_ERROR(1007, "验证码不正确")
+    SYSTEM_VERIFICATION_CODE_ERROR(1007, "验证码不正确"),
+
+    SYSTEM_PASSWORD_TOO_SHORT(1008, "密码至少6位"),
+
+    SYSTEM_USER_DISABLED(1009, "该账号已被禁用")
 
     ;
 

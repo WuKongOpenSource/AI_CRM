@@ -654,6 +654,13 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- AI Follow-up Drawer -->
+    <AiFollowUpDrawer
+      v-model="showAiFollowUpDrawer"
+      :customer="customer"
+      @saved="handleAiFollowUpSaved"
+    />
   </div>
 </template>
 
@@ -670,6 +677,7 @@ import { ElMessage } from 'element-plus'
 import type { CustomerTag, FollowUp, CustomerUpdateBO, Contact } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
+import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -685,6 +693,7 @@ const showContactDetail = ref(false)
 const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
 const showEditDialog = ref(false)
+const showAiFollowUpDrawer = ref(false)
 const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)
@@ -879,7 +888,11 @@ async function handleDeleteCustomer() {
 }
 
 function handleAiFollowUp() {
-  router.push('/chat')
+  showAiFollowUpDrawer.value = true
+}
+
+function handleAiFollowUpSaved() {
+  if (customer.value) fetchFollowUps(customer.value.customerId, true)
 }
 
 function handleGenerateReport() {

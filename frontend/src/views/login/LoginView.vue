@@ -3,10 +3,8 @@
     <div class="w-full max-w-md px-4">
       <!-- Logo and Title -->
       <div class="text-center mb-10">
-        <div class="inline-flex items-center justify-center size-16 bg-primary rounded-2xl text-white shadow-xl shadow-primary/20 mb-4">
-          <span class="material-symbols-outlined text-4xl">rocket_launch</span>
-        </div>
-        <h1 class="text-2xl font-bold text-slate-900">Nexus AI CRM</h1>
+        <img src="/logo.png" alt="AI CRM" class="size-16 rounded-2xl shadow-xl shadow-primary/20 mb-4 inline-block" />
+        <h1 class="text-2xl font-bold text-slate-900">悟空AI CRM</h1>
         <p class="mt-1 text-sm text-slate-500">智能客户关系管理系统</p>
       </div>
 

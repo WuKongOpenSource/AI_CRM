@@ -4,14 +4,14 @@
     <aside v-if="!isMobile" class="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
       <!-- Logo -->
       <div class="p-6 flex items-center gap-3">
-        <div v-if="enterpriseStore.hasLogo" class="size-10 rounded-xl overflow-hidden shadow-lg">
+        <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
+        <div v-else class="size-10 flex-shrink-0 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
           <span class="material-symbols-outlined text-2xl">rocket_launch</span>
         </div>
-        <div>
-          <h1 class="text-slate-900 font-bold text-lg leading-tight">{{ enterpriseStore.displayName }}</h1>
+        <div class="min-w-0">
+          <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
           <p class="text-slate-500 text-[10px] uppercase tracking-widest">AI CRM System</p>
         </div>
       </div>
@@ -31,10 +31,11 @@
           <span class="text-sm font-medium">{{ item.label }}</span>
         </button>
 
-        <div class="pt-4 pb-2">
+        <div v-if="showConfigSection" class="pt-4 pb-2">
           <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">系统配置</p>
         </div>
 
+        <template v-if="showConfigSection">
         <button
           v-for="item in configNavItems"
           :key="item.route"
@@ -47,12 +48,16 @@
           <span class="material-symbols-outlined">{{ item.icon }}</span>
           <span class="text-sm font-medium">{{ item.label }}</span>
         </button>
+        </template>
       </nav>
 
       <!-- User Info -->
       <div class="p-4 border-t border-slate-200">
         <div class="flex items-center gap-3 p-2 bg-slate-50 rounded-xl cursor-pointer" @click="showUserMenu = !showUserMenu">
-          <div class="size-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
+          <div v-if="userStore.avatar" class="size-8 rounded-full overflow-hidden">
+            <img :src="userStore.avatar" class="w-full h-full object-cover" alt="avatar" />
+          </div>
+          <div v-else class="size-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
             {{ userStore.realname?.charAt(0) || 'U' }}
           </div>
           <div class="flex-1 min-w-0">
@@ -78,14 +83,14 @@
       <button @click="drawerVisible = true" class="size-10 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg">
         <span class="material-symbols-outlined">menu</span>
       </button>
-      <div class="flex items-center gap-2">
-        <div v-if="enterpriseStore.hasLogo" class="size-7 rounded-lg overflow-hidden">
+      <div class="flex items-center gap-2 min-w-0 flex-1 mx-2">
+        <div v-if="enterpriseStore.hasLogo" class="size-7 flex-shrink-0 rounded-lg overflow-hidden">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-7 bg-primary rounded-lg flex items-center justify-center text-white">
+        <div v-else class="size-7 flex-shrink-0 bg-primary rounded-lg flex items-center justify-center text-white">
           <span class="material-symbols-outlined text-sm">rocket_launch</span>
         </div>
-        <span class="text-sm font-bold text-slate-900">{{ enterpriseStore.displayName }}</span>
+        <span class="text-sm font-bold text-slate-900 truncate">{{ enterpriseStore.displayName }}</span>
       </div>
       <button @click="handleLogout" class="size-10 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg">
         <span class="material-symbols-outlined text-sm">logout</span>
@@ -100,14 +105,14 @@
       <Transition name="drawer-panel">
         <aside v-if="isMobile && drawerVisible" class="fixed left-0 top-0 bottom-0 w-72 bg-white flex flex-col shadow-2xl z-[101]">
           <div class="p-6 flex items-center gap-3">
-            <div v-if="enterpriseStore.hasLogo" class="size-10 rounded-xl overflow-hidden shadow-lg">
+            <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
             </div>
-            <div v-else class="size-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
+            <div v-else class="size-10 flex-shrink-0 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
               <span class="material-symbols-outlined text-2xl">rocket_launch</span>
             </div>
-            <div>
-              <h1 class="text-slate-900 font-bold text-lg leading-tight">{{ enterpriseStore.displayName }}</h1>
+            <div class="min-w-0">
+              <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
               <p class="text-slate-500 text-[10px] uppercase tracking-widest">AI CRM System</p>
             </div>
           </div>
@@ -122,9 +127,10 @@
               <span class="material-symbols-outlined">{{ item.icon }}</span>
               <span class="text-sm font-medium">{{ item.label }}</span>
             </button>
-            <div class="pt-4 pb-2">
+            <div v-if="showConfigSection" class="pt-4 pb-2">
               <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">系统配置</p>
             </div>
+            <template v-if="showConfigSection">
             <button
               v-for="item in configNavItems"
               :key="item.route"
@@ -135,6 +141,7 @@
               <span class="material-symbols-outlined">{{ item.icon }}</span>
               <span class="text-sm font-medium">{{ item.label }}</span>
             </button>
+            </template>
           </nav>
         </aside>
       </Transition>
@@ -209,17 +216,31 @@ const drawerVisible = ref(false)
 const showUserMenu = ref(false)
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
-const mainNavItems = [
-  { icon: 'auto_awesome', label: 'AI 助手', route: '/chat', fill: false },
-  { icon: 'group', label: '客户管理', route: '/customer', fill: true },
-  { icon: 'task_alt', label: '任务管理', route: '/task', fill: false },
-  { icon: 'calendar_today', label: '日程安排', route: '/calendar', fill: false },
-  { icon: 'menu_book', label: '知识库', route: '/knowledge', fill: false },
+const allMainNavItems = [
+  { icon: 'auto_awesome', label: 'AI 助手', route: '/chat', fill: false, permission: 'chat' },
+  { icon: 'group', label: '客户管理', route: '/customer', fill: true, permission: 'customer' },
+  { icon: 'task_alt', label: '任务管理', route: '/task', fill: false, permission: 'task' },
+  { icon: 'calendar_today', label: '日程安排', route: '/calendar', fill: false, permission: 'schedule' },
+  { icon: 'menu_book', label: '知识库', route: '/knowledge', fill: false, permission: 'knowledge' },
 ]
 
-const configNavItems = [
-  { icon: 'settings', label: '系统设置', route: '/settings' },
+const allConfigNavItems = [
+  { icon: 'settings', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
 ]
+
+// AI 助手（chat）默认所有人可见
+const mainNavItems = computed(() =>
+  allMainNavItems.filter(item => item.permission === 'chat' || userStore.hasPermission(item.permission as string))
+)
+
+const configNavItems = computed(() =>
+  allConfigNavItems.filter(item => {
+    const perms = item.permission as string[]
+    return perms.some(p => userStore.hasPermission(p))
+  })
+)
+
+const showConfigSection = computed(() => configNavItems.value.length > 0)
 
 const activeMenu = computed(() => {
   const path = route.path

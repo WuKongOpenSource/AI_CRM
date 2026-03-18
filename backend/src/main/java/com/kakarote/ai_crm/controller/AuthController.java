@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.entity.BO.LoginUserBO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.RegistrationService;
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -24,6 +25,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -58,6 +60,9 @@ public class AuthController {
     @Autowired
     private RegistrationService registrationService;
 
+    @Autowired
+    private FileStorageService fileStorageService;
+
     @PostMapping("/register")
     @Operation(summary = "用户注册")
     public Result<String> register(@Valid @RequestBody RegisterBO registerBO) {
@@ -73,6 +78,8 @@ public class AuthController {
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginUserBO.getUsername(), loginUserBO.getPassword()));
+        } catch (DisabledException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DISABLED);
         } catch (BadCredentialsException e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_USERNAME_OR_PASSWORD_ERROR);
         } catch (InternalAuthenticationServiceException ex) {
@@ -103,6 +110,10 @@ public class AuthController {
         userVO.setUserId(loginUser.getUser().getUserId());
         userVO.setUsername(loginUser.getUsername());
         userVO.setRealname(loginUser.getUser().getRealname());
+        userVO.setImg(loginUser.getUser().getImg());
+        if (loginUser.getUser().getImg() != null && !loginUser.getUser().getImg().isEmpty()) {
+            try { userVO.setImgUrl(fileStorageService.getUrl(loginUser.getUser().getImg())); } catch (Exception ignored) {}
+        }
         userVO.setMobile(loginUser.getUser().getMobile());
         userVO.setEmail(loginUser.getUser().getEmail());
         result.put("userInfo", userVO);

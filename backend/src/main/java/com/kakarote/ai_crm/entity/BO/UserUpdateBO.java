@@ -17,6 +17,9 @@ public class UserUpdateBO {
     @Schema(description = "用户ID")
     private Long userId;
 
+    @Schema(description = "头像")
+    private String img;
+
     @Schema(description = "手机号")
     private String mobile;
 

@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import org.springframework.context.annotation.Lazy;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -38,6 +39,7 @@ import java.util.List;
 public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements ITaskService {
 
     @Autowired
+    @Lazy
     private DynamicChatClientProvider chatClientProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();

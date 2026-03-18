@@ -31,6 +31,8 @@ import com.kakarote.ai_crm.entity.PO.ManagerRole;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.service.IManagerRoleService;
 
+import com.kakarote.ai_crm.service.FileStorageService;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -52,6 +54,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
 
     @Autowired
     private IManagerRoleService roleService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
 
     @Override
@@ -120,6 +125,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     public BasePage<ManageUserVO> queryPageList(UserQueryBO userQueryBO) {
         BasePage<ManageUserVO> page = baseMapper.queryPageList(userQueryBO.parse(), userQueryBO);
         fillRoleInfo(page.getRecords());
+        fillImgUrl(page.getRecords());
         return page;
     }
 
@@ -158,6 +164,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     public void updateUser(UserUpdateBO updateBO) {
         ManagerUser userEntity = baseMapper.getUserId(updateBO.getUserId());
         if (ObjectUtil.isNotNull(userEntity)){
+            if (ObjectUtil.isNotNull(updateBO.getImg())){
+                userEntity.setImg(updateBO.getImg());
+            }
             if (ObjectUtil.isNotNull(updateBO.getMobile())){
                 userEntity.setMobile(updateBO.getMobile());
             }
@@ -238,9 +247,25 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             }
             // 填充角色信息
             fillRoleInfo(Collections.singletonList(vo));
+            fillImgUrl(Collections.singletonList(vo));
             return vo;
         }
         return null;
+    }
+
+    /**
+     * 填充头像访问URL
+     */
+    private void fillImgUrl(List<ManageUserVO> voList) {
+        for (ManageUserVO vo : voList) {
+            if (StrUtil.isNotBlank(vo.getImg())) {
+                try {
+                    vo.setImgUrl(fileStorageService.getUrl(vo.getImg()));
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+        }
     }
 
     /**
@@ -251,6 +276,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
      */
     @Override
     public void updatePassword(String oldPassword, String newPassword) {
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_PASSWORD_TOO_SHORT);
+        }
         BCryptPasswordEncoder bCryptPasswordEncoder=new BCryptPasswordEncoder();
         ManagerUser userEntity = baseMapper.getUserId(UserUtil.getUserId());
         boolean matches = bCryptPasswordEncoder.matches(oldPassword, userEntity.getPassword());

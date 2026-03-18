@@ -144,7 +144,7 @@
       <template v-if="currentView === 'chat'">
         <div class="flex-1 flex flex-col overflow-hidden">
           <!-- Messages Area -->
-          <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth pb-48">
+          <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth pb-4">
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0">
               <div class="max-w-3xl mx-auto flex flex-col items-center text-center space-y-4 py-12">
@@ -256,7 +256,7 @@
           </div>
 
           <!-- Input Area -->
-          <div class="absolute bottom-0 left-0 right-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
+          <div class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
             <div class="max-w-4xl mx-auto space-y-4">
               <!-- Quick Action Chips -->
               <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center">
@@ -328,7 +328,7 @@
                   </div>
                 </div>
               </div>
-              <p class="text-center text-[9px] text-slate-300 uppercase font-bold tracking-[0.4em]">Nexus AI 自动化业务引擎</p>
+              <p class="text-center text-[9px] text-slate-300 uppercase font-bold tracking-[0.4em]">内容由AI生成，请核查重要信息</p>
             </div>
           </div>
         </div>

@@ -95,7 +95,7 @@ public class LoginUser implements UserDetails {
     @JsonIgnore
     @Override
     public boolean isEnabled() {
-        return true;
+        return user != null && Integer.valueOf(1).equals(user.getStatus());
     }
 
     public Long getLoginTime() {
