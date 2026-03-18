@@ -25,7 +25,7 @@ public class FollowupTools {
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-    @Tool(description = "创建跟进记录。当用户要新建、添加、记录跟进时调用。重要：调用此工具前，必须先完成所有信息收集——如果用户提到客户名称，先调用 queryCustomers 获取客户ID；如果提到联系人，先调用 queryContacts 获取联系人ID。然后将所有参数一次性传入此工具，只调用一次。用户确认信息后不要再次调用此工具。根据跟进内容推断类型：拜访=visit，电话/打电话=call，邮件=email，会议/开会=meeting，其他=visit。")
+    @Tool(description = "创建跟进记录。当用户要新建、添加、记录跟进时调用。重要：调用此工具前，如果用户提到客户名称，先调用 queryCustomers 获取客户ID；如果提到联系人，先调用 queryContacts 查询联系人ID。如果联系人查询不到，仍然继续创建跟进记录（联系人ID为可选参数，不传即可）。然后将所有参数一次性传入此工具，只调用一次。用户确认信息后不要再次调用此工具。根据跟进内容推断类型：拜访=visit，电话/打电话=call，邮件=email，会议/开会=meeting，其他=visit。")
     public String createFollowUp(
             @ToolParam(description = "关联客户ID（数字），必填。如果用户提到客户名称，请先调用 queryCustomers 查询获取客户ID") String customerIdStr,
             @ToolParam(description = "跟进类型：call(电话)/meeting(会议)/email(邮件)/visit(拜访)，根据内容推断，默认visit") String type,

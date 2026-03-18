@@ -245,8 +245,8 @@ public class ChatServiceImpl implements IChatService {
         List<Message> history = buildMessageHistory(sessionId);
 
         String attachmentContext = buildAttachmentContext(attachments);
-        String ragContext = buildRagContext(content);
-        String enhancedSystemPrompt = buildSystemPrompt() + ragContext;
+        // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
+        String enhancedSystemPrompt = buildSystemPrompt();
 
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
@@ -354,8 +354,8 @@ public class ChatServiceImpl implements IChatService {
         List<Message> history = buildMessageHistory(sessionId);
 
         String attachmentContext = buildAttachmentContext(attachments);
-        String ragContext = buildRagContext(content);
-        String enhancedSystemPrompt = buildSystemPrompt() + ragContext;
+        // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
+        String enhancedSystemPrompt = buildSystemPrompt();
 
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
