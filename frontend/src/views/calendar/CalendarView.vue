@@ -1,21 +1,21 @@
 <template>
-  <div class="flex h-full bg-white">
+  <div class="flex h-full bg-background-light">
     <!-- Calendar Main -->
-    <div class="flex-1 p-8 overflow-y-auto" :class="{ 'border-r border-slate-100': selectedEvent || selectedTask }">
-      <div class="max-w-5xl mx-auto space-y-10">
+    <div class="flex-1 p-4 md:p-8 overflow-y-auto" :class="{ 'border-r border-slate-100': selectedEvent || selectedTask }">
+      <div class="w-full space-y-6">
         <!-- Header -->
-        <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-2xl font-bold text-slate-900">智能日程安排</h2>
             <p class="text-sm text-slate-500 mt-1">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
           </div>
-          <div class="flex gap-3">
-            <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-200">
               <button
                 v-for="mode in viewModes"
                 :key="mode.value"
                 @click="viewMode = mode.value"
-                class="px-4 py-1.5 text-xs font-bold rounded-lg transition-all"
+                class="px-5 py-1.5 text-sm font-medium rounded-md transition-colors"
                 :class="viewMode === mode.value
                   ? 'bg-white text-primary shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'"
@@ -23,189 +23,219 @@
             </div>
             <button
               @click="showAddDialog = true"
-              class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 shadow-lg shadow-primary/20 flex items-center gap-1.5"
+              class="px-6 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
             >
-              <span class="material-symbols-outlined text-sm">add</span>
+              <span class="material-symbols-outlined text-[18px]">add</span>
               新增日程
             </button>
           </div>
         </div>
 
-        <!-- Week View -->
-        <div v-if="viewMode === 'grid'" class="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <div
-            v-for="day in weekDays"
-            :key="day.label"
-            class="bg-white p-4 min-h-48"
-            :class="{ 'bg-primary/5': day.isToday }"
-          >
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-[10px] font-black uppercase tracking-widest" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
-                {{ day.label }}
-              </span>
-              <span
-                class="size-6 flex items-center justify-center rounded-full text-xs font-bold"
-                :class="day.isToday ? 'bg-primary text-white' : 'text-slate-900'"
-              >{{ day.date }}</span>
-            </div>
-            <div class="space-y-2">
-              <div
-                v-for="event in getEventsForDate(day.fullDate)"
-                :key="event.scheduleId"
-                @click="selectedEvent = event; selectedTask = null"
-                class="p-2 bg-white border border-primary/20 rounded-lg shadow-sm cursor-pointer hover:scale-105 transition-transform"
-              >
-                <p class="text-[10px] font-bold text-primary truncate">{{ event.title }}</p>
-                <p class="text-[8px] text-slate-400">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
-              </div>
-              <!-- Tasks -->
-              <div
-                v-for="task in getTasksForDate(day.fullDate)"
-                :key="task.taskId"
-                class="p-2 bg-white border border-slate-200 rounded-lg shadow-sm cursor-pointer hover:scale-105 transition-transform flex items-start gap-1.5"
-              >
-                <button
-                  @click.stop="handleToggleTask(task)"
-                  class="size-4 rounded-full border-2 flex items-center justify-center shrink-0 mt-px transition-colors"
-                  :class="task.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-slate-400'"
-                >
-                  <span v-if="task.status === 'COMPLETED'" class="material-symbols-outlined text-white text-[10px]">check</span>
-                </button>
-                <div class="min-w-0 flex-1" @click="selectTask(task)">
-                  <p class="text-[10px] font-bold truncate" :class="task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-700'">{{ task.title }}</p>
-                  <p class="text-[8px] text-slate-400">{{ task.customerName || '' }}</p>
+        <!-- Calendar Views -->
+        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
+          <!-- Week View -->
+          <div v-if="viewMode === 'grid'" class="grid grid-cols-7 divide-x divide-slate-200 min-h-[400px]">
+            <div
+              v-for="day in weekDays"
+              :key="day.label"
+              class="flex flex-col bg-white"
+            >
+              <div class="p-5 flex items-center justify-between border-b border-slate-100">
+                <div class="flex flex-col">
+                  <span class="text-sm font-medium" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
+                    {{ day.label }}
+                  </span>
+                  <span class="text-[10px] text-slate-400">
+                    {{ getLunarText(day.fullDate) }}
+                  </span>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Month View -->
-        <div v-else-if="viewMode === 'month'" class="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <div v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']" :key="dayLabel" class="bg-slate-50 p-2 text-center border-b border-slate-200">
-            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ dayLabel }}</span>
-          </div>
-          <div
-            v-for="(cell, i) in monthCells"
-            :key="i"
-            class="bg-white p-2 h-28 border-b border-r border-slate-100"
-            :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
-          >
-            <div class="flex justify-between items-start mb-1">
-              <span
-                class="text-xs font-bold"
-                :class="[
-                  cell.isCurrentMonth ? 'text-slate-900' : 'text-slate-300',
-                  cell.isToday ? 'size-6 flex items-center justify-center bg-primary text-white rounded-full' : ''
-                ]"
-              >{{ cell.isCurrentMonth ? cell.date : '' }}</span>
-            </div>
-            <div v-if="cell.fullDate" class="space-y-1">
-              <div
-                v-for="event in getEventsForDate(cell.fullDate)"
-                :key="event.scheduleId"
-                @click="selectedEvent = event; selectedTask = null"
-                class="px-1.5 py-0.5 bg-primary/10 border-l-2 border-primary rounded text-[8px] font-bold text-primary truncate cursor-pointer hover:bg-primary/20"
-              >{{ formatTime(event.startTime) }} {{ event.title }}</div>
-              <!-- Tasks -->
-              <div
-                v-for="task in getTasksForDate(cell.fullDate)"
-                :key="task.taskId"
-                class="px-1.5 py-0.5 bg-slate-50 border-l-2 border-slate-300 rounded text-[8px] font-bold truncate cursor-pointer hover:bg-slate-100 flex items-center gap-1"
-              >
-                <button
-                  @click.stop="handleToggleTask(task)"
-                  class="size-3 rounded-full border flex items-center justify-center shrink-0 transition-colors"
-                  :class="task.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-400'"
-                >
-                  <span v-if="task.status === 'COMPLETED'" class="material-symbols-outlined text-white text-[8px]">check</span>
-                </button>
                 <span
-                  @click="selectTask(task)"
-                  class="truncate"
-                  :class="task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-600'"
-                >{{ task.title }}</span>
+                  class="size-7 flex items-center justify-center rounded-full text-sm font-bold"
+                  :class="day.isToday ? 'bg-primary text-white' : 'text-slate-900'"
+                >{{ day.date }}</span>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- List View -->
-        <div v-else class="space-y-6">
-          <!-- Schedules Section -->
-          <div class="space-y-4">
-            <div v-if="schedules.length === 0 && tasks.length === 0" class="text-center py-20 text-slate-400">
-              <span class="material-symbols-outlined text-4xl mb-2">calendar_today</span>
-              <p class="text-sm">暂无日程安排和待办任务</p>
-            </div>
-            <div
-              v-for="event in schedules"
-              :key="event.scheduleId"
-              @click="selectedEvent = event; selectedTask = null"
-              class="p-6 bg-white border border-slate-200 rounded-2xl hover:border-primary transition-all cursor-pointer group"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-6">
-                  <div class="text-center shrink-0">
-                    <p class="text-lg font-black text-slate-900">{{ formatTime(event.startTime) }}</p>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase">{{ formatDate(event.startTime) }}</p>
-                  </div>
-                  <div class="h-10 w-px bg-slate-100"></div>
-                  <div>
-                    <h4 class="font-bold text-slate-900 group-hover:text-primary transition-colors">{{ event.title }}</h4>
-                    <div class="flex items-center gap-2 mt-1">
-                      <span v-if="event.customerName" class="text-xs text-slate-500 font-medium">{{ event.customerName }}</span>
-                      <span v-if="event.typeName" class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">{{ event.typeName }}</span>
-                    </div>
-                  </div>
-                </div>
-                <span class="material-symbols-outlined text-slate-300">chevron_right</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tasks Section -->
-          <div v-if="tasks.length > 0" class="space-y-4">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-sm text-slate-400">task_alt</span>
-              <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">待办任务</span>
-              <span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-bold">{{ tasks.filter(t => t.status !== 'COMPLETED').length }}</span>
-            </div>
-            <div
-              v-for="task in tasks"
-              :key="task.taskId"
-              class="p-6 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 transition-all cursor-pointer group"
-            >
-              <div class="flex items-center gap-4">
-                <button
-                  @click.stop="handleToggleTask(task)"
-                  class="size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
-                  :class="task.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-slate-400'"
+              <div class="flex-1 p-3 space-y-3">
+                <div
+                  v-for="event in getEventsForDate(day.fullDate)"
+                  :key="event.scheduleId"
+                  @click="selectedEvent = event; selectedTask = null"
+                  class="p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
                 >
-                  <span v-if="task.status === 'COMPLETED'" class="material-symbols-outlined text-white text-sm">check</span>
-                </button>
-                <div class="flex-1 min-w-0" @click="selectTask(task)">
-                  <h4
-                    class="font-bold transition-colors"
-                    :class="task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-900 group-hover:text-slate-700'"
-                  >{{ task.title }}</h4>
-                  <div class="flex items-center gap-2 mt-1 flex-wrap">
-                    <span v-if="task.customerName" class="text-xs text-slate-500 font-medium">{{ task.customerName }}</span>
-                    <span v-if="task.dueDate" class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-bold">
-                      截止 {{ formatDueDate(task.dueDate) }}
-                    </span>
-                    <span
-                      v-if="task.priority"
-                      class="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                      :class="{
-                        'bg-red-50 text-red-500': task.priority === 'HIGH',
-                        'bg-amber-50 text-amber-500': task.priority === 'MEDIUM',
-                        'bg-slate-100 text-slate-500': task.priority === 'LOW',
-                      }"
-                    >{{ task.priority === 'HIGH' ? '高' : task.priority === 'MEDIUM' ? '中' : '低' }}</span>
+                  <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
+                  <p class="text-[10px] text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
+                </div>
+                <!-- Tasks -->
+                <div
+                  v-for="task in getTasksForDate(day.fullDate)"
+                  :key="task.taskId"
+                  class="p-3 rounded-xl border border-slate-200 bg-white shadow-sm transition-all flex items-start gap-2"
+                >
+                  <button
+                    @click.stop="handleToggleTask(task)"
+                    class="mt-0.5 shrink-0 size-4 rounded-sm border flex items-center justify-center transition-colors"
+                    :class="task.status === 'COMPLETED'
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : 'border-slate-300 hover:border-primary text-transparent hover:text-primary/20'"
+                  >
+                    <span class="material-symbols-outlined text-[12px] font-bold">check</span>
+                  </button>
+                  <div class="min-w-0 flex-1" @click="selectTask(task)">
+                    <p class="text-xs font-bold mb-1 truncate" :class="task.status === 'COMPLETED' ? 'text-slate-500 line-through' : 'text-slate-700'">
+                      {{ task.title }}
+                    </p>
+                    <p class="text-[10px] text-slate-400 truncate">{{ task.customerName || '' }}</p>
                   </div>
                 </div>
-                <span class="material-symbols-outlined text-slate-300" @click="selectTask(task)">chevron_right</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Month View -->
+          <div v-else-if="viewMode === 'month'" class="min-h-[600px] flex flex-col">
+            <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+              <div
+                v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
+                :key="dayLabel"
+                class="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider"
+              >
+                {{ dayLabel }}
+              </div>
+            </div>
+            <div class="flex-1 grid grid-cols-7 grid-rows-5 divide-x divide-y divide-slate-100">
+              <div
+                v-for="(cell, i) in monthCells"
+                :key="i"
+                class="min-h-[120px] p-2"
+                :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
+              >
+                <div class="flex justify-between items-start mb-1">
+                  <div class="flex flex-col gap-0.5">
+                    <span
+                      class="size-6 flex items-center justify-center rounded-full text-xs font-medium"
+                      :class="cell.isToday
+                        ? 'bg-primary text-white font-bold'
+                        : !cell.isCurrentMonth ? 'text-slate-300' : 'text-slate-700'"
+                    >
+                      {{ cell.isCurrentMonth ? cell.date : '' }}
+                    </span>
+                    <span v-if="cell.isCurrentMonth && cell.fullDate" class="text-[10px] text-slate-400 leading-none">
+                      {{ getLunarText(cell.fullDate) }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="cell.fullDate" class="space-y-1">
+                  <div
+                    v-for="event in getEventsForDate(cell.fullDate)"
+                    :key="event.scheduleId"
+                    @click="selectedEvent = event; selectedTask = null"
+                    class="px-2 py-1 text-[10px] font-medium bg-primary/10 text-primary rounded truncate cursor-pointer hover:bg-primary/20"
+                  >
+                    {{ formatTime(event.startTime) }} {{ event.title }}
+                  </div>
+                  <div
+                    v-for="task in getTasksForDate(cell.fullDate)"
+                    :key="task.taskId"
+                    class="px-2 py-1 text-[10px] font-medium rounded truncate cursor-pointer flex items-center gap-1 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  >
+                    <div
+                      class="shrink-0 size-3 rounded-sm border flex items-center justify-center transition-colors"
+                      :class="task.status === 'COMPLETED'
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : 'border-slate-300 text-transparent'"
+                      @click.stop="handleToggleTask(task)"
+                    >
+                      <span class="material-symbols-outlined text-[8px] font-bold">check</span>
+                    </div>
+                    <span
+                      @click="selectTask(task)"
+                      class="truncate"
+                      :class="task.status === 'COMPLETED' ? 'line-through text-slate-500' : ''"
+                    >{{ task.title }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- List View -->
+          <div v-else class="p-6">
+            <div class="space-y-6">
+              <!-- Schedules Section -->
+              <div class="space-y-4">
+                <div v-if="schedules.length === 0 && tasks.length === 0" class="text-center py-20 text-slate-400">
+                  <span class="material-symbols-outlined text-4xl mb-2">calendar_today</span>
+                  <p class="text-sm">暂无日程安排和待办任务</p>
+                </div>
+                <div
+                  v-for="event in schedules"
+                  :key="event.scheduleId"
+                  @click="selectedEvent = event; selectedTask = null"
+                  class="p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-md transition-all cursor-pointer group"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-6">
+                      <div class="text-center shrink-0">
+                        <p class="text-lg font-black text-slate-900">{{ formatTime(event.startTime) }}</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">{{ formatDate(event.startTime) }}</p>
+                      </div>
+                      <div class="h-10 w-px bg-slate-100"></div>
+                      <div class="min-w-0">
+                        <h4 class="font-bold text-slate-900 group-hover:text-primary transition-colors truncate">{{ event.title }}</h4>
+                        <div class="flex items-center gap-2 mt-1 flex-wrap">
+                          <span v-if="event.customerName" class="text-xs text-slate-500 font-medium">{{ event.customerName }}</span>
+                          <span v-if="event.typeName" class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">{{ event.typeName }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <span class="material-symbols-outlined text-slate-300">chevron_right</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tasks Section -->
+              <div v-if="tasks.length > 0" class="space-y-4">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-sm text-slate-400">task_alt</span>
+                  <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">待办任务</span>
+                  <span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-bold">{{ tasks.filter(t => t.status !== 'COMPLETED').length }}</span>
+                </div>
+                <div
+                  v-for="task in tasks"
+                  :key="task.taskId"
+                  class="p-6 bg-white border border-slate-200 rounded-2xl hover:shadow-md transition-all cursor-pointer group"
+                >
+                  <div class="flex items-center gap-4">
+                    <button
+                      @click.stop="handleToggleTask(task)"
+                      class="size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
+                      :class="task.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-slate-400'"
+                    >
+                      <span v-if="task.status === 'COMPLETED'" class="material-symbols-outlined text-white text-sm">check</span>
+                    </button>
+                    <div class="flex-1 min-w-0" @click="selectTask(task)">
+                      <h4
+                        class="font-bold transition-colors truncate"
+                        :class="task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-900 group-hover:text-slate-700'"
+                      >{{ task.title }}</h4>
+                      <div class="flex items-center gap-2 mt-1 flex-wrap">
+                        <span v-if="task.customerName" class="text-xs text-slate-500 font-medium">{{ task.customerName }}</span>
+                        <span v-if="task.dueDate" class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-bold">
+                          截止 {{ formatDueDate(task.dueDate) }}
+                        </span>
+                        <span
+                          v-if="task.priority"
+                          class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                          :class="{
+                            'bg-red-50 text-red-500': task.priority === 'HIGH',
+                            'bg-amber-50 text-amber-500': task.priority === 'MEDIUM',
+                            'bg-slate-100 text-slate-500': task.priority === 'LOW',
+                          }"
+                        >{{ task.priority === 'HIGH' ? '高' : task.priority === 'MEDIUM' ? '中' : '低' }}</span>
+                      </div>
+                    </div>
+                    <span class="material-symbols-outlined text-slate-300" @click="selectTask(task)">chevron_right</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -506,6 +536,23 @@ import { getMySchedules, addSchedule, deleteSchedule } from '@/api/schedule'
 import { getMyTasks, updateTaskStatus } from '@/api/task'
 import type { ScheduleVO, ScheduleAddBO } from '@/api/schedule'
 import type { Task } from '@/types/common'
+
+const lunarFormatter = new Intl.DateTimeFormat('zh-Hans-u-ca-chinese', {
+  month: 'short',
+  day: 'numeric'
+})
+
+function getLunarText(dateStr: string): string {
+  try {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    if (Number.isNaN(d.getTime())) return ''
+    // Example output (depends on runtime): "二月18" / "闰二月18"
+    return lunarFormatter.format(d)
+  } catch {
+    return ''
+  }
+}
 
 const viewMode = ref<'grid' | 'month' | 'list'>('grid')
 const selectedEvent = ref<ScheduleVO | null>(null)
