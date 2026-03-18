@@ -486,39 +486,144 @@
     </div>
 
     <!-- Upload Dialog -->
-    <el-dialog v-model="showUploadDialog" title="上传文件" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
-      <el-form :model="uploadForm" label-width="80px">
-        <el-form-item label="文件">
-          <span class="text-primary font-medium">{{ uploadingFile?.name }}</span>
-        </el-form-item>
-        <el-form-item label="文件类型">
-          <el-select v-model="uploadForm.type" class="w-full" placeholder="选择文件类型">
-            <el-option label="会议记录" value="meeting" />
-            <el-option label="邮件" value="email" />
-            <el-option label="录音" value="recording" />
-            <el-option label="文档" value="document" />
-            <el-option label="方案" value="proposal" />
-            <el-option label="合同" value="contract" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="摘要">
-          <el-input v-model="uploadForm.summary" type="textarea" :rows="3" placeholder="请输入文件摘要（可选）" />
-        </el-form-item>
-      </el-form>
+    <el-dialog
+      v-model="showUploadDialog"
+      :width="isMobile ? '95%' : '570px'"
+      :fullscreen="isMobile"
+      align-center
+      :show-close="false"
+      class="wk-upload-dialog"
+      modal-class="wk-upload-dialog__overlay"
+    >
+      <div class="wk-upload-dialog__content">
+        <div class="text-center space-y-3 mb-8">
+          <div class="size-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto">
+            <span class="material-symbols-outlined text-3xl">cloud_upload</span>
+          </div>
+          <h3 class="text-xl font-bold text-slate-900">上传业务知识</h3>
+          <p class="text-slate-500 text-xs px-6">
+            支持 PDF、Word、PPT、Excel 或网页链接。AI 将自动解析并建立索引。
+          </p>
+        </div>
+
+        <div class="space-y-6">
+          <!-- Step 1: Category -->
+          <section class="space-y-3">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">1. 选择知识分类</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <button
+                v-for="cat in [
+                  { id: 'document', label: '产品文档', icon: 'description' },
+                  { id: 'proposal', label: '方案资料', icon: 'lightbulb' },
+                  { id: 'meeting', label: '会议记录', icon: 'event_note' },
+                  { id: 'contract', label: '合同文件', icon: 'assignment' },
+                  { id: 'email', label: '邮件往来', icon: 'mail' },
+                  { id: 'recording', label: '录音文件', icon: 'mic' }
+                ]"
+                :key="cat.id"
+                type="button"
+                :disabled="uploading"
+                @click="uploadForm.type = cat.id"
+                :class="[
+                  'flex flex-col items-center gap-2 py-4 rounded-2xl border transition-all bg-white',
+                  uploadForm.type === cat.id
+                    ? 'border-primary bg-primary/5 text-primary ring-2 ring-primary/20'
+                    : 'border-slate-100 text-slate-600 hover:border-slate-200 hover:bg-slate-50',
+                  uploading ? 'opacity-60 cursor-not-allowed' : ''
+                ]"
+              >
+                <span class="material-symbols-outlined text-xl">{{ cat.icon }}</span>
+                <span class="text-xs font-bold">{{ cat.label }}</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Step 2: File -->
+          <section class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">2. 上传文件</p>
+              <span v-if="uploading" class="inline-flex items-center gap-2 text-[11px] text-slate-500">
+                <span class="inline-block size-3 rounded-full border-2 border-slate-300 border-t-transparent animate-spin"></span>
+                正在上传...
+              </span>
+            </div>
+
+            <el-upload
+              class="w-full"
+              :show-file-list="false"
+              :before-upload="handleBeforeUpload"
+              :http-request="handleUpload"
+              :disabled="uploading"
+              drag
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
+            >
+              <div
+                class="rounded-[2rem] border-2 border-dashed border-slate-200 bg-white p-8 md:p-10 text-center transition-all hover:border-primary hover:bg-primary/5"
+              >
+                <template v-if="uploadingFile">
+                  <div class="mx-auto flex max-w-xl items-center gap-4 rounded-2xl bg-slate-900 p-4 text-left">
+                    <div class="size-10 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
+                      <span class="material-symbols-outlined text-lg">
+                        {{
+                          uploadingFile?.name?.toLowerCase().endsWith('.pdf')
+                            ? 'picture_as_pdf'
+                            : uploadingFile?.name?.toLowerCase().endsWith('.ppt') || uploadingFile?.name?.toLowerCase().endsWith('.pptx')
+                              ? 'slideshow'
+                              : 'description'
+                        }}
+                      </span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-bold text-white truncate">{{ uploadingFile.name }}</p>
+                      <p class="text-[11px] text-slate-300 mt-0.5">
+                        {{ `${(uploadingFile.size / 1024 / 1024).toFixed(2)} MB` }}
+                      </p>
+                      <p class="text-[11px] text-slate-400 mt-2">点击更换文件，或拖拽新文件到此处</p>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <span class="material-symbols-outlined text-4xl text-slate-300 mb-3">upload_file</span>
+                  <p class="text-xs font-bold text-slate-500">拖拽文件到此处，或点击浏览</p>
+                  <p class="text-[10px] text-slate-300 mt-1">支持 PDF、Word、PPT、Excel（最大 50MB）</p>
+                </template>
+              </div>
+            </el-upload>
+          </section>
+
+          <!-- Step 3: Summary -->
+          <section class="space-y-3">
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">3. 填写摘要（可选）</p>
+            <el-input
+              v-model="uploadForm.summary"
+              type="textarea"
+              :rows="3"
+              :disabled="uploading"
+              resize="none"
+              placeholder="例如：本次会议的关键结论、客户关注点、下一步行动…"
+            />
+          </section>
+        </div>
+      </div>
+
       <template #footer>
-        <div class="flex justify-end gap-3">
+        <div class="flex gap-3">
           <button
-            class="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            class="flex-1 py-3.5 border border-slate-200 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="uploading"
             @click="showUploadDialog = false"
           >
             取消
           </button>
           <button
-            class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50"
-            :disabled="uploading"
+            class="flex-1 py-3.5 bg-primary text-white rounded-2xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 text-sm disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed"
+            :disabled="uploading || !uploadingFile"
             @click="handleConfirmUpload"
           >
-            {{ uploading ? '上传中...' : '上传' }}
+            <span class="inline-flex items-center justify-center gap-2">
+              <span v-if="uploading" class="inline-block size-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin"></span>
+              {{ uploading ? '上传中...' : '开始解析' }}
+            </span>
           </button>
         </div>
       </template>
@@ -591,6 +696,7 @@ const visiblePages = computed(() => {
 })
 
 onMounted(() => {
+  void uploadRef.value
   fetchList()
 })
 
@@ -813,4 +919,65 @@ function getParseStatusLabel(status?: string): string {
 :deep(.el-upload) {
   width: 100%;
 }
+/* Upload dialog skin (UI only) */
+:deep(.wk-upload-dialog.el-dialog) {
+  border-radius: 2rem;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.35);
+}
+
+:deep(.wk-upload-dialog .el-dialog__header) {
+  display: none;
+  padding: 0;
+}
+
+:deep(.wk-upload-dialog .el-dialog__body) {
+  padding: 16px 20px 20px 20px;
+}
+
+:deep(.wk-upload-dialog .el-dialog__footer) {
+  padding: 0 20px 20px 20px;
+  border-top: none;
+  box-shadow: none;
+}
+
+:deep(.wk-upload-dialog__overlay) {
+  background: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(10px);
+}
+
+:deep(.wk-upload-dialog .el-textarea__inner) {
+  border-radius: 14px;
+}
+
+:deep(.wk-upload-dialog .el-input__wrapper) {
+  border-radius: 14px;
+}
+
+:deep(.wk-upload-dialog .el-upload-dragger) {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+:deep(.wk-upload-dialog .el-upload.is-drag) {
+  width: 100%;
+}
+
+:deep(.wk-upload-dialog.el-dialog) {
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+
+:deep(.wk-upload-dialog .el-dialog__body) {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+}
+
+:deep(.wk-upload-dialog .el-dialog__footer) {
+  flex: 0 0 auto;
+}
+
 </style>
