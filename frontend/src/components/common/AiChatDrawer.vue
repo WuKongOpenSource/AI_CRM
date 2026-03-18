@@ -48,7 +48,7 @@
         </div>
 
         <!-- Tab Bar -->
-        <div class="flex border-b border-slate-100 px-4">
+        <!-- <div class="flex border-b border-slate-100 px-4">
           <button
             class="flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-colors"
             :class="currentTab === 'chat'
@@ -70,7 +70,7 @@
             系统通知
             <span class="size-2 rounded-full bg-red-500 absolute top-2.5 right-2"></span>
           </button>
-        </div>
+        </div> -->
 
         <!-- Chat Content -->
         <template v-if="currentTab === 'chat'">
