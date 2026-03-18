@@ -711,7 +711,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -727,6 +727,7 @@ import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 
 const router = useRouter()
+const route = useRoute()
 const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
 
@@ -920,6 +921,11 @@ onMounted(async () => {
   }
 
   await customerStore.fetchCustomerList(true)
+
+  if (route.query.action === 'create') {
+    showAddDialog.value = true
+    router.replace({ path: route.path, query: {} })
+  }
 })
 
 function handleSearch() {

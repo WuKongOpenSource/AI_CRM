@@ -528,6 +528,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
         EnterpriseConfigVO vo = new EnterpriseConfigVO();
         vo.setName(configs.getOrDefault("enterprise_name", null));
+        vo.setDescription(configs.getOrDefault("enterprise_description", null));
 
         String logo = configs.getOrDefault("enterprise_logo", null);
         vo.setLogo(logo);
@@ -558,6 +559,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
         if (updateBO.getLogo() != null) {
             configs.put("enterprise_logo", updateBO.getLogo());
+        }
+        if (updateBO.getDescription() != null) {
+            configs.put("enterprise_description", updateBO.getDescription());
         }
 
         if (!configs.isEmpty()) {

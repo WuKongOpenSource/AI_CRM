@@ -12,7 +12,7 @@
         </div>
         <div class="min-w-0">
           <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
-          <p class="text-slate-500 text-[10px] uppercase tracking-widest">AI CRM System</p>
+          <p class="text-slate-500 text-[10px] uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
         </div>
       </div>
 
@@ -113,7 +113,7 @@
             </div>
             <div class="min-w-0">
               <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
-              <p class="text-slate-500 text-[10px] uppercase tracking-widest">AI CRM System</p>
+              <p class="text-slate-500 text-[10px] uppercase tracking-widest">{{ enterpriseStore.displayDescription }}</p>
             </div>
           </div>
           <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
@@ -169,7 +169,7 @@
             <span class="material-symbols-outlined">notifications</span>
           </button>
           <button
-            @click="$router.push('/customer')"
+            @click="$router.push({ path: '/customer', query: { action: 'create' } })"
             class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20"
           >
             <span class="material-symbols-outlined text-sm">add</span>

@@ -22,6 +22,9 @@ public class EnterpriseConfigVO implements Serializable {
     @Schema(description = "企业Logo访问URL")
     private String logoUrl;
 
+    @Schema(description = "企业说明")
+    private String description;
+
     @Schema(description = "最后更新时间")
     private Date updateTime;
 }
