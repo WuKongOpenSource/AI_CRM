@@ -250,6 +250,9 @@
       direction="rtl"
       :size="'400px'"
       :with-header="false"
+      :modal="false"
+      :lock-scroll="false"
+      modal-penetrable
       class="schedule-detail-drawer"
     >
       <div v-if="selectedEvent" class="h-full flex flex-col bg-white shadow-2xl">
@@ -342,89 +345,15 @@
       </div>
     </el-drawer>
 
-    <!-- Task Detail Panel -->
-    <Transition name="slide-right">
-      <aside v-if="selectedTask" class="w-[420px] bg-slate-50 flex flex-col shrink-0">
-        <div class="p-8 flex-1 overflow-y-auto">
-          <div class="flex items-center justify-between mb-8">
-            <div class="flex items-center gap-2">
-              <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span class="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">任务详情</span>
-            </div>
-            <button @click="selectedTask = null" class="size-8 flex items-center justify-center rounded-full hover:bg-white text-slate-400 transition-colors">
-              <span class="material-symbols-outlined">close</span>
-            </button>
-          </div>
-
-          <div class="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-100 mb-8">
-            <div class="flex items-start gap-3 mb-4">
-              <button
-                @click="handleToggleTask(selectedTask!)"
-                class="size-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors"
-                :class="selectedTask.status === 'COMPLETED' ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-slate-400'"
-              >
-                <span v-if="selectedTask.status === 'COMPLETED'" class="material-symbols-outlined text-white text-sm">check</span>
-              </button>
-              <h2
-                class="text-xl font-bold"
-                :class="selectedTask.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-900'"
-              >{{ selectedTask.title }}</h2>
-            </div>
-
-            <div class="flex items-center gap-3 text-sm text-slate-500 mb-6 flex-wrap">
-              <div v-if="selectedTask.dueDate" class="flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">event</span>
-                截止 {{ formatDueDate(selectedTask.dueDate) }}
-              </div>
-              <span
-                v-if="selectedTask.priority"
-                class="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                :class="{
-                  'bg-red-50 text-red-500': selectedTask.priority === 'HIGH',
-                  'bg-amber-50 text-amber-500': selectedTask.priority === 'MEDIUM',
-                  'bg-slate-100 text-slate-500': selectedTask.priority === 'LOW',
-                }"
-              >{{ selectedTask.priority === 'HIGH' ? '高优先级' : selectedTask.priority === 'MEDIUM' ? '中优先级' : '低优先级' }}</span>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full font-bold"
-                :class="{
-                  'bg-amber-50 text-amber-600': selectedTask.status === 'PENDING',
-                  'bg-blue-50 text-blue-600': selectedTask.status === 'IN_PROGRESS',
-                  'bg-emerald-50 text-emerald-600': selectedTask.status === 'COMPLETED',
-                }"
-              >{{ selectedTask.status === 'PENDING' ? '待处理' : selectedTask.status === 'IN_PROGRESS' ? '进行中' : '已完成' }}</span>
-            </div>
-
-            <div class="space-y-6">
-              <div v-if="selectedTask.customerName">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">关联客户</p>
-                <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100">{{ selectedTask.customerName }}</span>
-              </div>
-              <div v-if="selectedTask.assignedToName">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">负责人</p>
-                <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100">{{ selectedTask.assignedToName }}</span>
-              </div>
-              <div v-if="selectedTask.description">
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">描述</p>
-                <p class="text-sm text-slate-700 leading-relaxed">{{ selectedTask.description }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="p-6 bg-white border-t border-slate-100 flex gap-3">
-          <button
-            @click="handleToggleTask(selectedTask!)"
-            class="flex-1 py-3 rounded-xl text-sm font-bold transition-all"
-            :class="selectedTask.status === 'COMPLETED'
-              ? 'border border-slate-200 text-slate-600 hover:bg-slate-50'
-              : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm'"
-          >
-            {{ selectedTask.status === 'COMPLETED' ? '标记为未完成' : '标记为已完成' }}
-          </button>
-        </div>
-      </aside>
-    </Transition>
+    <TaskDetailDrawer
+      v-model="showCalendarTaskDetail"
+      :task="selectedTask"
+      :is-mobile="isMobile"
+      :can-edit="false"
+      :can-delete="false"
+      :can-toggle-complete="true"
+      @toggle-complete="handleToggleTask"
+    />
 
     <!-- Add Schedule Dialog -->
     <el-dialog
@@ -576,6 +505,7 @@ import { getMySchedules, addSchedule, deleteSchedule } from '@/api/schedule'
 import { getMyTasks, updateTaskStatus } from '@/api/task'
 import type { ScheduleVO, ScheduleAddBO } from '@/api/schedule'
 import type { Task } from '@/types/common'
+import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
 
 const { isMobile } = useResponsive()
 
@@ -600,6 +530,13 @@ const showScheduleDetailDrawer = computed({
   get: () => !!selectedEvent.value && !isMobile.value,
   set: (val: boolean) => {
     if (!val) selectedEvent.value = null
+  }
+})
+
+const showCalendarTaskDetail = computed({
+  get: () => !!selectedTask.value,
+  set: (val: boolean) => {
+    if (!val) selectedTask.value = null
   }
 })
 
