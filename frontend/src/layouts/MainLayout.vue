@@ -7,8 +7,8 @@
         <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-10 flex-shrink-0 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
-          <span class="material-symbols-outlined text-2xl">rocket_launch</span>
+        <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+          <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div class="min-w-0">
           <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
@@ -87,8 +87,8 @@
         <div v-if="enterpriseStore.hasLogo" class="size-7 flex-shrink-0 rounded-lg overflow-hidden">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
-        <div v-else class="size-7 flex-shrink-0 bg-primary rounded-lg flex items-center justify-center text-white">
-          <span class="material-symbols-outlined text-sm">rocket_launch</span>
+        <div v-else class="size-7 flex-shrink-0 rounded-lg overflow-hidden">
+          <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
         </div>
         <span class="text-sm font-bold text-slate-900 truncate">{{ enterpriseStore.displayName }}</span>
       </div>
@@ -108,8 +108,8 @@
             <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
             </div>
-            <div v-else class="size-10 flex-shrink-0 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
-              <span class="material-symbols-outlined text-2xl">rocket_launch</span>
+            <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden shadow-lg">
+              <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
             </div>
             <div class="min-w-0">
               <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
