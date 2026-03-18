@@ -188,14 +188,28 @@
                     @node-click="handleDeptClick"
                   >
                     <template #default="{ data }">
-                      <div class="group flex items-center justify-between w-full pr-1 overflow-hidden">
-                        <span class="flex items-center gap-2 text-sm min-w-0 overflow-hidden">
-                          <span class="material-symbols-outlined text-base opacity-60 shrink-0">
-                            {{ data.children && data.children.length > 0 ? 'folder_open' : 'description' }}
+                      <div
+                        class="group w-full overflow-hidden px-2 py-1"
+                      >
+                        <div
+                          class="flex items-center justify-between w-full overflow-hidden rounded-xl px-2 py-2 transition-colors"
+                          :class="selectedDept?.deptId === data.deptId ? 'bg-primary/10' : 'hover:bg-slate-50'"
+                        >
+                          <span class="flex items-center gap-2 text-sm min-w-0 overflow-hidden">
+                            <span
+                              class="material-symbols-outlined text-base shrink-0 transition-colors"
+                              :class="selectedDept?.deptId === data.deptId ? 'text-primary' : 'text-slate-400'"
+                            >
+                              {{ data.children && data.children.length > 0 ? 'folder_open' : 'description' }}
+                            </span>
+                            <span
+                              class="font-semibold truncate transition-colors"
+                              :class="selectedDept?.deptId === data.deptId ? 'text-primary' : 'text-slate-700'"
+                            >
+                              {{ data.deptName }}
+                            </span>
                           </span>
-                          <span class="font-medium truncate">{{ data.deptName }}</span>
-                        </span>
-                        <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                           <button
                             @click.stop="handleDeptCommand('addChild', data)"
                             class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
@@ -217,6 +231,7 @@
                           >
                             <span class="material-symbols-outlined text-sm">delete</span>
                           </button>
+                          </div>
                         </div>
                       </div>
                     </template>
@@ -3213,7 +3228,12 @@ watch(showAddRoleUserDialog, async (val) => {
 }
 
 :deep(.el-tree-node.is-current > .el-tree-node__content) {
-  background-color: var(--el-color-primary-light-9);
+  background-color: transparent;
+}
+
+/* Dept tree: let custom row handle hover/selected */
+:deep(.el-tree-node__content:hover) {
+  background-color: transparent;
 }
 
 /* Employee detail drawer: remove default body padding */
