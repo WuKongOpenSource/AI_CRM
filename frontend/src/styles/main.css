@@ -180,6 +180,18 @@ html, body, #app {
   font-weight: bold;
 }
 
+.el-tag.el-zoom-in-center-enter-active,
+.el-tag.el-zoom-in-center-leave-active {
+  transition: none !important;
+  animation: none !important;
+}
+
+.el-tag.el-zoom-in-center-enter-from,
+.el-tag.el-zoom-in-center-leave-active {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 .el-button--primary {
   background-color: #137fec !important;
   border-color: #137fec !important;
