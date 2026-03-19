@@ -85,9 +85,9 @@
 
           <!-- Stage Stepper (inside same card) -->
           <div class="mt-5 pt-4 border-t border-slate-100">
-            <div class="flex items-center gap-2 mb-4">
+            <div class="flex items-center gap-2 mb-6">
               <span class="material-symbols-outlined text-primary text-lg">trending_up</span>
-              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">客户阶段</h3>
+              <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div>
             <div class="relative overflow-x-auto">
               <!-- Chevron segments (fixed width) -->
@@ -337,9 +337,9 @@
             </div>
 
             <!-- Contacts Module -->
-            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden" v-loading="contactLoading">
-              <div class="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
-                <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6" v-loading="contactLoading">
+              <div class="mb-6 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary text-lg">group</span>
                   关联联系人
                   <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
@@ -348,7 +348,7 @@
                   <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
                 </button>
               </div>
-              <div class="p-4 space-y-3">
+              <div class="space-y-3">
                 <div v-if="contacts.length === 0" class="py-6 text-center">
                   <p class="text-xs text-slate-400">暂无联系人</p>
                 </div>
@@ -432,9 +432,9 @@
             </section> -->
 
             <!-- Tasks Module -->
-            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-              <div class="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
-                <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+              <div class="mb-6 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary text-lg">task_alt</span>
                   待办任务
                 </h4>
@@ -442,7 +442,7 @@
                   <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                 </button>
               </div>
-              <div class="p-4 space-y-3">
+              <div class="space-y-3">
                 <div v-if="!customer.tasks?.length" class="py-6 text-center">
                   <p class="text-xs text-slate-400">暂无待办任务</p>
                 </div>
@@ -464,14 +464,14 @@
             </section>
 
             <!-- Documents Module -->
-            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-              <div class="px-5 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
-                <h4 class="text-xs font-bold text-slate-700 flex items-center gap-2">
+            <section class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+              <div class="mb-6 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span class="material-symbols-outlined text-primary text-lg">folder_open</span>
                   文档中心
                 </h4>
               </div>
-              <div class="p-4">
+              <div>
                 <p class="py-6 text-center text-xs text-slate-400">暂无文档</p>
               </div>
             </section>

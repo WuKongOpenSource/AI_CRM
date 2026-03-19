@@ -65,7 +65,7 @@
         <select
           v-else-if="field.fieldType === 'select'"
           v-model="localValues[field.fieldName]"
-          class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all appearance-none"
+          class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
           @change="emitChange"
         >
           <option value="" disabled>{{ field.placeholder || '请选择' }}</option>

@@ -21,18 +21,18 @@
         </div>
         <!-- Import/Export - desktop only -->
         <div v-if="!isMobile" class="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
-          <button class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5" @click="showImportDialog = true">
-            <span class="material-symbols-outlined text-[16px]">upload</span>
+          <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" @click="showImportDialog = true">
+            <span class="material-symbols-outlined text-[18px] leading-none">upload</span>
             导入
           </button>
-          <button class="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5" :disabled="exporting" @click="handleExport">
-            <span class="material-symbols-outlined text-[16px]">download</span>
+          <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" :disabled="exporting" @click="handleExport">
+            <span class="material-symbols-outlined text-[18px] leading-none">download</span>
             导出
           </button>
         </div>
         <!-- Add Customer -->
         <button
-          class="px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+          class="h-10 px-4 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
           @click="showAddDialog = true"
         >
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
@@ -90,7 +90,7 @@
                   <!-- Level -->
                   <td class="px-6 py-4 whitespace-nowrap">
                     <span v-if="customer.level"
-                      class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded text-sm"
+                      class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
                       :class="{
                         'bg-emerald-50 text-emerald-600': customer.level === 'A',
                         'bg-blue-50 text-blue-600': customer.level === 'B',
@@ -201,7 +201,7 @@
 
           <!-- Pagination -->
           <div v-if="customerStore.totalCount > 0" class="shrink-0 px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-slate-200">
-            <span class="text-xs text-slate-500">
+            <span class="text-sm text-slate-500">
               共 {{ customerStore.totalCount }} 条客户数据
             </span>
             <div class="flex items-center gap-1">
@@ -349,6 +349,7 @@
       title="导入客户"
       :width="isMobile ? '95%' : '800px'"
       :fullscreen="isMobile"
+      class="wk-dialog--flush"
       @close="resetImport"
     >
       <!-- Step 1: Upload -->
@@ -362,7 +363,7 @@
           drag
         >
           <span class="material-symbols-outlined text-4xl text-slate-400 mb-2">upload_file</span>
-          <div class="text-slate-600">将 Excel 文件拖到此处，或<em class="text-primary">点击上传</em></div>
+          <div class="text-slate-600">将 Excel 文件拖到此处，或<em class="text-primary not-italic">点击上传</em></div>
           <template #tip>
             <div class="text-xs text-slate-400 mt-2">支持 .xlsx / .xls 格式，表头需包含「公司名称」列</div>
             <div class="mt-2">
