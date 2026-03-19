@@ -55,21 +55,27 @@
             <button
               v-for="session in groupedSessions.today"
               :key="session.sessionId"
-              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative min-w-0 overflow-hidden"
-              :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId
-                ? 'bg-white shadow-sm border border-slate-200'
-                : 'hover:bg-slate-100/50 border border-transparent'"
+              class="w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all group"
+              :class="isSessionActive(session.sessionId)
+                ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
+                : 'border-transparent hover:bg-slate-100/50'"
               @click="handleSelectSession(session.sessionId)"
             >
-              <span
-                class="text-sm font-semibold truncate block max-w-full"
-                :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
-              >{{ session.title || '新对话' }}</span>
+              <div class="flex min-w-0 items-center gap-2">
+                <span
+                  class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                  :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                  :title="session.title || '新对话'"
+                >{{ session.title || '新对话' }}</span>
+                <span
+                  class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
+                  :class="isSessionActive(session.sessionId)
+                    ? 'pointer-events-auto opacity-100'
+                    : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
+                  @click.stop="handleDeleteSession(session.sessionId)"
+                >close</span>
+              </div>
               <span class="text-xs text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
-              <span
-                class="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                @click.stop="handleDeleteSession(session.sessionId)"
-              >close</span>
             </button>
           </template>
 
@@ -79,21 +85,27 @@
             <button
               v-for="session in groupedSessions.yesterday"
               :key="session.sessionId"
-              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative min-w-0 overflow-hidden"
-              :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId
-                ? 'bg-white shadow-sm border border-slate-200'
-                : 'hover:bg-slate-100/50 border border-transparent'"
+              class="w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all group"
+              :class="isSessionActive(session.sessionId)
+                ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
+                : 'border-transparent hover:bg-slate-100/50'"
               @click="handleSelectSession(session.sessionId)"
             >
-              <span
-                class="text-sm font-semibold truncate block max-w-full"
-                :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
-              >{{ session.title || '新对话' }}</span>
+              <div class="flex min-w-0 items-center gap-2">
+                <span
+                  class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                  :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                  :title="session.title || '新对话'"
+                >{{ session.title || '新对话' }}</span>
+                <span
+                  class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
+                  :class="isSessionActive(session.sessionId)
+                    ? 'pointer-events-auto opacity-100'
+                    : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
+                  @click.stop="handleDeleteSession(session.sessionId)"
+                >close</span>
+              </div>
               <span class="text-xs text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
-              <span
-                class="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                @click.stop="handleDeleteSession(session.sessionId)"
-              >close</span>
             </button>
           </template>
 
@@ -103,21 +115,27 @@
             <button
               v-for="session in groupedSessions.earlier"
               :key="session.sessionId"
-              class="w-full flex flex-col gap-1 p-3 rounded-xl transition-all text-left group relative min-w-0 overflow-hidden"
-              :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId
-                ? 'bg-white shadow-sm border border-slate-200'
-                : 'hover:bg-slate-100/50 border border-transparent'"
+              class="w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all group"
+              :class="isSessionActive(session.sessionId)
+                ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
+                : 'border-transparent hover:bg-slate-100/50'"
               @click="handleSelectSession(session.sessionId)"
             >
-              <span
-                class="text-sm font-semibold truncate block max-w-full"
-                :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
-              >{{ session.title || '新对话' }}</span>
+              <div class="flex min-w-0 items-center gap-2">
+                <span
+                  class="block min-w-0 flex-1 truncate text-sm font-semibold leading-5"
+                  :class="isSessionActive(session.sessionId) ? 'text-primary' : 'text-slate-700'"
+                  :title="session.title || '新对话'"
+                >{{ session.title || '新对话' }}</span>
+                <span
+                  class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
+                  :class="isSessionActive(session.sessionId)
+                    ? 'pointer-events-auto opacity-100'
+                    : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
+                  @click.stop="handleDeleteSession(session.sessionId)"
+                >close</span>
+              </div>
               <span class="text-xs text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
-              <span
-                class="absolute right-2 top-1/2 -translate-y-1/2 material-symbols-outlined text-sm text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                @click.stop="handleDeleteSession(session.sessionId)"
-              >close</span>
             </button>
           </template>
         </template>
@@ -263,7 +281,7 @@
                 <button
                   v-for="action in quickActions"
                   :key="action.label"
-                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
                   @click="sendQuickMessage(action.text)"
                 >
                   {{ action.label }}
@@ -676,6 +694,10 @@ async function handleSelectSession(sessionId: string) {
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
+}
+
+function isSessionActive(sessionId: string): boolean {
+  return currentView.value === 'chat' && chatStore.currentSessionId === sessionId
 }
 
 async function handleDeleteSession(sessionId: string) {

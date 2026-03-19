@@ -89,7 +89,7 @@
                   <button
                     v-for="action in quickActions"
                     :key="action.label"
-                    class="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+                    class="px-3 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
                     @click="sendQuickMessage(action.text)"
                   >
                     {{ action.label }}

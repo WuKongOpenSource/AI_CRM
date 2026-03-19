@@ -119,11 +119,11 @@
                   <div class="relative z-10 flex h-full items-center justify-center overflow-hidden px-4 transition-transform duration-200 group-hover:scale-[1.02]">
                     <div class="flex min-w-0 max-w-full items-center justify-center gap-2">
                       <span
-                        class="material-symbols-outlined shrink-0 text-[12px] font-bold transition-colors"
+                        class="material-symbols-outlined shrink-0 text-[14px] font-bold transition-colors"
                         :class="getStepperLabelClass(stage, idx)"
                       >{{ getStepperStageIcon(stage) }}</span>
                       <span
-                        class="block min-w-0 truncate text-xs font-bold tracking-wider transition-colors"
+                        class="block min-w-0 truncate text-[14px] font-bold tracking-wider transition-colors"
                         :class="getStepperLabelClass(stage, idx)"
                       >{{ getStepperLabel(stage) }}</span>
                     </div>

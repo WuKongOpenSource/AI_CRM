@@ -542,7 +542,7 @@
           <section class="space-y-3">
             <div class="flex items-center justify-between gap-3">
               <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">2. 上传文件</p>
-              <span v-if="uploading" class="inline-flex items-center gap-2 text-[11px] text-slate-500">
+              <span v-if="uploading" class="inline-flex items-center gap-2 text-xs text-slate-500">
                 <span class="inline-block size-3 rounded-full border-2 border-slate-300 border-t-transparent animate-spin"></span>
                 正在上传...
               </span>
@@ -575,10 +575,10 @@
                     </div>
                     <div class="min-w-0 flex-1">
                       <p class="text-sm font-bold text-white truncate">{{ uploadingFile.name }}</p>
-                      <p class="text-[11px] text-slate-300 mt-0.5">
+                      <p class="text-xs text-slate-300 mt-0.5">
                         {{ `${(uploadingFile.size / 1024 / 1024).toFixed(2)} MB` }}
                       </p>
-                      <p class="text-[11px] text-slate-400 mt-2">点击更换文件，或拖拽新文件到此处</p>
+                      <p class="text-xs text-slate-400 mt-2">点击更换文件，或拖拽新文件到此处</p>
                     </div>
                   </div>
                 </template>

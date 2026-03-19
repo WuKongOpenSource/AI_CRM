@@ -188,7 +188,7 @@
                       :key="idx"
                       class="p-3 bg-primary/5 border border-primary/10 rounded-xl"
                     >
-                      <p class="text-[11px] text-slate-700 leading-relaxed">"{{ point }}"</p>
+                      <p class="text-xs text-slate-700 leading-relaxed">"{{ point }}"</p>
                     </div>
                   </div>
                 </section>
@@ -203,7 +203,7 @@
                       class="flex items-center gap-2 p-2 bg-white border border-slate-200 rounded-lg"
                     >
                       <span class="material-symbols-outlined text-amber-500 text-sm">trending_up</span>
-                      <span class="text-[11px] font-medium text-slate-700">{{ entity.name }}</span>
+                      <span class="text-xs font-medium text-slate-700">{{ entity.name }}</span>
                     </div>
                   </div>
                 </section>
