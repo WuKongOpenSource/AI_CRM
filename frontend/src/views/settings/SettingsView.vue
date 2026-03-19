@@ -189,10 +189,10 @@
                   >
                     <template #default="{ data }">
                       <div
-                        class="group w-full overflow-hidden px-2 py-1"
+                        class="group w-full overflow-hidden px-2 py-0"
                       >
                         <div
-                          class="flex items-center justify-between w-full overflow-hidden rounded-xl px-2 py-2 transition-colors"
+                          class="flex items-center justify-between w-full min-h-[40px] overflow-hidden rounded-xl px-2 py-1 transition-colors"
                           :class="selectedDept?.deptId === data.deptId ? 'bg-primary/10' : 'hover:bg-slate-50'"
                         >
                           <span class="flex items-center gap-2 text-sm min-w-0 overflow-hidden">
@@ -3005,8 +3005,15 @@ watch(showAddRoleUserDialog, async (val) => {
 <style scoped>
 /* Department tree styles */
 :deep(.el-tree-node__content) {
-  height: 36px;
-  padding-right: 4px;
+  height: auto !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  align-items: stretch !important;
+  box-sizing: border-box;
+}
+
+:deep(.el-tree-node__expand-icon) {
+  align-self: center;
 }
 
 :deep(.el-tree-node.is-current > .el-tree-node__content) {
