@@ -597,89 +597,12 @@
     </el-drawer>
 
     <!-- Edit Customer Dialog -->
-    <el-dialog v-model="showEditDialog" title="编辑客户信息" :width="isMobile ? '95%' : '600px'" :fullscreen="isMobile">
-      <el-form :model="editForm" label-width="100px">
-        <el-form-item label="公司名称" required>
-          <el-input v-model="editForm.companyName" placeholder="请输入公司名称" />
-        </el-form-item>
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="行业">
-              <el-input v-model="editForm.industry" placeholder="请输入行业" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="客户级别">
-              <el-select v-model="editForm.level" class="w-full">
-                <el-option label="A级" value="A" />
-                <el-option label="B级" value="B" />
-                <el-option label="C级" value="C" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="商机阶段">
-              <el-select v-model="editForm.stage" class="w-full">
-                <el-option label="线索" value="lead" />
-                <el-option label="资格审查" value="qualified" />
-                <el-option label="方案报价" value="proposal" />
-                <el-option label="谈判中" value="negotiation" />
-                <el-option label="结单" value="closed" />
-                <el-option label="已流失" value="lost" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="报价金额">
-              <el-input-number v-model="editForm.quotation" :min="0" :precision="2" :controls="false" class="w-full" placeholder="报价金额" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="20">
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="合同金额">
-              <el-input-number v-model="editForm.contractAmount" :min="0" :precision="2" :controls="false" class="w-full" placeholder="合同金额" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :sm="12">
-            <el-form-item label="回款金额">
-              <el-input-number v-model="editForm.revenue" :min="0" :precision="2" :controls="false" class="w-full" placeholder="回款金额" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="网站">
-          <el-input v-model="editForm.website" placeholder="请输入网站地址" />
-        </el-form-item>
-        <el-form-item label="地址">
-          <el-input v-model="editForm.address" placeholder="请输入地址" />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="editForm.description" type="textarea" :rows="3" placeholder="请输入备注" />
-        </el-form-item>
-        <DynamicFieldForm ref="editDynamicFieldFormRef" entity-type="customer" v-model="editCustomFieldValues" title="扩展信息" />
-      </el-form>
-      <template #footer>
-        <div class="flex justify-between w-full">
-          <el-popconfirm
-            title="确定要删除此客户吗？删除后不可恢复。"
-            confirm-button-text="删除"
-            cancel-button-text="取消"
-            confirm-button-type="danger"
-            @confirm="handleDeleteCustomer"
-          >
-            <template #reference>
-              <el-button type="danger" plain>删除客户</el-button>
-            </template>
-          </el-popconfirm>
-          <div class="flex gap-2">
-            <el-button @click="showEditDialog = false">取消</el-button>
-            <el-button type="primary" :loading="submitting" @click="handleSaveEdit">保存</el-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
+    <CustomerUpsertDialog
+      v-model="showEditDialog"
+      mode="edit"
+      :customer="customer"
+      @success="handleEditSuccess"
+    />
 
     <!-- AI Follow-up Drawer -->
     <AiFollowUpDrawer
@@ -700,10 +623,10 @@ import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/follow
 import { addContact, updateContact, deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { CustomerTag, FollowUp, CustomerUpdateBO, Contact } from '@/types/customer'
+import type { CustomerTag, FollowUp, Contact } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
+import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -732,24 +655,9 @@ const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
 const customFields = ref<CustomField[]>([])
-const editCustomFieldValues = ref<Record<string, any>>({})
-const editDynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
 
 const primaryContact = computed(() => contacts.value.find(c => c.isPrimary) || contacts.value[0] || null)
 
-const editForm = reactive({
-  customerId: '',
-  companyName: '',
-  industry: '',
-  level: 'B',
-  stage: 'lead',
-  quotation: undefined as number | undefined,
-  contractAmount: undefined as number | undefined,
-  revenue: undefined as number | undefined,
-  website: '',
-  address: '',
-  description: ''
-})
 
 function formatDateForApi(date: Date = new Date()): string {
   const year = date.getFullYear()
@@ -850,55 +758,13 @@ function handleContactPageChange(page: number) {
 }
 
 function handleEdit() {
-  if (!customer.value) return
-  editForm.customerId = customer.value.customerId
-  editForm.companyName = customer.value.companyName || ''
-  editForm.industry = customer.value.industry || ''
-  editForm.level = customer.value.level || 'B'
-  editForm.stage = customer.value.stage || 'lead'
-  editForm.quotation = (customer.value as any).quotation
-  editForm.contractAmount = (customer.value as any).contractAmount
-  editForm.revenue = (customer.value as any).revenue
-  editForm.website = customer.value.website || ''
-  editForm.address = customer.value.address || ''
-  editForm.description = customer.value.description || ''
-  editCustomFieldValues.value = customer.value.customFields ? { ...customer.value.customFields } : {}
   showEditDialog.value = true
 }
 
-async function handleSaveEdit() {
-  if (!editForm.companyName.trim()) {
-    ElMessage.warning('请输入公司名称')
-    return
-  }
-  if (editDynamicFieldFormRef.value) {
-    const missingFields = editDynamicFieldFormRef.value.getRequiredFieldLabels()
-    if (missingFields.length > 0) {
-      ElMessage.warning(`请填写必填字段: ${missingFields.join(', ')}`)
-      return
-    }
-  }
-  submitting.value = true
-  try {
-    const updateData: CustomerUpdateBO = {
-      customerId: editForm.customerId,
-      companyName: editForm.companyName,
-      industry: editForm.industry || undefined,
-      level: editForm.level as any,
-      stage: editForm.stage as any,
-      website: editForm.website || undefined,
-      address: editForm.address || undefined,
-      description: editForm.description || undefined,
-      customFields: editCustomFieldValues.value
-    }
-    await customerStore.editCustomer(updateData)
-    await customerStore.fetchCustomerDetail(editForm.customerId)
-    showEditDialog.value = false
-    ElMessage.success('客户信息更新成功')
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    submitting.value = false
+async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
+  if (payload.mode !== 'edit') return
+  if (customer.value?.customerId) {
+    await customerStore.fetchCustomerDetail(customer.value.customerId)
   }
 }
 
