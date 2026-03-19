@@ -9,9 +9,14 @@
   >
     <template #header>
       <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900">新增日程</h2>
-          <p class="text-sm text-slate-500 mt-1">填写日程信息</p>
+        <div class="flex items-center gap-3">
+          <div class="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <span class="material-symbols-outlined text-xl text-primary">calendar_month</span>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">新增日程</h2>
+            <p class="text-xs text-slate-500 mt-0.5">手动填写日程详细信息</p>
+          </div>
         </div>
         <button
           class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
