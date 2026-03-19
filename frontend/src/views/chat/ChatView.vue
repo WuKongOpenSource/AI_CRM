@@ -16,7 +16,7 @@
       </div>
 
       <!-- System Notifications Menu Item -->
-      <div class="px-3 py-4">
+      <!-- <div class="px-3 py-4">
         <button
           class="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left"
           :class="currentView === 'notifications'
@@ -31,7 +31,7 @@
           </div>
           <div v-if="currentView !== 'notifications'" class="size-2 rounded-full bg-primary animate-pulse"></div>
         </button>
-      </div>
+      </div> -->
 
       <!-- Divider -->
       <div class="mx-6 h-px bg-slate-100 mb-4"></div>
@@ -461,11 +461,11 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const MAX_FILE_COUNT = 5
 
 // Notifications mock data
-const notifications = ref([
-  { id: 1, content: '客户张三的项目进度已更新', time: '5分钟前', color: 'bg-blue-500' },
-  { id: 2, content: '有3个任务即将到期', time: '1小时前', color: 'bg-orange-500' },
-  { id: 3, content: '知识库同步完成', time: '2小时前', color: 'bg-green-500' }
-])
+// const notifications = ref([
+//   { id: 1, content: '客户张三的项目进度已更新', time: '5分钟前', color: 'bg-blue-500' },
+//   { id: 2, content: '有3个任务即将到期', time: '1小时前', color: 'bg-orange-500' },
+//   { id: 3, content: '知识库同步完成', time: '2小时前', color: 'bg-green-500' }
+// ])
 
 // System notifications for notification view
 const systemNotifications = ref([

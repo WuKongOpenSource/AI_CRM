@@ -214,8 +214,8 @@ const localValues = ref<Record<string, any>>({})
 
 // Parse and validate default value based on field type
 function parseDefaultValue(field: CustomField): any {
-  const val = field.defaultValue
-  if (!val && val !== false && val !== 0) return null
+  const val: unknown = (field as any).defaultValue
+  if (val === undefined || val === null || val === '') return null
 
   switch (field.fieldType) {
     case 'number': {
@@ -227,7 +227,7 @@ function parseDefaultValue(field: CustomField): any {
     case 'datetime':
       return /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(String(val)) ? val : null
     case 'checkbox':
-      return val === true || val === 'true' || val === '1'
+      return val === true || val === 1 || String(val) === 'true' || String(val) === '1'
     case 'select':
       if (field.options?.some(opt => opt.value === val)) return val
       return null
@@ -246,8 +246,9 @@ async function loadFields() {
         if (field.fieldType === 'multiselect') {
           localValues.value[field.fieldName] = []
         } else if (field.fieldType === 'checkbox') {
-          localValues.value[field.fieldName] = field.defaultValue ? parseDefaultValue(field) : false
-        } else if (field.defaultValue) {
+          const hasDefault = (field as any).defaultValue !== undefined && (field as any).defaultValue !== null && (field as any).defaultValue !== ''
+          localValues.value[field.fieldName] = hasDefault ? parseDefaultValue(field) : false
+        } else if ((field as any).defaultValue !== undefined && (field as any).defaultValue !== null && (field as any).defaultValue !== '') {
           localValues.value[field.fieldName] = parseDefaultValue(field)
         } else {
           localValues.value[field.fieldName] = null

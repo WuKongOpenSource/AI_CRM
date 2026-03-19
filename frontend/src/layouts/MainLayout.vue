@@ -169,7 +169,7 @@
             <span class="material-symbols-outlined">notifications</span>
           </button>
           <button
-            @click="$router.push({ path: '/customer', query: { action: 'create' } })"
+            @click="showCreateCustomer = true"
             class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20"
           >
             <span class="material-symbols-outlined text-sm">add</span>
@@ -187,6 +187,12 @@
         </router-view>
       </main>
     </div>
+
+    <CustomerUpsertDialog
+      v-model="showCreateCustomer"
+      mode="create"
+      @success="handleCreateCustomerSuccess"
+    />
 
     <!-- Floating Action Button (shown on non-chat pages, hidden when drawer is open) -->
     <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
@@ -207,6 +213,8 @@ import { useChatDrawer } from '@/composables/useChatDrawer'
 import { ElMessageBox } from 'element-plus'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
+import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import { appEvents, APP_EVENT } from '@/utils/events'
 
 const route = useRoute()
 const router = useRouter()
@@ -215,6 +223,7 @@ const enterpriseStore = useEnterpriseStore()
 const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
 const globalSearchKeyword = ref('')
+const showCreateCustomer = ref(false)
 
 // Sync global search with customer store keyword
 watch(() => customerStore.queryParams.keyword, (val) => {
@@ -308,6 +317,10 @@ async function handleLogout() {
   } catch {
     // User cancelled
   }
+}
+
+function handleCreateCustomerSuccess() {
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
 }
 </script>
 
