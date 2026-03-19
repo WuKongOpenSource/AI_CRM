@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn dependency:resolve:*)",
+      "Bash(mvn dependency:tree:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(mvn help:evaluate:*)",
+      "Bash(xargs:*)",
+      "WebFetch(domain:medium.com)",
+      "Bash(set:*)",
+      "Bash(npx vite:*)",
+      "Bash(del \"D:\\\\workspace\\\\AI_CRM\\\\frontend\\\\.env.test\")",
+      "Bash(ls -la \"D:\\\\workspace\\\\AI_CRM\\\\backend\\\\src\\\\main\\\\resources\"\" | grep -E \"static)",
+      "Bash(public \")"
+    ]
+  }
+}

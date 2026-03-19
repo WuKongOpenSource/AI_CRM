@@ -38,17 +38,17 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     private IDynamicSchemaService dynamicSchemaService;
 
     /**
-     * 字段类型 -> MySQL列类型映射
+     * 字段类型 -> PostgreSQL列类型映射
      */
     private static final Map<String, String> TYPE_MAPPING = Map.of(
             "text", "VARCHAR(500)",
             "textarea", "TEXT",
             "number", "DECIMAL(15,2)",
             "date", "DATE",
-            "datetime", "DATETIME",
+            "datetime", "TIMESTAMP",
             "select", "VARCHAR(100)",
             "multiselect", "TEXT",
-            "checkbox", "TINYINT"
+            "checkbox", "BOOLEAN"
     );
 
     /**

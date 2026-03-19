@@ -212,6 +212,30 @@ const emit = defineEmits<{
 const fields = ref<CustomField[]>([])
 const localValues = ref<Record<string, any>>({})
 
+// Parse and validate default value based on field type
+function parseDefaultValue(field: CustomField): any {
+  const val = field.defaultValue
+  if (!val && val !== false && val !== 0) return null
+
+  switch (field.fieldType) {
+    case 'number': {
+      const num = Number(val)
+      return isNaN(num) ? null : num
+    }
+    case 'date':
+      return /^\d{4}-\d{2}-\d{2}$/.test(String(val)) ? val : null
+    case 'datetime':
+      return /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(String(val)) ? val : null
+    case 'checkbox':
+      return val === true || val === 'true' || val === '1'
+    case 'select':
+      if (field.options?.some(opt => opt.value === val)) return val
+      return null
+    default:
+      return val
+  }
+}
+
 // Load custom fields
 async function loadFields() {
   try {
@@ -222,9 +246,9 @@ async function loadFields() {
         if (field.fieldType === 'multiselect') {
           localValues.value[field.fieldName] = []
         } else if (field.fieldType === 'checkbox') {
-          localValues.value[field.fieldName] = false
+          localValues.value[field.fieldName] = field.defaultValue ? parseDefaultValue(field) : false
         } else if (field.defaultValue) {
-          localValues.value[field.fieldName] = field.defaultValue
+          localValues.value[field.fieldName] = parseDefaultValue(field)
         } else {
           localValues.value[field.fieldName] = null
         }

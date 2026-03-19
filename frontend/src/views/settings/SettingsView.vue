@@ -1383,8 +1383,53 @@
         <el-form-item label="占位提示">
           <el-input v-model="fieldForm.placeholder" placeholder="输入框提示文字" />
         </el-form-item>
-        <el-form-item label="默认值">
-          <el-input v-model="fieldForm.defaultValue" placeholder="字段默认值" />
+        <el-form-item v-if="!['multiselect', 'checkbox'].includes(fieldForm.fieldType)" label="默认值">
+          <!-- 数字 -->
+          <el-input-number
+            v-if="fieldForm.fieldType === 'number'"
+            v-model="fieldForm.defaultValue"
+            placeholder="字段默认值"
+            :controls="false"
+            class="w-full"
+          />
+          <!-- 日期 -->
+          <el-date-picker
+            v-else-if="fieldForm.fieldType === 'date'"
+            v-model="fieldForm.defaultValue"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择默认日期"
+            class="w-full"
+          />
+          <!-- 日期时间 -->
+          <el-date-picker
+            v-else-if="fieldForm.fieldType === 'datetime'"
+            v-model="fieldForm.defaultValue"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="选择默认日期时间"
+            class="w-full"
+          />
+          <!-- 单选下拉 -->
+          <el-select
+            v-else-if="fieldForm.fieldType === 'select'"
+            v-model="fieldForm.defaultValue"
+            placeholder="选择默认值"
+            class="w-full"
+            clearable
+          >
+            <el-option
+              v-for="opt in fieldForm.options.filter(o => o.value && o.label)"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <!-- 文本 / 多行文本 -->
+          <el-input v-else v-model="fieldForm.defaultValue" placeholder="字段默认值" />
+        </el-form-item>
+        <el-form-item v-if="fieldForm.fieldType === 'checkbox'" label="默认值">
+          <el-switch v-model="fieldForm.defaultValue" />
         </el-form-item>
 
         <!-- Options for select types -->
@@ -2307,6 +2352,12 @@ function handleEditField(field: CustomField) {
 }
 
 function handleFieldTypeChange(newType: FieldType) {
+  // 切换类型时重置默认值（类型不兼容）
+  if (newType === 'checkbox') {
+    fieldForm.defaultValue = false as any
+  } else {
+    fieldForm.defaultValue = ''
+  }
   if (!['select', 'multiselect'].includes(newType)) {
     fieldForm.options = []
   } else if (fieldForm.options.length === 0) {
