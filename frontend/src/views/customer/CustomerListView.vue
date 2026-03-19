@@ -489,6 +489,7 @@ import { transferCustomer, exportCustomers, downloadImportTemplate, importCustom
 import { queryUserList } from '@/api/auth'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import { appEvents, APP_EVENT } from '@/utils/events'
 
 const router = useRouter()
 const route = useRoute()
@@ -670,6 +671,14 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleTableViewportResize)
   if (searchTimer) clearTimeout(searchTimer)
+})
+
+const offCustomerListRefresh = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
+  customerStore.fetchCustomerList(true)
+})
+
+onBeforeUnmount(() => {
+  offCustomerListRefresh()
 })
 
 function handleSearch() {
