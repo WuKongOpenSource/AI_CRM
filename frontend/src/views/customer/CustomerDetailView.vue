@@ -227,8 +227,9 @@
                     @click="handleRemoveTag(tag)"
                   >close</span>
                 </span>
-                <button class="px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors" @click="showAddTagDialog = true">
-                  + 添加标签
+                <button class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors" @click="showAddTagDialog = true">
+                  <span class="wk-plus-button-mark" aria-hidden="true">+</span>
+                  <span>添加标签</span>
                 </button>
               </div>
             </section>
@@ -344,7 +345,7 @@
                   <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
                 </h4>
                 <button class="size-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all" @click="handleAddContact">
-                  <span class="material-symbols-outlined text-sm">person_add</span>
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
                 </button>
               </div>
               <div class="p-4 space-y-3">
@@ -438,7 +439,7 @@
                   待办任务
                 </h4>
                 <button class="size-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all" @click="handleAddTask">
-                  <span class="material-symbols-outlined text-sm">add</span>
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                 </button>
               </div>
               <div class="p-4 space-y-3">

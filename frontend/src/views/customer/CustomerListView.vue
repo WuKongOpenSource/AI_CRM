@@ -35,7 +35,7 @@
           class="px-5 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
           @click="showAddDialog = true"
         >
-          <span class="material-symbols-outlined text-sm">person_add</span>
+          <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
           <span v-if="!isMobile">新增客户</span>
         </button>
       </div>

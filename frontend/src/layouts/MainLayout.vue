@@ -172,7 +172,7 @@
             @click="showCreateCustomer = true"
             class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm shadow-primary/20"
           >
-            <span class="material-symbols-outlined text-sm">add</span>
+            <span class="material-symbols-outlined wk-plus-button-icon">add</span>
             新增客户
           </button>
         </div>

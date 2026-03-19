@@ -169,7 +169,7 @@
                     class="size-8 flex items-center justify-center bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-all"
                     title="添加一级部门"
                   >
-                    <span class="material-symbols-outlined text-sm">add</span>
+                    <span class="material-symbols-outlined wk-plus-button-icon">add</span>
                   </button>
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto p-4">
@@ -215,7 +215,7 @@
                             class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
                             title="添加子部门"
                           >
-                            <span class="material-symbols-outlined text-sm">add</span>
+                            <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                           </button>
                           <button
                             @click.stop="handleDeptCommand('edit', data)"
@@ -250,7 +250,7 @@
                   :disabled="!selectedDept"
                   class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold flex items-center gap-1 hover:bg-primary/90 transition-all disabled:opacity-50"
                 >
-                  <span class="material-symbols-outlined text-sm">person_add</span>
+                  <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
                   添加成员
                 </button>
               </div>
@@ -272,7 +272,7 @@
                       :disabled="!selectedDept"
                       class="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
-                      <span class="material-symbols-outlined text-sm">person_add</span>
+                      <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
                       添加员工
                     </button>
                   </div>
@@ -430,7 +430,7 @@
               size="80%"
             >
               <button class="w-full mb-3 px-4 py-2 bg-primary/10 text-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-primary/20 transition-all" @click="handleAddDept(0)">
-                <span class="material-symbols-outlined text-sm">add</span>
+                <span class="material-symbols-outlined wk-plus-button-icon">add</span>
                 添加部门
               </button>
               <el-tree
@@ -455,7 +455,7 @@
                         @click.stop="handleDeptCommand('addChild', data)"
                         class="size-6 flex items-center justify-center rounded hover:bg-slate-100 text-slate-400 hover:text-primary"
                       >
-                        <span class="material-symbols-outlined text-sm">add</span>
+                        <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
                       </button>
                       <button
                         @click.stop="handleDeptCommand('edit', data)"
@@ -489,7 +489,7 @@
                   @click="handleAddRole"
                   class="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
                 >
-                  <span class="material-symbols-outlined text-sm">add</span>
+                  <span class="material-symbols-outlined wk-plus-button-icon">add</span>
                   新增角色
                 </button>
               </div>
@@ -572,7 +572,7 @@
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-medium">AI 智能体管理</h3>
               <el-button type="primary" @click="showAgentDialog = true">
-                <el-icon class="mr-1"><Plus /></el-icon>
+                <el-icon class="mr-1 wk-plus-button-icon"><Plus /></el-icon>
                 添加智能体
               </el-button>
             </div>
@@ -617,7 +617,7 @@
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-medium">自定义字段管理</h3>
               <el-button type="primary" @click="handleOpenFieldDialog">
-                <el-icon class="mr-1"><Plus /></el-icon>
+                <el-icon class="mr-1 wk-plus-button-icon"><Plus /></el-icon>
                 添加字段
               </el-button>
             </div>
@@ -1445,7 +1445,10 @@
               </el-button>
             </div>
             <el-button text @click="fieldForm.options.push({ value: '', label: '' })">
-              + 添加选项
+              <span class="inline-flex items-center gap-1.5">
+                <span class="wk-plus-button-mark" aria-hidden="true">+</span>
+                <span>添加选项</span>
+              </span>
             </el-button>
           </div>
         </el-form-item>
@@ -1576,7 +1579,7 @@
                       @click="showAddRoleUserDialog = true"
                       class="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
                     >
-                      <span class="material-symbols-outlined text-sm">person_add</span>
+                      <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
                       添加成员
                     </button>
                   </div>

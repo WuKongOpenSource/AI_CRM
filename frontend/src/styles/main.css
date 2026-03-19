@@ -51,6 +51,27 @@ html, body, #app {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
+.wk-plus-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wk-plus-button-icon--compact {
+  font-size: 16px;
+}
+
+.wk-plus-button-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 700;
+}
+
 /* Subtle pulse animation for AI elements */
 @keyframes pulse-subtle {
   0%, 100% { background-color: rgba(19, 127, 236, 0.05); }

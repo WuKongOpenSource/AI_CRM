@@ -10,7 +10,7 @@
           class="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all"
           @click="handleNewSession"
         >
-          <span class="material-symbols-outlined text-sm">add</span>
+          <span class="material-symbols-outlined wk-plus-button-icon">add</span>
           开启新对话
         </button>
       </div>

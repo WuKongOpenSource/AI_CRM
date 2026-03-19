@@ -36,7 +36,7 @@
               class="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
               @click="handleAddTask"
             >
-              <span class="material-symbols-outlined text-lg">add</span>
+              <span class="material-symbols-outlined wk-plus-button-icon">add</span>
               <span>{{ isMobile ? '新建' : '新建任务' }}</span>
             </button>
           </div>
