@@ -97,32 +97,42 @@
               <span class="material-symbols-outlined text-primary text-lg">trending_up</span>
               <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">客户阶段</h3>
             </div>
-            <div class="relative max-w-[55%]">
-              <!-- Track line -->
-              <div class="absolute top-3 left-0 right-0 h-0.5 bg-slate-200"></div>
-              <div class="absolute top-3 left-0 h-0.5 bg-primary transition-all duration-500"
-                :style="{ width: getProgressWidth() }"
-              ></div>
-              <!-- Stage nodes -->
-              <div class="relative flex justify-between">
+            <div class="relative overflow-x-auto">
+              <!-- Chevron segments (fixed width) -->
+              <div class="relative flex h-9 w-max min-w-[1080px] items-stretch">
                 <div
                   v-for="(stage, idx) in stageFlow"
                   :key="stage"
-                  class="flex flex-col items-center gap-2 cursor-pointer group"
+                  class="relative h-9 flex-none w-[180px] group cursor-pointer"
                   @click="handleStageChange(stage)"
+                  :style="{
+                    marginLeft: idx === 0 ? '0px' : '-10px',
+                    zIndex: customer.stage === stage ? 10 : 5 - idx
+                  }"
                 >
+                  <!-- Segment background (clip-path chevron) -->
                   <div
-                    class="size-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 relative z-10 text-[10px] font-bold"
-                    :class="getStepperNodeClass(stage, idx)"
-                  >
-                    <span v-if="stage === 'lost'" class="material-symbols-outlined text-[12px] font-bold">close</span>
-                    <span v-else-if="stage === 'closed' && customer.stage === 'closed'" class="material-symbols-outlined text-[12px] font-bold">handshake</span>
-                    <span v-else-if="getStageIndex(customer.stage) > idx && customer.stage !== 'lost'" class="material-symbols-outlined text-[12px] font-bold">check</span>
-                    <span v-else>{{ idx + 1 }}</span>
+                    class="absolute inset-0 transition-all duration-300"
+                    :class="getStepperSegmentBgClass(stage, idx)"
+                    :style="{ clipPath: getStepperClipPath(idx) }"
+                  ></div>
+                  <!-- Hover overlay (light blue) -->
+                  <div
+                    class="absolute inset-0 bg-primary/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                    :style="{ clipPath: getStepperClipPath(idx) }"
+                  ></div>
+
+                  <!-- Content -->
+                  <div class="relative z-10 h-full flex items-center justify-center gap-2 px-4 transition-transform duration-200 group-hover:scale-[1.02]">
+                    <span
+                      class="material-symbols-outlined text-[12px] font-bold transition-colors"
+                      :class="getStepperLabelClass(stage, idx)"
+                    >{{ getStepperStageIcon(stage) }}</span>
+                    <span
+                      class="text-[10px] font-bold tracking-wider whitespace-nowrap transition-colors"
+                      :class="getStepperLabelClass(stage, idx)"
+                    >{{ getStepperLabel(stage) }}</span>
                   </div>
-                  <span class="text-[10px] font-bold tracking-wider transition-colors whitespace-nowrap"
-                    :class="getStepperLabelClass(stage)"
-                  >{{ getStepperLabel(stage) }}</span>
                 </div>
               </div>
             </div>
@@ -972,11 +982,6 @@ function handleAddTask() {
   router.push('/task')
 }
 
-function handleOpenFollowUpDialog() {
-  followUpForm.followTime = formatDateForApi()
-  showAddFollowUpDialog.value = true
-}
-
 async function handleAddTag() {
   if (!newTagName.value.trim() || !customer.value) return
   submitting.value = true
@@ -1117,35 +1122,57 @@ function getStageLabelFull(stage: string): string {
   return stageOptions.find(s => s.value === stage)?.label || stage
 }
 
-function getProgressWidth(): string {
-  const cs = customer.value?.stage
-  if (!cs) return '0%'
-  // For lost customers, don't show progress line (they dropped out)
-  if (cs === 'lost') return '0%'
-  const idx = getStageIndex(cs)
-  if (idx < 0) return '0%'
-  // Progress line spans across 6 nodes (0-5), calculate proportionally
-  return `${(idx / (stageFlow.length - 1)) * 100}%`
+function getStepperClipPath(idx: number): string {
+  const isFirstNode = idx === 0
+  const isLastNode = idx === stageFlow.length - 1
+
+  // Same chevron geometry as reference UI (12px notch)
+  if (isFirstNode) {
+    return 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%)'
+  }
+  if (isLastNode) {
+    return 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 12px 50%)'
+  }
+
+  return 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%)'
 }
 
-function getStepperNodeClass(stage: string, idx: number): string {
+function getStepperSegmentBgClass(stage: string, idx: number): string {
   const cs = customer.value?.stage
-  if (!cs) return 'bg-white border-slate-200 text-slate-300'
-  // "已流失" node
+  if (!cs) return 'bg-slate-100'
+
+  const isCompleted = getStageIndex(cs) > idx && cs !== 'lost'
+  const isCurrent = cs === stage
+
+  // Lost outcome
   if (stage === 'lost') {
-    if (cs === 'lost') return 'bg-slate-50 border-slate-500 text-slate-600 shadow-md shadow-slate-500/20 scale-110'
-    return 'bg-white border-slate-200 text-slate-300 group-hover:border-slate-400'
+    if (cs === 'lost') return 'bg-rose-500'
+    return 'bg-slate-100'
   }
-  // "结单/已成交" node
+
+  // Closed outcome (won)
   if (stage === 'closed') {
-    if (cs === 'closed') return 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-md shadow-emerald-500/20 scale-110'
-    return 'bg-white border-slate-200 text-slate-300 group-hover:border-primary/50'
+    if (cs === 'closed') return 'bg-emerald-500'
+    return 'bg-slate-100'
   }
-  // Current stage
-  if (cs === stage) return 'bg-white border-primary text-primary shadow-md shadow-primary/20 scale-110'
-  // Completed stages (before current, not lost)
-  if (getStageIndex(cs) > idx && cs !== 'lost') return 'bg-primary border-primary text-white'
-  return 'bg-white border-slate-200 text-slate-300 group-hover:border-primary/50'
+
+  // Middle stages
+  if (isCurrent) return 'bg-primary'
+  if (isCompleted) return 'bg-primary/20'
+  return 'bg-slate-100'
+}
+
+function getStepperStageIcon(stage: string): string {
+  // Keep icon mapping purely presentational
+  const icons: Record<string, string> = {
+    lead: 'person_search',
+    qualified: 'verified',
+    proposal: 'description',
+    negotiation: 'forum',
+    closed: 'handshake',
+    lost: 'block'
+  }
+  return icons[stage] || 'lens'
 }
 
 function getStepperLabel(stage: string): string {
@@ -1158,18 +1185,20 @@ function getStepperLabel(stage: string): string {
   return getStageLabelFull(stage)
 }
 
-function getStepperLabelClass(stage: string): string {
+function getStepperLabelClass(stage: string, idx: number): string {
   const cs = customer.value?.stage
-  if (stage === 'lost' && cs === 'lost') return 'text-slate-600'
-  if (stage === 'lost') return 'text-slate-400'
-  if (stage === 'closed' && cs === 'closed') return 'text-emerald-600'
-  if (cs === stage) return 'text-primary'
-  return 'text-slate-400'
-}
+  if (!cs) return 'text-slate-400'
 
-function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = { high: '高意向', active: '活跃', followup: '需跟进', dormant: '休眠' }
-  return labels[status] || status || '未设置'
+  // Lost outcome
+  if (stage === 'lost') return cs === 'lost' ? 'text-white' : 'text-slate-500'
+
+  // Closed outcome (won)
+  if (stage === 'closed') return cs === 'closed' ? 'text-white' : 'text-slate-500'
+
+  const isCompleted = getStageIndex(cs) > idx && cs !== 'lost'
+  if (cs === stage) return 'text-white'
+  if (isCompleted) return 'text-primary'
+  return 'text-slate-500'
 }
 
 async function handleStageChange(newStage: string) {
