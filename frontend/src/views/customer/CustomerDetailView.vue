@@ -97,8 +97,9 @@
                   :key="stage"
                   class="relative h-9 flex-none w-[180px] group cursor-pointer"
                   @click="handleStageChange(stage)"
+                  :title="getStepperLabel(stage)"
                   :style="{
-                    marginLeft: idx === 0 ? '0px' : '-10px',
+                    marginLeft: idx === 0 ? '0px' : `-${STEPPER_CHEVRON_SIZE - STEPPER_SEGMENT_GAP}px`,
                     zIndex: customer.stage === stage ? 10 : 5 - idx
                   }"
                 >
@@ -115,15 +116,17 @@
                   ></div>
 
                   <!-- Content -->
-                  <div class="relative z-10 h-full flex items-center justify-center gap-2 px-4 transition-transform duration-200 group-hover:scale-[1.02]">
-                    <span
-                      class="material-symbols-outlined text-[12px] font-bold transition-colors"
-                      :class="getStepperLabelClass(stage, idx)"
-                    >{{ getStepperStageIcon(stage) }}</span>
-                    <span
-                      class="text-xs font-bold tracking-wider whitespace-nowrap transition-colors"
-                      :class="getStepperLabelClass(stage, idx)"
-                    >{{ getStepperLabel(stage) }}</span>
+                  <div class="relative z-10 flex h-full items-center justify-center overflow-hidden px-4 transition-transform duration-200 group-hover:scale-[1.02]">
+                    <div class="flex min-w-0 max-w-full items-center justify-center gap-2">
+                      <span
+                        class="material-symbols-outlined shrink-0 text-[12px] font-bold transition-colors"
+                        :class="getStepperLabelClass(stage, idx)"
+                      >{{ getStepperStageIcon(stage) }}</span>
+                      <span
+                        class="block min-w-0 truncate text-xs font-bold tracking-wider transition-colors"
+                        :class="getStepperLabelClass(stage, idx)"
+                      >{{ getStepperLabel(stage) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1055,6 +1058,11 @@ const stageOptions = [
   { value: 'closed', label: '结单' },
   { value: 'lost', label: '已流失' }
 ]
+const STEPPER_SEGMENT_WIDTH = 180
+const STEPPER_SEGMENT_HEIGHT = 36
+const STEPPER_CHEVRON_SIZE = 12
+const STEPPER_SEGMENT_GAP = 8
+const STEPPER_END_RADIUS = STEPPER_SEGMENT_HEIGHT / 2
 
 function getStageLabelFull(stage: string): string {
   return stageOptions.find(s => s.value === stage)?.label || stage
@@ -1064,12 +1072,12 @@ function getStepperClipPath(idx: number): string {
   const isFirstNode = idx === 0
   const isLastNode = idx === stageFlow.length - 1
 
-  // Same chevron geometry as reference UI (12px notch)
+  // Keep the existing chevron join, but soften the outer ends into half-round caps.
   if (isFirstNode) {
-    return 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%)'
+    return `path('M ${STEPPER_END_RADIUS} 0 H ${STEPPER_SEGMENT_WIDTH - STEPPER_CHEVRON_SIZE} L ${STEPPER_SEGMENT_WIDTH} ${STEPPER_SEGMENT_HEIGHT / 2} L ${STEPPER_SEGMENT_WIDTH - STEPPER_CHEVRON_SIZE} ${STEPPER_SEGMENT_HEIGHT} H ${STEPPER_END_RADIUS} Q 0 ${STEPPER_SEGMENT_HEIGHT} 0 ${STEPPER_SEGMENT_HEIGHT / 2} Q 0 0 ${STEPPER_END_RADIUS} 0 Z')`
   }
   if (isLastNode) {
-    return 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 12px 50%)'
+    return `path('M 0 0 H ${STEPPER_SEGMENT_WIDTH - STEPPER_END_RADIUS} Q ${STEPPER_SEGMENT_WIDTH} 0 ${STEPPER_SEGMENT_WIDTH} ${STEPPER_SEGMENT_HEIGHT / 2} Q ${STEPPER_SEGMENT_WIDTH} ${STEPPER_SEGMENT_HEIGHT} ${STEPPER_SEGMENT_WIDTH - STEPPER_END_RADIUS} ${STEPPER_SEGMENT_HEIGHT} H 0 L ${STEPPER_CHEVRON_SIZE} ${STEPPER_SEGMENT_HEIGHT / 2} Z')`
   }
 
   return 'polygon(0% 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 0% 100%, 12px 50%)'
