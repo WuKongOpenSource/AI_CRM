@@ -170,7 +170,7 @@
                 <!-- AI Message -->
                 <div v-if="message.role !== 'user'" class="flex gap-4 md:gap-5">
                   <div class="size-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20">
-                    <span class="material-symbols-outlined text-lg">smart_toy</span>
+                    <span class="material-symbols-outlined text-lg">auto_awesome</span>
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
                     <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
@@ -359,7 +359,7 @@
                 <!-- AI Header -->
                 <div class="flex items-center gap-3 px-2">
                   <div class="size-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-sm">
-                    <span class="material-symbols-outlined text-sm">smart_toy</span>
+                    <span class="material-symbols-outlined text-sm">auto_awesome</span>
                   </div>
                   <div>
                     <p class="text-sm font-bold text-slate-900">悟空AI CRM 助手</p>

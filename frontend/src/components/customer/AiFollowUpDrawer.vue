@@ -17,7 +17,7 @@
         <div class="p-6 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-2">
             <div class="size-8 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
-              <span class="material-symbols-outlined text-lg">smart_toy</span>
+              <span class="material-symbols-outlined text-lg">auto_awesome</span>
             </div>
             <h2 class="text-lg font-bold text-slate-900">AI 智能跟进录入</h2>
             <span v-if="customer" class="text-xs text-slate-500 font-medium px-2 py-0.5 bg-slate-100 rounded-full truncate max-w-[150px]">

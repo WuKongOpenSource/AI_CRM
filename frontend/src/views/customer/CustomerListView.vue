@@ -90,7 +90,7 @@
                   <!-- Level -->
                   <td class="px-6 py-4 whitespace-nowrap">
                     <span v-if="customer.level"
-                      class="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-bold"
+                      class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded text-sm"
                       :class="{
                         'bg-emerald-50 text-emerald-600': customer.level === 'A',
                         'bg-blue-50 text-blue-600': customer.level === 'B',
@@ -182,7 +182,7 @@
                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                       @click="handleAiFollowUp(customer)"
                     >
-                      <span class="material-symbols-outlined text-sm">smart_toy</span>
+                      <span class="material-symbols-outlined text-sm">auto_awesome</span>
                       AI 跟进
                     </button>
                   </td>

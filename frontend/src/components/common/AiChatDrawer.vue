@@ -20,7 +20,7 @@
         <div class="p-4 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
             <div class="size-9 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
-              <span class="material-symbols-outlined text-lg">smart_toy</span>
+              <span class="material-symbols-outlined text-lg">auto_awesome</span>
             </div>
             <div>
               <h2 class="text-base font-bold text-slate-900">悟空AI 助手</h2>
@@ -108,7 +108,7 @@
                 <!-- AI Message -->
                 <div v-if="message.role !== 'user'" class="flex gap-3">
                   <div class="size-8 rounded-lg bg-primary flex items-center justify-center text-white shrink-0 shadow-sm shadow-primary/20">
-                    <span class="material-symbols-outlined text-base">smart_toy</span>
+                    <span class="material-symbols-outlined text-base">auto_awesome</span>
                   </div>
                   <div class="flex-1 space-y-2 min-w-0">
                     <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-3 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
@@ -247,7 +247,7 @@
             <div v-for="notif in notifications" :key="notif.id" class="space-y-2">
               <div class="flex items-center gap-2 px-1">
                 <div class="size-7 rounded-lg bg-primary flex items-center justify-center text-white">
-                  <span class="material-symbols-outlined text-sm">smart_toy</span>
+                  <span class="material-symbols-outlined text-sm">auto_awesome</span>
                 </div>
                 <span class="text-xs font-bold text-slate-900">悟空AI CRM 助手</span>
                 <span class="text-[10px] text-slate-400">{{ notif.time }}</span>
