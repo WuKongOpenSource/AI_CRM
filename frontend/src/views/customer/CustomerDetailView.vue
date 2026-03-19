@@ -65,7 +65,7 @@
             <div class="flex gap-2 shrink-0">
               <button class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors" @click="handleEdit">编辑资料</button>
               <button class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-1.5 hover:bg-primary/20 transition-colors" @click="handleAiFollowUp">
-                <span class="material-symbols-outlined text-sm">smart_toy</span>
+                <span class="material-symbols-outlined text-sm">auto_awesome</span>
                 AI 跟进
               </button>
               <button class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors" @click="handleGenerateReport">
