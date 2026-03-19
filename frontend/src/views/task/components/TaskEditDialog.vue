@@ -38,9 +38,9 @@
       </div>
     </template>
 
-    <div class="space-y-5 bg-slate-50/50 p-5 md:p-6">
+    <div class="space-y-8 bg-white px-5 pb-6 pt-5 md:px-6 md:pb-7 md:pt-6">
       <!-- AI Parse Section (Create only) -->
-      <div v-if="!editingTask" class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div v-if="!editingTask" class="space-y-3">
         <div class="flex items-center gap-2 mb-3">
           <span class="material-symbols-outlined text-primary text-sm">auto_awesome</span>
           <span class="text-xs font-bold text-primary">AI 智能解析 (可选)</span>
@@ -49,7 +49,7 @@
           <textarea
             v-model="aiParseInput"
             placeholder="例如：明天下午两点前给科技创新有限公司的张总发一份 Q4 扩容方案的报价单，标记为高优先级..."
-            class="w-full text-sm text-slate-600 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-xl px-4 py-3 outline-none transition-all resize-none h-24"
+            class="w-full text-sm text-slate-600 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-2xl px-4 py-4 outline-none transition-all resize-none h-28"
           />
           <button
             @click="$emit('ai-parse')"
@@ -65,7 +65,7 @@
       </div>
 
       <!-- Form Fields -->
-      <div class="bg-white p-4 md:p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+      <div class="space-y-5">
         <div>
           <label class="text-xs font-bold text-slate-500 mb-1.5 block">任务标题 <span class="text-red-500">*</span></label>
           <input
@@ -260,16 +260,16 @@ const participants = computed({
 
 <style>
 .task-dialog .el-dialog__header {
-  padding: 20px 24px 0;
+  padding: 22px 24px 16px !important;
   margin-right: 0;
 }
 .task-dialog .el-dialog__body {
-  padding: 0;
+  padding: 0 !important;
   max-height: 65vh;
   overflow-y: auto;
 }
 .task-dialog .el-dialog__footer {
-  padding: 16px 24px 20px;
+  padding: 14px 24px 22px !important;
 }
 /* Prevent overlay from scrolling — dialog body scrolls internally */
 .el-overlay:has(.task-dialog) {
@@ -294,4 +294,3 @@ const participants = computed({
 
 
 </style>
-

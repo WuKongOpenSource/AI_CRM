@@ -22,8 +22,8 @@
       </div>
     </template>
 
-    <div class="space-y-6 bg-slate-50/50 p-6">
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+    <div class="space-y-6 bg-white px-5 pb-6 pt-5 md:px-6 md:pb-7 md:pt-6">
+      <div class="space-y-5">
         <div>
           <label class="text-xs font-bold text-slate-500 mb-1.5 block">日程标题 <span class="text-red-500">*</span></label>
           <input
@@ -228,10 +228,19 @@ async function handleSaveSchedule() {
 }
 </script>
 
-<style scoped>
-:deep(.schedule-dialog .el-dialog__body) {
+<style>
+.schedule-dialog .el-dialog__header {
+  padding: 22px 24px 16px !important;
+  margin-right: 0;
+}
+
+.schedule-dialog .el-dialog__body {
   max-height: 70vh;
   overflow-y: auto;
-  padding: 0;
+  padding: 0 !important;
+}
+
+.schedule-dialog .el-dialog__footer {
+  padding: 14px 24px 22px !important;
 }
 </style>
