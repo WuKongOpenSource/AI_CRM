@@ -799,14 +799,6 @@ function getStageDotClass(stage: string): string {
   return classes[stage] || 'bg-slate-400'
 }
 
-function formatMoney(value: number | undefined): string {
-  if (!value) return '¥0'
-  if (value >= 10000) {
-    return `¥${(value / 10000).toFixed(1)}万`
-  }
-  return `¥${value.toLocaleString()}`
-}
-
 function formatRelativeTime(dateStr: string | undefined): string {
   if (!dateStr) return '暂无'
   const date = new Date(dateStr)
