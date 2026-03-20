@@ -539,6 +539,7 @@
                             管理用户
                           </button>
                           <button
+                            v-if="role.realm !== 'super_admin'"
                             @click="openRoleDrawer(role, 'permissions')"
                             class="text-primary hover:text-primary/80 font-bold transition-colors text-xs flex items-center gap-1"
                           >
