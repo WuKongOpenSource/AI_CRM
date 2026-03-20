@@ -120,11 +120,11 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="报价金额" min-width="130" align="right">
+              <!-- <el-table-column label="报价金额" min-width="130" align="right">
                 <template #default="{ row }">
                   <span class="text-sm font-medium text-slate-900 whitespace-nowrap">{{ row.quotation ? formatMoney(row.quotation) : '-' }}</span>
                 </template>
-              </el-table-column>
+              </el-table-column> -->
 
               <el-table-column label="最后跟进" min-width="120">
                 <template #default="{ row }">
