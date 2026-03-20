@@ -25,7 +25,7 @@
       <div
         v-for="field in customFields"
         :key="field.fieldId"
-        class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
+        class="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200"
       >
         <div class="flex items-center flex-1">
           <div class="mr-4">

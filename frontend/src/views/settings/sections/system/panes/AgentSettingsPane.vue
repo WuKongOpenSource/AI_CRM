@@ -17,7 +17,7 @@
       <div
         v-for="agent in agentStore.allAgents"
         :key="agent.agentId"
-        class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
+        class="flex items-center justify-between p-4 bg-white rounded-lg border border-slate-200"
       >
         <div class="flex items-center">
           <el-icon :size="24" class="text-primary"><Promotion /></el-icon>
