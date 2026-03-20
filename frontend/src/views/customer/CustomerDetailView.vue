@@ -86,7 +86,9 @@
           <!-- Stage Stepper (inside same card) -->
           <div class="mt-5 pt-4 border-t border-slate-100">
             <div class="flex items-center gap-2 mb-6">
-              <span class="material-symbols-outlined text-primary text-lg">trending_up</span>
+              <span :class="sectionIconBoxClass" :style="getSectionIconStyle('customerStage')">
+                <WkIcon name="stage" :size="15" />
+              </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div>
             <div class="relative overflow-x-auto">
@@ -144,7 +146,9 @@
             <!-- Basic Info -->
             <section class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary text-lg">info</span>
+                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('basicInfo')">
+                  <WkIcon name="profile" :size="15" />
+                </span>
                 基本信息
               </h3>
               <div class="space-y-5">
@@ -213,7 +217,9 @@
             <!-- Tags -->
             <section class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary text-lg">sell</span>
+                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('tags')">
+                  <span :class="sectionMaterialIconClass">sell</span>
+                </span>
                 标签
               </h3>
               <div class="flex flex-wrap gap-2">
@@ -238,7 +244,9 @@
             <!-- Custom Fields -->
             <section v-if="customFields.length > 0" class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <h3 class="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary text-lg">tune</span>
+                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('customFields')">
+                  <span :class="sectionMaterialIconClass">tune</span>
+                </span>
                 扩展信息
               </h3>
               <div class="space-y-5">
@@ -254,7 +262,9 @@
           <div class="lg:col-span-6 space-y-6">
             <div class="flex items-center justify-between">
               <h3 class="flex items-center gap-2 text-lg font-bold text-slate-900">
-                <span class="material-symbols-outlined text-primary">history</span>
+                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('recentActivity')">
+                  <span :class="sectionMaterialIconClass">history</span>
+                </span>
                 最近活动 - 智能跟进时间轴
               </h3>
               <div class="flex items-center gap-3">
@@ -331,7 +341,9 @@
           <div class="lg:col-span-3 space-y-6">
             <div class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary">hub</span>
+                <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
+                  <span :class="sectionMaterialIconClass">hub</span>
+                </span>
                 关联业务模块
               </h3>
               <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">3个模块</span>
@@ -341,7 +353,9 @@
             <section class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6" v-loading="contactLoading">
               <div class="mb-6 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span class="material-symbols-outlined text-primary text-lg">group</span>
+                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
+                    <span :class="sectionMaterialIconClass">group</span>
+                  </span>
                   关联联系人
                   <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
                 </h4>
@@ -436,7 +450,9 @@
             <section class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
               <div class="mb-6 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span class="material-symbols-outlined text-primary text-lg">task_alt</span>
+                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
+                    <WkIcon name="task" :size="15" />
+                  </span>
                   待办任务
                 </h4>
                 <button class="size-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all" @click="handleAddTask">
@@ -468,7 +484,9 @@
             <section class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
               <div class="mb-6 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span class="material-symbols-outlined text-primary text-lg">folder_open</span>
+                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('documentCenter')">
+                    <WkIcon name="knowledge" :size="15" />
+                  </span>
                   文档中心
                 </h4>
               </div>
@@ -652,6 +670,26 @@ const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
 const customFields = ref<CustomField[]>([])
+
+const sectionIconBoxClass = 'inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white shadow-[0_8px_18px_rgba(15,23,42,0.08)]'
+const sectionMaterialIconClass = 'material-symbols-outlined text-[16px] leading-none'
+const sectionIconBgColors = {
+  customerStage: '#0052CC',
+  basicInfo: '#5243AA',
+  tags: '#DE350B',
+  customFields: '#00875A',
+  recentActivity: '#FF991F',
+  relatedBusiness: '#00A3BF',
+  relatedContacts: '#DE350B',
+  todoTasks: '#00875A',
+  documentCenter: '#0052CC',
+} as const
+
+type SectionIconKey = keyof typeof sectionIconBgColors
+
+function getSectionIconStyle(key: SectionIconKey): { backgroundColor: string } {
+  return { backgroundColor: sectionIconBgColors[key] }
+}
 
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
   const value = contact?.isPrimary as boolean | number | string | undefined
