@@ -234,6 +234,8 @@
       @success="handleCreateCustomerSuccess"
     />
 
+    <AccountSettingsModal v-model="showAccountSettingsModal" />
+
     <!-- Floating Action Button (shown on non-chat pages, hidden when drawer is open) -->
     <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
 
@@ -255,6 +257,7 @@ import { ElMessageBox } from 'element-plus'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { appEvents, APP_EVENT } from '@/utils/events'
 
@@ -280,6 +283,7 @@ onMounted(() => enterpriseStore.loadConfig())
 
 const drawerVisible = ref(false)
 const showUserMenu = ref(false)
+const showAccountSettingsModal = ref(false)
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
 type MainNavItem = {
@@ -342,7 +346,7 @@ function mobileNavigate(path: string) {
 
 function handleOpenAccountSettings() {
   showUserMenu.value = false
-  router.push('/settings/system/profile')
+  showAccountSettingsModal.value = true
 }
 
 function handleGlobalSearch() {

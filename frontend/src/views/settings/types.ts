@@ -1,7 +1,6 @@
 export type SettingsMainTab = 'team' | 'role' | 'system'
 
 export type SystemSettingsTab =
-  | 'profile'
   | 'enterprise'
   | 'api'
   | 'agent'

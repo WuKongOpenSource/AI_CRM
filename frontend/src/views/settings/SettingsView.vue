@@ -27,7 +27,7 @@ import SystemSettingsSection from './sections/system/SystemSettingsSection.vue'
 
 const route = useRoute()
 const router = useRouter()
-const lastSystemTab = ref<SystemSettingsTab>('profile')
+const lastSystemTab = ref<SystemSettingsTab>('enterprise')
 const systemTabValues = new Set<SystemSettingsTab>(SYSTEM_SETTINGS_TABS.map((tab) => tab.value))
 
 const sectionMap = {
