@@ -8,7 +8,7 @@
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
-          <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
+          <img :src="defaultLogoImg" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div class="min-w-0">
           <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
@@ -88,7 +88,7 @@
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div v-else class="size-7 flex-shrink-0 rounded-lg overflow-hidden bg-transparent border border-slate-200">
-          <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
+          <img :src="defaultLogoImg" class="w-full h-full object-cover" alt="logo" />
         </div>
         <span class="text-sm font-bold text-slate-900 truncate">{{ enterpriseStore.displayName }}</span>
       </div>
@@ -109,7 +109,7 @@
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
             </div>
             <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
-              <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
+              <img :src="defaultLogoImg" class="w-full h-full object-cover" alt="logo" />
             </div>
             <div class="min-w-0">
               <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
@@ -207,6 +207,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useEnterpriseStore } from '@/stores/enterprise'
+import defaultLogoImg from '@/assets/images/logo.png'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatDrawer } from '@/composables/useChatDrawer'

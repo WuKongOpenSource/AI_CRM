@@ -20,9 +20,16 @@
           <div class="relative z-10">
             <div class="mb-12 flex items-center gap-3">
               <div
-                class="flex size-10 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20"
+                class="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-black/20 ring-1 ring-white/20"
               >
-                <span class="material-symbols-outlined text-2xl text-white">smart_toy</span>
+                <img
+                  :src="logoImg"
+                  alt="悟空AI CRM"
+                  class="size-[1.65rem] object-contain"
+                  width="26"
+                  height="26"
+                  decoding="async"
+                />
               </div>
               <span class="text-xl font-bold tracking-tight">悟空AI CRM</span>
             </div>
@@ -71,9 +78,9 @@
               <!-- Mobile brand -->
               <div class="mb-8 flex items-center justify-center gap-3 lg:hidden">
                 <img
-                  src="/logo.png"
+                  :src="logoImg"
                   alt="悟空AI CRM"
-                  class="size-10 rounded-xl shadow-lg shadow-primary/20"
+                  class="size-10 rounded-xl bg-white object-contain p-1 shadow-lg shadow-slate-300/40 ring-1 ring-slate-200/80"
                 />
                 <span class="text-lg font-bold text-slate-900">悟空AI CRM</span>
               </div>
@@ -342,6 +349,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import logoImg from '@/assets/images/logo.png'
 import { getOidcSessionToken, register, sendEmailCode } from '@/api/auth'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
 
