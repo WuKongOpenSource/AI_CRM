@@ -316,7 +316,7 @@
                     {{ isLogin ? '立即注册' : '返回登录' }}
                   </button>
                 </p>
-                <p v-if="isLogin" class="mt-3 text-xs text-slate-400">测试账号: admin / 123456a</p>
+                <!-- <p v-if="isLogin" class="mt-3 text-xs text-slate-400">测试账号: admin / 123456a</p> -->
               </div>
             </div>
           </div>

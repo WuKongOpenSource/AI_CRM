@@ -4,7 +4,6 @@
     width="420px"
     title="安全验证"
     destroy-on-close
-    class="wk-dialog--flush"
     :close-on-click-modal="!loading && !checking"
     :close-on-press-escape="!loading && !checking"
     @close="handleClose"
