@@ -146,8 +146,13 @@
         <div class="p-3 bg-primary/5 rounded-xl border border-primary/10">
           <p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
           <div class="flex items-center gap-2">
-            <div class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span class="text-xs font-medium text-slate-600">AI 模型已就绪</span>
+            <div
+              class="size-1.5 rounded-full"
+              :class="hasAiApiKeyConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'"
+            ></div>
+            <span class="text-xs font-medium text-slate-600">
+              {{ hasAiApiKeyConfigured ? 'AI 模型已就绪' : '请先配置千问 API Key' }}
+            </span>
           </div>
         </div>
       </div>
@@ -449,6 +454,13 @@
       </template>
     </div>
 
+    <ApiKeySetupModal
+      :model-value="isApiKeyModalOpen"
+      :loading="savingApiKey"
+      :initial-api-key="apiKeyDraft"
+      @update:model-value="handleApiKeyModalVisibleChange"
+      @save="handleSaveApiKey"
+    />
   </div>
 </template>
 
@@ -460,7 +472,10 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { getAiConfig, updateAiConfig } from '@/api/systemConfig'
+import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
+import type { AiConfig, AiConfigUpdateBO } from '@/types/systemConfig'
 
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
@@ -474,9 +489,23 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
+const aiConfig = ref<AiConfig | null>(null)
+const aiConfigLoaded = ref(false)
+const isApiKeyModalOpen = ref(false)
+const apiKeyDraft = ref('')
+const savingApiKey = ref(false)
+const resumeSendAfterApiKeySave = ref(false)
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const MAX_FILE_COUNT = 5
+const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
+  provider: 'dashscope',
+  apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/',
+  apiKey: '',
+  model: 'qwen-max',
+  temperature: 0.7,
+  maxTokens: 4096
+}
 
 // Notifications mock data
 // const notifications = ref([
@@ -546,10 +575,13 @@ const quickActions = [
   { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
 ]
 
+const hasAiApiKeyConfigured = computed(() => hasApiKeyConfigured(aiConfig.value))
+
 onMounted(async () => {
   await Promise.all([
     chatStore.fetchSessions(),
-    agentStore.fetchEnabledAgents()
+    agentStore.fetchEnabledAgents(),
+    loadAiConfig()
   ])
 })
 
@@ -576,10 +608,106 @@ watch(
   }
 )
 
+function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO> | null): AiConfig {
+  return {
+    provider: config?.provider || DEFAULT_CHAT_AI_CONFIG.provider || 'dashscope',
+    apiUrl: config?.apiUrl || DEFAULT_CHAT_AI_CONFIG.apiUrl,
+    apiKey: config?.apiKey || '',
+    model: config?.model || DEFAULT_CHAT_AI_CONFIG.model,
+    temperature: config?.temperature ?? DEFAULT_CHAT_AI_CONFIG.temperature ?? 0.7,
+    maxTokens: config?.maxTokens ?? DEFAULT_CHAT_AI_CONFIG.maxTokens ?? 4096,
+    updateTime: config && 'updateTime' in config ? config.updateTime : undefined
+  }
+}
+
+function hasApiKeyConfigured(config?: { apiKey?: string } | null): boolean {
+  return Boolean(config?.apiKey?.trim())
+}
+
+async function loadAiConfig(force = false): Promise<AiConfig | null> {
+  if (aiConfigLoaded.value && !force) {
+    return aiConfig.value
+  }
+
+  try {
+    const config = await getAiConfig()
+    aiConfig.value = normalizeAiConfig(config)
+  } catch {
+    if (!aiConfig.value) {
+      aiConfig.value = normalizeAiConfig()
+    }
+  } finally {
+    aiConfigLoaded.value = true
+  }
+
+  return aiConfig.value
+}
+
+async function ensureAiApiKeyConfigured(): Promise<boolean> {
+  if (!hasApiKeyConfigured(aiConfig.value)) {
+    await loadAiConfig(true)
+  }
+
+  if (hasApiKeyConfigured(aiConfig.value)) {
+    return true
+  }
+
+  resumeSendAfterApiKeySave.value = true
+  apiKeyDraft.value = ''
+  isApiKeyModalOpen.value = true
+  return false
+}
+
+function handleApiKeyModalVisibleChange(visible: boolean) {
+  isApiKeyModalOpen.value = visible
+
+  if (!visible && !savingApiKey.value) {
+    apiKeyDraft.value = ''
+    resumeSendAfterApiKeySave.value = false
+  }
+}
+
+async function handleSaveApiKey(apiKey: string) {
+  const trimmedApiKey = apiKey.trim()
+  if (!trimmedApiKey) {
+    ElMessage.warning('请输入千问 API Key')
+    return
+  }
+
+  savingApiKey.value = true
+
+  try {
+    const payload: AiConfigUpdateBO = {
+      ...DEFAULT_CHAT_AI_CONFIG,
+      apiKey: trimmedApiKey
+    }
+
+    await updateAiConfig(payload)
+    aiConfig.value = normalizeAiConfig(payload)
+    aiConfigLoaded.value = true
+    isApiKeyModalOpen.value = false
+    apiKeyDraft.value = ''
+    ElMessage.success('千问 API Key 保存成功')
+
+    const shouldResumeSend = resumeSendAfterApiKeySave.value
+    resumeSendAfterApiKeySave.value = false
+
+    if (shouldResumeSend) {
+      await nextTick()
+      await handleSend()
+    }
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    savingApiKey.value = false
+  }
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
+  if (!(await ensureAiApiKeyConfigured())) return
 
   const content = text || '请分析这些文件'
   inputText.value = ''
