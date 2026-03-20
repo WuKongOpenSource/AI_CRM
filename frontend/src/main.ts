@@ -14,9 +14,11 @@ import '@fontsource/inter/900.css'
 import '@fontsource-variable/noto-sans-sc'
 // 本地图标
 import 'material-symbols/outlined.css'
+import WkIcon from '@/components/common/WkIcon.vue'
 
 import App from './App.vue'
 import router from './router'
+import './styles/iconfont.css'
 import './styles/main.css'
 
 const app = createApp(App)
@@ -24,6 +26,7 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+app.component('WkIcon', WkIcon)
 
 // Wait for router to be ready before mounting to prevent duplicate initial navigation
 router.isReady().then(() => {

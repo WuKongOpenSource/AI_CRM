@@ -1,0 +1,70 @@
+@font-face {
+  font-family: 'wk';
+  src:
+    url('../assets/iconfont/iconfont.woff2') format('woff2'),
+    url('../assets/iconfont/iconfont.woff') format('woff'),
+    url('../assets/iconfont/iconfont.ttf') format('truetype');
+  font-display: block;
+}
+
+.wk {
+  font-family: 'wk' !important;
+  display: inline-block;
+  font-size: 1em;
+  line-height: 1;
+  font-style: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.wk-icon {
+  vertical-align: middle;
+}
+
+.wk-icon-stage::before,
+.wk-icon-archery::before {
+  content: '\e6a9';
+}
+
+.wk-icon-profile::before {
+  content: '\e6aa';
+}
+
+.wk-icon-customer::before {
+  content: '\e6a8';
+}
+
+.wk-icon-meeting-record::before,
+.wk-icon-edit::before {
+  content: '\e6a0';
+}
+
+.wk-icon-add::before {
+  content: '\e6a1';
+}
+
+.wk-icon-task::before {
+  content: '\e6a2';
+}
+
+.wk-icon-knowledge::before {
+  content: '\e6a3';
+}
+
+.wk-icon-contract::before {
+  content: '\e6a4';
+}
+
+.wk-icon-settings::before,
+.wk-icon-set::before {
+  content: '\e6a5';
+}
+
+.wk-icon-import::before {
+  content: '\e6a6';
+}
+
+.wk-icon-export::before {
+  content: '\e6a7';
+}
