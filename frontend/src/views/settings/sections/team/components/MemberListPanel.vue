@@ -1,6 +1,6 @@
 <template>
-  <div class="flex-1 min-h-0 overflow-y-auto" :class="isMobile ? 'p-4' : 'p-8'">
-    <div class="max-w-6xl mx-auto w-full space-y-6">
+  <div class="flex-1 min-h-0 overflow-hidden" :class="isMobile ? 'p-4' : 'p-8'">
+    <div class="max-w-6xl mx-auto w-full h-full min-h-0 flex flex-col gap-6">
       <div v-if="isMobile" class="flex items-center gap-2 p-4 border border-slate-100 bg-white rounded-2xl">
         <button
           class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm max-w-[200px]"
@@ -56,18 +56,18 @@
         </div>
       </div>
 
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div v-if="loadingMembers" class="text-center py-16">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div v-if="loadingMembers" class="flex-1 min-h-0 flex items-center justify-center text-center py-16">
           <span class="material-symbols-outlined text-slate-300 text-3xl animate-spin">progress_activity</span>
         </div>
         <template v-else-if="deptMemberList.length === 0">
-          <div class="text-center py-16 text-slate-400">
+          <div class="flex-1 min-h-0 flex flex-col items-center justify-center text-center py-16 text-slate-400">
             <span class="material-symbols-outlined text-3xl mb-2 opacity-50">group_off</span>
             <p class="text-sm">{{ selectedDept ? '该部门暂无成员' : '请先选择一个部门' }}</p>
           </div>
         </template>
         <template v-else>
-          <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
+          <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4 shrink-0">
             <div class="relative flex-1">
               <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
               <input
@@ -88,89 +88,109 @@
             </select>
           </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="border-b border-slate-100">
-                  <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">员工</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">部门</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">角色</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">联系方式</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">状态</th>
-                  <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody v-if="filteredMembers.length > 0" class="divide-y divide-slate-50">
-                <tr
-                  v-for="member in filteredMembers"
-                  :key="member.userId"
-                  class="hover:bg-slate-50/50 transition-colors group cursor-pointer"
-                  @click="$emit('row-click', member)"
-                >
-                  <td class="px-6 py-4">
-                    <div class="flex items-center gap-3">
-                      <img v-if="member.imgUrl" :src="member.imgUrl" class="size-10 rounded-full object-cover shrink-0 shadow-sm" alt="avatar" />
-                      <div v-else class="size-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm" :class="getAvatarColor(member.realname)">
-                        {{ (member.realname || member.username || '?').charAt(0) }}
-                      </div>
-                      <div>
-                        <p class="text-sm font-bold text-slate-900 hover:text-primary transition-colors">{{ member.realname || member.username }}</p>
-                        <p class="text-xs text-slate-400">{{ member.email || '' }}</p>
-                      </div>
+          <div class="flex-1 min-h-0">
+            <el-table
+              :data="filteredMembers"
+              height="100%"
+              row-key="userId"
+              table-layout="fixed"
+              tooltip-effect="light"
+              class="wk-member-table"
+              empty-text="未找到匹配的员工"
+              @row-click="$emit('row-click', $event)"
+            >
+              <el-table-column label="员工" min-width="260">
+                <template #default="{ row }">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <img v-if="row.imgUrl" :src="row.imgUrl" class="size-10 rounded-full object-cover shrink-0 shadow-sm" alt="avatar" />
+                    <div v-else class="size-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm" :class="getAvatarColor(row.realname)">
+                      {{ (row.realname || row.username || '?').charAt(0) }}
                     </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <p class="text-sm text-slate-700">{{ selectedDept?.deptName || '-' }}</p>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div class="flex flex-wrap gap-1">
-                      <span v-for="roleName in member.roleNames || []" :key="roleName" class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-bold">{{ roleName }}</span>
-                      <span v-if="!member.roleNames || member.roleNames.length === 0" class="text-sm text-slate-400">-</span>
+                    <div class="min-w-0">
+                      <el-tooltip :content="row.realname || row.username || '-'" placement="top">
+                        <p class="text-sm font-bold text-slate-900 hover:text-primary transition-colors truncate">
+                          {{ row.realname || row.username }}
+                        </p>
+                      </el-tooltip>
+                      <el-tooltip v-if="row.email" :content="row.email" placement="top">
+                        <p class="text-xs text-slate-400 truncate">{{ row.email }}</p>
+                      </el-tooltip>
+                      <p v-else class="text-xs text-slate-300 truncate">-</p>
                     </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <div>
-                      <p v-if="member.mobile" class="text-sm text-slate-700">{{ member.mobile }}</p>
-                      <p v-if="member.post" class="text-xs text-slate-400">{{ member.post }}</p>
-                    </div>
-                  </td>
-                  <td class="px-6 py-4">
-                    <span
-                      class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-widest"
-                      :class="member.status === 1 ? 'bg-emerald-50 text-emerald-600' : member.status === 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'"
-                    >
-                      {{ member.status === 1 ? '活跃' : member.status === 0 ? '禁用' : '未激活' }}
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="部门" min-width="160" show-overflow-tooltip>
+                <template #default>
+                  <span class="text-sm text-slate-700">{{ selectedDept?.deptName || '-' }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="角色" min-width="220">
+                <template #default="{ row }">
+                  <div class="flex flex-wrap gap-1 min-w-0">
+                    <span v-for="roleName in row.roleNames || []" :key="roleName" class="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-bold max-w-full truncate">
+                      {{ roleName }}
                     </span>
-                  </td>
-                  <td class="px-6 py-4 text-right">
-                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-primary transition-all"
-                        title="编辑"
-                        @click.stop="$emit('edit-member', member)"
-                      >
-                        <span class="material-symbols-outlined text-sm">edit</span>
-                      </button>
-                      <button
-                        class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-amber-500 transition-all"
-                        :title="member.status === 1 ? '停用' : '启用'"
-                        @click.stop="$emit('toggle-status', member)"
-                      >
-                        <span class="material-symbols-outlined text-sm">{{ member.status === 1 ? 'block' : 'check_circle' }}</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-              <tbody v-else>
-                <tr>
-                  <td colspan="6" class="text-center py-16 text-slate-400">
-                    <span class="material-symbols-outlined text-3xl mb-2 opacity-50">search_off</span>
-                    <div class="text-sm">未找到匹配的员工</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <span v-if="!row.roleNames || row.roleNames.length === 0" class="text-sm text-slate-400">-</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="联系方式" min-width="180">
+                <template #default="{ row }">
+                  <div class="min-w-0">
+                    <el-tooltip v-if="row.mobile" :content="row.mobile" placement="top">
+                      <p class="text-sm text-slate-700 truncate">{{ row.mobile }}</p>
+                    </el-tooltip>
+                    <p v-else class="text-sm text-slate-300 truncate">-</p>
+                    <el-tooltip v-if="row.post" :content="row.post" placement="top">
+                      <p class="text-xs text-slate-400 truncate">{{ row.post }}</p>
+                    </el-tooltip>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="状态" width="120" align="center">
+                <template #default="{ row }">
+                  <span
+                    class="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-widest"
+                    :class="row.status === 1 ? 'bg-emerald-50 text-emerald-600' : row.status === 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'"
+                  >
+                    {{ row.status === 1 ? '活跃' : row.status === 0 ? '禁用' : '未激活' }}
+                  </span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="操作" width="112" align="right" fixed="right">
+                <template #default="{ row }">
+                  <div class="wk-member-actions flex items-center justify-end gap-2 transition-opacity">
+                    <button
+                      class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-primary transition-all"
+                      title="编辑"
+                      @click.stop="$emit('edit-member', row)"
+                    >
+                      <span class="material-symbols-outlined text-sm">edit</span>
+                    </button>
+                    <button
+                      class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-amber-500 transition-all"
+                      :title="row.status === 1 ? '停用' : '启用'"
+                      @click.stop="$emit('toggle-status', row)"
+                    >
+                      <span class="material-symbols-outlined text-sm">{{ row.status === 1 ? 'block' : 'check_circle' }}</span>
+                    </button>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <template #empty>
+                <div class="text-center py-16 text-slate-400">
+                  <span class="material-symbols-outlined text-3xl mb-2 opacity-50">search_off</span>
+                  <div class="text-sm">未找到匹配的员工</div>
+                </div>
+              </template>
+            </el-table>
           </div>
         </template>
       </div>
@@ -216,3 +236,21 @@ const roleFilterValue = computed({
   set: (value: string) => emit('update:memberRoleId', value)
 })
 </script>
+
+<style scoped>
+:deep(.wk-member-table .el-table__row) {
+  cursor: pointer;
+}
+
+:deep(.wk-member-table .el-table__body tr:hover .wk-member-actions) {
+  opacity: 1;
+}
+
+:deep(.wk-member-table .el-table__body tr .wk-member-actions) {
+  opacity: 0;
+}
+
+:deep(.wk-member-table .el-table__cell) {
+  vertical-align: middle;
+}
+</style>
