@@ -594,83 +594,24 @@
       </template>
     </el-dialog>
 
-    <!-- Add/Edit Contact Dialog -->
-    <el-dialog v-model="showAddContactDialog" :title="editingContact ? '编辑联系人' : '添加联系人'" :width="isMobile ? '95%' : '500px'" :fullscreen="isMobile">
-      <el-form :model="contactForm" label-width="80px">
-        <el-form-item label="姓名" required>
-          <el-input v-model="contactForm.name" placeholder="请输入姓名" />
-        </el-form-item>
-        <el-form-item label="职位">
-          <el-input v-model="contactForm.position" placeholder="请输入职位" />
-        </el-form-item>
-        <el-form-item label="电话">
-          <el-input v-model="contactForm.phone" placeholder="请输入电话" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="contactForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="微信">
-          <el-input v-model="contactForm.wechat" placeholder="请输入微信号" />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="contactForm.notes" type="textarea" :rows="3" placeholder="请输入备注" />
-        </el-form-item>
-        <el-form-item label="主联系人">
-          <el-switch v-model="contactForm.isPrimary" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddContactDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitContact">{{ editingContact ? '保存' : '添加' }}</el-button>
-      </template>
-    </el-dialog>
+    <ContactUpsertDialog
+      v-model="showAddContactDialog"
+      :customer-id="customer?.customerId || ''"
+      :contact="editingContact"
+      :existing-primary-contact="primaryContact"
+      @success="handleContactUpsertSuccess"
+    />
 
-    <!-- Contact Detail Drawer -->
-    <el-drawer v-model="showContactDetail" title="联系人详情" :size="isMobile ? '100%' : '400px'">
-      <template v-if="currentContact">
-        <div class="space-y-4">
-          <div class="flex items-center gap-3 mb-6">
-            <div class="size-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">{{ currentContact.name?.charAt(0) }}</div>
-            <div>
-              <h3 class="font-bold text-lg text-slate-900">{{ currentContact.name }}</h3>
-              <p v-if="currentContact.position" class="text-sm text-slate-500">{{ currentContact.position }}</p>
-              <span v-if="currentContact.isPrimary" class="text-xs font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">主联系人</span>
-            </div>
-          </div>
-          <div class="space-y-3">
-            <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-xs text-slate-400 uppercase font-bold mb-1">电话</p>
-              <p class="text-sm text-slate-900">{{ currentContact.phone || '-' }}</p>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-xs text-slate-400 uppercase font-bold mb-1">邮箱</p>
-              <p class="text-sm text-slate-900">{{ currentContact.email || '-' }}</p>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-xs text-slate-400 uppercase font-bold mb-1">微信</p>
-              <p class="text-sm text-slate-900">{{ currentContact.wechat || '-' }}</p>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-xs text-slate-400 uppercase font-bold mb-1">备注</p>
-              <p class="text-sm text-slate-900">{{ currentContact.notes || '-' }}</p>
-            </div>
-            <div class="p-3 bg-slate-50 rounded-xl">
-              <p class="text-xs text-slate-400 uppercase font-bold mb-1">创建时间</p>
-              <p class="text-sm text-slate-900">{{ currentContact.createTime ? formatDateTime(currentContact.createTime) : '-' }}</p>
-            </div>
-          </div>
-          <div class="mt-6 flex gap-2">
-            <button v-if="canEditContacts" class="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition-all" @click="handleEditContact(currentContact); showContactDetail = false">编辑</button>
-            <button v-if="!currentContact.isPrimary && canSetPrimaryContacts" class="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all" @click="handleSetPrimary(currentContact.contactId); showContactDetail = false">设为主联系人</button>
-            <el-popconfirm v-if="canDeleteContacts" title="确定删除该联系人吗？" confirm-button-text="删除" cancel-button-text="取消" @confirm="handleDeleteContact(currentContact!.contactId); showContactDetail = false">
-              <template #reference>
-                <button class="px-4 py-2 bg-white border border-red-200 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-all">删除</button>
-              </template>
-            </el-popconfirm>
-          </div>
-        </div>
-      </template>
-    </el-drawer>
+    <ContactDetailDrawer
+      v-model="showContactDetail"
+      :contact="currentContact"
+      :can-edit="canEditContacts"
+      :can-delete="canDeleteContacts"
+      :can-set-primary="canSetPrimaryContacts"
+      @edit="handleEditContact"
+      @delete="handleDeleteContact"
+      @set-primary="handleSetPrimary"
+    />
 
     <!-- Edit Customer Dialog -->
     <CustomerUpsertDialog
@@ -697,13 +638,15 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
-import { addContact, updateContact, deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
+import { deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CustomerTag, FollowUp, Contact } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
+import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -824,17 +767,6 @@ const followUpForm = reactive({
   followTime: formatDateForApi()
 })
 
-const contactForm = reactive({
-  customerId: '',
-  name: '',
-  position: '',
-  phone: '',
-  email: '',
-  wechat: '',
-  notes: '',
-  isPrimary: false
-})
-
 const customer = computed(() => customerStore.currentCustomer)
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canDeleteCustomer = computed(() => userStore.hasPermission('customer:delete'))
@@ -857,7 +789,6 @@ onMounted(async () => {
   if (customerId) {
     loading.value = true
     followUpForm.customerId = customerId
-    contactForm.customerId = customerId
 
     const fetchTasks: Promise<any>[] = [
       customerStore.fetchCustomerDetail(customerId).catch(err => {
@@ -999,22 +930,10 @@ function handleGenerateReport() {
   ElMessage.info('AI 分析报告功能开发中')
 }
 
-function resetContactForm() {
-  contactForm.name = ''
-  contactForm.position = ''
-  contactForm.phone = ''
-  contactForm.email = ''
-  contactForm.wechat = ''
-  contactForm.notes = ''
-  contactForm.isPrimary = false
-}
-
 function handleAddContact() {
   if (!canCreateContacts.value) return
   if (customer.value) {
     editingContact.value = null
-    contactForm.customerId = customer.value.customerId
-    resetContactForm()
     showAddContactDialog.value = true
   }
 }
@@ -1028,15 +947,14 @@ function handleViewContact(contact: Contact) {
 function handleEditContact(contact: Contact) {
   if (!canEditContacts.value) return
   editingContact.value = contact
-  contactForm.customerId = contact.customerId
-  contactForm.name = contact.name || ''
-  contactForm.position = contact.position || ''
-  contactForm.phone = contact.phone || ''
-  contactForm.email = contact.email || ''
-  contactForm.wechat = contact.wechat || ''
-  contactForm.notes = contact.notes || ''
-  contactForm.isPrimary = isPrimaryContact(contact)
   showAddContactDialog.value = true
+}
+
+async function handleContactUpsertSuccess(payload: { mode: 'create' | 'edit' }) {
+  if (!customer.value) return
+  await refreshCustomerContext(customer.value.customerId, {
+    resetContacts: payload.mode === 'create'
+  })
 }
 
 async function handleDeleteContact(contactId: string) {
@@ -1127,56 +1045,6 @@ async function handleDeleteFollowUp(followUpId: string) {
     if (customer.value) await fetchFollowUps(customer.value.customerId)
     ElMessage.success('跟进记录已删除')
   } catch { /* Error handled */ }
-}
-
-async function handleSubmitContact() {
-  if (!canCreateContacts.value && !editingContact.value) return
-  if (!canEditContacts.value && editingContact.value) return
-  if (!contactForm.name.trim()) {
-    ElMessage.warning('请输入联系人姓名')
-    return
-  }
-  // 若勾选主联系人且已有主联系人，弹窗确认是否替换
-  if (contactForm.isPrimary) {
-    const existingPrimary = contacts.value.find(contact => isPrimaryContact(contact))
-    if (existingPrimary && existingPrimary.contactId !== editingContact.value?.contactId) {
-      try {
-        await ElMessageBox.confirm(
-          `当前主要联系人为「${existingPrimary.name}」，是否替换为新联系人？`,
-          '替换主要联系人',
-          { type: 'warning', confirmButtonText: '确定替换', cancelButtonText: '取消' }
-        )
-      } catch {
-        return
-      }
-    }
-  }
-  submitting.value = true
-  try {
-    const submitData = {
-      customerId: contactForm.customerId,
-      name: contactForm.name,
-      position: contactForm.position,
-      phone: contactForm.phone,
-      email: contactForm.email,
-      wechat: contactForm.wechat,
-      notes: contactForm.notes,
-      isPrimary: contactForm.isPrimary ? 1 : 0
-    }
-    if (editingContact.value) {
-      await updateContact({ ...submitData, contactId: editingContact.value.contactId } as any)
-      ElMessage.success('联系人更新成功')
-    } else {
-      await addContact(submitData as any)
-      ElMessage.success('联系人添加成功')
-    }
-    await refreshCustomerContext(contactForm.customerId, { resetContacts: !editingContact.value })
-    showAddContactDialog.value = false
-    editingContact.value = null
-    resetContactForm()
-  } catch { /* Error handled */ } finally {
-    submitting.value = false
-  }
 }
 
 function getStageBadgeClass(stage: string): string {
