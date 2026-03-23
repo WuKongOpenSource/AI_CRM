@@ -368,13 +368,14 @@
                     </div>
                     <div class="flex items-center gap-3">
                       <span class="text-xs text-slate-400 uppercase font-bold">{{ formatDateTime(item.followTime || item.createTime) }}</span>
-                      <el-popconfirm v-if="canDeleteFollowUps" title="确定删除这条跟进记录吗？" confirm-button-text="删除" cancel-button-text="取消" @confirm="handleDeleteFollowUp(item.followUpId)">
-                        <template #reference>
-                          <button class="text-slate-300 hover:text-red-500 transition-colors">
-                            <span class="material-symbols-outlined text-sm">delete</span>
-                          </button>
-                        </template>
-                      </el-popconfirm>
+                      <button
+                        v-if="canDeleteFollowUps"
+                        type="button"
+                        class="text-slate-300 hover:text-red-500 transition-colors"
+                        @click="confirmDeleteFollowUp(item.followUpId)"
+                      >
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                      </button>
                     </div>
                   </div>
                   <div v-if="item.nextFollowTime" class="flex items-center gap-2 mb-3 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg w-fit">
@@ -459,13 +460,16 @@
                   <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50" @click.stop>
                     <button v-if="canEditContacts" class="text-xs font-bold text-primary hover:underline" @click="handleEditContact(contact)">编辑</button>
                     <span v-if="canEditContacts && (!contact.isPrimary || canDeleteContacts)" class="text-slate-200">|</span>
-                    <button v-if="!contact.isPrimary && canSetPrimaryContacts" class="text-xs font-bold text-slate-400 hover:text-primary" @click="handleSetPrimary(contact.contactId)">设为主要</button>
+                    <button v-if="!contact.isPrimary && canSetPrimaryContacts" class="text-xs font-bold text-primary hover:text-primary/80 hover:underline" @click="handleSetPrimary(contact.contactId)">设为主要</button>
                     <span v-if="!contact.isPrimary && canSetPrimaryContacts && canDeleteContacts" class="text-slate-200">|</span>
-                    <el-popconfirm v-if="canDeleteContacts" title="确定删除该联系人吗？" confirm-button-text="删除" cancel-button-text="取消" @confirm="handleDeleteContact(contact.contactId)">
-                      <template #reference>
-                        <button class="text-xs font-bold text-red-400 hover:text-red-500">删除</button>
-                      </template>
-                    </el-popconfirm>
+                    <button
+                      v-if="canDeleteContacts"
+                      type="button"
+                      class="text-xs font-bold text-red-400 hover:text-red-500"
+                      @click="confirmDeleteContact(contact.contactId)"
+                    >
+                      删除
+                    </button>
                   </div>
                 </div>
                 <div v-if="contactTotal > contactPageSize" class="pt-2 flex justify-center">
@@ -957,6 +961,21 @@ async function handleContactUpsertSuccess(payload: { mode: 'create' | 'edit' }) 
   })
 }
 
+async function confirmDeleteContact(contactId: string) {
+  if (!canDeleteContacts.value) return
+  try {
+    await ElMessageBox.confirm('确定删除该联系人吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'el-button--danger'
+    })
+  } catch {
+    return
+  }
+  await handleDeleteContact(contactId)
+}
+
 async function handleDeleteContact(contactId: string) {
   if (!canDeleteContacts.value) return
   if (!customer.value) return
@@ -1036,6 +1055,21 @@ async function handleSubmitFollowUp() {
   } catch { /* Error handled */ } finally {
     submitting.value = false
   }
+}
+
+async function confirmDeleteFollowUp(followUpId: string) {
+  if (!canDeleteFollowUps.value) return
+  try {
+    await ElMessageBox.confirm('确定删除这条跟进记录吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      confirmButtonClass: 'el-button--danger'
+    })
+  } catch {
+    return
+  }
+  await handleDeleteFollowUp(followUpId)
 }
 
 async function handleDeleteFollowUp(followUpId: string) {

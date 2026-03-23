@@ -50,18 +50,9 @@
           <el-button text @click="handleEditField(field)">
             <span class="material-symbols-outlined text-base">edit</span>
           </el-button>
-          <el-popconfirm
-            title="删除字段将同时删除数据库列，确定继续吗？"
-            confirm-button-text="删除"
-            cancel-button-text="取消"
-            @confirm="handleDeleteField(field)"
-          >
-            <template #reference>
-              <el-button text type="danger">
-                <span class="material-symbols-outlined text-base">delete</span>
-              </el-button>
-            </template>
-          </el-popconfirm>
+          <el-button text type="danger" @click="confirmDeleteField(field)">
+            <span class="material-symbols-outlined text-base">delete</span>
+          </el-button>
         </div>
       </div>
     </div>
@@ -81,7 +72,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import {
   getFieldsByEntity,
@@ -258,6 +249,19 @@ async function handleToggleFieldStatus(field: CustomField, enabled: boolean) {
   } catch {
     // Error handled by interceptor
   }
+}
+
+async function confirmDeleteField(field: CustomField) {
+  try {
+    await ElMessageBox.confirm('删除字段将同时删除数据库列，确定继续吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  await handleDeleteField(field)
 }
 
 async function handleDeleteField(field: CustomField) {

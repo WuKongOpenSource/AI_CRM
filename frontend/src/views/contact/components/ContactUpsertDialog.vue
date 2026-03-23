@@ -142,8 +142,14 @@
                     />
                   </div>
                   <div class="space-y-1.5 md:col-span-2 flex items-center gap-3 pt-1">
-                    <label class="text-xs font-bold text-slate-500 uppercase ml-1 shrink-0">主联系人</label>
-                    <el-switch v-model="formData.isPrimary" />
+                    <label
+                      class="text-xs font-bold uppercase ml-1 shrink-0 transition-colors"
+                      :class="formData.isPrimary ? 'text-primary' : 'text-slate-500'"
+                    >主联系人</label>
+                    <el-switch
+                      v-model="formData.isPrimary"
+                      style="--el-switch-on-color: var(--el-color-primary)"
+                    />
                   </div>
                 </div>
               </section>
