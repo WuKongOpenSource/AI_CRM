@@ -240,7 +240,7 @@
 
       <!-- 3-Column Content -->
       <div class="flex-1 overflow-auto px-8 pb-8 pt-6">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
           <div class="lg:col-span-3 space-y-4">
             <!-- Basic Info -->
