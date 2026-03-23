@@ -117,43 +117,121 @@
             <div class="relative overflow-visible">
               <!-- Chevron segments (wrap layout, no scroll) -->
               <div class="relative flex flex-wrap items-stretch gap-y-2">
-                <div
-                  v-for="(stage, idx) in stageFlow"
-                  :key="stage"
-                  class="relative h-9 flex-none w-[180px] group cursor-pointer"
-                  @click="handleStageChange(stage)"
-                  :title="getStepperLabel(stage)"
-                  :style="{
-                    zIndex: customer.stage === stage ? 10 : 5 - idx
-                  }"
-                >
-                  <!-- Segment background (clip-path chevron) -->
-                  <div
-                    class="absolute inset-0 transition-all duration-300"
-                    :class="getStepperSegmentBgClass(stage, idx)"
-                    :style="{ clipPath: getStepperClipPath(idx) }"
-                  ></div>
-                  <!-- Hover overlay -->
-                  <div
-                    class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                    :class="getStepperHoverOverlayClass(stage, idx)"
-                    :style="{ clipPath: getStepperClipPath(idx) }"
-                  ></div>
+                <template v-for="(stage, idx) in stageFlow" :key="stage">
+                  <el-popover
+                    v-if="isTerminalStage(stage)"
+                    :visible="showTerminalStageMenu"
+                    trigger="click"
+                    placement="bottom-end"
+                    :offset="8"
+                    :width="144"
+                    :show-arrow="false"
+                    popper-class="wk-stage-result-popover"
+                    :disabled="!canChangeStage"
+                    @update:visible="showTerminalStageMenu = $event"
+                  >
+                    <div class="wk-stage-result-popover__inner">
+                      <div class="wk-stage-result-popover__head">
+                        <p class="wk-stage-result-popover__title">选择推进结果</p>
+                      </div>
+                      <button
+                        type="button"
+                        class="wk-stage-result-popover__item wk-stage-result-popover__item--won"
+                        :class="{ 'is-active': customer?.stage === 'closed' }"
+                        @click="handleTerminalStageSelect('closed')"
+                      >
+                        <span class="material-symbols-outlined wk-stage-result-popover__icon">handshake</span>
+                        已成交
+                      </button>
+                      <button
+                        type="button"
+                        class="wk-stage-result-popover__item wk-stage-result-popover__item--lost"
+                        :class="{ 'is-active': customer?.stage === 'lost' }"
+                        @click="handleTerminalStageSelect('lost')"
+                      >
+                        <span class="material-symbols-outlined wk-stage-result-popover__icon">block</span>
+                        已流失
+                      </button>
+                      <button
+                        v-if="customer?.stage === 'closed' || customer?.stage === 'lost'"
+                        type="button"
+                        class="wk-stage-result-popover__item wk-stage-result-popover__item--reopen"
+                        @click="handleReopenOpportunity"
+                      >
+                        <span class="material-symbols-outlined wk-stage-result-popover__icon">settings_backup_restore</span>
+                        重新开启商机
+                      </button>
+                    </div>
+                    <template #reference>
+                      <div
+                        class="relative h-9 flex-none w-[180px] group"
+                        :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
+                        :title="getStepperLabel(stage)"
+                        :style="{ zIndex: getStepperZIndex(stage, idx) }"
+                      >
+                        <div
+                          class="absolute inset-0 transition-all duration-300"
+                          :class="getStepperSegmentBgClass(stage, idx)"
+                          :style="{ clipPath: getStepperClipPath(idx) }"
+                        ></div>
+                        <div
+                          class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                          :class="getStepperHoverOverlayClass(stage, idx)"
+                          :style="{ clipPath: getStepperClipPath(idx) }"
+                        ></div>
+                        <div class="relative z-10 flex h-full items-center justify-center overflow-hidden px-4 transition-transform duration-200 group-hover:scale-[1.02]">
+                          <div class="flex min-w-0 max-w-full items-center justify-center gap-2">
+                            <span
+                              class="material-symbols-outlined shrink-0 text-[14px] font-bold transition-colors"
+                              :class="getStepperLabelClass(stage, idx)"
+                            >{{ getStepperStageIcon(stage) }}</span>
+                            <span
+                              class="block min-w-0 truncate text-[14px] font-bold tracking-wider transition-colors"
+                              :class="getStepperLabelClass(stage, idx)"
+                            >{{ getStepperLabel(stage) }}</span>
+                            <span
+                              v-if="canChangeStage"
+                              class="material-symbols-outlined shrink-0 text-[16px] leading-none transition-all duration-200"
+                              :class="[getStepperLabelClass(stage, idx), showTerminalStageMenu ? 'rotate-180' : 'rotate-0']"
+                            >expand_more</span>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+                  </el-popover>
 
-                  <!-- Content -->
-                  <div class="relative z-10 flex h-full items-center justify-center overflow-hidden px-4 transition-transform duration-200 group-hover:scale-[1.02]">
-                    <div class="flex min-w-0 max-w-full items-center justify-center gap-2">
-                      <span
-                        class="material-symbols-outlined shrink-0 text-[14px] font-bold transition-colors"
-                        :class="getStepperLabelClass(stage, idx)"
-                      >{{ getStepperStageIcon(stage) }}</span>
-                      <span
-                        class="block min-w-0 truncate text-[14px] font-bold tracking-wider transition-colors"
-                        :class="getStepperLabelClass(stage, idx)"
-                      >{{ getStepperLabel(stage) }}</span>
+                  <div
+                    v-else
+                    class="relative h-9 flex-none w-[180px] group"
+                    :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
+                    @click="handleStageChange(stage)"
+                    :title="getStepperLabel(stage)"
+                    :style="{ zIndex: getStepperZIndex(stage, idx) }"
+                  >
+                    <div
+                      class="absolute inset-0 transition-all duration-300"
+                      :class="getStepperSegmentBgClass(stage, idx)"
+                      :style="{ clipPath: getStepperClipPath(idx) }"
+                    ></div>
+                    <div
+                      class="absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                      :class="getStepperHoverOverlayClass(stage, idx)"
+                      :style="{ clipPath: getStepperClipPath(idx) }"
+                    ></div>
+                    <div class="relative z-10 flex h-full items-center justify-center overflow-hidden px-4 transition-transform duration-200 group-hover:scale-[1.02]">
+                      <div class="flex min-w-0 max-w-full items-center justify-center gap-2">
+                        <span
+                          class="material-symbols-outlined shrink-0 text-[14px] font-bold transition-colors"
+                          :class="getStepperLabelClass(stage, idx)"
+                        >{{ getStepperStageIcon(stage) }}</span>
+                        <span
+                          class="block min-w-0 truncate text-[14px] font-bold tracking-wider transition-colors"
+                          :class="getStepperLabelClass(stage, idx)"
+                        >{{ getStepperLabel(stage) }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>
@@ -256,13 +334,13 @@
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">会议摘要</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">重要进展</button>
                 </div> -->
-                <button
+                <!-- <button
                   class="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-primary/20 transition-colors"
                   @click="handleOpenFollowUpDialog"
                 >
                   <span class="material-symbols-outlined text-sm">add</span>
                   添加跟进
-                </button>
+                </button> -->
               </div>
             </div>
 
@@ -643,6 +721,7 @@ const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
 const showEditDialog = ref(false)
 const showAiFollowUpDrawer = ref(false)
+const showTerminalStageMenu = ref(false)
 const newTagName = ref('')
 const followUps = ref<FollowUp[]>([])
 const followUpTotal = ref(0)
@@ -993,12 +1072,6 @@ function handleAddTask() {
   router.push('/task')
 }
 
-function handleOpenFollowUpDialog() {
-  if (!canCreateFollowUps.value) return
-  followUpForm.followTime = formatDateForApi()
-  showAddFollowUpDialog.value = true
-}
-
 async function handleAddTag() {
   if (!canEditCustomerTags.value) return
   if (!newTagName.value.trim() || !customer.value) return
@@ -1127,17 +1200,24 @@ function getStageLabel(stage: string): string {
 }
 
 function getStageIndex(stage: string): number {
-  const stages = ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost']
-  return stages.indexOf(stage)
+  const stageIndexMap: Record<string, number> = {
+    lead: 0,
+    qualified: 1,
+    proposal: 2,
+    negotiation: 3,
+    closed: 4,
+    lost: 4
+  }
+  return stageIndexMap[stage] ?? -1
 }
 
-const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost']
+const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
 const stageOptions = [
   { value: 'lead', label: '线索' },
   { value: 'qualified', label: '资格审查' },
   { value: 'proposal', label: '方案报价' },
   { value: 'negotiation', label: '谈判中' },
-  { value: 'closed', label: '结单' },
+  { value: 'closed', label: '已成交' },
   { value: 'lost', label: '已流失' }
 ]
 const STEPPER_SEGMENT_WIDTH = 180
@@ -1170,33 +1250,47 @@ function getStepperSegmentBgClass(stage: string, idx: number): string {
     completed: 'bg-gradient-to-r from-[#22c55e] to-[#16c458] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]',
     current: 'bg-gradient-to-r from-[#113f98] to-[#194fa8] shadow-[0_8px_20px_rgba(17,63,152,0.18)]',
     closed: 'bg-gradient-to-r from-[#22c55e] to-[#16c458] shadow-[0_8px_20px_rgba(34,197,94,0.16)]',
-    lost: 'bg-gradient-to-r from-[#64748b] to-[#475569] shadow-[0_8px_20px_rgba(71,85,105,0.16)]',
+    lost: 'bg-gradient-to-r from-[#f43f5e] to-[#e11d48] shadow-[0_8px_20px_rgba(244,63,94,0.18)]',
     pending: 'bg-[#d9d9d9]'
   }
   return classes[state]
 }
 
 function getStepperStageIcon(stage: string): string {
-  // Keep icon mapping purely presentational
+  if (isTerminalStage(stage)) {
+    if (customer.value?.stage === 'closed') return 'handshake'
+    if (customer.value?.stage === 'lost') return 'block'
+    return 'flag'
+  }
+
   const icons: Record<string, string> = {
     lead: 'person_search',
     qualified: 'verified',
     proposal: 'description',
-    negotiation: 'forum',
-    closed: 'handshake',
-    lost: 'block'
+    negotiation: 'forum'
   }
   return icons[stage] || 'lens'
 }
 
 function getStepperLabel(stage: string): string {
-  if (stage === 'lost') return '已流失'
-  if (stage === 'closed') {
+  if (isTerminalStage(stage)) {
     const cs = customer.value?.stage
     if (cs === 'closed') return '已成交'
-    return '结单'
+    if (cs === 'lost') return '已流失'
+    return '推进结单'
   }
   return getStageLabelFull(stage)
+}
+
+function isTerminalStage(stage: string): boolean {
+  return stage === 'closed'
+}
+
+function getStepperZIndex(stage: string, idx: number): number {
+  const cs = customer.value?.stage
+  if (isTerminalStage(stage) && (cs === 'closed' || cs === 'lost')) return 10
+  if (cs === stage) return 10
+  return 5 - idx
 }
 
 function getStepperLabelClass(stage: string, idx: number): string {
@@ -1213,16 +1307,27 @@ function getStepperVisualState(stage: string, idx: number): 'completed' | 'curre
   const cs = customer.value?.stage
   if (!cs) return 'pending'
 
-  if (stage === 'lost' && cs === 'lost') return 'lost'
-  if (stage === 'closed' && cs === 'closed') return 'closed'
+  if (isTerminalStage(stage) && cs === 'lost') return 'lost'
+  if (isTerminalStage(stage) && cs === 'closed') return 'closed'
 
-  const isCompleted = getStageIndex(cs) > idx && cs !== 'lost'
+  const isCompleted = getStageIndex(cs) > idx
   if (cs === stage) return 'current'
   if (isCompleted) return 'completed'
   return 'pending'
 }
 
+async function handleTerminalStageSelect(stage: 'closed' | 'lost') {
+  showTerminalStageMenu.value = false
+  await handleStageChange(stage)
+}
+
+async function handleReopenOpportunity() {
+  showTerminalStageMenu.value = false
+  await handleStageChange('negotiation')
+}
+
 async function handleStageChange(newStage: string) {
+  showTerminalStageMenu.value = false
   if (!canChangeStage.value) return
   if (!customer.value || customer.value.stage === newStage) return
   try {
@@ -1273,3 +1378,100 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
   }
 }
 </script>
+
+<style>
+.wk-stage-result-popover.el-popper,
+.wk-stage-result-popover.el-popover {
+  padding: 0;
+  border: 1px solid rgb(226 232 240);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow:
+    0 25px 50px -12px rgb(0 0 0 / 0.25),
+    0 0 0 1px rgb(15 23 42 / 0.04);
+  z-index: 60 !important;
+  animation: wk-stage-result-popover-in 0.2s ease-out;
+}
+
+@keyframes wk-stage-result-popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.wk-stage-result-popover__inner {
+  padding: 0.375rem 0;
+  background: #fff;
+}
+
+.wk-stage-result-popover__head {
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-bottom: 1px solid rgb(248 250 252);
+}
+
+.wk-stage-result-popover__title {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(148 163 184);
+}
+
+.wk-stage-result-popover__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.wk-stage-result-popover__icon {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.wk-stage-result-popover__item--won {
+  color: rgb(5 150 105);
+}
+
+.wk-stage-result-popover__item--won:hover,
+.wk-stage-result-popover__item--won.is-active {
+  background: rgb(236 253 245);
+}
+
+.wk-stage-result-popover__item--lost {
+  color: rgb(225 29 72);
+}
+
+.wk-stage-result-popover__item--lost:hover,
+.wk-stage-result-popover__item--lost.is-active {
+  background: rgb(255 241 242);
+}
+
+.wk-stage-result-popover__item--reopen {
+  margin-top: 0.25rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid rgb(241 245 249);
+  color: rgb(71 85 105);
+}
+
+.wk-stage-result-popover__item--reopen:hover {
+  background: rgb(248 250 252);
+}
+</style>
