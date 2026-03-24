@@ -8,6 +8,8 @@ target
 */target/**
 frontend/node_modules
 frontend/dist
+frontend/.env.local
+frontend/.env.*.local
 frontend/tsconfig.tsbuildinfo
 frontend/tsconfig.node.tsbuildinfo
 uploads/**

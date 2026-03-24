@@ -5,12 +5,13 @@ import router from '@/router'
 
 const TOKEN_KEY = 'Manager-Token'
 
-export function getBasePath(): string {
-  return (window as any).__APP_CONFIG__?.basePath || '/'
-}
-
+/** 未配置、仅空白或显式空字符串时返回 ''，axios 将按相对当前页面的路径发请求 */
 export function getApiBaseUrl(): string {
-  return import.meta.env.VITE_API_BASE_URL || `${getBasePath()}crmapi`
+  const raw = import.meta.env.VITE_API_BASE_URL
+  if (typeof raw !== 'string') return ''
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  return trimmed.replace(/\/$/, '')
 }
 
 let isRedirecting = false
