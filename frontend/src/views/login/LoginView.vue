@@ -85,8 +85,12 @@
                 <span class="text-lg font-bold text-slate-900">悟空AI CRM</span>
               </div>
 
-              <!-- 双层叠放 + 高度过渡：与 out-in 不同，高度与透明度同时变化 -->
-              <div ref="stageRef" class="auth-form-stage">
+              <!-- 双层叠放 + 高度过渡；WebKit 上高度改为瞬时更新，避免布局动画卡顿 -->
+              <div
+                ref="stageRef"
+                class="auth-form-stage"
+                :class="{ 'auth-form-stage--instant-height': prefersInstantStageHeight }"
+              >
                 <div
                   ref="loginLayerRef"
                   class="auth-form-layer"
@@ -375,6 +379,16 @@ let countdownTimer: number | undefined
 const reduceMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+/** Safari / iOS 等对 height 逐帧插值开销大，仅保留 opacity + transform 过渡更顺 */
+function isWebKitWithoutChromium(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  if (/Chrome|Chromium|CriOS|EdgA|EdgiOS|Edg\/|OPR\//i.test(ua)) return false
+  return /AppleWebKit/i.test(ua)
+}
+
+const prefersInstantStageHeight = reduceMotion || isWebKitWithoutChromium()
+
 function measureActiveLayerHeight(): number {
   const el = isLogin.value ? loginLayerRef.value : registerLayerRef.value
   if (!el) return 0
@@ -389,7 +403,7 @@ async function syncStageHeight(animate: boolean) {
   const next = measureActiveLayerHeight()
   if (next <= 0) return
 
-  if (!animate || reduceMotion) {
+  if (!animate || prefersInstantStageHeight) {
     stage.style.height = `${next}px`
     return
   }
@@ -476,7 +490,10 @@ watch(
 
 watch(isLogin, async () => {
   await syncStageHeight(true)
-  formScrollRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  formScrollRef.value?.scrollTo({
+    top: 0,
+    behavior: prefersInstantStageHeight ? 'auto' : 'smooth'
+  })
 })
 
 function toggleMode() {
@@ -701,6 +718,11 @@ onBeforeUnmount(() => {
   transition: height 0.52s cubic-bezier(0.25, 0.46, 0.45, 1);
 }
 
+.auth-form-stage--instant-height {
+  transition: none;
+}
+
+/* 失活为终点时：尽快淡出，减轻与下一层叠字虚影 */
 .auth-form-layer {
   position: absolute;
   z-index: 0;
@@ -710,25 +732,33 @@ onBeforeUnmount(() => {
   width: 100%;
   opacity: 0;
   pointer-events: none;
+  backface-visibility: hidden;
+  isolation: isolate;
   transition:
-    opacity 0.38s cubic-bezier(0.25, 0.46, 0.45, 1),
-    transform 0.38s cubic-bezier(0.25, 0.46, 0.45, 1);
-  transform: translateY(6px);
+    opacity 0.2s cubic-bezier(0.4, 0, 0.85, 1),
+    transform 0.24s cubic-bezier(0.4, 0, 0.85, 1);
+  transform: translate3d(0, 6px, 0);
 }
 
+/* 激活为终点时：略延迟再淡入，等上一层基本退干净 */
 .auth-form-layer--active {
   z-index: 1;
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s,
+    transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.12s;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-form-stage {
+  .auth-form-stage,
+  .auth-form-stage--instant-height {
     transition: none;
   }
 
-  .auth-form-layer {
+  .auth-form-layer,
+  .auth-form-layer--active {
     transition: none;
     transform: none;
   }
