@@ -15,8 +15,8 @@
 ### 🚀 立即体验
 | 体验方式 | 地址/账号 | 说明 |
 | :--- | :--- | :--- |
-| **🌐 在线演示站** | [https://aicrm.5kcrm.cn](https://aicrm.5kcrm.cn) | **一键访问，推荐首选** |
-| **🔑 演示站账号** | 用户：`admin` <br> 密码：`123456a` | 用于登录在线演示站 |
+| **🌐 在线演示站** | [https://www.72crm.com/wkaicrm](https://www.72crm.com/wkaicrm) | **一键访问，推荐首选** |
+| **🔑 演示站账号** | 点击“免费体验”直接注册体验 | 用于登录在线演示站 |
 | **💬 帮助与讨论** | [前往社区论坛](https://bbs.72crm.com#/forum/detail/2020712408698912768) | 反馈问题、交流想法 |
 
 > **提示**：在线演示站已预置示例数据和客户信息，您可以直接登录并体验所有核心功能。
@@ -223,8 +223,8 @@ We strongly recommend you first experience the power of AI CRM through the follo
 
 | Experience | Address/Account | Notes |
 | :--- | :--- | :--- |
-| **🌐 Live Demo** | [https://aicrm.5kcrm.cn](https://aicrm.5kcrm.cn) | **One-click access, recommended** |
-| **🔑 Demo Account** | User: `admin` <br> Password: `123456a` | For logging into the live demo site |
+| **🌐 Live Demo** |  [https://www.72crm.com/wkaicrm](https://www.72crm.com/wkaicrm)  | **One-click access, recommended** |
+| **🔑 Demo Account** | Click "Free Trial" to register and experience directly | For logging into the live demo site |
 | **💬 Help & Discussion** | [Community Forum](https://bbs.72crm.com#/forum/detail/2020712408698912768) | Report issues and share ideas |
 
 > **Tip**: The live demo comes pre-loaded with sample data and customer information. You can log in directly and experience all core features.
