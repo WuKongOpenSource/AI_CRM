@@ -98,7 +98,7 @@ export const useCustomerStore = defineStore('customer', () => {
   function loadMore() {
     if (hasMore.value && !loading.value) {
       queryParams.value.page = (queryParams.value.page || 1) + 1
-      fetchCustomerList(false, true)  // append=true for infinite scroll
+      await fetchCustomerList(false, true)  // append=true for infinite scroll
     }
   }
 
