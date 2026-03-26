@@ -169,6 +169,7 @@ export interface ChatSendBO {
   sessionId: string
   content: string
   attachments?: ChatAttachmentDTO[]
+  ragEnabled?: boolean
 }
 
 // Enum types

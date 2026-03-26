@@ -43,7 +43,8 @@ export async function sendMessageStream(
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
-  attachments?: ChatAttachmentDTO[]
+  attachments?: ChatAttachmentDTO[],
+  ragEnabled?: boolean
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -68,7 +69,7 @@ export async function sendMessageStream(
         'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined })
+      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined, ragEnabled })
     })
 
     if (!response.ok) {
@@ -150,6 +151,6 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[]): Promise<string> {
-  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined })
+export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean): Promise<string> {
+  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined, ragEnabled })
 }

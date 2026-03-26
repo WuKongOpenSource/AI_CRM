@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * WeKnora REST 客户端
@@ -45,6 +46,7 @@ public class WeKnoraClient {
     private final ObjectMapper objectMapper;
     private final CrmTenantMapper crmTenantMapper;
     private final ConcurrentHashMap<Long, Object> tenantLocks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> conversationSessionCache = new ConcurrentHashMap<>();
 
     @Autowired
     public WeKnoraClient(WeKnoraConfig config, CrmTenantMapper crmTenantMapper) {
@@ -94,6 +96,13 @@ public class WeKnoraClient {
         private final String id;
         private final String name;
         private final String type;
+    }
+
+    @Data
+    public static class WeKnoraChatResult {
+        private final String answer;
+        private final List<WeKnoraChunk> references;
+        private final boolean completed;
     }
 
     /**
@@ -734,10 +743,23 @@ public class WeKnoraClient {
                             root.get("data"), new TypeReference<List<WeKnoraChunk>>() {});
                     double threshold = config.getSearch().getVectorThreshold();
                     int maxCount = config.getSearch().getMatchCount();
-                    return chunks.stream()
+                    List<WeKnoraChunk> filteredChunks = chunks.stream()
                             .filter(c -> c.getScore() == null || c.getScore() >= threshold)
                             .limit(maxCount)
                             .toList();
+
+                    if (!filteredChunks.isEmpty()) {
+                        return filteredChunks;
+                    }
+
+                    if (!chunks.isEmpty()) {
+                        log.warn("RAG 检索结果被阈值全部过滤，回退为 Top{} 原始结果: threshold={}, query={}",
+                                maxCount, threshold, query);
+                        return chunks.stream()
+                                .limit(maxCount)
+                                .toList();
+                    }
+                    return Collections.emptyList();
                 }
             }
             log.warn("WeKnora 搜索返回空结果: {}", response.getBody());
@@ -746,6 +768,49 @@ public class WeKnoraClient {
             log.error("WeKnora 搜索异常: {}", e.getMessage(), e);
             return Collections.emptyList();
         }
+    }
+
+    public WeKnoraChatResult askKnowledgeQuestion(Long tenantId, Long conversationId, String query) {
+        return askKnowledgeQuestion(tenantId, conversationId, query, Collections.emptyList());
+    }
+
+    public WeKnoraChatResult askKnowledgeQuestion(Long tenantId, Long conversationId,
+                                                  String query, List<String> knowledgeIds) {
+        if (!isEnabled() || StrUtil.isBlank(query)) {
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+
+        TenantWeKnoraContext ctx = getOrCreateTenantContext(tenantId);
+        String sessionId = getOrCreateConversationSession(tenantId, conversationId, ctx);
+        boolean useAgentChat = knowledgeIds != null && !knowledgeIds.isEmpty();
+        log.debug("RAG问答请求开始: tenantId={}, conversationId={}, sessionId={}, kbId={}, useAgentChat={}, knowledgeIds={}, query={}",
+                tenantId, conversationId, sessionId, ctx.getKnowledgeBaseId(),
+                useAgentChat, knowledgeIds, abbreviateForLog(query));
+        try {
+            WeKnoraChatResult result = executeKnowledgeChat(ctx, sessionId, query, knowledgeIds, useAgentChat);
+            if (useAgentChat && isUnavailableChatResult(result)) {
+                log.warn("WeKnora 定向知识问答未返回可用结果，降级为通用知识库问答: tenantId={}, sessionId={}",
+                        tenantId, sessionId);
+                result = executeKnowledgeChat(ctx, sessionId, query, Collections.emptyList(), false);
+            }
+            log.debug("RAG问答请求完成: tenantId={}, conversationId={}, sessionId={}, answerLength={}, references={}, completed={}",
+                    tenantId, conversationId, sessionId,
+                    result.getAnswer() != null ? result.getAnswer().length() : 0,
+                    result.getReferences() != null ? result.getReferences().size() : 0,
+                    result.isCompleted());
+            return result;
+        } catch (Exception e) {
+            log.error("WeKnora 问答异常: tenantId={}, sessionId={}, error={}",
+                    tenantId, sessionId, e.getMessage(), e);
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+    }
+
+    public void clearConversationSession(Long tenantId, Long conversationId) {
+        if (tenantId == null || conversationId == null) {
+            return;
+        }
+        conversationSessionCache.remove(buildConversationSessionKey(tenantId, conversationId));
     }
 
     public List<WeKnoraChunk> hybridSearch(String query, String knowledgeBaseId, String tenantApiKey) {
@@ -800,6 +865,217 @@ public class WeKnoraClient {
             log.error("WeKnora 获取知识详情异常: {}", e.getMessage(), e);
             return null;
         }
+    }
+
+    private String getOrCreateConversationSession(Long tenantId, Long conversationId, TenantWeKnoraContext ctx) {
+        String cacheKey = buildConversationSessionKey(tenantId, conversationId);
+        String cachedSessionId = conversationSessionCache.get(cacheKey);
+        if (StrUtil.isNotBlank(cachedSessionId)) {
+            log.debug("复用RAG会话: cacheKey={}, sessionId={}", cacheKey, cachedSessionId);
+            return cachedSessionId;
+        }
+
+        synchronized (conversationSessionCache) {
+            cachedSessionId = conversationSessionCache.get(cacheKey);
+            if (StrUtil.isNotBlank(cachedSessionId)) {
+                log.debug("复用RAG会话(并发命中缓存): cacheKey={}, sessionId={}", cacheKey, cachedSessionId);
+                return cachedSessionId;
+            }
+            String sessionId = createConversationSession(ctx.getKnowledgeBaseId(), ctx.getApiKey());
+            conversationSessionCache.put(cacheKey, sessionId);
+            log.debug("创建并缓存RAG会话: cacheKey={}, sessionId={}, kbId={}", cacheKey, sessionId, ctx.getKnowledgeBaseId());
+            return sessionId;
+        }
+    }
+
+    private String createConversationSession(String knowledgeBaseId, String tenantApiKey) {
+        String url = config.getBaseUrl() + "/sessions";
+
+        HttpHeaders headers = createHeaders(tenantApiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("knowledge_base_id", knowledgeBaseId);
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                JsonNode data = root.path("data");
+                String sessionId = data.path("id").asText(null);
+                if (StrUtil.isBlank(sessionId)) {
+                    sessionId = root.path("id").asText(null);
+                }
+                if (StrUtil.isNotBlank(sessionId)) {
+                    return sessionId;
+                }
+            }
+            throw new RuntimeException("WeKnora 创建会话失败: " + response.getBody());
+        } catch (Exception e) {
+            log.error("WeKnora 创建会话异常: {}", e.getMessage(), e);
+            throw new RuntimeException("WeKnora 创建会话失败: " + e.getMessage(), e);
+        }
+    }
+
+    private WeKnoraChatResult parseChatResult(String responseBody) {
+        if (StrUtil.isBlank(responseBody)) {
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+
+        String answer = "";
+        List<WeKnoraChunk> references = new ArrayList<>();
+        boolean completed = false;
+
+        try {
+            String trimmed = responseBody.trim();
+            if (trimmed.startsWith("{")) {
+                JsonNode root = objectMapper.readTree(trimmed);
+                answer = appendAnswer(answer, root);
+                references.addAll(extractReferences(root));
+                completed = root.path("done").asBoolean(false);
+            } else {
+                String[] events = responseBody.split("\\r?\\n\\r?\\n");
+                for (String event : events) {
+                    String payload = Arrays.stream(event.split("\\r?\\n"))
+                            .map(String::trim)
+                            .filter(line -> line.startsWith("data:"))
+                            .map(line -> line.substring(5).trim())
+                            .filter(StrUtil::isNotBlank)
+                            .collect(Collectors.joining("\n"));
+
+                    if (StrUtil.isBlank(payload) || "[DONE]".equalsIgnoreCase(payload)) {
+                        continue;
+                    }
+
+                    JsonNode node = objectMapper.readTree(payload);
+                    if ("error".equalsIgnoreCase(node.path("response_type").asText())) {
+                        throw new RuntimeException(node.path("content").asText("WeKnora 问答失败"));
+                    }
+
+                    answer = appendAnswer(answer, node);
+                    references.addAll(extractReferences(node));
+                    if (node.path("done").asBoolean(false)) {
+                        completed = true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("解析 WeKnora 问答结果失败: {}", e.getMessage());
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+
+        List<WeKnoraChunk> uniqueReferences = references.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(
+                                chunk -> String.format("%s:%s:%s",
+                                        StrUtil.blankToDefault(chunk.getKnowledgeId(), ""),
+                                        chunk.getChunkIndex(),
+                                        chunk.getStartAt()),
+                                chunk -> chunk,
+                                (left, right) -> left,
+                                LinkedHashMap::new),
+                        map -> new ArrayList<>(map.values())
+                ));
+
+        return new WeKnoraChatResult(answer.trim(), uniqueReferences, completed);
+    }
+
+    private WeKnoraChatResult executeKnowledgeChat(TenantWeKnoraContext ctx, String sessionId,
+                                                   String query, List<String> knowledgeIds,
+                                                   boolean useAgentChat) {
+        String url = config.getBaseUrl() + (useAgentChat ? "/agent-chat/" : "/knowledge-chat/") + sessionId;
+        log.debug("调用RAG问答接口: url={}, kbId={}, useAgentChat={}, knowledgeIds={}, query={}",
+                url, ctx.getKnowledgeBaseId(), useAgentChat, knowledgeIds, abbreviateForLog(query));
+
+        HttpHeaders headers = createHeaders(ctx.getApiKey());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON));
+
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("query", query);
+        if (useAgentChat) {
+            requestBody.put("knowledge_base_ids", List.of(ctx.getKnowledgeBaseId()));
+            requestBody.put("knowledge_ids", knowledgeIds);
+            requestBody.put("agent_enabled", false);
+            requestBody.put("web_search_enabled", false);
+        }
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw new RuntimeException("WeKnora 问答返回异常: " + response.getStatusCode());
+        }
+        return parseChatResult(response.getBody());
+    }
+
+    private boolean isUnavailableChatResult(WeKnoraChatResult result) {
+        if (result == null || StrUtil.isBlank(result.getAnswer())) {
+            return true;
+        }
+        return result.getAnswer().contains("NO_MATCH");
+    }
+
+    private String abbreviateForLog(String text) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        return normalized.length() > 120 ? normalized.substring(0, 120) + "..." : normalized;
+    }
+
+    private String appendAnswer(String currentAnswer, JsonNode node) {
+        if (node == null || node.isMissingNode()) {
+            return currentAnswer;
+        }
+
+        String responseType = node.path("response_type").asText("");
+        String content = node.path("content").asText("");
+
+        if (StrUtil.isBlank(content)) {
+            JsonNode data = node.path("data");
+            if (!data.isMissingNode()) {
+                content = data.path("content").asText("");
+                if (StrUtil.isBlank(content)) {
+                    content = data.path("answer").asText("");
+                }
+            }
+        }
+
+        if (StrUtil.isBlank(content)) {
+            return currentAnswer;
+        }
+
+        if (StrUtil.isBlank(responseType)
+                || "answer".equalsIgnoreCase(responseType)
+                || "final".equalsIgnoreCase(responseType)
+                || "message".equalsIgnoreCase(responseType)) {
+            return currentAnswer + content;
+        }
+        return currentAnswer;
+    }
+
+    private List<WeKnoraChunk> extractReferences(JsonNode node) {
+        if (node == null || node.isMissingNode()) {
+            return Collections.emptyList();
+        }
+
+        JsonNode referenceNode = node.get("knowledge_references");
+        if ((referenceNode == null || referenceNode.isMissingNode() || referenceNode.isNull())
+                && node.has("data")) {
+            referenceNode = node.path("data").get("knowledge_references");
+        }
+
+        if (referenceNode != null && referenceNode.isArray()) {
+            return objectMapper.convertValue(referenceNode, new TypeReference<List<WeKnoraChunk>>() {});
+        }
+        return Collections.emptyList();
+    }
+
+    private String buildConversationSessionKey(Long tenantId, Long conversationId) {
+        return tenantId + ":" + (conversationId != null ? conversationId : 0L);
     }
 
     private HttpHeaders createHeaders(String apiKey) {

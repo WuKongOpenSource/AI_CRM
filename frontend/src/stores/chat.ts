@@ -20,12 +20,15 @@ interface LocalMessage {
 }
 
 export const useChatStore = defineStore('chat', () => {
+  const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
+
   // State
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
   const messages = ref<LocalMessage[]>([])
   const isStreaming = ref(false)
   const loading = ref(false)
+  const ragEnabled = ref(loadRagEnabled())
 
   // Getters
   const currentSession = computed(() =>
@@ -77,7 +80,12 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessage(content: string, attachments?: ChatAttachmentDTO[], attachmentVOs?: ChatAttachmentVO[]): Promise<void> {
+  async function sendMessage(
+    content: string,
+    attachments?: ChatAttachmentDTO[],
+    attachmentVOs?: ChatAttachmentVO[],
+    useRag?: boolean
+  ): Promise<void> {
     if (!currentSessionId.value) {
       // Create new session if none exists
       await startNewSession('新对话')
@@ -136,7 +144,8 @@ export const useChatStore = defineStore('chat', () => {
             lastMessage.isStreaming = false
           }
         },
-        attachments
+        attachments,
+        useRag ?? ragEnabled.value
       )
     } catch (error) {
       // Error already handled by onError callback, but ensure message is marked as complete
@@ -152,7 +161,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessageWithSync(content: string): Promise<string> {
+  async function sendMessageWithSync(content: string, useRag?: boolean): Promise<string> {
     if (!currentSessionId.value) {
       await startNewSession('新对话')
     }
@@ -168,7 +177,7 @@ export const useChatStore = defineStore('chat', () => {
 
     loading.value = true
     try {
-      const response = await sendMessageSync(currentSessionId.value!, content)
+      const response = await sendMessageSync(currentSessionId.value!, content, undefined, useRag ?? ragEnabled.value)
 
       const assistantMessage: LocalMessage = {
         id: (Date.now() + 1).toString(),
@@ -189,6 +198,23 @@ export const useChatStore = defineStore('chat', () => {
     currentSessionId.value = null
   }
 
+  function setRagEnabled(value: boolean) {
+    ragEnabled.value = value
+    try {
+      localStorage.setItem(RAG_ENABLED_STORAGE_KEY, value ? '1' : '0')
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function loadRagEnabled(): boolean {
+    try {
+      return localStorage.getItem(RAG_ENABLED_STORAGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  }
+
   return {
     // State
     sessions,
@@ -196,6 +222,7 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     isStreaming,
     loading,
+    ragEnabled,
     // Getters
     currentSession,
     // Actions
@@ -205,6 +232,7 @@ export const useChatStore = defineStore('chat', () => {
     removeSession,
     sendMessage,
     sendMessageWithSync,
-    clearMessages
+    clearMessages,
+    setRagEnabled
   }
 })

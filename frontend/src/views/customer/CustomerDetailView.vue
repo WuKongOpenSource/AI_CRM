@@ -348,6 +348,14 @@
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.website || '-' }}</p>
                 </div>
                 <div>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">报价金额</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatAmount(customer.quotation) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">备注</p>
+                  <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2 whitespace-pre-wrap break-words">{{ customer.remark || '暂无备注' }}</p>
+                </div>
+                <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
                   <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
                 </div>
@@ -1423,6 +1431,16 @@ function formatDate(dateStr: string): string {
 
 function formatDateTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+function formatAmount(value?: number | null): string {
+  if (value === null || value === undefined) return '-'
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return '-'
+  return `¥ ${amount.toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  })}`
 }
 
 function formatCustomFieldValue(field: CustomField, value: any): string {

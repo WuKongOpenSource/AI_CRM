@@ -25,6 +25,9 @@ public class ChatSendBO {
     @Schema(description = "附件列表")
     private List<AttachmentDTO> attachments;
 
+    @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
+    private Boolean ragEnabled;
+
     @Data
     @Schema(description = "附件信息")
     public static class AttachmentDTO {

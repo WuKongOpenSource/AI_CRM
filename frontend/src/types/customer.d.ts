@@ -92,8 +92,11 @@ export interface CustomerAddBO {
   level?: CustomerLevel
   phone?: string
   email?: string
+  source?: string
   website?: string
   address?: string
+  quotation?: number | null
+  remark?: string
   description?: string
   // Primary contact
   contactName?: string

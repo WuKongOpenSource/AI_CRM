@@ -392,6 +392,23 @@
                   />
                   <div class="flex items-center gap-2 pr-1">
                     <button
+                      type="button"
+                      class="h-10 rounded-full border px-3.5 text-sm font-semibold shadow-sm transition-all"
+                      :class="chatStore.ragEnabled
+                        ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+                      :aria-pressed="chatStore.ragEnabled"
+                      :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
+                      @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
+                    >
+                      <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] leading-none">
+                          menu_book
+                        </span>
+                        <span>知识库检索</span>
+                      </span>
+                    </button>
+                    <button
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
                       :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
                       @click="handleSend"
@@ -887,7 +904,7 @@ async function handleSend() {
 
   // Switch to chat view when sending
   currentView.value = 'chat'
-  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs)
+  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
 }
 
 function sendQuickMessage(text: string) {

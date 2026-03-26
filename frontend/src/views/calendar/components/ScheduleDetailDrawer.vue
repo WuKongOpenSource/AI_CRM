@@ -45,7 +45,7 @@
           <div class="flex items-center gap-1">
             <span class="material-symbols-outlined text-sm">schedule</span>
             {{ formatDateTime(schedule.startTime) }}
-            <template v-if="schedule.endTime"> ~ {{ formatTime(schedule.endTime) }}</template>
+            <template v-if="schedule.endTime"> ~ {{ formatEndDateTime(schedule.startTime, schedule.endTime) }}</template>
           </div>
           <div v-if="schedule.location" class="flex items-center gap-1">
             <span class="material-symbols-outlined text-sm">location_on</span>
@@ -161,6 +161,19 @@ function formatDateTime(dateStr: string): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatEndDateTime(startDateStr: string, endDateStr: string): string {
+  if (!endDateStr) return ''
+  if (!startDateStr) return formatDateTime(endDateStr)
+
+  const startDate = new Date(startDateStr)
+  const endDate = new Date(endDateStr)
+  const isSameDay = startDate.getFullYear() === endDate.getFullYear()
+    && startDate.getMonth() === endDate.getMonth()
+    && startDate.getDate() === endDate.getDate()
+
+  return isSameDay ? formatTime(endDateStr) : formatDateTime(endDateStr)
 }
 
 async function handleGoToCustomerDetail() {

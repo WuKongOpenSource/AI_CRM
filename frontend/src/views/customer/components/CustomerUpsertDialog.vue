@@ -121,6 +121,54 @@
                         <el-option label="已流失" value="lost" />
                       </el-select>
                     </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">来源</label>
+                      <el-input
+                        v-model="formData.source"
+                        placeholder="例如：官网咨询 / 展会 / 朋友介绍"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">网站</label>
+                      <el-input
+                        v-model="formData.website"
+                        placeholder="例如：https://example.com"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">报价金额</label>
+                      <el-input
+                        v-model.number="formData.quotation"
+                        type="number"
+                        placeholder="请输入报价金额"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="md:col-span-2 space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">地址</label>
+                      <el-input
+                        v-model="formData.address"
+                        type="textarea"
+                        :autosize="{ minRows: 2, maxRows: 4 }"
+                        placeholder="请输入客户地址"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="md:col-span-2 space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">备注</label>
+                      <el-input
+                        v-model="formData.remark"
+                        type="textarea"
+                        :autosize="{ minRows: 2, maxRows: 5 }"
+                        placeholder="补充说明客户背景、需求、报价说明等"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
 
                     <DynamicFieldForm
                       ref="dynamicFieldFormRef"
@@ -229,8 +277,11 @@ const formData = reactive<CustomerAddBO>({
   industry: '',
   level: 'B',
   stage: 'lead',
+  source: '',
   website: '',
   address: '',
+  quotation: undefined,
+  remark: '',
   description: '',
   contactName: '',
   contactPhone: '',
@@ -262,8 +313,11 @@ function hydrateFromCustomer() {
     industry: c?.industry || '',
     level: (c?.level || 'B') as CustomerLevel,
     stage: (c?.stage || 'lead') as CustomerStage,
+    source: (c?.source || '') as any,
     website: (c?.website || '') as any,
     address: (c?.address || '') as any,
+    quotation: (c?.quotation ?? undefined) as any,
+    remark: ((c as any)?.remark || '') as any,
     description: (c?.description || '') as any
   })
   const pc = getPrimaryContactFromCustomer(c)
@@ -279,8 +333,11 @@ function resetAll() {
     industry: '',
     level: 'B',
     stage: 'lead',
+    source: '',
     website: '',
     address: '',
+    quotation: undefined,
+    remark: '',
     description: '',
     contactName: '',
     contactPhone: '',
@@ -358,6 +415,8 @@ async function handleAiExtract() {
     if (result.industry) formData.industry = result.industry
     if (result.level && ['A', 'B', 'C'].includes(result.level)) formData.level = result.level as CustomerLevel
     if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost'].includes(result.stage)) formData.stage = result.stage as CustomerStage
+    if (result.source) formData.source = result.source
+    if (result.remark) formData.remark = result.remark
     if (result.contactName) formData.contactName = result.contactName
     if (result.contactPhone) formData.contactPhone = result.contactPhone
     if (result.contactEmail) formData.contactEmail = result.contactEmail
