@@ -555,27 +555,27 @@
 
                     <div class="h-px w-full bg-slate-100" />
 
-                    <div v-if="contact.phone || contact.email || contact.wechat" class="space-y-2">
-                      <div class="flex items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined text-[18px] leading-none text-slate-400">call</span>
-                        <span :class="contact.phone ? 'font-mono text-xs font-medium tracking-tight text-slate-700' : 'text-xs text-slate-400'">
-                          {{ contact.phone || '未填写电话号码' }}
-                        </span>
+                    <div class="space-y-2">
+                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
+                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">call</span>
+                        <span
+                          :class="contact.phone ? 'font-mono text-xs font-medium tracking-tight text-slate-700' : 'text-xs font-medium text-slate-400'"
+                        >{{ contact.phone || '未填写' }}</span>
                       </div>
-                      <div v-if="contact.email" class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined text-[18px] leading-none text-slate-400">mail</span>
-                        <span class="min-w-0 truncate text-xs font-medium tracking-tight text-slate-700">{{ contact.email }}</span>
+                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
+                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">mail</span>
+                        <span
+                          class="min-w-0 truncate text-xs font-medium tracking-tight"
+                          :class="contact.email ? 'text-slate-700' : 'text-slate-400'"
+                        >{{ contact.email || '未填写' }}</span>
                       </div>
-                      <div v-if="contact.wechat" class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
-                        <span class="material-symbols-outlined text-[18px] leading-none text-slate-400">chat</span>
-                        <span class="min-w-0 truncate text-xs font-medium tracking-tight text-slate-700">{{ contact.wechat }}</span>
+                      <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
+                        <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">chat</span>
+                        <span
+                          class="min-w-0 truncate text-xs font-medium tracking-tight"
+                          :class="contact.wechat ? 'text-slate-700' : 'text-slate-400'"
+                        >{{ contact.wechat ? `WeChat: ${contact.wechat}` : '未填写' }}</span>
                       </div>
-                    </div>
-                    <div
-                      v-else
-                      class="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-400"
-                    >
-                      暂未完善联系方式
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2 pt-1" @click.stop>
