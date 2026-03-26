@@ -520,50 +520,90 @@
                 </button>
               </div>
               <div class="space-y-4">
-                <div v-if="contacts.length === 0" class="py-4 text-center">
-                  <p class="text-xs text-slate-400">暂无联系人</p>
+                <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-8 text-center">
+                  <span class="material-symbols-outlined text-3xl leading-none text-slate-200">person_off</span>
+                  <p class="mt-2 text-xs font-medium text-slate-400">暂无关联联系人</p>
                 </div>
                 <div
                   v-for="contact in contacts"
                   :key="contact.contactId"
-                  class="p-3 bg-white border border-slate-100 rounded-xl group hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer"
+                  class="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/70"
                   @click="handleViewContact(contact)"
                 >
-                  <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-2">
-                      <div class="size-8 rounded-lg bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        {{ contact.name?.charAt(0) }}
+                  <div class="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-slate-50 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                  <div class="relative flex flex-col gap-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0 flex flex-1 items-center gap-3">
+                        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-600 transition-colors group-hover:border-primary/20 group-hover:bg-primary/10 group-hover:text-primary">
+                          {{ contact.name?.trim()?.charAt(0) || '?' }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-2">
+                            <h5 class="truncate text-sm font-bold leading-tight text-slate-900">{{ contact.name }}</h5>
+                          </div>
+                          <p class="mt-0.5 truncate text-[11px] font-medium text-slate-500">{{ contact.position || '--' }}</p>
+                        </div>
                       </div>
-                      <div>
-                        <h5 class="text-xs font-bold text-slate-900 truncate max-w-[120px]">{{ contact.name }}</h5>
-                        <p class="text-xs text-slate-400 truncate max-w-[120px]">{{ contact.position || '联系人' }}</p>
+                      <span
+                        v-if="contact.isPrimary"
+                        class="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary"
+                      >
+                        <span class="material-symbols-outlined text-[12px] leading-none">stars</span>
+                        主要联系人
+                      </span>
+                    </div>
+
+                    <div class="h-px w-full bg-slate-100" />
+
+                    <div v-if="contact.phone || contact.email || contact.wechat" class="space-y-2">
+                      <div class="flex items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
+                        <span class="material-symbols-outlined text-[18px] leading-none text-slate-400">call</span>
+                        <span :class="contact.phone ? 'font-mono text-xs font-medium tracking-tight text-slate-700' : 'text-xs text-slate-400'">
+                          {{ contact.phone || '未填写电话号码' }}
+                        </span>
+                      </div>
+                      <div v-if="contact.email" class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
+                        <span class="material-symbols-outlined text-[18px] leading-none text-slate-400">mail</span>
+                        <span class="min-w-0 truncate text-xs font-medium tracking-tight text-slate-700">{{ contact.email }}</span>
+                      </div>
+                      <div v-if="contact.wechat" class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
+                        <span class="material-symbols-outlined text-[18px] leading-none text-slate-400">chat</span>
+                        <span class="min-w-0 truncate text-xs font-medium tracking-tight text-slate-700">{{ contact.wechat }}</span>
                       </div>
                     </div>
-                    <span v-if="contact.isPrimary" class="px-1.5 py-0.5 bg-primary/10 text-primary text-xs font-black rounded uppercase">主要</span>
-                  </div>
-                  <div class="flex items-center gap-3 text-xs text-slate-500">
-                    <div v-if="contact.phone" class="flex items-center gap-1">
-                      <span class="material-symbols-outlined text-xs">call</span>
-                      <span class="font-mono">{{ contact.phone }}</span>
-                    </div>
-                    <div v-if="contact.email" class="flex items-center gap-1">
-                      <span class="material-symbols-outlined text-xs">mail</span>
-                      <span class="truncate max-w-[80px]">{{ contact.email }}</span>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-50" @click.stop>
-                    <button v-if="canEditContacts" class="text-xs font-bold text-primary hover:underline" @click="handleEditContact(contact)">编辑</button>
-                    <span v-if="canEditContacts && (!contact.isPrimary || canDeleteContacts)" class="text-slate-200">|</span>
-                    <button v-if="!contact.isPrimary && canSetPrimaryContacts" class="text-xs font-bold text-primary hover:text-primary/80 hover:underline" @click="handleSetPrimary(contact.contactId)">设为主要</button>
-                    <span v-if="!contact.isPrimary && canSetPrimaryContacts && canDeleteContacts" class="text-slate-200">|</span>
-                    <button
-                      v-if="canDeleteContacts"
-                      type="button"
-                      class="text-xs font-bold text-red-400 hover:text-red-500"
-                      @click="confirmDeleteContact(contact.contactId)"
+                    <div
+                      v-else
+                      class="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-400"
                     >
-                      删除
-                    </button>
+                      暂未完善联系方式
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 pt-1" @click.stop>
+                      <button
+                        v-if="canEditContacts"
+                        type="button"
+                        class="inline-flex items-center rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-primary/20 hover:bg-primary/5 hover:text-primary"
+                        @click="handleEditContact(contact)"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        v-if="!contact.isPrimary && canSetPrimaryContacts"
+                        type="button"
+                        class="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100"
+                        @click="handleSetPrimary(contact.contactId)"
+                      >
+                        设为主要
+                      </button>
+                      <button
+                        v-if="canDeleteContacts"
+                        type="button"
+                        class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-100"
+                        @click="confirmDeleteContact(contact.contactId)"
+                      >
+                        删除
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div v-if="contactTotal > contactPageSize" class="pt-2 flex justify-center">

@@ -144,11 +144,11 @@
       <!-- AI Quota -->
       <div class="p-4 border-t border-slate-100">
         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
-          <div class="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 额度</p>
-              <p class="mt-1 text-sm font-semibold text-slate-900">{{ aiQuotaModeLabel }}</p>
-            </div>
+          <div
+            class="flex items-start justify-between gap-3"
+            :class="currentAiMode === 'gift' ? 'mb-3' : 'mb-4'"
+          >
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 额度</p>
             <span
               class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold"
               :class="aiStatusBadgeClass"
@@ -157,19 +157,22 @@
             </span>
           </div>
 
-          <div class="mb-1 flex items-end gap-1">
-            <span class="text-2xl font-bold leading-none text-slate-900">{{ giftTokenRemainingWan }}</span>
-            <span class="pb-0.5 text-xs text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
-          </div>
-          <p class="mb-3 text-xs text-slate-500">{{ aiQuotaDescription }}</p>
-
-          <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-              class="h-full rounded-full transition-all"
-              :class="giftTokenProgressClass"
-              :style="{ width: `${giftTokenProgressPercent}%` }"
-            />
-          </div>
+          <template v-if="currentAiMode === 'gift'">
+            <div class="mb-1 flex flex-wrap items-baseline gap-1">
+              <span class="text-xs font-semibold tabular-nums text-slate-900">{{ giftTokenRemainingWan }}</span>
+              <span class="text-xs font-medium text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
+            </div>
+            <p v-if="giftTokenRemaining <= 0" class="mb-3 text-xs text-slate-500">
+              赠送额度已用完，可配置 AI Key 后继续使用。
+            </p>
+            <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                class="h-full rounded-full transition-all"
+                :class="giftTokenProgressClass"
+                :style="{ width: `${giftTokenProgressPercent}%` }"
+              />
+            </div>
+          </template>
 
           <div class="mb-4 flex gap-2">
             <button
@@ -661,12 +664,11 @@ const giftTokenProgressPercent = computed(() => {
 })
 const giftTokenRemainingWan = computed(() => formatWanToken(giftTokenRemaining.value))
 const giftTokenTotalWan = computed(() => formatWanToken(giftTokenTotal.value))
-const aiQuotaModeLabel = computed(() => currentAiMode.value === 'gift' ? '默认赠送额度' : '自定义模型')
 const aiStatusBadgeText = computed(() => {
   if (currentAiMode.value === 'gift') {
-    return giftTokenRemaining.value > 0 ? '赠送中' : '已用完'
+    return giftTokenRemaining.value > 0 ? '赠送额度' : '已用完'
   }
-  return aiReady.value ? '已就绪' : '待配置'
+  return aiReady.value ? '自定义模型已就绪' : '待配置'
 })
 const aiStatusBadgeClass = computed(() => {
   if (currentAiMode.value === 'gift') {
@@ -681,14 +683,6 @@ const aiStatusBadgeClass = computed(() => {
 const giftTokenProgressClass = computed(() => {
   if (giftTokenRemaining.value <= 0) return 'bg-amber-400'
   return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
-})
-const aiQuotaDescription = computed(() => {
-  if (currentAiMode.value === 'gift') {
-    return giftTokenRemaining.value > 0
-      ? '未配置自定义模型时，默认使用平台赠送 token。'
-      : '赠送额度已用完，可配置 AI Key 后继续使用。'
-  }
-  return '当前使用租户自定义模型，仍会继续统计 token 用量。'
 })
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())

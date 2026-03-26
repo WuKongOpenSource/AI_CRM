@@ -223,7 +223,7 @@
                 >
                   <template #tip>
                     <p class="text-xs text-slate-600 leading-relaxed">
-                      您可以直接粘贴该客户的 LinkedIn 简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
+                      您可以直接粘贴该客户的简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
                     </p>
                   </template>
                 </AiParseInsightSidebar>
