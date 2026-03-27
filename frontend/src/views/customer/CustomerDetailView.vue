@@ -515,9 +515,26 @@
                   关联联系人
                   <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
                 </h4>
-                <button v-if="canCreateContacts" class="size-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all" @click="handleAddContact">
-                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
-                </button>
+                <div v-if="canCreateContacts" class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
+                    title="名片上传"
+                    aria-label="名片上传"
+                    @click="handleAddContactCardUpload"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">contact_page</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
+                    title="新建联系人"
+                    aria-label="新建联系人"
+                    @click="handleAddContact"
+                  >
+                    <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">person_add</span>
+                  </button>
+                </div>
               </div>
               <div class="space-y-4">
                 <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-8 text-center">
@@ -538,8 +555,25 @@
                           {{ contact.name?.trim()?.charAt(0) || '?' }}
                         </div>
                         <div class="min-w-0 flex-1">
-                          <div class="flex items-center gap-2">
-                            <h5 class="truncate text-sm font-bold leading-tight text-slate-900">{{ contact.name }}</h5>
+                          <div class="flex min-w-0 items-center gap-1.5">
+                            <h5 class="min-w-0 truncate text-sm font-bold leading-tight text-slate-900">{{ contact.name }}</h5>
+                            <el-tooltip
+                              v-if="!contact.isPrimary && canSetPrimaryContacts"
+                              content="设为主要联系人"
+                              placement="top"
+                            >
+                              <button
+                                type="button"
+                                class="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 transition-all hover:bg-amber-100 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+                                aria-label="设为主要联系人"
+                                @click.stop="handleSetPrimary(contact.contactId)"
+                              >
+                                <span
+                                  class="material-symbols-outlined text-[18px] leading-none"
+                                  style="font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24"
+                                >star</span>
+                              </button>
+                            </el-tooltip>
                           </div>
                           <p class="mt-0.5 truncate text-[11px] font-medium text-slate-500">{{ contact.position || '--' }}</p>
                         </div>
@@ -560,49 +594,22 @@
                         <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">call</span>
                         <span
                           :class="contact.phone ? 'font-mono text-xs font-medium tracking-tight text-slate-700' : 'text-xs font-medium text-slate-400'"
-                        >{{ contact.phone || '未填写' }}</span>
+                        >{{ contact.phone || '--' }}</span>
                       </div>
                       <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
                         <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">mail</span>
                         <span
                           class="min-w-0 truncate text-xs font-medium tracking-tight"
                           :class="contact.email ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.email || '未填写' }}</span>
+                        >{{ contact.email || '--' }}</span>
                       </div>
                       <div class="flex min-w-0 items-center gap-3 text-slate-600 transition-colors group-hover:text-slate-700">
                         <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-slate-400">chat</span>
                         <span
                           class="min-w-0 truncate text-xs font-medium tracking-tight"
                           :class="contact.wechat ? 'text-slate-700' : 'text-slate-400'"
-                        >{{ contact.wechat ? `WeChat: ${contact.wechat}` : '未填写' }}</span>
+                        >{{ contact.wechat ? `WeChat: ${contact.wechat}` : '--' }}</span>
                       </div>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-2 pt-1" @click.stop>
-                      <button
-                        v-if="canEditContacts"
-                        type="button"
-                        class="inline-flex items-center rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-primary/20 hover:bg-primary/5 hover:text-primary"
-                        @click="handleEditContact(contact)"
-                      >
-                        编辑
-                      </button>
-                      <button
-                        v-if="!contact.isPrimary && canSetPrimaryContacts"
-                        type="button"
-                        class="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100"
-                        @click="handleSetPrimary(contact.contactId)"
-                      >
-                        设为主要
-                      </button>
-                      <button
-                        v-if="canDeleteContacts"
-                        type="button"
-                        class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-600 transition-colors hover:border-rose-300 hover:bg-rose-100"
-                        @click="confirmDeleteContact(contact.contactId)"
-                      >
-                        删除
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -737,15 +744,13 @@
       :customer-id="customer?.customerId || ''"
       :contact="editingContact"
       :existing-primary-contact="primaryContact"
+      :auto-open-ai-image-picker-token="contactAiImagePickerToken"
       @success="handleContactUpsertSuccess"
     />
 
     <ContactDetailDrawer
       v-model="showContactDetail"
       :contact="currentContact"
-      :can-edit="canEditContacts"
-      :can-delete="canDeleteContacts"
-      :can-set-primary="canSetPrimaryContacts"
       @edit="handleEditContact"
       @delete="handleDeleteContact"
       @set-primary="handleSetPrimary"
@@ -802,6 +807,7 @@ const showAddContactDialog = ref(false)
 const showContactDetail = ref(false)
 const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
+const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showAiFollowUpDrawer = ref(false)
 const showTerminalStageMenu = ref(false)
@@ -1182,6 +1188,15 @@ function handleAddContact() {
   }
 }
 
+function handleAddContactCardUpload() {
+  if (!canCreateContacts.value) return
+  if (customer.value) {
+    editingContact.value = null
+    contactAiImagePickerToken.value += 1
+    showAddContactDialog.value = true
+  }
+}
+
 function handleViewContact(contact: Contact) {
   if (!canViewContacts.value) return
   currentContact.value = contact
@@ -1201,20 +1216,20 @@ async function handleContactUpsertSuccess(payload: { mode: 'create' | 'edit' }) 
   })
 }
 
-async function confirmDeleteContact(contactId: string) {
-  if (!canDeleteContacts.value) return
-  try {
-    await ElMessageBox.confirm('确定删除该联系人吗？', '提示', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      confirmButtonClass: 'el-button--danger'
-    })
-  } catch {
-    return
-  }
-  await handleDeleteContact(contactId)
-}
+// async function confirmDeleteContact(contactId: string) {
+//   if (!canDeleteContacts.value) return
+//   try {
+//     await ElMessageBox.confirm('确定删除该联系人吗？', '提示', {
+//       type: 'warning',
+//       confirmButtonText: '删除',
+//       cancelButtonText: '取消',
+//       confirmButtonClass: 'el-button--danger'
+//     })
+//   } catch {
+//     return
+//   }
+//   await handleDeleteContact(contactId)
+// }
 
 async function handleDeleteContact(contactId: string) {
   if (!canDeleteContacts.value) return

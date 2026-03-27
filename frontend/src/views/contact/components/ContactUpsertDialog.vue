@@ -52,6 +52,14 @@
 
           <div class="flex-1 overflow-y-auto p-4 sm:p-6">
             <div class="space-y-5">
+              <input
+                ref="aiImageInputRef"
+                type="file"
+                class="hidden"
+                accept="image/*"
+                @change="handleAiImageChange"
+              />
+
               <AiSmartEntrySection
                 v-if="!isEdit"
                 v-model="aiInputText"
@@ -162,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { addContact, updateContact } from '@/api/contact'
@@ -179,10 +187,12 @@ const props = withDefaults(
     customerId: string
     contact?: Contact | null
     existingPrimaryContact?: Contact | null
+    autoOpenAiImagePickerToken?: number
   }>(),
   {
     contact: null,
-    existingPrimaryContact: null
+    existingPrimaryContact: null,
+    autoOpenAiImagePickerToken: 0
   }
 )
 
@@ -215,6 +225,18 @@ const aiParsing = ref(false)
 const aiParseResult = ref<CustomerAiParseVO | null>(null)
 const aiImageFile = ref<File | null>(null)
 const aiImagePreview = ref<string | null>(null)
+const aiImageInputRef = ref<HTMLInputElement | null>(null)
+const lastHandledAiImagePickerToken = ref(0)
+
+function applyAiImageFile(file: File) {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  removeAiImage()
+  aiImageFile.value = file
+  aiImagePreview.value = URL.createObjectURL(file)
+}
 
 function removeAiImage() {
   if (aiImagePreview.value) URL.revokeObjectURL(aiImagePreview.value)
@@ -236,11 +258,27 @@ function handleAiPaste(e: ClipboardEvent) {
     if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
       const file = items[i].getAsFile()
       if (file) {
-        aiImageFile.value = file
-        aiImagePreview.value = URL.createObjectURL(file)
+        applyAiImageFile(file)
+        break
       }
     }
   }
+}
+
+function handleAiImageChange(event: Event) {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (file) {
+    applyAiImageFile(file)
+  }
+  if (input) {
+    input.value = ''
+  }
+}
+
+async function openAiImagePicker() {
+  await nextTick()
+  aiImageInputRef.value?.click()
 }
 
 async function handleAiExtract() {
@@ -323,6 +361,17 @@ watch(
     }
 
     resetForm()
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [props.modelValue, props.autoOpenAiImagePickerToken, props.contact?.contactId] as const,
+  ([visible, token, contactId]) => {
+    if (!visible || token <= 0 || contactId) return
+    if (token === lastHandledAiImagePickerToken.value) return
+    lastHandledAiImagePickerToken.value = token
+    void openAiImagePicker()
   },
   { immediate: true }
 )

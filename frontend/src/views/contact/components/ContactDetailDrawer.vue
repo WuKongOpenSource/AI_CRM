@@ -267,6 +267,7 @@
 import { computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
+import { useUserStore } from '@/stores/user'
 import type { Contact } from '@/types/customer'
 import WkIcon from '@/components/common/WkIcon.vue'
 
@@ -274,17 +275,16 @@ const props = withDefaults(
   defineProps<{
     modelValue: boolean
     contact?: Contact | null
-    canEdit?: boolean
-    canDelete?: boolean
-    canSetPrimary?: boolean
   }>(),
   {
-    contact: null,
-    canEdit: false,
-    canDelete: false,
-    canSetPrimary: false
+    contact: null
   }
 )
+
+const userStore = useUserStore()
+const canEdit = computed(() => userStore.hasPermission('contact:edit'))
+const canDelete = computed(() => userStore.hasPermission('contact:delete'))
+const canSetPrimary = computed(() => userStore.hasPermission('contact:set_primary'))
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
