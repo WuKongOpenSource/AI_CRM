@@ -281,7 +281,31 @@
                 min-width="140"
               >
                 <template #default="{ row }">
-                  <span class="text-sm text-slate-600 whitespace-nowrap">{{ row.customFields?.[field.fieldName] ?? '-' }}</span>
+                  <template v-if="field.fieldType === 'checkbox'">
+                    <span
+                      v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
+                      :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-slate-600'"
+                    >
+                      <span
+                        class="size-1.5 rounded-full"
+                        :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-400'"
+                      ></span>
+                      {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
+                    </span>
+                    <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                  </template>
+                  <span
+                    v-else
+                    class="block text-sm text-slate-600 truncate"
+                    :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
+                  >
+                    {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
+                  </span>
                 </template>
               </el-table-column>
 
@@ -404,6 +428,7 @@ import CustomerImportDialog from '@/views/customer/components/CustomerImportDial
 import CustomerInsightSidebar from '@/views/customer/components/CustomerInsightSidebar.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
 
 const router = useRouter()
 const route = useRoute()

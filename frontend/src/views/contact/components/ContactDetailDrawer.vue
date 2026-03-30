@@ -212,13 +212,66 @@
 
             <!-- Notes -->
             <div class="space-y-4 border-t border-slate-100 pt-4">
-              <div class="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+              <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                 <p class="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   备注
                 </p>
-                <p class="text-xs font-medium leading-relaxed text-slate-600">
+                <p class="text-sm font-medium leading-relaxed text-slate-700">
                   {{ contact.notes || '—' }}
                 </p>
+              </div>
+            </div>
+
+            <div
+              v-if="contactCustomFieldItems.length"
+              class="space-y-4"
+            >
+              <div v-if="false" class="flex items-center gap-3">
+                <div
+                  class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400 shadow-sm"
+                >
+                  <span class="material-symbols-outlined text-xl leading-none">tune</span>
+                </div>
+                <div>
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    自定义字段
+                  </p>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <div
+                  v-for="field in contactCustomFieldItems"
+                  :key="field.fieldId"
+                  class="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {{ field.fieldLabel }}
+                  </p>
+                  <div class="mt-2">
+                    <span
+                      v-if="field.fieldType === 'checkbox' && field.checkboxState !== null"
+                      class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+                      :class="field.checkboxState
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-slate-600'"
+                    >
+                      <span
+                        class="size-1.5 rounded-full"
+                        :class="field.checkboxState
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-400'"
+                      ></span>
+                      {{ field.checkboxState ? '开启' : '关闭' }}
+                    </span>
+                    <p
+                      v-else
+                      class="break-words text-sm font-bold leading-relaxed text-slate-900"
+                    >
+                      {{ field.displayValue }}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -264,12 +317,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getEnabledFieldsByEntity } from '@/api/customField'
 import { useResponsive } from '@/composables/useResponsive'
 import { useUserStore } from '@/stores/user'
+import type { CustomField } from '@/types/customField'
 import type { Contact } from '@/types/customer'
 import WkIcon from '@/components/common/WkIcon.vue'
+import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
 
 const props = withDefaults(
   defineProps<{
@@ -285,6 +341,8 @@ const userStore = useUserStore()
 const canEdit = computed(() => userStore.hasPermission('contact:edit'))
 const canDelete = computed(() => userStore.hasPermission('contact:delete'))
 const canSetPrimary = computed(() => userStore.hasPermission('contact:set_primary'))
+const contactCustomFields = ref<CustomField[]>([])
+const contactCustomFieldsLoaded = ref(false)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
@@ -304,6 +362,19 @@ const displayInitial = computed(() => {
   const n = props.contact?.name?.trim()
   if (!n) return '?'
   return n.charAt(0)
+})
+
+const contactCustomFieldItems = computed(() => {
+  const values = props.contact?.customFields || {}
+
+  return contactCustomFields.value.map(field => {
+    const rawValue = values[field.fieldName]
+    return {
+      ...field,
+      displayValue: formatCustomFieldValue(field, rawValue),
+      checkboxState: field.fieldType === 'checkbox' ? getCustomFieldCheckboxState(rawValue) : null
+    }
+  })
 })
 
 function closeDrawer() {
@@ -346,6 +417,16 @@ function formatDateTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+async function ensureContactCustomFieldsLoaded() {
+  if (contactCustomFieldsLoaded.value) return
+  try {
+    contactCustomFields.value = await getEnabledFieldsByEntity('contact')
+    contactCustomFieldsLoaded.value = true
+  } catch {
+    contactCustomFields.value = []
+  }
+}
+
 async function copyText(text: string, successMsg: string) {
   try {
     await navigator.clipboard.writeText(text)
@@ -354,6 +435,14 @@ async function copyText(text: string, successMsg: string) {
     ElMessage.warning('复制失败，请手动复制')
   }
 }
+watch(
+  () => [props.modelValue, props.contact?.contactId] as const,
+  ([visible]) => {
+    if (!visible) return
+    void ensureContactCustomFieldsLoaded()
+  },
+  { immediate: true }
+)
 </script>
 
 <style>

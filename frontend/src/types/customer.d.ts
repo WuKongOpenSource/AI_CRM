@@ -211,6 +211,7 @@ export interface Contact {
   wechat?: string
   isPrimary: boolean
   notes?: string
+  customFields?: Record<string, any>
   createTime: string
 }
 

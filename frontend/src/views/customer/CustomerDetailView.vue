@@ -384,7 +384,7 @@
                 </div>
                 <div v-for="field in customFields" :key="field.fieldId">
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{{ field.fieldLabel }}</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldValue(field, customer.customFields?.[field.fieldName]) }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2">{{ formatCustomFieldDisplayValue(field, customer.customFields?.[field.fieldName]) }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">客户背景</p>
@@ -787,6 +787,7 @@ import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CustomerTag, FollowUp, Contact } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
+import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
@@ -1544,6 +1545,8 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
     default: return String(value)
   }
 }
+
+void formatCustomFieldValue
 </script>
 
 <style>
