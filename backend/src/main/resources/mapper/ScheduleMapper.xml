@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ScheduleMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.ScheduleVO">
+        SELECT
+            s.schedule_id,
+            s.title,
+            s.description,
+            s.start_time,
+            s.end_time,
+            s.type,
+            s.customer_id,
+            c.company_name AS customer_name,
+            s.contact_id,
+            ct.name AS contact_name,
+            s.location,
+            s.create_user_id,
+            u.realname AS create_user_name,
+            s.create_time
+        FROM crm_schedule s
+        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
+        LEFT JOIN manager_user u ON s.create_user_id = u.user_id
+        WHERE 1=1
+        <if test="query.customerId != null">
+            AND s.customer_id = #{query.customerId}
+        </if>
+        <if test="query.type != null and query.type != ''">
+            AND s.type = #{query.type}
+        </if>
+        <if test="query.startDate != null">
+            AND s.start_time &gt;= #{query.startDate}
+        </if>
+        <if test="query.endDate != null">
+            AND s.start_time &lt;= #{query.endDate}
+        </if>
+        ORDER BY s.start_time DESC
+    </select>
+
+    <select id="getMySchedules" resultType="com.kakarote.ai_crm.entity.VO.ScheduleVO">
+        SELECT
+            s.schedule_id,
+            s.title,
+            s.description,
+            s.start_time,
+            s.end_time,
+            s.type,
+            s.customer_id,
+            c.company_name AS customer_name,
+            s.contact_id,
+            ct.name AS contact_name,
+            s.location,
+            s.create_user_id,
+            u.realname AS create_user_name,
+            s.create_time
+        FROM crm_schedule s
+        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
+        LEFT JOIN manager_user u ON s.create_user_id = u.user_id
+        WHERE s.create_user_id = #{userId}
+        <if test="filter == 'today'">
+            AND DATE(s.start_time) = CURRENT_DATE
+        </if>
+        <if test="filter == 'thisWeek'">
+            AND s.start_time &gt;= #{today}
+            AND s.start_time &lt;= #{weekEnd}
+        </if>
+        ORDER BY s.start_time ASC
+    </select>
+
+</mapper>

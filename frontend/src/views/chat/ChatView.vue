@@ -62,7 +62,7 @@
               @click="handleSelectSession(session.sessionId)"
             >
               <span
-                class="text-sm font-semibold truncate"
+                class="text-sm font-semibold truncate block max-w-full"
                 :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
               >{{ session.title || '新对话' }}</span>
               <span class="text-[10px] text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
@@ -86,7 +86,7 @@
               @click="handleSelectSession(session.sessionId)"
             >
               <span
-                class="text-sm font-semibold truncate"
+                class="text-sm font-semibold truncate block max-w-full"
                 :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
               >{{ session.title || '新对话' }}</span>
               <span class="text-[10px] text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>
@@ -110,7 +110,7 @@
               @click="handleSelectSession(session.sessionId)"
             >
               <span
-                class="text-sm font-semibold truncate"
+                class="text-sm font-semibold truncate block max-w-full"
                 :class="currentView === 'chat' && chatStore.currentSessionId === session.sessionId ? 'text-primary' : 'text-slate-700'"
               >{{ session.title || '新对话' }}</span>
               <span class="text-[10px] text-slate-400 font-medium">{{ formatSessionTime(session.updateTime || session.createTime) }}</span>

@@ -22,6 +22,7 @@ import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     @Autowired
     private CustomerMapper customerMapper;
 
+    @Lazy
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
 

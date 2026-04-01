@@ -7,7 +7,7 @@
         <div class="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h2 class="text-2xl font-bold text-slate-900">智能日程安排</h2>
-            <p class="text-sm text-slate-500 mt-1">{{ currentDateStr }} • 今天有 {{ todayEventCount }} 场关键会议</p>
+            <p class="text-sm text-slate-500 mt-1">{{ currentDateStr }} • 今天有 {{ todayEventCount }} 个日程</p>
           </div>
           <div class="flex gap-3">
             <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
@@ -36,7 +36,7 @@
           <div
             v-for="day in weekDays"
             :key="day.label"
-            class="bg-white p-4 h-48"
+            class="bg-white p-4 min-h-48"
             :class="{ 'bg-primary/5': day.isToday }"
           >
             <div class="flex items-center justify-between mb-4">
@@ -48,15 +48,15 @@
                 :class="day.isToday ? 'bg-primary text-white' : 'text-slate-900'"
               >{{ day.date }}</span>
             </div>
-            <div v-if="day.isToday" class="space-y-2">
+            <div class="space-y-2">
               <div
-                v-for="event in events"
-                :key="event.id"
+                v-for="event in getEventsForDate(day.fullDate)"
+                :key="event.scheduleId"
                 @click="selectedEvent = event"
                 class="p-2 bg-white border border-primary/20 rounded-lg shadow-sm cursor-pointer hover:scale-105 transition-transform"
               >
                 <p class="text-[10px] font-bold text-primary truncate">{{ event.title }}</p>
-                <p class="text-[8px] text-slate-400">{{ event.time }} • {{ event.customer }}</p>
+                <p class="text-[8px] text-slate-400">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
               </div>
             </div>
           </div>
@@ -82,76 +82,48 @@
                 ]"
               >{{ cell.isCurrentMonth ? cell.date : '' }}</span>
             </div>
-            <div v-if="cell.isToday" class="space-y-1">
+            <div v-if="cell.fullDate" class="space-y-1">
               <div
-                v-for="event in events"
-                :key="event.id"
+                v-for="event in getEventsForDate(cell.fullDate)"
+                :key="event.scheduleId"
                 @click="selectedEvent = event"
                 class="px-1.5 py-0.5 bg-primary/10 border-l-2 border-primary rounded text-[8px] font-bold text-primary truncate cursor-pointer hover:bg-primary/20"
-              >{{ event.time }} {{ event.title }}</div>
+              >{{ formatTime(event.startTime) }} {{ event.title }}</div>
             </div>
           </div>
         </div>
 
         <!-- List View -->
         <div v-else class="space-y-4">
+          <div v-if="schedules.length === 0" class="text-center py-20 text-slate-400">
+            <span class="material-symbols-outlined text-4xl mb-2">calendar_today</span>
+            <p class="text-sm">暂无日程安排</p>
+          </div>
           <div
-            v-for="event in events"
-            :key="event.id"
+            v-for="event in schedules"
+            :key="event.scheduleId"
             @click="selectedEvent = event"
             class="p-6 bg-white border border-slate-200 rounded-2xl hover:border-primary transition-all cursor-pointer group"
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-6">
                 <div class="text-center shrink-0">
-                  <p class="text-lg font-black text-slate-900">{{ event.time }}</p>
-                  <p class="text-[10px] font-bold text-slate-400 uppercase">{{ event.duration }}</p>
+                  <p class="text-lg font-black text-slate-900">{{ formatTime(event.startTime) }}</p>
+                  <p class="text-[10px] font-bold text-slate-400 uppercase">{{ formatDate(event.startTime) }}</p>
                 </div>
                 <div class="h-10 w-px bg-slate-100"></div>
                 <div>
                   <h4 class="font-bold text-slate-900 group-hover:text-primary transition-colors">{{ event.title }}</h4>
                   <div class="flex items-center gap-2 mt-1">
-                    <span class="material-symbols-outlined text-xs text-slate-400">person</span>
-                    <span class="text-xs text-slate-500 font-medium">{{ event.customer }}</span>
+                    <span v-if="event.customerName" class="text-xs text-slate-500 font-medium">{{ event.customerName }}</span>
+                    <span v-if="event.typeName" class="text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">{{ event.typeName }}</span>
                   </div>
                 </div>
               </div>
-              <div class="flex items-center gap-3">
-                <div class="flex -space-x-2">
-                  <div
-                    v-for="(p, idx) in event.participants.slice(0, 3)"
-                    :key="idx"
-                    class="size-8 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-500"
-                  >{{ p.charAt(0) }}</div>
-                </div>
-                <span class="material-symbols-outlined text-slate-300">chevron_right</span>
-              </div>
+              <span class="material-symbols-outlined text-slate-300">chevron_right</span>
             </div>
           </div>
         </div>
-
-        <!-- AI Suggested Follow-ups -->
-        <section>
-          <h3 class="text-sm font-bold text-slate-900 mb-6 flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary">auto_awesome</span>
-            AI 建议的跟进时段
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div
-              v-for="(item, i) in aiSuggestions"
-              :key="i"
-              class="p-5 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-primary/30 transition-all"
-            >
-              <p class="text-[10px] font-bold text-primary uppercase mb-2">建议时段：{{ item.timeSlot }}</p>
-              <h4 class="font-bold text-slate-900 mb-1">{{ item.customer }}</h4>
-              <p class="text-xs text-slate-500 mb-4">{{ item.reason }}</p>
-              <button class="text-xs font-bold text-primary flex items-center gap-1 group-hover:gap-2 transition-all">
-                {{ item.action }}
-                <span class="material-symbols-outlined text-xs">arrow_forward</span>
-              </button>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
 
@@ -162,7 +134,7 @@
           <div class="flex items-center justify-between mb-8">
             <div class="flex items-center gap-2">
               <span class="size-2 rounded-full bg-primary animate-pulse"></span>
-              <span class="text-[10px] font-bold text-primary uppercase tracking-widest">会议简报 (AI Briefing)</span>
+              <span class="text-[10px] font-bold text-primary uppercase tracking-widest">日程详情</span>
             </div>
             <button @click="selectedEvent = null" class="size-8 flex items-center justify-center rounded-full hover:bg-white text-slate-400 transition-colors">
               <span class="material-symbols-outlined">close</span>
@@ -171,71 +143,45 @@
 
           <div class="bg-white rounded-[2rem] p-8 shadow-xl shadow-slate-200/40 border border-slate-100 mb-8">
             <h2 class="text-xl font-bold text-slate-900 mb-2">{{ selectedEvent.title }}</h2>
-            <div class="flex items-center gap-4 text-sm text-slate-500 mb-6">
+            <div class="flex items-center gap-4 text-sm text-slate-500 mb-6 flex-wrap">
               <div class="flex items-center gap-1">
                 <span class="material-symbols-outlined text-sm">schedule</span>
-                {{ selectedEvent.time }} ({{ selectedEvent.duration }})
+                {{ formatDateTime(selectedEvent.startTime) }}
+                <template v-if="selectedEvent.endTime"> ~ {{ formatTime(selectedEvent.endTime) }}</template>
               </div>
-              <div class="flex items-center gap-1">
+              <div v-if="selectedEvent.location" class="flex items-center gap-1">
                 <span class="material-symbols-outlined text-sm">location_on</span>
-                腾讯会议
+                {{ selectedEvent.location }}
+              </div>
+              <div v-if="selectedEvent.typeName" class="flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">label</span>
+                {{ selectedEvent.typeName }}
               </div>
             </div>
 
             <div class="space-y-6">
-              <div>
-                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">参会人员</p>
-                <div class="flex flex-wrap gap-2">
-                  <span
-                    v-for="p in selectedEvent.participants"
-                    :key="p"
-                    class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100"
-                  >{{ p }}</span>
-                </div>
+              <div v-if="selectedEvent.customerName">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">关联客户</p>
+                <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100">{{ selectedEvent.customerName }}</span>
               </div>
-
-              <div class="p-5 bg-primary/5 rounded-2xl border border-primary/10">
-                <div class="flex items-center gap-2 mb-3">
-                  <span class="material-symbols-outlined text-primary text-sm">auto_awesome</span>
-                  <p class="text-xs font-bold text-primary">AI 核心提醒</p>
-                </div>
-                <p class="text-sm text-slate-700 leading-relaxed font-medium">{{ selectedEvent.aiBrief }}</p>
+              <div v-if="selectedEvent.contactName">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">联系人</p>
+                <span class="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-medium rounded-full border border-slate-100">{{ selectedEvent.contactName }}</span>
               </div>
-            </div>
-          </div>
-
-          <!-- Historical Insights -->
-          <div class="space-y-6">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest px-2">历史关联洞察</h3>
-            <div class="space-y-4">
-              <div class="p-4 bg-white rounded-2xl border border-slate-100 flex gap-4">
-                <div class="size-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined">warning</span>
-                </div>
-                <div>
-                  <h4 class="text-xs font-bold text-slate-900 mb-1">账单异常争议</h4>
-                  <p class="text-[10px] text-slate-500 leading-relaxed">客户在 3 天前的邮件中提到 1 月份账单金额与实际用量不符，需在会议开始前确认核销进度。</p>
-                </div>
-              </div>
-              <div class="p-4 bg-white rounded-2xl border border-slate-100 flex gap-4">
-                <div class="size-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <span class="material-symbols-outlined">trending_up</span>
-                </div>
-                <div>
-                  <h4 class="text-xs font-bold text-slate-900 mb-1">扩容紧迫性</h4>
-                  <p class="text-[10px] text-slate-500 leading-relaxed">AI 监测到客户业务流量在过去 48 小时内激增 30%，目前已接近预警线，这是促成签约的绝佳时机。</p>
-                </div>
+              <div v-if="selectedEvent.description">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">描述</p>
+                <p class="text-sm text-slate-700 leading-relaxed">{{ selectedEvent.description }}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div class="p-6 bg-white border-t border-slate-100 flex gap-3">
-          <button class="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
-            进入会议
-          </button>
-          <button class="flex-1 py-3 border border-slate-200 rounded-xl text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all">
-            修改时间
+          <button
+            @click="handleDeleteSchedule"
+            class="flex-1 py-3 border border-red-200 text-red-500 rounded-xl text-sm font-bold hover:bg-red-50 transition-all"
+          >
+            删除日程
           </button>
         </div>
       </aside>
@@ -254,7 +200,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-xl font-bold text-slate-900">新增日程</h2>
-            <p class="text-sm text-slate-500 mt-1">手动填写或使用 AI 智能解析</p>
+            <p class="text-sm text-slate-500 mt-1">填写日程信息</p>
           </div>
           <button
             @click="showAddDialog = false"
@@ -266,29 +212,6 @@
       </template>
 
       <div class="space-y-6 bg-slate-50/50 p-6">
-        <!-- AI Natural Language Input -->
-        <div class="space-y-3">
-          <label class="text-sm font-bold text-slate-700 flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-lg">auto_awesome</span>
-            AI 智能解析 (可选)
-          </label>
-          <div class="relative">
-            <textarea
-              v-model="aiTextInput"
-              placeholder="例如：下周二下午三点和科技创新有限公司的张总开会讨论 Q4 扩容方案..."
-              class="w-full h-28 p-4 text-sm text-slate-700 bg-white border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl outline-none transition-all resize-none shadow-sm"
-            />
-            <button
-              @click="ElMessage.info('AI 智能解析功能开发中')"
-              :disabled="!aiTextInput.trim()"
-              class="absolute bottom-3 right-3 px-4 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-1.5"
-            >
-              <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
-              一键解析
-            </button>
-          </div>
-        </div>
-
         <!-- Form Fields -->
         <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div>
@@ -357,33 +280,20 @@
               >
                 <option value="meeting">会议</option>
                 <option value="call">电话</option>
-                <option value="task">任务</option>
+                <option value="visit">拜访</option>
               </select>
             </div>
             <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">关联客户/公司</label>
+              <label class="text-xs font-bold text-slate-500 mb-1.5 block">地点</label>
               <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-                <span class="material-symbols-outlined text-slate-400 text-sm">domain</span>
+                <span class="material-symbols-outlined text-slate-400 text-sm">location_on</span>
                 <input
-                  v-model="scheduleForm.company"
+                  v-model="scheduleForm.location"
                   type="text"
-                  placeholder="请输入公司名称"
+                  placeholder="请输入地点"
                   class="w-full text-sm text-slate-900 bg-transparent outline-none"
                 />
               </div>
-            </div>
-          </div>
-
-          <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">参与人 (逗号分隔)</label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">group</span>
-              <input
-                v-model="scheduleForm.participants"
-                type="text"
-                placeholder="例如: 张三, 李四"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
-              />
             </div>
           </div>
 
@@ -408,10 +318,10 @@
           </button>
           <button
             @click="handleSaveSchedule"
-            :disabled="!scheduleForm.title || !scheduleForm.startDate || !scheduleForm.startTime"
+            :disabled="!scheduleForm.title || !scheduleForm.startDate || !scheduleForm.startTime || saving"
             class="flex-1 py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shadow-sm"
           >
-            确认保存
+            {{ saving ? '保存中...' : '确认保存' }}
           </button>
         </div>
       </template>
@@ -420,23 +330,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
-import { ElMessage } from 'element-plus'
-
-interface CalendarEvent {
-  id: string
-  title: string
-  customer: string
-  time: string
-  duration: string
-  type: 'meeting' | 'call' | 'followup'
-  aiBrief: string
-  participants: string[]
-  status: 'upcoming' | 'ongoing' | 'completed'
-}
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getMySchedules, addSchedule, deleteSchedule } from '@/api/schedule'
+import type { ScheduleVO, ScheduleAddBO } from '@/api/schedule'
 
 const viewMode = ref<'grid' | 'month' | 'list'>('grid')
-const selectedEvent = ref<CalendarEvent | null>(null)
+const selectedEvent = ref<ScheduleVO | null>(null)
+const schedules = ref<ScheduleVO[]>([])
+const loading = ref(false)
+const saving = ref(false)
 
 const viewModes = [
   { value: 'grid' as const, label: '周' },
@@ -455,34 +358,62 @@ const currentDateStr = computed(() => {
   return `${y}年${m}月${d}日，${dayName}`
 })
 
-const events = ref<CalendarEvent[]>([
-  {
-    id: '1',
-    title: 'Q4 扩容方案技术评审',
-    customer: '科技创新有限公司',
-    time: '14:00',
-    duration: '60 min',
-    type: 'meeting',
-    aiBrief: '客户 CTO 将出席。重点关注：数据迁移风险、Q3 账单异常解释。建议准备近 3 个月的使用量趋势报告。',
-    participants: ['张经理 (采购)', '刘工 (CTO)', '陈经理 (我)'],
-    status: 'upcoming'
-  },
-  {
-    id: '2',
-    title: 'TechVentures 意向确认电话',
-    customer: 'Sarah Smith',
-    time: '16:30',
-    duration: '15 min',
-    type: 'call',
-    aiBrief: 'Sarah 刚结束一场行业峰会。建议以此作为切入点，询问其对"智能 CRM"的新看法。CEO 级别对话，是进入决策层的关键时点。',
-    participants: ['Sarah Smith', '陈经理 (我)'],
-    status: 'upcoming'
-  }
-])
+const todayEventCount = computed(() => {
+  const todayStr = toDateStr(now)
+  return schedules.value.filter(e => toDateStr(new Date(e.startTime)) === todayStr).length
+})
 
-// Add Schedule Dialog
+// --- Data Loading ---
+
+async function loadSchedules() {
+  loading.value = true
+  try {
+    schedules.value = await getMySchedules('all')
+  } catch (e) {
+    console.error('加载日程失败', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadSchedules()
+})
+
+// --- Helpers ---
+
+function toDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function formatTime(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function getEventsForDate(dateStr: string): ScheduleVO[] {
+  return schedules.value.filter(e => toDateStr(new Date(e.startTime)) === dateStr)
+}
+
+// --- Add Schedule ---
+
 const showAddDialog = ref(false)
-const aiTextInput = ref('')
 
 const scheduleForm = reactive({
   title: '',
@@ -490,49 +421,37 @@ const scheduleForm = reactive({
   startTime: '',
   endDate: '',
   endTime: '',
-  type: 'meeting' as 'meeting' | 'call' | 'task',
-  company: '',
-  participants: '',
+  type: 'meeting' as string,
+  location: '',
   description: ''
 })
 
-const typeMap: Record<string, CalendarEvent['type']> = {
-  meeting: 'meeting',
-  call: 'call',
-  task: 'followup'
-}
-
-function handleSaveSchedule() {
+async function handleSaveSchedule() {
   if (!scheduleForm.title || !scheduleForm.startDate || !scheduleForm.startTime) return
 
-  const participantList = scheduleForm.participants
-    ? scheduleForm.participants.split(',').map(s => s.trim()).filter(Boolean)
-    : []
+  saving.value = true
+  try {
+    const data: ScheduleAddBO = {
+      title: scheduleForm.title,
+      startTime: `${scheduleForm.startDate}T${scheduleForm.startTime}:00`,
+      type: scheduleForm.type,
+      location: scheduleForm.location || undefined,
+      description: scheduleForm.description || undefined,
+    }
+    if (scheduleForm.endDate && scheduleForm.endTime) {
+      data.endTime = `${scheduleForm.endDate}T${scheduleForm.endTime}:00`
+    }
 
-  const newEvent: CalendarEvent = {
-    id: String(Date.now()),
-    title: scheduleForm.title,
-    customer: scheduleForm.company || '',
-    time: scheduleForm.startTime,
-    duration: scheduleForm.endTime
-      ? `${diffMinutes(scheduleForm.startTime, scheduleForm.endTime)} min`
-      : '60 min',
-    type: typeMap[scheduleForm.type] || 'meeting',
-    aiBrief: scheduleForm.description || '',
-    participants: participantList,
-    status: 'upcoming'
+    await addSchedule(data)
+    showAddDialog.value = false
+    resetScheduleForm()
+    ElMessage.success('日程创建成功')
+    await loadSchedules()
+  } catch (e: any) {
+    ElMessage.error('创建日程失败: ' + (e.message || '未知错误'))
+  } finally {
+    saving.value = false
   }
-
-  events.value.push(newEvent)
-  showAddDialog.value = false
-  resetScheduleForm()
-  ElMessage.success('日程创建成功')
-}
-
-function diffMinutes(start: string, end: string): number {
-  const [sh, sm] = start.split(':').map(Number)
-  const [eh, em] = end.split(':').map(Number)
-  return (eh * 60 + em) - (sh * 60 + sm)
 }
 
 function resetScheduleForm() {
@@ -542,17 +461,29 @@ function resetScheduleForm() {
   scheduleForm.endDate = ''
   scheduleForm.endTime = ''
   scheduleForm.type = 'meeting'
-  scheduleForm.company = ''
-  scheduleForm.participants = ''
+  scheduleForm.location = ''
   scheduleForm.description = ''
-  aiTextInput.value = ''
 }
 
-const todayEventCount = computed(() => events.value.length)
+// --- Delete Schedule ---
 
-// Week days for grid view
+async function handleDeleteSchedule() {
+  if (!selectedEvent.value) return
+  try {
+    await ElMessageBox.confirm('确定删除该日程？', '提示', { type: 'warning' })
+    await deleteSchedule(selectedEvent.value.scheduleId)
+    selectedEvent.value = null
+    ElMessage.success('日程已删除')
+    await loadSchedules()
+  } catch {
+    // cancelled
+  }
+}
+
+// --- Week View ---
+
 const weekDays = computed(() => {
-  const today = now.getDay() // 0=Sun, 1=Mon...
+  const today = now.getDay()
   const mondayOffset = today === 0 ? -6 : 1 - today
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(now)
@@ -560,37 +491,35 @@ const weekDays = computed(() => {
     return {
       label: ['周一','周二','周三','周四','周五','周六','周日'][i],
       date: d.getDate(),
+      fullDate: toDateStr(d),
       isToday: d.toDateString() === now.toDateString()
     }
   })
 })
 
-// Month cells
+// --- Month View ---
+
 const monthCells = computed(() => {
   const year = now.getFullYear()
   const month = now.getMonth()
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
-  const startDow = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1 // Mon=0
+  const startDow = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
   const totalDays = lastDay.getDate()
   const cells = []
   for (let i = 0; i < 35; i++) {
     const date = i - startDow + 1
     const isCurrentMonth = date > 0 && date <= totalDays
+    const cellDate = isCurrentMonth ? new Date(year, month, date) : null
     cells.push({
       date: isCurrentMonth ? date : 0,
       isCurrentMonth,
-      isToday: isCurrentMonth && date === now.getDate()
+      isToday: isCurrentMonth && date === now.getDate(),
+      fullDate: cellDate ? toDateStr(cellDate) : ''
     })
   }
   return cells
 })
-
-const aiSuggestions = [
-  { customer: '未来教育机构', reason: '客户通常在周四下午 15:00 活跃', action: '发送回访邮件', timeSlot: '15:30 - 16:00' },
-  { customer: '全球贸易集团', reason: '合同审批周期已过半，建议探测进度', action: '电话沟通', timeSlot: '15:30 - 16:00' },
-  { customer: '智慧医疗中心', reason: '行业新政策发布，适合作为激活话题', action: '发送行业动态', timeSlot: '15:30 - 16:00' },
-]
 </script>
 
 <style scoped>
