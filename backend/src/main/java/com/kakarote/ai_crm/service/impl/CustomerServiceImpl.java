@@ -426,25 +426,60 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         writer.writeHeadRow(headers);
 
-        // 5. 写数据行
+        // 列索引常量
+        final int CUSTOMER_COL_END = 10;
+        final int CUSTOM_FIELD_COL_START = 16;
+        final int CUSTOM_FIELD_COL_END = headers.size() - 1;
+
+        // 5. 写数据行，记录多联系人客户的行范围
+        List<int[]> mergeRanges = new ArrayList<>(); // [startRow, rowCount]
+        int dataRowIndex = 1; // row 0 = header
+
         for (Customer c : customers) {
             List<Contact> contacts = contactMap.getOrDefault(c.getCustomerId(), Collections.emptyList());
             Map<String, Object> cfValues = customFieldService.getCustomFieldValues("customer", c.getCustomerId());
+            int startRow = dataRowIndex;
 
             if (contacts.isEmpty()) {
-                // 无联系人，联系人列留空
-                List<Object> row = buildExportRow(c, null, customFields, cfValues);
-                writer.writeRow(row);
+                writer.writeRow(buildExportRow(c, null, customFields, cfValues));
+                dataRowIndex++;
             } else {
                 for (Contact contact : contacts) {
-                    List<Object> row = buildExportRow(c, contact, customFields, cfValues);
-                    writer.writeRow(row);
+                    writer.writeRow(buildExportRow(c, contact, customFields, cfValues));
+                    dataRowIndex++;
+                }
+            }
+
+            int rowsWritten = dataRowIndex - startRow;
+            if (rowsWritten > 1) {
+                mergeRanges.add(new int[]{startRow, rowsWritten});
+            }
+        }
+
+        // 5b. 合并多联系人客户的客户列单元格
+        Sheet exportSheet = writer.getSheet();
+        if (!mergeRanges.isEmpty()) {
+            CellStyle mergedStyle = writer.getWorkbook().createCellStyle();
+            mergedStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            for (int[] range : mergeRanges) {
+                int firstRow = range[0];
+                int lastRow = firstRow + range[1] - 1;
+
+                // 合并客户列 (0–10)
+                for (int col = 0; col <= CUSTOMER_COL_END; col++) {
+                    exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
+                    applyMergedStyle(exportSheet, firstRow, col, mergedStyle);
+                }
+                // 合并自定义字段列 (16+)
+                for (int col = CUSTOM_FIELD_COL_START; col <= CUSTOM_FIELD_COL_END; col++) {
+                    exportSheet.addMergedRegion(new CellRangeAddress(firstRow, lastRow, col, col));
+                    applyMergedStyle(exportSheet, firstRow, col, mergedStyle);
                 }
             }
         }
 
         // 6. 设置列宽
-        Sheet exportSheet = writer.getSheet();
         int defaultExportWidth = 18 * 256;
         int wideExportWidth = 24 * 256;
         Set<String> wideColumns = Set.of("公司名称", "地址", "网站", "备注");
@@ -498,6 +533,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             row.add(cfValues != null ? cfValues.get(cf.getFieldName()) : null);
         }
         return row;
+    }
+
+    private void applyMergedStyle(Sheet sheet, int rowIdx, int colIdx, CellStyle style) {
+        Row row = sheet.getRow(rowIdx);
+        if (row != null) {
+            Cell cell = row.getCell(colIdx);
+            if (cell == null) cell = row.createCell(colIdx);
+            cell.setCellStyle(style);
+        }
     }
 
     // ==================== 导入模板 ====================

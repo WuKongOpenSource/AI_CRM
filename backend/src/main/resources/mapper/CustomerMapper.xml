@@ -27,7 +27,12 @@
         LEFT JOIN manager_user u ON c.owner_id = u.user_id
         WHERE c.status = 1
         <if test="query.keyword != null and query.keyword != ''">
-            AND c.company_name LIKE CONCAT('%', #{query.keyword}, '%')
+            AND (
+                c.company_name LIKE CONCAT('%', #{query.keyword}, '%')
+                OR c.primary_contact_name LIKE CONCAT('%', #{query.keyword}, '%')
+                OR c.primary_contact_phone LIKE CONCAT('%', #{query.keyword}, '%')
+                OR c.tag_names LIKE CONCAT('%', #{query.keyword}, '%')
+            )
         </if>
         <if test="query.stage != null and query.stage != ''">
             AND c.stage = #{query.stage}

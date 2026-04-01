@@ -686,7 +686,7 @@ import { addCustomerTag, removeCustomerTag, updateCustomerStage } from '@/api/cu
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList } from '@/api/followup'
 import { addContact, updateContact, deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CustomerTag, FollowUp, CustomerUpdateBO, Contact } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
@@ -1031,6 +1031,21 @@ async function handleSubmitContact() {
   if (!contactForm.name.trim()) {
     ElMessage.warning('请输入联系人姓名')
     return
+  }
+  // 若勾选主联系人且已有主联系人，弹窗确认是否替换
+  if (contactForm.isPrimary) {
+    const existingPrimary = contacts.value.find(c => c.isPrimary)
+    if (existingPrimary && existingPrimary.contactId !== editingContact.value?.contactId) {
+      try {
+        await ElMessageBox.confirm(
+          `当前主要联系人为「${existingPrimary.name}」，是否替换为新联系人？`,
+          '替换主要联系人',
+          { type: 'warning', confirmButtonText: '确定替换', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+    }
   }
   submitting.value = true
   try {

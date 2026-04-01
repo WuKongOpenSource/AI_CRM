@@ -42,4 +42,7 @@ public class Const {
      * 权限缓存
      */
     public static final String USER_AUTH_CACHE_KET = "MANAGER:USER:AUTH:";
+
+    /** 超级管理员角色标识 */
+    public static final String SUPER_ADMIN_REALM = "super_admin";
 }

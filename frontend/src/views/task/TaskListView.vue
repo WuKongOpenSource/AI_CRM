@@ -611,25 +611,55 @@
             </div>
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1.5 block">关联客户</label>
-              <input
-                v-model="formData.customerName"
-                type="text"
-                placeholder="请输入关联客户名称"
-                class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-              />
+              <el-select
+                v-model="formData.customerId"
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                default-first-option
+                placeholder="搜索客户名称"
+                :remote-method="searchCustomers"
+                :loading="customerSearchLoading"
+                class="w-full"
+                size="default"
+              >
+                <el-option
+                  v-for="item in customerOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
             </div>
           </div>
 
           <!-- Participants + Assignee (Edit mode shows both in grid) -->
           <div :class="editingTask ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : ''">
             <div>
-              <label class="text-xs font-bold text-slate-500 mb-1.5 block">参与人 (逗号分隔)</label>
-              <input
-                v-model="formData.participantNames"
-                type="text"
-                placeholder="例如: 张三, 李四"
-                class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-              />
+              <label class="text-xs font-bold text-slate-500 mb-1.5 block">参与人</label>
+              <el-select
+                v-model="selectedParticipants"
+                multiple
+                filterable
+                remote
+                reserve-keyword
+                clearable
+                allow-create
+                default-first-option
+                placeholder="搜索或输入用户名称"
+                :remote-method="searchUsers"
+                :loading="userSearchLoading"
+                class="w-full"
+                size="default"
+              >
+                <el-option
+                  v-for="item in userOptions"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
             </div>
             <div v-if="editingTask">
               <label class="text-xs font-bold text-slate-500 mb-1.5 block">负责人</label>
@@ -714,6 +744,9 @@ async function searchCustomers(query: string) {
       value: String(c.customerId),
       label: c.companyName
     }))
+  } catch (e) {
+    console.warn('客户搜索失败:', e)
+    customerOptions.value = []
   } finally {
     customerSearchLoading.value = false
   }
@@ -735,6 +768,9 @@ async function searchUsers(query: string) {
       value: u.realname || u.username,
       label: u.realname || u.username
     }))
+  } catch (e) {
+    console.warn('用户搜索失败:', e)
+    userOptions.value = []
   } finally {
     userSearchLoading.value = false
   }
@@ -743,15 +779,14 @@ async function searchUsers(query: string) {
 // Selected participant names as array for el-select multiple
 const selectedParticipants = ref<string[]>([])
 
-const formData = reactive<TaskAddBO & { status?: TaskStatus; customerName?: string; assignedToName?: string }>({
+const formData = reactive<TaskAddBO & { status?: TaskStatus; assignedToName?: string }>({
   title: '',
   description: '',
   priority: 'MEDIUM',
   dueDate: undefined,
   status: undefined,
   taskType: '',
-  participantNames: '',
-  customerName: '',
+  customerId: '',
   assignedToName: ''
 })
 
@@ -847,10 +882,19 @@ function handleEdit(task: Task) {
     dueDate: task.dueDate ? formatDateTimeLocal(task.dueDate) : undefined,
     status: task.status,
     taskType: task.taskType || '',
-    participantNames: task.participantNames || '',
-    customerName: task.customerName || '',
+    customerId: task.customerId || '',
     assignedToName: task.assignedToName || ''
   })
+  // Populate customer select options for edit mode
+  if (task.customerId && task.customerName) {
+    customerOptions.value = [{ value: String(task.customerId), label: task.customerName }]
+  }
+  // Populate participants
+  selectedParticipants.value = task.participantNames
+    ? task.participantNames.split(/[,，]\s*/).filter(Boolean)
+    : []
+  // Populate user options so selected values display labels
+  userOptions.value = selectedParticipants.value.map(name => ({ value: name, label: name }))
   showAddDialog.value = true
 }
 
@@ -882,7 +926,8 @@ async function handleSubmit() {
       priority: formData.priority,
       dueDate: formData.dueDate,
       taskType: formData.taskType,
-      participantNames: formData.participantNames
+      participantNames: selectedParticipants.value.join(', '),
+      customerId: formData.customerId || undefined
     }
     if (editingTask.value) {
       await taskStore.editTask({ ...submitData, taskId: editingTask.value.taskId, status: formData.status })
@@ -901,9 +946,12 @@ async function handleSubmit() {
 function resetForm() {
   editingTask.value = null
   aiParseInput.value = ''
+  selectedParticipants.value = []
+  customerOptions.value = []
+  userOptions.value = []
   Object.assign(formData, {
     title: '', description: '', priority: 'MEDIUM', dueDate: undefined, status: undefined,
-    taskType: '', participantNames: '', customerName: '', assignedToName: ''
+    taskType: '', customerId: '', assignedToName: ''
   })
 }
 
@@ -916,8 +964,19 @@ async function handleAiParse() {
     if (result.dueDate) formData.dueDate = result.dueDate
     if (result.priority) formData.priority = result.priority.toUpperCase() as any
     if (result.taskType) formData.taskType = result.taskType
-    if (result.customerName) formData.customerName = result.customerName
-    if (result.participantNames) formData.participantNames = result.participantNames
+    if (result.customerName) {
+      // AI parsed a customer name - search and try to match
+      const res = await queryCustomerList({ keyword: result.customerName, page: 1, limit: 5 })
+      const list = res.list || []
+      if (list.length > 0) {
+        customerOptions.value = list.map((c: any) => ({ value: String(c.customerId), label: c.companyName }))
+        formData.customerId = String(list[0].customerId)
+      }
+    }
+    if (result.participantNames) {
+      selectedParticipants.value = result.participantNames.split(/[,，]\s*/).filter(Boolean)
+      userOptions.value = selectedParticipants.value.map(name => ({ value: name, label: name }))
+    }
     if (result.description) formData.description = result.description
     if (result.assignedToName) formData.assignedToName = result.assignedToName
     ElMessage.success('AI 解析完成，请确认并补充信息')

@@ -90,6 +90,11 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
             managerRole.setCreateUserId(UserUtil.getUserId());
             save(managerRole);
         } else {
+            // 系统预设角色不允许修改标识符
+            ManagerRole existing = getById(setRoleBO.getRoleId());
+            if (existing != null && Const.SUPER_ADMIN_REALM.equals(existing.getRealm())) {
+                setRoleBO.setRealm(existing.getRealm());
+            }
             lambdaUpdate().eq(ManagerRole::getRoleId,setRoleBO.getRoleId()).set(ManagerRole::getRoleName, setRoleBO.getRoleName())
                     .set(ManagerRole::getDescription, setRoleBO.getDescription())
                     .set(ManagerRole::getRealm, setRoleBO.getRealm()).update();
@@ -125,6 +130,14 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
     public void deleteByIds(List<Serializable> ids) {
         if (ids == null || ids.isEmpty()) {
             return;
+        }
+        // 系统预设角色不允许删除
+        long sysCount = lambdaQuery()
+                .in(ManagerRole::getRoleId, ids)
+                .eq(ManagerRole::getRealm, Const.SUPER_ADMIN_REALM)
+                .count();
+        if (sysCount > 0) {
+            throw new BusinessException(AdminCodeEnum.ADMIN_SYSTEM_ROLE_CANNOT_DELETE);
         }
         removeByIds(ids);
         //删除关联的员工

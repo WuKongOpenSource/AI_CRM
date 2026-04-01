@@ -123,10 +123,29 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
      */
     @Override
     public BasePage<ManageUserVO> queryPageList(UserQueryBO userQueryBO) {
+        // 如果指定了部门ID，收集该部门及所有下级部门ID
+        if (userQueryBO.getDeptId() != null) {
+            List<ManagerDept> allDepts = deptMapper.selectList(null);
+            List<Long> deptIds = new ArrayList<>();
+            collectChildDeptIds(allDepts, userQueryBO.getDeptId(), deptIds);
+            userQueryBO.setDeptIds(deptIds);
+        }
         BasePage<ManageUserVO> page = baseMapper.queryPageList(userQueryBO.parse(), userQueryBO);
         fillRoleInfo(page.getRecords());
         fillImgUrl(page.getRecords());
         return page;
+    }
+
+    /**
+     * 递归收集指定部门及其所有下级部门ID
+     */
+    private void collectChildDeptIds(List<ManagerDept> allDepts, Long parentId, List<Long> result) {
+        result.add(parentId);
+        for (ManagerDept dept : allDepts) {
+            if (parentId.equals(dept.getParentId())) {
+                collectChildDeptIds(allDepts, dept.getDeptId(), result);
+            }
+        }
     }
 
     private void fillRoleInfo(List<ManageUserVO> users) {

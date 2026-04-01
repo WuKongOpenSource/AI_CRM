@@ -155,9 +155,12 @@
           <div class="relative w-full max-w-md">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
             <input
+              v-model="globalSearchKeyword"
               type="text"
               class="w-full bg-slate-100 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 transition-all outline-none"
               placeholder="搜索公司、联系人或 AI 标签..."
+              @keydown.enter="handleGlobalSearch"
+              @input="debouncedGlobalSearch"
             />
           </div>
         </div>
@@ -194,10 +197,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useEnterpriseStore } from '@/stores/enterprise'
+import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { ElMessageBox } from 'element-plus'
@@ -208,7 +212,14 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
+const customerStore = useCustomerStore()
 const { isMobile } = useResponsive()
+const globalSearchKeyword = ref('')
+
+// Sync global search with customer store keyword
+watch(() => customerStore.queryParams.keyword, (val) => {
+  globalSearchKeyword.value = val || ''
+})
 
 onMounted(() => enterpriseStore.loadConfig())
 
@@ -260,6 +271,27 @@ function navigateTo(path: string) {
 function mobileNavigate(path: string) {
   router.push(path)
   drawerVisible.value = false
+}
+
+function handleGlobalSearch() {
+  const keyword = globalSearchKeyword.value.trim()
+  customerStore.queryParams.keyword = keyword
+  customerStore.queryParams.page = 1
+  if (route.path.startsWith('/customer')) {
+    customerStore.fetchCustomerList(true)
+  } else {
+    router.push('/customer')
+  }
+}
+
+let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
+function debouncedGlobalSearch() {
+  if (globalSearchTimer) clearTimeout(globalSearchTimer)
+  globalSearchTimer = setTimeout(() => {
+    if (route.path.startsWith('/customer')) {
+      handleGlobalSearch()
+    }
+  }, 500)
 }
 
 async function handleLogout() {

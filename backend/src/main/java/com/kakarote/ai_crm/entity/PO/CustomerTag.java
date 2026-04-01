@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.entity.PO;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -24,6 +25,7 @@ public class CustomerTag implements Serializable {
      */
     @TableId(type = IdType.ASSIGN_ID)
     @Schema(description = "主键")
+    @JsonProperty("tagId")
     private Long id;
 
     /**

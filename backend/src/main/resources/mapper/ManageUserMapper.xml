@@ -20,8 +20,11 @@
         <if test="data.roleId != null">
             and g.role_id=#{data.roleId}
         </if>
-        <if test="data.deptId != null">
-            and a.dept_id=#{data.deptId}
+        <if test="data.deptIds != null and data.deptIds.size() > 0">
+            and a.dept_id IN
+            <foreach collection="data.deptIds" item="did" open="(" separator="," close=")">
+                #{did}
+            </foreach>
         </if>
     </select>
     <select id="getUserId" resultType="com.kakarote.ai_crm.entity.PO.ManagerUser">

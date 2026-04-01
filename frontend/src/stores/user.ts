@@ -10,6 +10,7 @@ export const useUserStore = defineStore('user', () => {
   const token = ref<string | null>(getToken())
   const userInfo = ref<UserInfo | null>(null)
   const permissions = ref<Record<string, any>>({})
+  const permissionsLoaded = ref(false)
 
   // Getters
   const isLoggedIn = computed(() => !!token.value)
@@ -22,8 +23,10 @@ export const useUserStore = defineStore('user', () => {
    * 检查用户是否拥有某个模块的权限
    */
   function hasPermission(module: string): boolean {
-    // 权限树为空时（未加载）不限制
-    if (!permissions.value || Object.keys(permissions.value).length === 0) return true
+    // 权限树尚未加载时不限制（初始页面加载阶段）
+    if (!permissionsLoaded.value) return true
+    // 权限树已加载但为空 = 用户无任何权限
+    if (!permissions.value || Object.keys(permissions.value).length === 0) return false
     return !!permissions.value[module]
   }
 
@@ -42,6 +45,7 @@ export const useUserStore = defineStore('user', () => {
       token.value = null
       userInfo.value = null
       permissions.value = {}
+      permissionsLoaded.value = false
       removeToken()
       const enterpriseStore = useEnterpriseStore()
       enterpriseStore.reset()
@@ -55,12 +59,14 @@ export const useUserStore = defineStore('user', () => {
       const [info, auth] = await Promise.all([apiGetUserInfo(), apiGetUserAuth()])
       userInfo.value = info
       permissions.value = auth || {}
+      permissionsLoaded.value = true
       return info
     } catch (error) {
       // Token might be invalid
       token.value = null
       userInfo.value = null
       permissions.value = {}
+      permissionsLoaded.value = false
       removeToken()
       throw error
     }
@@ -74,6 +80,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = null
     userInfo.value = null
     permissions.value = {}
+    permissionsLoaded.value = false
     removeToken()
   }
 

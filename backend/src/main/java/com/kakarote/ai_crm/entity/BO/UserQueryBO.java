@@ -4,6 +4,8 @@ import com.kakarote.ai_crm.common.PageEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 用户查询BO
  *
@@ -21,4 +23,7 @@ public class UserQueryBO extends PageEntity {
 
     @Schema(description = "部门ID")
     private Long deptId;
+
+    @Schema(description = "部门ID列表（含下级部门）", hidden = true)
+    private List<Long> deptIds;
 }

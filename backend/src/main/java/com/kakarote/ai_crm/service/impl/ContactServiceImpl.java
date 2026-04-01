@@ -36,6 +36,7 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
     private CustomerServiceImpl customerService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Long addContact(ContactAddBO contactAddBO) {
         Contact contact = BeanUtil.copyProperties(contactAddBO, Contact.class);
         contact.setStatus(1);
@@ -43,6 +44,14 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
             contact.setIsPrimary(0);
         }
         save(contact);
+        // 若设为主联系人，重置该客户下其他联系人的主联系人标记
+        if (contact.getIsPrimary() != null && contact.getIsPrimary() == 1) {
+            lambdaUpdate()
+                .eq(Contact::getCustomerId, contact.getCustomerId())
+                .ne(Contact::getContactId, contact.getContactId())
+                .set(Contact::getIsPrimary, 0)
+                .update();
+        }
         // 同步客户冗余字段
         customerService.syncContactCache(contact.getCustomerId());
         return contact.getContactId();
@@ -58,14 +67,21 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         BeanUtil.copyProperties(contactUpdateBO, contact, "contactId", "createUserId", "createTime", "customFields");
         updateById(contact);
 
+        // 若设为主联系人，重置该客户下其他联系人的主联系人标记
+        if (contact.getIsPrimary() != null && contact.getIsPrimary() == 1) {
+            lambdaUpdate()
+                .eq(Contact::getCustomerId, contact.getCustomerId())
+                .ne(Contact::getContactId, contact.getContactId())
+                .set(Contact::getIsPrimary, 0)
+                .update();
+        }
+
         // 更新自定义字段
         if (contactUpdateBO.getCustomFields() != null && !contactUpdateBO.getCustomFields().isEmpty()) {
             customFieldService.updateCustomFieldValues("contact", contactUpdateBO.getContactId(), contactUpdateBO.getCustomFields());
         }
-        // 如果是主联系人，同步冗余字段
-        if (contact.getIsPrimary() != null && contact.getIsPrimary() == 1) {
-            customerService.syncContactCache(contact.getCustomerId());
-        }
+        // 同步客户冗余字段
+        customerService.syncContactCache(contact.getCustomerId());
     }
 
     @Override

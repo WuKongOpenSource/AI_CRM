@@ -29,6 +29,7 @@ public enum AdminCodeEnum implements ResultCode {
     TOKEN_ACCOUNT_DISABLE(1310,"账户未启用"),
     ACCOUNT_TOKEN_INADEQUATE(1311,"积分不足"),
     TRANS_ERROR(1312,"暂不支持该操作"),
+    ADMIN_SYSTEM_ROLE_CANNOT_DELETE(1313,"系统预设角色不可删除"),
     ;
 
     AdminCodeEnum(int code, String msg) {
