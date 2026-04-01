@@ -421,7 +421,7 @@
                 <span class="text-xs text-slate-400">{{ formatDate(item.createTime) }}</span>
               </div>
               <!-- Actions -->
-              <div class="md:col-span-2 flex items-center justify-end gap-1">
+              <div class="md:col-span-2 flex flex-wrap items-center justify-end gap-1" @click.stop>
                 <button
                   type="button"
                   class="rounded-lg px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
@@ -436,6 +436,14 @@
                   @click.stop="handleDownload(item)"
                 >
                   <span class="material-symbols-outlined text-sm">download</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
+                  title="删除"
+                  @click.stop="handleDelete(item)"
+                >
+                  <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
               </div>
             </div>
