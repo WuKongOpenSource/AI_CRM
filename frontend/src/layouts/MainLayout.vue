@@ -207,7 +207,7 @@ onMounted(() => enterpriseStore.loadConfig())
 
 const drawerVisible = ref(false)
 const showUserMenu = ref(false)
-const { openChatDrawer, isOpen: chatDrawerOpen } = useChatDrawer()
+const { isOpen: chatDrawerOpen } = useChatDrawer()
 
 const mainNavItems = [
   { icon: 'auto_awesome', label: 'AI 助手', route: '/chat', fill: false },

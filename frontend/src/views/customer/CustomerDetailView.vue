@@ -56,7 +56,7 @@
                     </div>
                     <div class="flex items-center gap-1">
                       <span class="text-slate-400">状态:</span>
-                      <span class="text-primary font-bold">{{ getStatusLabel(customer.status) }}</span>
+                      <span class="text-primary font-bold">{{ getStatusLabel(customer.stage) }}</span>
                     </div>
                   </div>
                 </div>
@@ -175,7 +175,7 @@
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">创建人</p>
-                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.createUserName || '-' }}</p>
+                  <p class="text-sm text-slate-900 font-medium px-2 py-1 -ml-2 truncate">{{ customer.ownerName || '-' }}</p>
                 </div>
                 <div>
                   <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">创建时间</p>
@@ -283,9 +283,9 @@
                       </el-popconfirm>
                     </div>
                   </div>
-                  <div v-if="item.nextContactTime" class="flex items-center gap-2 mb-3 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg w-fit">
+                  <div v-if="item.nextFollowTime" class="flex items-center gap-2 mb-3 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg w-fit">
                     <span class="material-symbols-outlined text-xs">event_repeat</span>
-                    下次联系: {{ formatDateTime(item.nextContactTime) }}
+                    下次联系: {{ formatDateTime(item.nextFollowTime) }}
                   </div>
                   <p class="text-sm text-slate-600 leading-relaxed">{{ item.content }}</p>
                 </div>
@@ -1068,12 +1068,6 @@ const stageOptions = [
   { value: 'closed', label: '结单' },
   { value: 'lost', label: '已流失' }
 ]
-
-function getNextStage(current: string): string | null {
-  const idx = stageFlow.indexOf(current)
-  if (idx >= 0 && idx < stageFlow.length - 1) return stageFlow[idx + 1]
-  return null
-}
 
 function getStageLabelFull(stage: string): string {
   return stageOptions.find(s => s.value === stage)?.label || stage

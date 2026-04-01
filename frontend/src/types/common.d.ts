@@ -10,6 +10,8 @@ export interface Task {
   dueDate?: string
   assignedTo?: string
   assignedToName?: string
+  taskType?: string
+  participantNames?: string
   createUserId?: string
   createUserName?: string
   generatedByAi: boolean
@@ -27,6 +29,8 @@ export interface TaskAddBO {
   priority?: TaskPriority
   dueDate?: string
   assignedTo?: string
+  taskType?: string
+  participantNames?: string
 }
 
 export interface TaskUpdateBO extends TaskAddBO {

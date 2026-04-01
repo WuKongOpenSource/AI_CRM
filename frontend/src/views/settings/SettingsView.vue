@@ -218,7 +218,7 @@
                   <span class="truncate">{{ selectedDept ? selectedDept.deptName : '选择部门' }}</span>
                 </button>
                 <button
-                  @click="resetMemberForm(); showAddMemberDialog = true"
+                  @click="handleAddMember()"
                   :disabled="!selectedDept"
                   class="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold flex items-center gap-1 hover:bg-primary/90 transition-all disabled:opacity-50"
                 >
@@ -240,7 +240,7 @@
                     </div>
                     <button
                       v-if="!isMobile"
-                      @click="showAddMemberDialog = true"
+                      @click="handleAddMember()"
                       :disabled="!selectedDept"
                       class="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
@@ -297,7 +297,8 @@
                             <tr
                               v-for="member in memberList"
                               :key="member.userId"
-                              class="hover:bg-slate-50/50 transition-colors group"
+                              class="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                              @click="handleMemberRowClick(member)"
                             >
                               <td class="px-6 py-4">
                                 <div class="flex items-center gap-3">
@@ -336,14 +337,14 @@
                               <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
-                                    @click="handleEditMember(member)"
+                                    @click.stop="handleEditMember(member)"
                                     class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-primary transition-all"
                                     title="编辑"
                                   >
                                     <span class="material-symbols-outlined text-sm">edit</span>
                                   </button>
                                   <button
-                                    @click="handleToggleStatus(member)"
+                                    @click.stop="handleToggleStatus(member)"
                                     class="size-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-slate-400 hover:text-amber-500 transition-all"
                                     :title="member.status === 1 ? '停用' : '启用'"
                                   >
@@ -1174,50 +1175,113 @@
     <!-- Member Dialog -->
     <el-dialog
       v-model="showAddMemberDialog"
-      :title="editingMember ? '编辑成员' : '添加成员'"
-      :width="isMobile ? '95%' : '500px'"
+      :title="editingMember ? '编辑员工' : '新增员工'"
+      :width="isMobile ? '95%' : '650px'"
       :fullscreen="isMobile"
     >
-      <el-form :model="memberForm" label-width="80px">
-        <el-form-item v-if="!editingMember" label="用户名" required>
-          <el-input v-model="memberForm.username" placeholder="请输入用户名（用于登录）" />
-        </el-form-item>
-        <el-form-item label="姓名" required>
-          <el-input v-model="memberForm.realname" placeholder="请输入真实姓名" />
-        </el-form-item>
-        <el-form-item v-if="!editingMember" label="密码" required>
-          <el-input v-model="memberForm.password" type="password" show-password placeholder="请输入初始密码" />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="memberForm.mobile" placeholder="请输入手机号" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="memberForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="部门">
-          <el-tree-select
-            v-model="memberForm.deptId"
-            :data="deptTree"
-            :props="{ label: 'deptName', value: 'deptId', children: 'children' }"
-            placeholder="请选择部门"
-            clearable
-            check-strictly
-            :render-after-expand="false"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="岗位">
-          <el-input v-model="memberForm.post" placeholder="请输入岗位" />
-        </el-form-item>
-        <el-form-item label="角色">
-          <el-select v-model="memberForm.roleIds" multiple placeholder="请选择角色" style="width: 100%">
-            <el-option v-for="r in allRoleOptions" :key="r.roleId" :label="r.roleName" :value="r.roleId" />
-          </el-select>
-        </el-form-item>
+      <el-form :model="memberForm" label-position="top">
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="姓名" required>
+              <el-input v-model="memberForm.realname" placeholder="请输入员工姓名" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="职位">
+              <el-input v-model="memberForm.post" placeholder="如：销售经理" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="用户名" :required="!editingMember">
+              <el-input v-model="memberForm.username" :disabled="!!editingMember" :placeholder="editingMember ? '' : '用于系统登录'" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="登录密码" :required="!editingMember">
+              <el-input v-model="memberForm.password" type="password" show-password :placeholder="editingMember ? '留空则不修改' : '默认密码 123456'" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="所属部门">
+              <el-tree-select
+                v-model="memberForm.deptId"
+                :data="deptTree"
+                :props="{ label: 'deptName', value: 'deptId', children: 'children' }"
+                placeholder="请选择部门"
+                clearable
+                check-strictly
+                :render-after-expand="false"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="直属上级">
+              <el-select v-model="memberForm.parentId" placeholder="无 (顶级员工)" clearable filterable style="width: 100%">
+                <el-option :value="null" label="无 (顶级员工)" />
+                <el-option
+                  v-for="u in parentOptions"
+                  :key="u.userId"
+                  :label="u.realname || u.username"
+                  :value="u.userId"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="电子邮箱">
+              <el-input v-model="memberForm.email" placeholder="example@wukong.ai" />
+            </el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="手机号码">
+              <el-input v-model="memberForm.mobile" placeholder="请输入手机号" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
+
+      <!-- Status -->
+      <div class="mb-4">
+        <label class="text-sm font-medium text-slate-700 mb-2 block">状态</label>
+        <el-radio-group v-model="memberForm.status">
+          <el-radio :value="1">活跃</el-radio>
+          <el-radio :value="0">离职/停用</el-radio>
+        </el-radio-group>
+      </div>
+
+      <!-- Role Selection -->
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-3">
+          <label class="text-sm font-bold text-slate-900">系统角色权限</label>
+          <span class="text-xs text-primary">已选择 {{ memberForm.roleIds.length }} 个角色</span>
+        </div>
+        <div class="border border-slate-200 rounded-xl p-4 max-h-48 overflow-y-auto bg-slate-50/50">
+          <el-checkbox-group v-model="memberForm.roleIds">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+              <el-checkbox
+                v-for="r in allRoleOptions"
+                :key="r.roleId"
+                :label="r.roleName"
+                :value="r.roleId"
+                class="!mr-0"
+              />
+            </div>
+          </el-checkbox-group>
+        </div>
+      </div>
+
       <template #footer>
-        <el-button @click="showAddMemberDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submittingMember" @click="handleSaveMember">保存</el-button>
+        <div class="flex gap-3 w-full">
+          <el-button class="flex-1" size="large" @click="showAddMemberDialog = false">取消</el-button>
+          <el-button class="flex-1" size="large" type="primary" :loading="submittingMember" @click="handleSaveMember">保存员工信息</el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -1542,6 +1606,125 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Employee Detail Drawer -->
+    <el-drawer
+      v-model="showMemberDetailDrawer"
+      direction="rtl"
+      :size="isMobile ? '100%' : '380px'"
+      :with-header="false"
+    >
+      <div v-if="detailMember" class="h-full flex flex-col">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-4 pb-0">
+          <h3 class="text-lg font-bold text-slate-900">员工详情</h3>
+          <button @click="showMemberDetailDrawer = false" class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+            <span class="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-y-auto p-6 pt-4">
+          <!-- Avatar + Name + Position -->
+          <div class="text-center mb-6">
+            <div class="relative inline-block">
+              <div class="size-20 rounded-full mx-auto flex items-center justify-center text-white text-2xl font-bold shadow-lg" :class="getAvatarColor(detailMember.realname)">
+                {{ (detailMember.realname || detailMember.username || '?').charAt(0) }}
+              </div>
+              <span
+                class="absolute bottom-0.5 right-0.5 size-4 rounded-full border-2 border-white"
+                :class="detailMember.status === 1 ? 'bg-emerald-400' : 'bg-slate-300'"
+              ></span>
+            </div>
+            <h2 class="text-xl font-bold text-slate-900 mt-3">{{ detailMember.realname || detailMember.username }}</h2>
+            <p class="text-sm text-primary font-medium mt-1">{{ detailMember.post || '员工' }}</p>
+          </div>
+
+          <!-- Info Cards -->
+          <div class="grid grid-cols-2 gap-3 mb-6">
+            <div class="bg-slate-50 rounded-xl p-3">
+              <p class="text-[10px] text-slate-400 mb-1">所属部门</p>
+              <p class="text-sm font-semibold text-slate-900">{{ detailMember.deptName || '-' }}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3">
+              <p class="text-[10px] text-slate-400 mb-1">登录账号</p>
+              <p class="text-sm font-semibold text-slate-900">@{{ detailMember.username }}</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3 col-span-2">
+              <p class="text-[10px] text-slate-400 mb-1">直属上级</p>
+              <p class="text-sm font-semibold text-slate-900">{{ detailMember.parentName || '无' }}</p>
+            </div>
+          </div>
+
+          <!-- Roles -->
+          <div class="mb-6">
+            <h4 class="text-sm font-bold text-slate-900 mb-2">系统角色</h4>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="rn in (detailMember.roleNames || [])"
+                :key="rn"
+                class="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold inline-flex items-center gap-1.5"
+              >
+                <span class="size-1.5 rounded-full bg-blue-400"></span>
+                {{ rn }}
+              </span>
+              <span v-if="!detailMember.roleNames?.length" class="text-sm text-slate-400">未分配角色</span>
+            </div>
+          </div>
+
+          <!-- Contact Info -->
+          <div class="mb-6">
+            <h4 class="text-sm font-bold text-slate-900 mb-3">联系信息</h4>
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <div class="size-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-blue-500 text-base">mail</span>
+                </div>
+                <div>
+                  <p class="text-[10px] text-slate-400">电子邮箱</p>
+                  <p class="text-sm text-slate-700">{{ detailMember.email || '-' }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="size-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-green-500 text-base">phone</span>
+                </div>
+                <div>
+                  <p class="text-[10px] text-slate-400">手机号码</p>
+                  <p class="text-sm text-slate-700">{{ detailMember.mobile || '-' }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Work Summary -->
+          <div class="mb-6">
+            <h4 class="text-sm font-bold text-slate-900 mb-2">工作摘要</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="bg-blue-50 rounded-xl p-4 text-center">
+                <p class="text-2xl font-black text-blue-600">-</p>
+                <p class="text-[10px] text-blue-400 mt-1 font-medium">跟进客户</p>
+              </div>
+              <div class="bg-emerald-50 rounded-xl p-4 text-center">
+                <p class="text-2xl font-black text-emerald-600">-</p>
+                <p class="text-[10px] text-emerald-400 mt-1 font-medium">活跃商机</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="p-4 pt-0 flex gap-3">
+          <el-button class="flex-1" type="primary" size="large" @click="showMemberDetailDrawer = false; handleEditMember(detailMember)">
+            <span class="material-symbols-outlined text-base mr-1">edit</span>
+            编辑资料
+          </el-button>
+          <el-button size="large" type="danger" plain class="!px-3" @click="handleDeleteMember(detailMember)">
+            <span class="material-symbols-outlined text-base">delete</span>
+          </el-button>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -1566,7 +1749,7 @@ import {
   enableCustomField,
   disableCustomField
 } from '@/api/customField'
-import { getLoginUserDetail, updateProfile, changePassword, queryUserList, addUser, updateUserInfo } from '@/api/auth'
+import { getLoginUserDetail, updateProfile, changePassword, queryUserList, addUser, updateUserInfo, deleteUsers } from '@/api/auth'
 import { queryDeptTree as fetchDeptTree, addDept, updateDept, deleteDept } from '@/api/dept'
 import type { DeptVO } from '@/types/dept'
 import { getAiConfig, updateAiConfig, testAiConnection, getMinioConsoleUrl, getMinioSsoUrl, getWeKnoraConfig, updateWeKnoraConfig, testWeKnoraConnection, getEnterpriseConfig, updateEnterpriseConfig } from '@/api/systemConfig'
@@ -1738,9 +1921,16 @@ const memberForm = reactive({
   email: '',
   post: '',
   deptId: null as number | string | null,
+  parentId: null as number | string | null,
+  status: 1 as number,
   roleIds: [] as string[]
 })
 const allRoleOptions = ref<RoleVO[]>([])
+const allUserListForParent = ref<any[]>([])
+
+// Employee detail drawer
+const showMemberDetailDrawer = ref(false)
+const detailMember = ref<any>(null)
 
 // Role management state
 const roleList = ref<RoleVO[]>([])
@@ -2184,6 +2374,8 @@ async function handleSaveDept() {
 
 function handleEditMember(member: any) {
   editingMember.value = member
+  loadAllUsersForParent()
+  loadRoleOptions()
   Object.assign(memberForm, {
     username: member.username || '',
     realname: member.realname || '',
@@ -2192,6 +2384,8 @@ function handleEditMember(member: any) {
     email: member.email || '',
     post: member.post || '',
     deptId: member.deptId || null,
+    parentId: member.parentId || null,
+    status: member.status ?? 1,
     roleIds: (member.roleIds || []).map(String)
   })
   showAddMemberDialog.value = true
@@ -2225,9 +2419,12 @@ async function handleSaveMember() {
         email: memberForm.email || undefined,
         post: memberForm.post || undefined,
         deptId: memberForm.deptId || undefined,
+        parentId: memberForm.parentId || 0,
+        status: memberForm.status,
+        password: memberForm.password || undefined,
         roleIds: memberForm.roleIds
       })
-      ElMessage.success('成员更新成功')
+      ElMessage.success('员工更新成功')
       showAddMemberDialog.value = false
       editingMember.value = null
       await loadMembers()
@@ -2238,34 +2435,25 @@ async function handleSaveMember() {
       submittingMember.value = false
     }
   } else {
-    if (!memberForm.username.trim() || !memberForm.realname.trim() || !memberForm.password.trim()) {
-      ElMessage.warning('请填写用户名、姓名和密码')
+    if (!memberForm.username.trim() || !memberForm.realname.trim()) {
+      ElMessage.warning('请填写用户名和姓名')
       return
     }
     submittingMember.value = true
     try {
       await addUser({
         username: memberForm.username,
-        password: memberForm.password,
+        password: memberForm.password || '123456',
         realname: memberForm.realname,
         mobile: memberForm.mobile || undefined,
         email: memberForm.email || undefined,
         deptId: memberForm.deptId || (selectedDept.value ? selectedDept.value.deptId : undefined),
-        post: memberForm.post || undefined
+        post: memberForm.post || undefined,
+        parentId: memberForm.parentId || undefined,
+        status: memberForm.status,
+        roleIds: memberForm.roleIds.length > 0 ? memberForm.roleIds : undefined
       })
-      // 如果选了角色，查找新创建的用户并关联角色
-      if (memberForm.roleIds.length > 0) {
-        const res = await queryUserList({ search: memberForm.username, limit: 1 })
-        const newUser = res?.list?.[0] || res?.records?.[0]
-        if (newUser) {
-          await addUsersToRole([String(newUser.userId)], memberForm.roleIds[0])
-          // 如果有多个角色，逐个关联
-          for (let i = 1; i < memberForm.roleIds.length; i++) {
-            await addUsersToRole([String(newUser.userId)], memberForm.roleIds[i])
-          }
-        }
-      }
-      ElMessage.success('成员添加成功')
+      ElMessage.success('员工添加成功')
       showAddMemberDialog.value = false
       resetMemberForm()
       await loadMembers()
@@ -2280,7 +2468,52 @@ async function handleSaveMember() {
 
 function resetMemberForm() {
   editingMember.value = null
-  Object.assign(memberForm, { username: '', realname: '', password: '', mobile: '', email: '', post: '', deptId: selectedDept.value ? selectedDept.value.deptId : null, roleIds: [] })
+  Object.assign(memberForm, { username: '', realname: '', password: '', mobile: '', email: '', post: '', deptId: selectedDept.value ? selectedDept.value.deptId : null, parentId: null, status: 1, roleIds: [] })
+}
+
+async function loadAllUsersForParent() {
+  try {
+    const res = await queryUserList({ limit: 500 })
+    allUserListForParent.value = res?.list || res?.records || []
+  } catch { /* ignore */ }
+}
+
+const parentOptions = computed(() => {
+  const currentId = editingMember.value?.userId
+  return allUserListForParent.value.filter((u: any) =>
+    u.status === 1 && (!currentId || String(u.userId) !== String(currentId))
+  )
+})
+
+function handleMemberRowClick(member: any) {
+  detailMember.value = member
+  showMemberDetailDrawer.value = true
+}
+
+async function handleDeleteMember(member: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除员工「${member.realname || member.username}」吗？此操作不可撤销。`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+    )
+    await deleteUsers([member.userId])
+    ElMessage.success('员工已删除')
+    showMemberDetailDrawer.value = false
+    await loadMembers()
+    await loadDeptTree()
+  } catch { /* cancelled */ }
+}
+
+async function loadRoleOptions() {
+  try { allRoleOptions.value = await queryRoleList() } catch { /* ignore */ }
+}
+
+function handleAddMember() {
+  resetMemberForm()
+  loadAllUsersForParent()
+  loadRoleOptions()
+  showAddMemberDialog.value = true
 }
 
 // Agent methods

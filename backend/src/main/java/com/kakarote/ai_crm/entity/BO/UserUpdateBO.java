@@ -41,6 +41,9 @@ public class UserUpdateBO {
     @Schema(description = "状态,0禁用,1正常,2未激活")
     private Integer status;
 
+    @Schema(description = "直属上级ID")
+    private Long parentId;
+
     @Schema(description = "角色ID列表")
     private List<Long> roleIds;
 }

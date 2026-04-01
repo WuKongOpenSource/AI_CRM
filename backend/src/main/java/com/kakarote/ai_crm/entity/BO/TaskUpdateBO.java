@@ -37,4 +37,10 @@ public class TaskUpdateBO {
 
     @Schema(description = "客户ID")
     private Long customerId;
+
+    @Schema(description = "任务类型")
+    private String taskType;
+
+    @Schema(description = "参与人名称（逗号分隔）")
+    private String participantNames;
 }

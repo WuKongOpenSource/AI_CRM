@@ -261,6 +261,13 @@ public class ChatServiceImpl implements IChatService {
 
         log.debug("开始 AI 对话，启用工具调用...");
 
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            String tip = "请先在系统设置-系统参数设置-AI/API设置中配置AI大模型相关信息";
+            saveMessage(sessionId, "assistant", tip);
+            AiContextHolder.clear();
+            return Flux.just(tip);
+        }
+
         ChatClient chatClient = chatClientProvider.getChatClient();
 
         final String finalContent = enhancedContent;

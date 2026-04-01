@@ -3,8 +3,10 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
+import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
+import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.service.ITaskService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,5 +70,11 @@ public class TaskController {
     public Result<List<TaskVO>> myTasks(
             @Parameter(description = "筛选: all/today/thisWeek/overdue") @RequestParam(defaultValue = "all") String filter) {
         return Result.ok(taskService.getMyTasks(filter));
+    }
+
+    @PostMapping("/ai-parse")
+    @Operation(summary = "AI智能解析任务")
+    public Result<TaskAiParseVO> aiParse(@Valid @RequestBody TaskAiParseBO parseBO) {
+        return Result.ok(taskService.aiParseTask(parseBO));
     }
 }

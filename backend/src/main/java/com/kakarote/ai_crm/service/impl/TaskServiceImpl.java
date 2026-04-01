@@ -5,27 +5,63 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
+import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.TaskMapper;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.UserUtil;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 
 /**
  * 任务服务实现
  */
+@Slf4j
 @Service
 public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements ITaskService {
+
+    @Autowired
+    private DynamicChatClientProvider chatClientProvider;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final String AI_TASK_PARSE_PROMPT = """
+        你是一个专业的 CRM 助手。请分析以下自然语言任务描述，提取结构化信息并以 JSON 格式返回。
+
+        当前时间: %s
+
+        用户输入:
+        %s
+
+        请严格按以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
+        {
+          "title": "简洁明确的任务标题",
+          "dueDate": "截止日期时间，格式 yyyy-MM-dd HH:mm（根据描述推断，如'明天下午两点'则计算实际日期）",
+          "priority": "优先级，只能是: high, medium, low（根据紧急程度和关键词判断，如'高优先级'='high'）",
+          "taskType": "任务类型，只能是: 跟进, 文档, 会议, 电话, 其他（根据内容推断）",
+          "customerName": "关联客户名称（如果能从描述中识别，否则为空字符串）",
+          "participantNames": "参与人名称，多人用逗号分隔（如果能从描述中识别，否则为空字符串）",
+          "assignedToName": "负责人名称（如果能从描述中识别，否则为空字符串）",
+          "description": "任务的详细描述或补充说明"
+        }
+        """;
 
     @Override
     public Long addTask(TaskAddBO taskAddBO) {
@@ -146,5 +182,71 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (tasks != null) {
             tasks.forEach(this::fillTaskNames);
         }
+    }
+
+    @Override
+    public TaskAiParseVO aiParseTask(TaskAiParseBO parseBO) {
+        String now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        String prompt = String.format(AI_TASK_PARSE_PROMPT, now, parseBO.getContent());
+
+        try {
+            String response = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
+
+            log.info("AI 任务解析原始响应: {}", response);
+            return parseTaskAiResponse(response);
+        } catch (Exception e) {
+            log.error("AI 任务解析失败，返回默认值", e);
+            return buildFallbackTaskResult(parseBO.getContent());
+        }
+    }
+
+    private TaskAiParseVO parseTaskAiResponse(String response) {
+        try {
+            String json = response.trim();
+            if (json.startsWith("```")) {
+                json = json.replaceFirst("```(?:json)?\\s*", "");
+                json = json.replaceFirst("\\s*```$", "");
+            }
+
+            JsonNode root = objectMapper.readTree(json);
+            TaskAiParseVO vo = new TaskAiParseVO();
+            vo.setTitle(getTextOrDefault(root, "title", ""));
+            vo.setDueDate(getTextOrDefault(root, "dueDate", ""));
+            vo.setPriority(getTextOrDefault(root, "priority", "medium"));
+            vo.setTaskType(getTextOrDefault(root, "taskType", "其他"));
+            vo.setCustomerName(getTextOrDefault(root, "customerName", ""));
+            vo.setParticipantNames(getTextOrDefault(root, "participantNames", ""));
+            vo.setAssignedToName(getTextOrDefault(root, "assignedToName", ""));
+            vo.setDescription(getTextOrDefault(root, "description", ""));
+            return vo;
+        } catch (Exception e) {
+            log.warn("AI 任务解析响应 JSON 解析失败: {}", e.getMessage());
+            return buildFallbackTaskResult("");
+        }
+    }
+
+    private String getTextOrDefault(JsonNode root, String field, String defaultValue) {
+        if (root.has(field) && !root.get(field).isNull()) {
+            String value = root.get(field).asText();
+            return StrUtil.isNotBlank(value) ? value : defaultValue;
+        }
+        return defaultValue;
+    }
+
+    private TaskAiParseVO buildFallbackTaskResult(String content) {
+        TaskAiParseVO vo = new TaskAiParseVO();
+        vo.setTitle(content.length() > 50 ? content.substring(0, 50) + "..." : content);
+        vo.setDueDate("");
+        vo.setPriority("medium");
+        vo.setTaskType("其他");
+        vo.setCustomerName("");
+        vo.setParticipantNames("");
+        vo.setAssignedToName("");
+        vo.setDescription(content);
+        return vo;
     }
 }

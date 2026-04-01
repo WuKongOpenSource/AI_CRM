@@ -39,12 +39,48 @@ export interface CustomerListVO extends Customer {
 }
 
 export interface CustomerDetailVO extends Customer {
-  contacts: Contact[]
-  followUps: FollowUp[]
+  source?: string
+  stageName?: string
+  quotation?: number
+  contractAmount?: number
+  revenue?: number
+  lastContactTime?: string
+  nextFollowTime?: string
+  remark?: string
+  ownerAvatar?: string
+  contacts: ContactVO[]
+  recentFollowUps: FollowUpVO[]
   tags: CustomerTag[]
-  documents: Knowledge[]
+  documents: KnowledgeVO[]
   tasks: Task[]
+  teamMembers?: TeamMemberVO[]
   customFields?: Record<string, any>
+}
+
+export interface ContactVO extends Contact {
+  // Backend ContactVO fields if needed
+}
+
+export interface FollowUpVO extends FollowUp {
+  customerName?: string
+  contactId?: string
+  contactName?: string
+  typeName?: string
+}
+
+export interface KnowledgeVO {
+  knowledgeId: string
+  name: string
+  type: string
+  summary?: string
+  createTime: string
+}
+
+export interface TeamMemberVO {
+  userId: string
+  name: string
+  avatar?: string
+  role?: string
 }
 
 export interface CustomerAddBO {

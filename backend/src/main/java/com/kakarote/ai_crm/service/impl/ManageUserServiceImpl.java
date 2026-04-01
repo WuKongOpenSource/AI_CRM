@@ -69,6 +69,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
      * @param userAddBO data
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void addUser(UserAddBO userAddBO) {
         ManagerUser manageUser = null;
         //判断用户名是否存在
@@ -86,9 +87,26 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 userAddBO.setPassword(password);
             }
             manageUser = BeanUtil.copyProperties(userAddBO, ManagerUser.class);
-            manageUser.setStatus(1);
+            if (userAddBO.getStatus() != null) {
+                manageUser.setStatus(userAddBO.getStatus());
+            } else {
+                manageUser.setStatus(1);
+            }
             manageUser.setCreateTime(new Date());
             save(manageUser);
+            // 关联角色
+            if (CollUtil.isNotEmpty(userAddBO.getRoleIds())) {
+                Long userId = manageUser.getUserId();
+                List<ManagerUserRole> roles = userAddBO.getRoleIds().stream().map(roleId -> {
+                    ManagerUserRole ur = new ManagerUserRole();
+                    ur.setUserId(userId);
+                    ur.setRoleId(roleId);
+                    ur.setCreateUserId(UserUtil.getUserId());
+                    ur.setCreateTime(LocalDateTime.now());
+                    return ur;
+                }).collect(Collectors.toList());
+                userRoleService.saveBatch(roles, Const.BATCH_SAVE_SIZE);
+            }
         }
     }
 
@@ -165,6 +183,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             }
             if (ObjectUtil.isNotNull(updateBO.getStatus())){
                 userEntity.setStatus(updateBO.getStatus());
+            }
+            if (updateBO.getParentId() != null){
+                userEntity.setParentId(updateBO.getParentId() == 0 ? null : updateBO.getParentId());
             }
             updateById(userEntity);
             // 同步角色

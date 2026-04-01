@@ -37,4 +37,10 @@ public class TaskAddBO {
 
     @Schema(description = "AI生成上下文")
     private String aiContext;
+
+    @Schema(description = "任务类型")
+    private String taskType;
+
+    @Schema(description = "参与人名称（逗号分隔）")
+    private String participantNames;
 }

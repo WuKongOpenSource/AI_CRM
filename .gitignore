@@ -8,5 +8,7 @@ target
 */target/**
 frontend/node_modules
 frontend/dist
+frontend/tsconfig.tsbuildinfo
+frontend/tsconfig.node.tsbuildinfo
 uploads/**
 backend/src/main/resources/public/

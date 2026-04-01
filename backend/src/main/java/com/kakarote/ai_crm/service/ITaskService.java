@@ -3,9 +3,11 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
+import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 
 import java.util.List;
@@ -44,4 +46,9 @@ public interface ITaskService extends IService<Task> {
      * 查询我的任务
      */
     List<TaskVO> getMyTasks(String filter);
+
+    /**
+     * AI智能解析任务
+     */
+    TaskAiParseVO aiParseTask(TaskAiParseBO parseBO);
 }

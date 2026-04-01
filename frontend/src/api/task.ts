@@ -43,3 +43,21 @@ export function updateTaskStatus(taskId: string, status: string): Promise<void> 
 export function getMyTasks(filter: string = 'all'): Promise<Task[]> {
   return get('/task/myTasks', { params: { filter } })
 }
+
+/**
+ * AI parse task from natural language
+ */
+export interface TaskAiParseVO {
+  title: string
+  dueDate: string
+  priority: string
+  taskType: string
+  customerName: string
+  participantNames: string
+  assignedToName: string
+  description: string
+}
+
+export function aiParseTask(content: string): Promise<TaskAiParseVO> {
+  return post('/task/ai-parse', { content })
+}

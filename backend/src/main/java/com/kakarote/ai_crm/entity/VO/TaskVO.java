@@ -65,4 +65,10 @@ public class TaskVO {
 
     @Schema(description = "是否逾期")
     private Boolean overdue;
+
+    @Schema(description = "任务类型")
+    private String taskType;
+
+    @Schema(description = "参与人名称（逗号分隔）")
+    private String participantNames;
 }

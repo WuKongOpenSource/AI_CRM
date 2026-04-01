@@ -719,7 +719,7 @@ import type { UploadInstance, UploadFile } from 'element-plus'
 import type { CustomerListVO, CustomerAddBO, CustomerImportPreview, CustomerImportRow, CustomerImportResult, CustomerLevel, CustomerStage } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { transferCustomer, updateCustomerStage, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport, aiParseCustomer } from '@/api/customer'
+import { transferCustomer, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport, aiParseCustomer } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { queryUserList } from '@/api/auth'
@@ -938,21 +938,6 @@ function handleRowClick(row: CustomerListVO) {
   router.push(`/customer/${row.customerId}`)
 }
 
-function handleEdit(row: CustomerListVO) {
-  editingCustomer.value = row
-  Object.assign(formData, {
-    companyName: row.companyName,
-    industry: row.industry || '',
-    level: row.level || 'B',
-    stage: row.stage || 'lead',
-    contactName: row.primaryContactName || '',
-    contactPhone: row.primaryContactPhone || '',
-    contactEmail: ''
-  })
-  customFieldValues.value = row.customFields ? { ...row.customFields } : {}
-  showAddDialog.value = true
-}
-
 async function handleSubmit() {
   if (!formData.companyName?.trim()) {
     ElMessage.warning('请输入公司名称')
@@ -1043,33 +1028,6 @@ function getStageDotClass(stage: string): string {
     lost: 'bg-red-500'
   }
   return classes[stage] || 'bg-slate-400'
-}
-
-const stageFlow = ['lead', 'qualified', 'proposal', 'negotiation', 'closed']
-const allStageOptions = [
-  { value: 'lead', label: '线索' },
-  { value: 'qualified', label: '资格审查' },
-  { value: 'proposal', label: '方案报价' },
-  { value: 'negotiation', label: '谈判中' },
-  { value: 'closed', label: '已成交' },
-  { value: 'lost', label: '已流失' }
-]
-
-function getNextStage(current: string): string | null {
-  const idx = stageFlow.indexOf(current)
-  if (idx >= 0 && idx < stageFlow.length - 1) return stageFlow[idx + 1]
-  return null
-}
-
-async function handleAdvanceStage(customerId: string, newStage: string) {
-  try {
-    await updateCustomerStage(customerId, newStage)
-    await customerStore.fetchCustomerList(true)
-    try { await customerStore.fetchStatistics(); statistics.value = customerStore.statistics } catch { /* ignore */ }
-    ElMessage.success(`商机阶段已更新为「${allStageOptions.find(s => s.value === newStage)?.label || newStage}」`)
-  } catch {
-    // Error handled by interceptor
-  }
 }
 
 function formatMoney(value: number | undefined): string {

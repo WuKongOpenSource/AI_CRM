@@ -18,7 +18,9 @@
             t.completed_time,
             t.create_user_id,
             cu.realname AS create_user_name,
-            t.create_time
+            t.create_time,
+            t.task_type,
+            t.participant_names
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
@@ -80,7 +82,9 @@
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
-            t.create_time
+            t.create_time,
+            t.task_type,
+            t.participant_names
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
@@ -107,7 +111,9 @@
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
-            t.create_time
+            t.create_time,
+            t.task_type,
+            t.participant_names
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id

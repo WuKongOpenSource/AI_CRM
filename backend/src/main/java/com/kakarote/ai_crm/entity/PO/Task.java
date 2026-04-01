@@ -81,6 +81,18 @@ public class Task implements Serializable {
     private String aiContext;
 
     /**
+     * 任务类型
+     */
+    @Schema(description = "任务类型")
+    private String taskType;
+
+    /**
+     * 参与人名称（逗号分隔）
+     */
+    @Schema(description = "参与人名称（逗号分隔）")
+    private String participantNames;
+
+    /**
      * 完成时间
      */
     @Schema(description = "完成时间")

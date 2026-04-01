@@ -3,8 +3,10 @@ package com.kakarote.ai_crm.entity.BO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.util.List;
+
 /**
- * 用户修改BO
+ * 用户添加BO
  *
  * @author guomenghao
  */
@@ -32,4 +34,13 @@ public class UserAddBO {
 
     @Schema(description = "岗位")
     private String post;
+
+    @Schema(description = "直属上级ID")
+    private Long parentId;
+
+    @Schema(description = "状态,0禁用,1正常")
+    private Integer status;
+
+    @Schema(description = "角色ID列表")
+    private List<Long> roleIds;
 }
