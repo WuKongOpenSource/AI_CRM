@@ -139,7 +139,7 @@
           </div>
           <div class="mt-1 text-xs text-slate-400">
             <template v-if="currentProviderPreset?.apiKeyConfigured">
-              当前服务商已保存 API Key，如需覆盖请重新输入后保存。
+              当前服务商已保存 API Key，不重新输入时保存会沿用已有 Key；如需覆盖或测试请重新输入。
             </template>
             <template v-else>
               出于安全原因，系统不会回显已保存的 API Key。保存或测试前需要重新输入。
@@ -551,12 +551,13 @@ async function handleTestConnection() {
 }
 
 async function handleSaveAiConfig() {
+  const trimmedApiKey = aiConfigForm.apiKey?.trim() || ''
   if (!aiConfigForm.apiUrl?.trim()) {
     ElMessage.warning('请填写 API 地址')
     return
   }
-  if (!aiConfigForm.apiKey?.trim()) {
-    ElMessage.warning('请填写 API 密钥')
+  if (!trimmedApiKey && !currentProviderPreset.value?.apiKeyConfigured) {
+    ElMessage.warning('请填写 API 密钥，或先保存当前服务商的 API Key')
     return
   }
   if (!aiConfigForm.model?.trim()) {
@@ -569,7 +570,7 @@ async function handleSaveAiConfig() {
     await updateAiConfig({
       provider: getCurrentProvider(),
       apiUrl: aiConfigForm.apiUrl.trim(),
-      apiKey: aiConfigForm.apiKey.trim(),
+      apiKey: trimmedApiKey,
       model: aiConfigForm.model.trim(),
       temperature: aiConfigForm.temperature,
       maxTokens: aiConfigForm.maxTokens,

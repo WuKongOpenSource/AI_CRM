@@ -24,8 +24,7 @@ public class AiConfigUpdateBO implements Serializable {
     @Schema(description = "API 基础 URL", example = "https://dashscope.aliyuncs.com/compatible-mode")
     private String apiUrl;
 
-    @NotBlank(message = "API Key 不能为空")
-    @Schema(description = "API 密钥")
+    @Schema(description = "API 密钥；更新已保存服务商时可留空以沿用历史 Key")
     private String apiKey;
 
     @NotBlank(message = "模型名称不能为空")

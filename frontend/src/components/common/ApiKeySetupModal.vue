@@ -11,13 +11,13 @@
     <Transition name="scale-fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[181] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[181] flex items-center justify-center p-5 sm:p-8"
       >
         <div
-          class="w-full max-w-lg overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-2xl shadow-slate-900/15"
+          class="flex max-h-[calc(100vh-2.5rem)] w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-2xl shadow-slate-900/15 sm:max-h-[calc(100vh-4rem)]"
           @click.stop
         >
-          <div class="p-8">
+          <div class="min-h-0 flex-1 overflow-y-auto p-6 sm:p-8">
             <div class="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 shadow-sm">
               <span class="material-symbols-outlined text-4xl">key</span>
             </div>
@@ -29,7 +29,7 @@
             <div class="space-y-4">
               <div>
                 <p class="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">AI 服务商</p>
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto pr-1">
                   <button
                     v-for="preset in providerOptions"
                     :key="preset.value"
@@ -71,6 +71,7 @@
                   allow-create
                   default-first-option
                   :reserve-keyword="false"
+                  popper-class="api-key-model-select-popper"
                   :placeholder="currentModelPlaceholder"
                 >
                   <el-option
@@ -109,7 +110,7 @@
                 </div>
                 <p class="px-1 text-[11px] text-slate-400">
                   <template v-if="currentProviderPreset?.apiKeyConfigured">
-                    当前服务商已保存过 API Key，重新保存会覆盖原配置。
+                    当前服务商已保存过 API Key，不重新输入时会沿用已有 Key；如需覆盖请重新输入。
                   </template>
                   <template v-else>
                     当前服务商尚未配置 API Key，保存后会自动设为默认生效。
@@ -146,7 +147,7 @@
             </div>
           </div>
 
-          <div class="border-t border-slate-100 bg-slate-50 p-4">
+          <div class="shrink-0 border-t border-slate-100 bg-slate-50 p-4">
             <p class="text-center text-[10px] font-bold uppercase tracking-[0.32em] text-slate-400">
               悟空AI 安全加密传输
             </p>
@@ -222,10 +223,16 @@ const currentModelPlaceholder = computed(() => {
     || '请输入模型名称'
 })
 const currentApiKeyPlaceholder = computed(() => {
+  if (currentProviderPreset.value?.apiKeyConfigured) {
+    return `已保存 ${currentProviderPreset.value?.label || 'AI'} API Key，可留空沿用`
+  }
   return `请输入您的 ${currentProviderPreset.value?.label || 'AI'} API Key`
 })
+const hasReusableApiKey = computed(() => {
+  return Boolean(localForm.apiKey?.trim() || currentProviderPreset.value?.apiKeyConfigured)
+})
 const canSave = computed(() => {
-  return Boolean(localForm.provider && localForm.apiUrl?.trim() && localForm.apiKey?.trim() && localForm.model?.trim())
+  return Boolean(localForm.provider && localForm.apiUrl?.trim() && hasReusableApiKey.value && localForm.model?.trim())
 })
 
 watch(
@@ -362,5 +369,14 @@ function handleSave() {
 
 :deep(.api-key-model-select .el-select__wrapper.is-focused) {
   box-shadow: 0 0 0 2px rgb(59 130 246 / 0.2);
+}
+
+:global(.api-key-model-select-popper .el-select-dropdown__wrap) {
+  max-height: 156px;
+}
+
+:global(.api-key-model-select-popper .el-scrollbar__wrap) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 </style>

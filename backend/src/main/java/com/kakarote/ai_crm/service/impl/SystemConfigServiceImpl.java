@@ -190,9 +190,11 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     public void updateAiConfig(AiConfigUpdateBO updateBO) {
         String normalizedApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(updateBO.getApiUrl());
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(updateBO.getProvider(), normalizedApiUrl);
-        AiModelCapabilities capabilities = validateAiConfig(descriptor, updateBO);
         Map<String, String> existingConfigs = getConfigsByType(AI_CONFIG_TYPE);
         Map<String, StoredProviderConfig> providerConfigs = loadWritableProviderConfigs(existingConfigs);
+        String normalizedApiKey = resolveApiKeyForSave(descriptor.getCode(), updateBO.getApiKey(), providerConfigs);
+        updateBO.setApiKey(normalizedApiKey);
+        AiModelCapabilities capabilities = validateAiConfig(descriptor, updateBO);
 
         String normalizedModel = updateBO.getModel().trim();
         Double resolvedTemperature = updateBO.getTemperature() != null ? updateBO.getTemperature() : defaultTemperature;
@@ -202,7 +204,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         providerConfigs.put(descriptor.getCode(), new StoredProviderConfig(
                 descriptor.getCode(),
                 normalizedApiUrl,
-                updateBO.getApiKey().trim(),
+                normalizedApiKey,
                 normalizedModel,
                 resolvedTemperature,
                 resolvedMaxTokens,
@@ -213,7 +215,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         configs.put(AI_MODE_KEY, AiMode.CUSTOM.getCode());
         configs.put(AI_PROVIDER_KEY, descriptor.getCode());
         configs.put(AI_API_URL_KEY, normalizedApiUrl);
-        configs.put(AI_API_KEY_KEY, updateBO.getApiKey().trim());
+        configs.put(AI_API_KEY_KEY, normalizedApiKey);
         configs.put(AI_MODEL_KEY, normalizedModel);
         configs.put(AI_TEMPERATURE_KEY, String.valueOf(resolvedTemperature));
         configs.put(AI_MAX_TOKENS_KEY, String.valueOf(resolvedMaxTokens));
@@ -560,6 +562,20 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                     "当前模型不支持工具调用，不适合作为 CRM 主对话模型，请改用支持 Tool Calling 的模型");
         }
         return capabilities;
+    }
+
+    private String resolveApiKeyForSave(String providerCode, String inputApiKey,
+                                        Map<String, StoredProviderConfig> providerConfigs) {
+        String normalizedApiKey = StrUtil.nullToEmpty(inputApiKey).trim();
+        if (StrUtil.isNotBlank(normalizedApiKey)) {
+            return normalizedApiKey;
+        }
+
+        StoredProviderConfig savedConfig = providerConfigs.get(providerCode);
+        if (savedConfig == null) {
+            return normalizedApiKey;
+        }
+        return StrUtil.nullToEmpty(savedConfig.apiKey()).trim();
     }
 
     private void validateExtraHeadersJson(String extraHeadersJson) {

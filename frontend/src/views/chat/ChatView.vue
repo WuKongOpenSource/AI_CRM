@@ -833,12 +833,17 @@ function resolveProviderLabel(provider?: AiProvider): string {
 }
 
 async function handleSaveApiKey(payload: AiConfigUpdateBO) {
+  const resolvedProvider = (payload.provider || DEFAULT_CHAT_AI_CONFIG.provider) as AiProvider
   const trimmedApiKey = payload.apiKey.trim()
   const trimmedApiUrl = payload.apiUrl.trim()
   const trimmedModel = payload.model.trim()
+  const canReuseSavedApiKey = Boolean(
+    trimmedApiKey
+    || apiKeySetupProviderOptions.value.find((item) => item.value === resolvedProvider)?.apiKeyConfigured
+  )
 
-  if (!trimmedApiKey) {
-    ElMessage.warning('请输入 API Key')
+  if (!canReuseSavedApiKey) {
+    ElMessage.warning('请输入 API Key，或先保存当前服务商的 API Key')
     return
   }
   if (!trimmedApiUrl) {
@@ -856,6 +861,7 @@ async function handleSaveApiKey(payload: AiConfigUpdateBO) {
     const nextPayload: AiConfigUpdateBO = {
       ...DEFAULT_CHAT_AI_CONFIG,
       ...payload,
+      provider: resolvedProvider,
       apiUrl: trimmedApiUrl,
       apiKey: trimmedApiKey,
       model: trimmedModel,
