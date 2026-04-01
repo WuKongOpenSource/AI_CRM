@@ -35,7 +35,7 @@
 
     <!-- Content Area -->
     <div class="flex-1 overflow-auto">
-      <div class="p-4 md:p-6">
+      <div :class="activeTab === 'team' ? 'p-0' : 'p-4 md:p-6'">
           <!-- System Sub-tabs (v-show so it doesn't break v-if/v-else-if chain) -->
           <div v-show="isSystemTab" class="max-w-4xl mx-auto mb-6">
             <div class="flex gap-2 overflow-x-auto">
@@ -153,9 +153,13 @@
 
           <!-- Team Management Tab -->
           <div v-else-if="activeTab === 'team'">
-            <div class="flex h-full bg-slate-50/50" :class="{ 'flex-col': isMobile }" style="min-height: 500px">
+            <div
+              class="flex h-full bg-slate-50/50 overflow-hidden"
+              :class="{ 'flex-col': isMobile }"
+              style="min-height: 500px"
+            >
               <!-- Left Sidebar: Department Tree -->
-              <div v-if="!isMobile" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col rounded-l-2xl">
+              <div v-if="!isMobile" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col">
                 <div class="p-6 border-b border-slate-100 flex items-center justify-between">
                   <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span class="material-symbols-outlined text-primary text-lg">account_tree</span>
@@ -222,7 +226,7 @@
               </div>
 
               <!-- Mobile: Department selector -->
-              <div v-if="isMobile" class="flex items-center gap-2 mb-3">
+              <div v-if="isMobile" class="flex items-center gap-2 p-4 border-b border-slate-100 bg-white">
                 <button @click="showDeptDrawer = true" class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm max-w-[200px]">
                   <span class="material-symbols-outlined text-slate-400 text-base">account_tree</span>
                   <span class="truncate">{{ selectedDept ? selectedDept.deptName : '选择部门' }}</span>
@@ -238,7 +242,7 @@
               </div>
 
               <!-- Right Content: Employee List -->
-              <div class="flex-1 overflow-y-auto" :class="isMobile ? '' : 'p-8'">
+              <div class="flex-1 overflow-y-auto" :class="isMobile ? 'p-4' : 'p-8'">
                 <div class="max-w-6xl mx-auto w-full space-y-6">
                   <!-- Header -->
                   <div class="flex items-center justify-between">
@@ -291,6 +295,28 @@
                       </div>
                     </template>
                     <template v-else>
+                      <!-- Filters -->
+                      <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
+                        <div class="relative flex-1">
+                          <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+                          <input
+                            v-model="memberSearch"
+                            type="text"
+                            placeholder="搜索员工姓名、邮箱或手机号..."
+                            class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary/50 outline-none transition-shadow"
+                          />
+                        </div>
+                        <select
+                          v-model.number="memberRoleId"
+                          class="bg-white border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-600 outline-none focus:ring-2 focus:ring-primary/50"
+                        >
+                          <option :value="0">所有角色</option>
+                          <option v-for="r in allRoleOptions" :key="r.roleId" :value="Number(r.roleId)">
+                            {{ r.roleName }}
+                          </option>
+                        </select>
+                      </div>
+
                       <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                           <thead>
@@ -303,9 +329,9 @@
                               <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">操作</th>
                             </tr>
                           </thead>
-                          <tbody class="divide-y divide-slate-50">
+                          <tbody v-if="filteredMembers.length > 0" class="divide-y divide-slate-50">
                             <tr
-                              v-for="member in memberList"
+                              v-for="member in filteredMembers"
                               :key="member.userId"
                               class="hover:bg-slate-50/50 transition-colors group cursor-pointer"
                               @click="handleMemberRowClick(member)"
@@ -316,7 +342,7 @@
                                     {{ (member.realname || member.username || '?').charAt(0) }}
                                   </div>
                                   <div>
-                                    <p class="text-sm font-bold text-slate-900">{{ member.realname || member.username }}</p>
+                                    <p class="text-sm font-bold text-slate-900 hover:text-primary transition-colors">{{ member.realname || member.username }}</p>
                                     <p class="text-[10px] text-slate-400">{{ member.email || '' }}</p>
                                   </div>
                                 </div>
@@ -361,6 +387,14 @@
                                     <span class="material-symbols-outlined text-sm">{{ member.status === 1 ? 'block' : 'check_circle' }}</span>
                                   </button>
                                 </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                          <tbody v-else>
+                            <tr>
+                              <td colspan="6" class="text-center py-16 text-slate-400">
+                                <span class="material-symbols-outlined text-3xl mb-2 opacity-50">search_off</span>
+                                <div class="text-sm">未找到匹配的员工</div>
                               </td>
                             </tr>
                           </tbody>
@@ -1930,6 +1964,22 @@ const memberList = ref<any[]>([])
 const loadingDeptTree = ref(false)
 const loadingMembers = ref(false)
 const showDeptDrawer = ref(false)
+const memberSearch = ref('')
+const memberRoleId = ref<number>(0)
+
+const filteredMembers = computed(() => {
+  const list = memberList.value || []
+  const s = memberSearch.value.trim().toLowerCase()
+  const roleId = Number(memberRoleId.value || 0)
+  return list.filter((m: any) => {
+    const okSearch = !s || [m.realname, m.username, m.email, m.mobile]
+      .filter(Boolean)
+      .some((v: string) => String(v).toLowerCase().includes(s))
+    const okRole = roleId === 0 || (Array.isArray(m.roleIds) && m.roleIds.map(String).includes(String(roleId))) ||
+      (Array.isArray(m.roles) && m.roles.map(String).includes(String(roleId)))
+    return okSearch && okRole
+  })
+})
 
 // Dept dialog
 const showDeptDialog = ref(false)
