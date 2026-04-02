@@ -1,25 +1,28 @@
 <template>
   <el-dialog
     v-model="visible"
-    width="680px"
+    :width="isMobile ? '96%' : '720px'"
+    :fullscreen="isMobile"
     :show-close="false"
     destroy-on-close
     top="6vh"
-    class="schedule-dialog !rounded-2xl !p-0 overflow-hidden"
+    class="schedule-dialog !rounded-2xl !p-0 overflow-hidden wk-crm-el-field-scope"
   >
     <template #header>
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="size-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <span class="material-symbols-outlined text-xl text-primary">calendar_month</span>
+          <div class="size-11 rounded-2xl bg-primary/10 flex items-center justify-center shadow-sm">
+            <span class="material-symbols-outlined text-[22px] text-primary">calendar_month</span>
           </div>
           <div>
             <h2 class="text-lg font-bold text-slate-900">新增日程</h2>
-            <p class="text-xs text-slate-500 mt-0.5">手动填写日程详细信息</p>
+            <p class="text-xs text-slate-500 mt-0.5">手动填写更高效，也支持 AI 智能解析</p>
           </div>
         </div>
         <button
           class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
+          type="button"
+          aria-label="关闭"
           @click="visible = false"
         >
           <span class="material-symbols-outlined">close</span>
@@ -28,96 +31,189 @@
     </template>
 
     <div class="space-y-6 bg-white px-5 pb-6 pt-5 md:px-6 md:pb-7 md:pt-6">
+      <section class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-white to-slate-50 p-4 shadow-sm">
+        <div class="flex items-center gap-2 mb-3">
+          <WkIcon name="ai" class="text-primary text-sm" />
+          <span class="text-xs font-bold text-primary uppercase tracking-wide">智能解析</span>
+          <span class="text-xs text-slate-400">一句话补齐时间、客户和系统员工参与人</span>
+        </div>
+        <div class="relative">
+          <el-input
+            v-model="aiParseInput"
+            type="textarea"
+            :rows="4"
+            resize="none"
+            placeholder="例如：下周二下午三点和科技创新有限公司的张总开会讨论 Q4 扩容方案，地点在总部 8 楼会议室，参与人有李四、王敏。"
+            class="wk-crm-el-field-input wk-crm-el-field-ai w-full"
+          />
+          <button
+            :disabled="!aiParseInput.trim() || aiParsing"
+            class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            @click="handleAiParse"
+          >
+            <span v-if="aiParsing" class="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+            <WkIcon v-else name="ai" class="text-sm" />
+            {{ aiParsing ? '解析中...' : '一键解析' }}
+          </button>
+        </div>
+      </section>
+
       <div class="space-y-5">
         <div>
-          <label class="text-xs font-bold text-slate-500 mb-1.5 block">日程标题 <span class="text-red-500">*</span></label>
-          <input
+          <label class="mb-1.5 block text-xs font-bold text-slate-500">
+            日程标题
+            <span class="text-red-500">*</span>
+          </label>
+          <el-input
             v-model="scheduleForm.title"
-            type="text"
             placeholder="请输入日程标题"
-            class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2 outline-none transition-all"
+            size="large"
+            class="w-full wk-crm-el-field-input"
           />
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">开始日期 <span class="text-red-500">*</span></label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
-              <input
-                v-model="scheduleForm.startDate"
-                type="date"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
-              />
-            </div>
+            <label class="mb-1.5 block text-xs font-bold text-slate-500">
+              开始日期
+              <span class="text-red-500">*</span>
+            </label>
+            <el-date-picker
+              v-model="scheduleForm.startDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="选择开始日期"
+              size="large"
+              class="w-full wk-crm-el-field-date"
+            />
           </div>
           <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">开始时间 <span class="text-red-500">*</span></label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">schedule</span>
-              <input
-                v-model="scheduleForm.startTime"
-                type="time"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
-              />
-            </div>
+            <label class="mb-1.5 block text-xs font-bold text-slate-500">
+              开始时间
+              <span class="text-red-500">*</span>
+            </label>
+            <el-time-picker
+              v-model="scheduleForm.startTime"
+              value-format="HH:mm"
+              format="HH:mm"
+              placeholder="选择开始时间"
+              size="large"
+              class="w-full wk-crm-el-field-date"
+            />
           </div>
           <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">结束日期</label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">event</span>
-              <input
-                v-model="scheduleForm.endDate"
-                type="date"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
-              />
-            </div>
+            <label class="mb-1.5 block text-xs font-bold text-slate-500">结束日期</label>
+            <el-date-picker
+              v-model="scheduleForm.endDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="选择结束日期"
+              clearable
+              size="large"
+              class="w-full wk-crm-el-field-date"
+            />
           </div>
           <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">结束时间</label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">update</span>
-              <input
-                v-model="scheduleForm.endTime"
-                type="time"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
-              />
-            </div>
+            <label class="mb-1.5 block text-xs font-bold text-slate-500">结束时间</label>
+            <el-time-picker
+              v-model="scheduleForm.endTime"
+              value-format="HH:mm"
+              format="HH:mm"
+              placeholder="选择结束时间"
+              clearable
+              size="large"
+              class="w-full wk-crm-el-field-date"
+            />
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">类型</label>
-            <select
+            <label class="mb-1.5 block text-xs font-bold text-slate-500">类型</label>
+            <el-select
               v-model="scheduleForm.type"
-              class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2 outline-none transition-all"
+              class="w-full wk-crm-el-field-select"
+              size="large"
             >
-              <option value="meeting">会议</option>
-              <option value="call">电话</option>
-              <option value="visit">拜访</option>
-            </select>
+              <el-option label="会议" value="meeting" />
+              <el-option label="电话" value="call" />
+              <el-option label="拜访" value="visit" />
+              <el-option label="其他" value="other" />
+            </el-select>
           </div>
           <div>
-            <label class="text-xs font-bold text-slate-500 mb-1.5 block">地点</label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">location_on</span>
-              <input
-                v-model="scheduleForm.location"
-                type="text"
-                placeholder="请输入地点"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
+            <label class="mb-1.5 block text-xs font-bold text-slate-500">关联客户/公司</label>
+            <el-select
+              v-model="scheduleForm.customerId"
+              filterable
+              remote
+              reserve-keyword
+              clearable
+              default-first-option
+              placeholder="输入公司名称"
+              :remote-method="searchCustomers"
+              :loading="customerSearchLoading"
+              class="w-full wk-crm-el-field-select"
+              size="large"
+            >
+              <el-option
+                v-for="item in customerOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
               />
-            </div>
+            </el-select>
           </div>
         </div>
 
         <div>
-          <label class="text-xs font-bold text-slate-500 mb-1.5 block">描述备注</label>
-          <textarea
+          <label class="mb-1.5 block text-xs font-bold text-slate-500">参与人</label>
+          <el-select
+            v-model="selectedParticipantUserIds"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            default-first-option
+            placeholder="搜索并选择系统员工"
+            :remote-method="searchUsers"
+            :loading="userSearchLoading"
+            class="w-full wk-crm-el-field-select"
+            size="large"
+          >
+            <el-option
+              v-for="item in userOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+          <p v-if="participantAiWarning" class="mt-1 text-xs font-medium text-amber-600">
+            AI 识别到但未匹配到系统员工：{{ participantAiWarning }}
+          </p>
+        </div>
+
+        <div>
+          <label class="mb-1.5 block text-xs font-bold text-slate-500">地点</label>
+          <el-input
+            v-model="scheduleForm.location"
+            placeholder="请输入地点"
+            size="large"
+            class="w-full wk-crm-el-field-input"
+          />
+        </div>
+
+        <div>
+          <label class="mb-1.5 block text-xs font-bold text-slate-500">描述备注</label>
+          <el-input
             v-model="scheduleForm.description"
+            type="textarea"
+            :rows="4"
+            resize="none"
             placeholder="请输入日程备注信息..."
-            class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2 outline-none transition-all resize-none h-20"
+            class="w-full wk-crm-el-field-input"
           />
         </div>
       </div>
@@ -126,17 +222,19 @@
     <template #footer>
       <div class="flex gap-3">
         <button
-          class="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+          class="flex-1 rounded-xl bg-slate-100 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-200"
+          type="button"
           @click="visible = false"
         >
           取消
         </button>
         <button
           :disabled="!canSave"
-          class="flex-1 py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shadow-sm"
+          class="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
           @click="handleSaveSchedule"
         >
-          {{ saving ? '保存中...' : '确认保存' }}
+          {{ saving ? '保存中...' : '确认创建' }}
         </button>
       </div>
     </template>
@@ -146,7 +244,34 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { addSchedule, type ScheduleAddBO } from '@/api/schedule'
+import { queryUserList } from '@/api/auth'
+import { queryCustomerList } from '@/api/customer'
+import {
+  addSchedule,
+  aiParseSchedule,
+  type ScheduleAddBO,
+  type ScheduleAiParseVO,
+  type ScheduleParticipantUser
+} from '@/api/schedule'
+import WkIcon from '@/components/common/WkIcon.vue'
+import { useResponsive } from '@/composables/useResponsive'
+
+type Option = {
+  value: string
+  label: string
+}
+
+type ScheduleFormState = {
+  title: string
+  startDate: string
+  startTime: string
+  endDate: string
+  endTime: string
+  type: string
+  customerId: string
+  location: string
+  description: string
+}
 
 const props = defineProps<{
   modelValue: boolean
@@ -157,16 +282,7 @@ const emit = defineEmits<{
   (e: 'created'): void
 }>()
 
-type ScheduleFormState = {
-  title: string
-  startDate: string
-  startTime: string
-  endDate: string
-  endTime: string
-  type: string
-  location: string
-  description: string
-}
+const { isMobile } = useResponsive()
 
 function createDefaultFormState(): ScheduleFormState {
   return {
@@ -176,13 +292,22 @@ function createDefaultFormState(): ScheduleFormState {
     endDate: '',
     endTime: '',
     type: 'meeting',
+    customerId: '',
     location: '',
     description: ''
   }
 }
 
 const saving = ref(false)
+const aiParsing = ref(false)
+const aiParseInput = ref('')
+const participantAiWarning = ref('')
 const scheduleForm = reactive<ScheduleFormState>(createDefaultFormState())
+const selectedParticipantUserIds = ref<string[]>([])
+const customerOptions = ref<Option[]>([])
+const customerSearchLoading = ref(false)
+const userOptions = ref<Option[]>([])
+const userSearchLoading = ref(false)
 
 const visible = computed({
   get: () => props.modelValue,
@@ -190,43 +315,243 @@ const visible = computed({
 })
 
 const canSave = computed(() =>
-  !!scheduleForm.title && !!scheduleForm.startDate && !!scheduleForm.startTime && !saving.value
+  !!scheduleForm.title.trim() && !!scheduleForm.startDate && !!scheduleForm.startTime && !saving.value
 )
 
 watch(
   () => props.modelValue,
   value => {
-    if (!value) resetScheduleForm()
+    if (!value) {
+      resetScheduleForm()
+    }
   }
 )
 
 function resetScheduleForm() {
   Object.assign(scheduleForm, createDefaultFormState())
+  aiParseInput.value = ''
+  participantAiWarning.value = ''
+  selectedParticipantUserIds.value = []
+  customerOptions.value = []
+  userOptions.value = []
+}
+
+function normalizeScheduleType(type?: string): string {
+  const raw = (type || '').trim().toLowerCase()
+  if (['meeting', 'call', 'visit', 'other'].includes(raw)) {
+    return raw
+  }
+  switch (type?.trim()) {
+    case '会议':
+      return 'meeting'
+    case '电话':
+      return 'call'
+    case '拜访':
+      return 'visit'
+    case '其他':
+      return 'other'
+    default:
+      return 'meeting'
+  }
+}
+
+function formatDatePart(value: number): string {
+  return value.toString().padStart(2, '0')
+}
+
+function parseAiDateTime(value?: string) {
+  if (!value) return null
+
+  const directMatch = value.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/)
+  if (directMatch) {
+    const [, year, month, day, hour, minute] = directMatch
+    return {
+      date: `${year}-${formatDatePart(Number(month))}-${formatDatePart(Number(day))}`,
+      time: `${formatDatePart(Number(hour))}:${minute}`
+    }
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+
+  return {
+    date: `${parsed.getFullYear()}-${formatDatePart(parsed.getMonth() + 1)}-${formatDatePart(parsed.getDate())}`,
+    time: `${formatDatePart(parsed.getHours())}:${formatDatePart(parsed.getMinutes())}`
+  }
+}
+
+function buildUserOption(user: ScheduleParticipantUser | Record<string, any>): Option {
+  const userId = String(user.userId ?? '')
+  const realname = String(user.realname || '').trim()
+  const username = String(user.username || '').trim()
+  const displayName = realname || username || userId
+  return {
+    value: userId,
+    label: username && username !== displayName ? `${displayName} (${username})` : displayName
+  }
+}
+
+function mergeUserOptions(options: Option[]) {
+  const optionMap = new Map(userOptions.value.map(item => [item.value, item]))
+  options.forEach(item => {
+    optionMap.set(item.value, item)
+  })
+  userOptions.value = Array.from(optionMap.values())
+}
+
+async function searchCustomers(query: string) {
+  if (!query) {
+    return
+  }
+  customerSearchLoading.value = true
+  try {
+    const res = await queryCustomerList({ keyword: query, page: 1, limit: 20 })
+    customerOptions.value = (res.list || []).map((customer: any) => ({
+      value: String(customer.customerId),
+      label: customer.companyName
+    }))
+  } catch (error) {
+    console.warn('客户搜索失败:', error)
+    customerOptions.value = []
+  } finally {
+    customerSearchLoading.value = false
+  }
+}
+
+async function searchUsers(query: string) {
+  if (!query) {
+    return
+  }
+  userSearchLoading.value = true
+  try {
+    const res = await queryUserList({ search: query })
+    const activeUsers = (res.list || []).filter((user: any) => user.status === 1 || user.status === undefined)
+    mergeUserOptions(activeUsers.map((user: any) => buildUserOption(user)))
+  } catch (error) {
+    console.warn('用户搜索失败:', error)
+  } finally {
+    userSearchLoading.value = false
+  }
+}
+
+function hasMeaningfulAiParseResult(result: ScheduleAiParseVO): boolean {
+  return Boolean(
+    result.title?.trim()
+    || result.startTime?.trim()
+    || result.endTime?.trim()
+    || result.customerName?.trim()
+    || result.location?.trim()
+    || result.description?.trim()
+    || result.participantUsers?.length
+    || result.unmatchedParticipantNames?.trim()
+  )
+}
+
+async function handleAiParse() {
+  if (!aiParseInput.value.trim()) return
+
+  aiParsing.value = true
+  try {
+    const result = await aiParseSchedule(aiParseInput.value.trim())
+    if (!hasMeaningfulAiParseResult(result)) {
+      participantAiWarning.value = ''
+      ElMessage.warning('本次智能解析没有提取到可填充的信息，请调整描述后重试')
+      return
+    }
+
+    if (result.title) scheduleForm.title = result.title
+    if (result.type) scheduleForm.type = normalizeScheduleType(result.type)
+    if (result.location) scheduleForm.location = result.location
+    if (result.description) scheduleForm.description = result.description
+
+    const parsedStart = parseAiDateTime(result.startTime)
+    if (parsedStart) {
+      scheduleForm.startDate = parsedStart.date
+      scheduleForm.startTime = parsedStart.time
+      if (!scheduleForm.endDate) {
+        scheduleForm.endDate = parsedStart.date
+      }
+    }
+
+    const parsedEnd = parseAiDateTime(result.endTime)
+    if (parsedEnd) {
+      scheduleForm.endDate = parsedEnd.date
+      scheduleForm.endTime = parsedEnd.time
+    }
+
+    if (result.customerName) {
+      const res = await queryCustomerList({ keyword: result.customerName, page: 1, limit: 5 })
+      const customers = res.list || []
+      if (customers.length > 0) {
+        customerOptions.value = customers.map((customer: any) => ({
+          value: String(customer.customerId),
+          label: customer.companyName
+        }))
+        scheduleForm.customerId = String(customers[0].customerId)
+      }
+    }
+
+    if (result.participantUsers?.length) {
+      const options = result.participantUsers.map(user => buildUserOption(user))
+      mergeUserOptions(options)
+      selectedParticipantUserIds.value = result.participantUsers.map(user => String(user.userId))
+    } else {
+      selectedParticipantUserIds.value = []
+    }
+
+    participantAiWarning.value = result.unmatchedParticipantNames || ''
+
+    if (participantAiWarning.value) {
+      ElMessage.warning('部分参与人未匹配到系统员工，请手动确认')
+    } else {
+      ElMessage.success('智能解析完成，请确认后再创建')
+    }
+  } catch (error) {
+    console.error('AI 解析日程失败', error)
+  } finally {
+    aiParsing.value = false
+  }
 }
 
 async function handleSaveSchedule() {
   if (!canSave.value) return
 
+  if ((scheduleForm.endDate && !scheduleForm.endTime) || (!scheduleForm.endDate && scheduleForm.endTime)) {
+    ElMessage.warning('结束日期和结束时间请同时填写')
+    return
+  }
+
+  const startTime = `${scheduleForm.startDate}T${scheduleForm.startTime}:00`
+  const endTime = scheduleForm.endDate && scheduleForm.endTime
+    ? `${scheduleForm.endDate}T${scheduleForm.endTime}:00`
+    : undefined
+
+  if (endTime && new Date(endTime).getTime() < new Date(startTime).getTime()) {
+    ElMessage.warning('结束时间不能早于开始时间')
+    return
+  }
+
   saving.value = true
   try {
     const data: ScheduleAddBO = {
-      title: scheduleForm.title,
-      startTime: `${scheduleForm.startDate}T${scheduleForm.startTime}:00`,
+      title: scheduleForm.title.trim(),
+      startTime,
+      endTime,
       type: scheduleForm.type,
+      customerId: scheduleForm.customerId || undefined,
       location: scheduleForm.location || undefined,
-      description: scheduleForm.description || undefined
-    }
-
-    if (scheduleForm.endDate && scheduleForm.endTime) {
-      data.endTime = `${scheduleForm.endDate}T${scheduleForm.endTime}:00`
+      description: scheduleForm.description || undefined,
+      participantUserIds: selectedParticipantUserIds.value.length ? selectedParticipantUserIds.value : undefined
     }
 
     await addSchedule(data)
     ElMessage.success('日程创建成功')
     emit('created')
     visible.value = false
-  } catch (e: any) {
-    ElMessage.error('创建日程失败: ' + (e?.message || '未知错误'))
+  } catch (error) {
+    console.error('Create schedule failed:', error)
   } finally {
     saving.value = false
   }
@@ -240,12 +565,16 @@ async function handleSaveSchedule() {
 }
 
 .schedule-dialog .el-dialog__body {
-  max-height: 70vh;
+  max-height: 72vh;
   overflow-y: auto;
   padding: 0 !important;
 }
 
 .schedule-dialog .el-dialog__footer {
   padding: 14px 24px 22px !important;
+}
+
+.el-overlay:has(.schedule-dialog) {
+  overflow: hidden;
 }
 </style>

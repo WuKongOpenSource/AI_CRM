@@ -2,37 +2,122 @@
   <div class="space-y-6">
     <el-card shadow="never" class="!border-slate-200">
       <template #header>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-4">
           <span class="font-medium">AI 大模型配置</span>
           <el-tag v-if="aiConfigForm.updateTime" size="small" type="info">
-            最后更新: {{ formatTime(aiConfigForm.updateTime) }}
+            最后更新 {{ formatTime(aiConfigForm.updateTime) }}
           </el-tag>
         </div>
       </template>
 
-      <el-form :model="aiConfigForm" label-position="top" class="max-w-2xl">
-        <el-form-item label="AI 服务提供商">
+      <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">当前模式</p>
+            <div class="mt-2 flex items-center gap-2">
+              <el-tag :type="currentMode === 'gift' ? 'success' : 'primary'">
+                {{ currentMode === 'gift' ? '赠送额度模式' : '自定义模型模式' }}
+              </el-tag>
+              <span class="text-sm text-slate-500">
+                剩余 {{ giftTokenRemainingWan }} / {{ giftTokenTotalWan }} 万 token
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-slate-500">
+              未配置自定义模型时默认消耗赠送额度；切换到自定义模型后仍会继续统计 token 用量。
+            </p>
+          </div>
+
+          <div class="flex gap-2">
+            <el-button
+              :disabled="!canUseGiftMode"
+              :loading="switchingAiMode"
+              @click="handleUseGiftMode"
+            >
+              使用赠送额度
+            </el-button>
+            <el-button
+              type="primary"
+              plain
+              :disabled="!canUseSavedCustomMode"
+              :loading="switchingAiMode"
+              @click="handleUseSavedCustomMode"
+            >
+              启用已保存自定义模型
+            </el-button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-6 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">已保存服务商</p>
+            <p class="mt-2 text-sm text-slate-600">
+              已配置 {{ configuredProviders.length }} / {{ providerOptions.length }} 个服务商，切换编辑时不会互相覆盖。
+            </p>
+          </div>
+          <el-tag type="primary" effect="plain">
+            多服务商配置池
+          </el-tag>
+        </div>
+
+        <div v-if="configuredProviders.length" class="mt-4 flex flex-wrap gap-2">
+          <button
+            v-for="provider in configuredProviders"
+            :key="provider.value"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-all"
+            :class="provider.value === aiConfigForm.provider
+              ? 'border-primary bg-primary/5 text-primary'
+              : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-primary/40 hover:text-primary'"
+            @click="handleProviderChange(provider.value)"
+          >
+            <span>{{ provider.label }}</span>
+            <span
+              class="rounded-full px-2 py-0.5 text-[11px]"
+              :class="provider.active ? 'bg-primary text-white' : 'bg-slate-200 text-slate-600'"
+            >
+              {{ provider.active ? '当前生效' : '已保存' }}
+            </span>
+          </button>
+        </div>
+        <p v-else class="mt-4 text-sm text-slate-400">
+          还没有已保存的服务商配置，保存后会自动加入配置池。
+        </p>
+      </div>
+
+      <el-form :model="aiConfigForm" label-position="top" class="max-w-3xl">
+        <el-form-item label="AI 服务商">
           <el-select v-model="aiConfigForm.provider" class="w-full" @change="handleProviderChange">
             <el-option
-              v-for="preset in AI_PROVIDER_PRESETS"
+              v-for="preset in providerOptions"
               :key="preset.value"
               :label="preset.label"
               :value="preset.value"
             />
           </el-select>
+          <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <span>{{ currentProviderPreset?.description || '支持 OpenAI 兼容接口的通用模型配置。' }}</span>
+            <el-tag v-if="currentProviderPreset?.configured" size="small" type="success" effect="plain">
+              已保存该服务商配置
+            </el-tag>
+            <el-tag v-if="currentProviderPreset?.active" size="small" type="primary" effect="plain">
+              当前默认生效
+            </el-tag>
+          </div>
         </el-form-item>
 
         <el-form-item label="API 基础地址">
-          <el-input v-model="aiConfigForm.apiUrl" placeholder="https://api.openai.com/v1">
+          <el-input v-model="aiConfigForm.apiUrl" placeholder="https://api.openai.com">
             <template #prepend>URL</template>
           </el-input>
-          <div class="text-xs text-slate-400 mt-1">
-            OpenAI 兼容接口的基础 URL，末尾不要加斜杠
+          <div class="mt-1 text-xs text-slate-400">
+            这里填写兼容 OpenAI Chat Completions 的基础地址，不需要额外填写结尾的 `/v1`。
           </div>
         </el-form-item>
 
         <el-form-item label="API 密钥">
-          <div class="flex gap-2 w-full">
+          <div class="flex w-full gap-2">
             <el-input
               v-model="aiConfigForm.apiKey"
               :type="showApiKey ? 'text' : 'password'"
@@ -52,11 +137,19 @@
               测试连接
             </el-button>
           </div>
+          <div class="mt-1 text-xs text-slate-400">
+            <template v-if="currentProviderPreset?.apiKeyConfigured">
+              当前服务商已保存 API Key，不重新输入时保存会沿用已有 Key；如需覆盖或测试请重新输入。
+            </template>
+            <template v-else>
+              出于安全原因，系统不会回显已保存的 API Key。保存或测试前需要重新输入。
+            </template>
+          </div>
           <div v-if="connectionTestResult" class="mt-2">
             <el-alert :type="connectionTestResult.success ? 'success' : 'error'" :closable="false" show-icon>
               <template #title>
                 {{ connectionTestResult.success ? '连接成功' : '连接失败' }}
-                <span class="text-slate-500 ml-2">({{ connectionTestResult.responseTime }}ms)</span>
+                <span class="ml-2 text-slate-500">({{ connectionTestResult.responseTime }}ms)</span>
               </template>
               <template #default>
                 {{ connectionTestResult.message }}
@@ -66,7 +159,14 @@
         </el-form-item>
 
         <el-form-item label="模型">
-          <el-select v-model="aiConfigForm.model" class="w-full" filterable allow-create>
+          <el-select
+            v-model="aiConfigForm.model"
+            class="w-full"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="请选择或输入模型名称"
+          >
             <el-option
               v-for="model in currentProviderModels"
               :key="model"
@@ -74,13 +174,45 @@
               :value="model"
             />
           </el-select>
-          <div class="text-xs text-slate-400 mt-1">
-            可以从列表选择或直接输入自定义模型名称
+          <div class="mt-1 text-xs text-slate-400">
+            {{ currentModelHint }}
           </div>
         </el-form-item>
 
-        <el-form-item label="Temperature (创造性)">
-          <div class="flex items-center gap-4 w-full">
+        <el-form-item label="模型能力">
+          <div class="flex flex-wrap gap-2">
+            <el-tag :type="currentCapabilities.supportsStream ? 'success' : 'info'">
+              {{ currentCapabilities.supportsStream ? '支持流式输出' : '不支持流式输出' }}
+            </el-tag>
+            <el-tag :type="currentCapabilities.supportsToolCall ? 'success' : 'warning'">
+              {{ currentCapabilities.supportsToolCall ? '支持工具调用' : '不支持工具调用' }}
+            </el-tag>
+            <el-tag :type="currentCapabilities.supportsVision ? 'success' : 'info'">
+              {{ currentCapabilities.supportsVision ? '支持视觉输入' : '文本模型' }}
+            </el-tag>
+          </div>
+          <div class="mt-1 text-xs text-slate-400">
+            能力展示优先使用当前已保存模型的后端判定；修改模型后，最终以“测试连接”和“保存配置”的校验结果为准。
+          </div>
+        </el-form-item>
+
+        <el-form-item label="额外请求头 (JSON)">
+          <el-input
+            v-model="aiConfigForm.extraHeadersJson"
+            type="textarea"
+            :rows="4"
+            placeholder="{&quot;appid&quot;:&quot;your-app-id&quot;}"
+          />
+          <div class="mt-1 text-xs text-slate-400">
+            用于兼容某些服务商的附加请求头。{{ currentExtraHeadersHint || '如无需额外请求头可留空。' }}
+          </div>
+          <div v-if="currentProviderPreset?.savedExtraHeadersConfigured" class="mt-1 text-xs text-emerald-600">
+            当前服务商已保存额外请求头，页面中展示的是管理端可编辑的原始配置。
+          </div>
+        </el-form-item>
+
+        <el-form-item label="Temperature">
+          <div class="flex w-full items-center gap-4">
             <el-slider
               v-model="aiConfigForm.temperature"
               :min="0"
@@ -98,9 +230,6 @@
               class="w-24"
             />
           </div>
-          <div class="text-xs text-slate-400 mt-1">
-            值越低回复越确定，值越高回复越有创造性。推荐值：0.7
-          </div>
         </el-form-item>
 
         <el-form-item label="最大 Token 数">
@@ -111,15 +240,20 @@
             :step="100"
             class="w-full"
           />
-          <div class="text-xs text-slate-400 mt-1">
-            单次对话允许的最大 Token 数量，包括输入和输出
-          </div>
         </el-form-item>
 
-        <div class="flex gap-3 pt-4 border-t border-slate-200">
+        <div class="flex flex-wrap gap-3 border-t border-slate-200 pt-4">
           <el-button type="primary" :loading="savingAiConfig" @click="handleSaveAiConfig">
             <el-icon class="mr-1"><Document /></el-icon>
-            保存 AI 配置
+            保存当前服务商配置
+          </el-button>
+          <el-button
+            plain
+            :disabled="!currentProviderPreset?.configured || currentProviderPreset?.active"
+            :loading="activatingProvider"
+            @click="handleActivateProvider"
+          >
+            启用当前服务商
           </el-button>
           <el-button @click="loadAiConfig">重置</el-button>
         </div>
@@ -130,10 +264,11 @@
       <template #header>
         <span class="font-medium">配置说明</span>
       </template>
-      <div class="text-sm text-slate-600 space-y-2">
-        <p><strong>OpenAI:</strong> 使用 OpenAI 官方 API，需要有效的 API Key</p>
-        <p><strong>阿里云 DashScope:</strong> 使用阿里云通义千问系列模型，API 地址为 https://dashscope.aliyuncs.com/compatible-mode/</p>
-        <p><strong>自定义:</strong> 任何 OpenAI 兼容的 API 服务，如 LocalAI、Ollama 等</p>
+
+      <div class="space-y-3 text-sm text-slate-600">
+        <p>当前 CRM 默认要求主对话模型支持工具调用，否则无法正常驱动客户、任务、跟进等内置工具。</p>
+        <p>现在支持为不同服务商分别保存配置，切换编辑时会自动回填对应服务商的历史参数。</p>
+        <p>如果你要接入百度千帆等需要额外头信息的服务，可以在“额外请求头 (JSON)”中补充。</p>
       </div>
     </el-card>
   </div>
@@ -143,66 +278,250 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Connection, Document, Hide, View } from '@element-plus/icons-vue'
-import { getAiConfig, testAiConnection, updateAiConfig } from '@/api/systemConfig'
-import type { AiConfigUpdateBO, AiConnectionTestResult, AiProvider } from '@/types/systemConfig'
+import {
+  activateAiProvider,
+  getAiConfigDetail,
+  testAiConnection,
+  updateAiConfig,
+  useCustomAiConfig,
+  useGiftAiConfig
+} from '@/api/systemConfig'
+import type {
+  AiConfig,
+  AiConfigUpdateBO,
+  AiConnectionTestResult,
+  AiModelCapabilities,
+  AiProvider,
+  AiProviderPreset
+} from '@/types/systemConfig'
 import { AI_PROVIDER_PRESETS } from '../constants'
+
+type AiConfigFormState = AiConfigUpdateBO & {
+  updateTime?: string
+  configured?: boolean
+  apiKeyConfigured?: boolean
+}
+
+type ProviderDraftMap = Partial<Record<AiProvider, AiConfigFormState>>
+
+const DEFAULT_PROVIDER: AiProvider = 'dashscope'
 
 const showApiKey = ref(false)
 const savingAiConfig = ref(false)
 const testingConnection = ref(false)
+const switchingAiMode = ref(false)
+const activatingProvider = ref(false)
 const connectionTestResult = ref<AiConnectionTestResult | null>(null)
+const providerOptions = ref<AiProviderPreset[]>(AI_PROVIDER_PRESETS)
+const providerDrafts = ref<ProviderDraftMap>({})
+const loadedConfig = ref<AiConfig | null>(null)
 
-const aiConfigForm = reactive<AiConfigUpdateBO & { updateTime?: string }>({
-  provider: 'dashscope',
-  apiUrl: '',
+const aiConfigForm = reactive<AiConfigFormState>({
+  provider: DEFAULT_PROVIDER,
+  apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
   apiKey: '',
-  model: '',
+  model: 'qwen3.5-plus',
   temperature: 0.7,
   maxTokens: 2048,
-  updateTime: undefined
+  extraHeadersJson: '',
+  updateTime: undefined,
+  configured: false,
+  apiKeyConfigured: false
 })
 
-const currentProviderModels = computed(() => {
-  const preset = AI_PROVIDER_PRESETS.find((item) => item.value === aiConfigForm.provider)
-  return preset?.models || []
+const currentProviderPreset = computed(() => {
+  return providerOptions.value.find((item) => item.value === aiConfigForm.provider) || null
+})
+
+const configuredProviders = computed(() => providerOptions.value.filter((item) => item.configured))
+const currentMode = computed(() => loadedConfig.value?.mode || 'gift')
+const giftTokenTotal = computed(() => loadedConfig.value?.giftTokenTotal ?? 0)
+const giftTokenRemaining = computed(() => loadedConfig.value?.giftTokenRemaining ?? 0)
+const giftTokenRemainingWan = computed(() => (giftTokenRemaining.value / 10000).toFixed(1))
+const giftTokenTotalWan = computed(() => (giftTokenTotal.value / 10000).toFixed(1))
+const canUseGiftMode = computed(() => currentMode.value !== 'gift' && giftTokenRemaining.value > 0)
+const canUseSavedCustomMode = computed(() => currentMode.value !== 'custom' && Boolean(loadedConfig.value?.customConfigSaved))
+const currentProviderModels = computed(() => currentProviderPreset.value?.models || [])
+
+const currentCapabilities = computed<AiModelCapabilities>(() => {
+  if (
+    loadedConfig.value &&
+    loadedConfig.value.provider === aiConfigForm.provider &&
+    loadedConfig.value.model === aiConfigForm.model &&
+    loadedConfig.value.capabilities
+  ) {
+    return loadedConfig.value.capabilities
+  }
+
+  return inferCapabilities(aiConfigForm.provider, aiConfigForm.model)
+})
+
+const currentModelHint = computed(() => {
+  if (
+    loadedConfig.value &&
+    loadedConfig.value.provider === aiConfigForm.provider &&
+    loadedConfig.value.model === aiConfigForm.model &&
+    loadedConfig.value.modelHint
+  ) {
+    return loadedConfig.value.modelHint
+  }
+  return currentProviderPreset.value?.modelHint || '请选择或输入可用模型名称。'
+})
+
+const currentExtraHeadersHint = computed(() => {
+  if (
+    loadedConfig.value &&
+    loadedConfig.value.provider === aiConfigForm.provider &&
+    loadedConfig.value.extraHeadersHint
+  ) {
+    return loadedConfig.value.extraHeadersHint
+  }
+  return currentProviderPreset.value?.extraHeadersHint || ''
 })
 
 onMounted(async () => {
   await loadAiConfig()
 })
 
-function handleProviderChange(provider: AiProvider) {
-  const preset = AI_PROVIDER_PRESETS.find((item) => item.value === provider)
-  if (preset) {
-    aiConfigForm.apiUrl = preset.baseUrl
-    if (preset.models.length > 0) {
-      aiConfigForm.model = preset.models[0]
-    }
+function createProviderDraft(preset?: AiProviderPreset | null): AiConfigFormState {
+  const provider = (preset?.value || DEFAULT_PROVIDER) as AiProvider
+  return {
+    provider,
+    apiUrl: preset?.savedApiUrl || preset?.baseUrl || '',
+    apiKey: '',
+    model: preset?.savedModel || preset?.models?.[0] || '',
+    temperature: preset?.savedTemperature ?? 0.7,
+    maxTokens: preset?.savedMaxTokens ?? 2048,
+    extraHeadersJson: preset?.savedExtraHeadersJson ?? '',
+    updateTime: undefined,
+    configured: Boolean(preset?.configured),
+    apiKeyConfigured: Boolean(preset?.apiKeyConfigured)
   }
+}
+
+function getCurrentProvider(): AiProvider {
+  return aiConfigForm.provider ?? DEFAULT_PROVIDER
+}
+
+function syncCurrentFormToDraft() {
+  const provider = getCurrentProvider()
+  providerDrafts.value[provider] = {
+    provider,
+    apiUrl: aiConfigForm.apiUrl,
+    apiKey: aiConfigForm.apiKey,
+    model: aiConfigForm.model,
+    temperature: aiConfigForm.temperature,
+    maxTokens: aiConfigForm.maxTokens,
+    extraHeadersJson: aiConfigForm.extraHeadersJson || '',
+    updateTime: aiConfigForm.updateTime,
+    configured: aiConfigForm.configured,
+    apiKeyConfigured: aiConfigForm.apiKeyConfigured
+  }
+}
+
+function applyProviderDraft(provider: AiProvider) {
+  const preset = providerOptions.value.find((item) => item.value === provider) || null
+  const draft = providerDrafts.value[provider] || createProviderDraft(preset)
+  providerDrafts.value[provider] = draft
+
+  Object.assign(aiConfigForm, {
+    provider,
+    apiUrl: draft.apiUrl,
+    apiKey: draft.apiKey,
+    model: draft.model,
+    temperature: draft.temperature ?? 0.7,
+    maxTokens: draft.maxTokens ?? 2048,
+    extraHeadersJson: draft.extraHeadersJson || '',
+    updateTime: draft.updateTime,
+    configured: draft.configured ?? false,
+    apiKeyConfigured: draft.apiKeyConfigured ?? false
+  })
+
+  showApiKey.value = false
   connectionTestResult.value = null
+}
+
+function handleProviderChange(provider: AiProvider) {
+  syncCurrentFormToDraft()
+  applyProviderDraft(provider)
 }
 
 async function loadAiConfig() {
   try {
-    const config = await getAiConfig()
-    Object.assign(aiConfigForm, {
-      provider: (config.provider || 'dashscope') as AiProvider,
-      apiUrl: config.apiUrl || '',
-      apiKey: '',
-      model: config.model || '',
-      temperature: config.temperature ?? 0.7,
-      maxTokens: config.maxTokens ?? 2048,
-      updateTime: config.updateTime
+    const config = await getAiConfigDetail()
+    loadedConfig.value = config
+    providerOptions.value = config.availableProviders?.length ? config.availableProviders : AI_PROVIDER_PRESETS
+
+    const nextDrafts: ProviderDraftMap = {}
+    providerOptions.value.forEach((preset) => {
+      nextDrafts[preset.value] = createProviderDraft(preset)
     })
-    connectionTestResult.value = null
+
+    const currentProvider = (config.provider
+      || providerOptions.value.find((item) => item.active)?.value
+      || providerOptions.value[0]?.value
+      || DEFAULT_PROVIDER) as AiProvider
+
+    const currentDraft = nextDrafts[currentProvider]
+    if (currentDraft) {
+      currentDraft.updateTime = config.updateTime
+    }
+
+    providerDrafts.value = nextDrafts
+    applyProviderDraft(currentProvider)
   } catch {
     // Error handled by interceptor
   }
 }
 
+async function handleUseGiftMode() {
+  switchingAiMode.value = true
+  try {
+    await useGiftAiConfig()
+    ElMessage.success('已切换到赠送额度模式')
+    await loadAiConfig()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    switchingAiMode.value = false
+  }
+}
+
+async function handleUseSavedCustomMode() {
+  switchingAiMode.value = true
+  try {
+    await useCustomAiConfig()
+    ElMessage.success('已启用已保存的自定义模型')
+    await loadAiConfig()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    switchingAiMode.value = false
+  }
+}
+
+async function handleActivateProvider() {
+  const provider = getCurrentProvider()
+
+  activatingProvider.value = true
+  try {
+    await activateAiProvider({ provider })
+    ElMessage.success(`已切换到 ${currentProviderPreset.value?.label || provider} 配置`)
+    await loadAiConfig()
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    activatingProvider.value = false
+  }
+}
+
 async function handleTestConnection() {
-  if (!aiConfigForm.apiUrl || !aiConfigForm.apiKey) {
-    ElMessage.warning('请先填写 API 地址和密钥')
+  if (!aiConfigForm.apiUrl?.trim() || !aiConfigForm.apiKey?.trim()) {
+    ElMessage.warning('请先填写 API 地址和 API 密钥')
+    return
+  }
+  if (!aiConfigForm.model?.trim()) {
+    ElMessage.warning('请先填写模型名称')
     return
   }
 
@@ -211,12 +530,13 @@ async function handleTestConnection() {
 
   try {
     const result = await testAiConnection({
-      provider: aiConfigForm.provider,
-      apiUrl: aiConfigForm.apiUrl,
-      apiKey: aiConfigForm.apiKey,
-      model: aiConfigForm.model,
+      provider: getCurrentProvider(),
+      apiUrl: aiConfigForm.apiUrl.trim(),
+      apiKey: aiConfigForm.apiKey.trim(),
+      model: aiConfigForm.model.trim(),
       temperature: aiConfigForm.temperature,
-      maxTokens: aiConfigForm.maxTokens
+      maxTokens: aiConfigForm.maxTokens,
+      extraHeadersJson: aiConfigForm.extraHeadersJson?.trim() || ''
     })
     connectionTestResult.value = result
   } catch (error: any) {
@@ -231,15 +551,16 @@ async function handleTestConnection() {
 }
 
 async function handleSaveAiConfig() {
-  if (!aiConfigForm.apiUrl) {
+  const trimmedApiKey = aiConfigForm.apiKey?.trim() || ''
+  if (!aiConfigForm.apiUrl?.trim()) {
     ElMessage.warning('请填写 API 地址')
     return
   }
-  if (!aiConfigForm.apiKey) {
-    ElMessage.warning('请填写 API 密钥')
+  if (!trimmedApiKey && !currentProviderPreset.value?.apiKeyConfigured) {
+    ElMessage.warning('请填写 API 密钥，或先保存当前服务商的 API Key')
     return
   }
-  if (!aiConfigForm.model) {
+  if (!aiConfigForm.model?.trim()) {
     ElMessage.warning('请选择或输入模型名称')
     return
   }
@@ -247,14 +568,15 @@ async function handleSaveAiConfig() {
   savingAiConfig.value = true
   try {
     await updateAiConfig({
-      provider: aiConfigForm.provider,
-      apiUrl: aiConfigForm.apiUrl,
-      apiKey: aiConfigForm.apiKey,
-      model: aiConfigForm.model,
+      provider: getCurrentProvider(),
+      apiUrl: aiConfigForm.apiUrl.trim(),
+      apiKey: trimmedApiKey,
+      model: aiConfigForm.model.trim(),
       temperature: aiConfigForm.temperature,
-      maxTokens: aiConfigForm.maxTokens
+      maxTokens: aiConfigForm.maxTokens,
+      extraHeadersJson: aiConfigForm.extraHeadersJson?.trim() || ''
     })
-    ElMessage.success('AI 配置保存成功，已立即生效')
+    ElMessage.success('当前服务商配置已保存，并已设为默认生效')
     await loadAiConfig()
   } catch {
     // Error handled by interceptor
@@ -266,5 +588,35 @@ async function handleSaveAiConfig() {
 function formatTime(time: string | undefined): string {
   if (!time) return ''
   return new Date(time).toLocaleString('zh-CN')
+}
+
+function inferCapabilities(provider: AiProvider | undefined, model: string | undefined): AiModelCapabilities {
+  const normalizedProvider = (provider || '').toLowerCase()
+  const normalizedModel = (model || '').trim().toLowerCase()
+
+  let supportsStream = currentProviderPreset.value?.supportsStream ?? true
+  let supportsToolCall = currentProviderPreset.value?.supportsToolCall ?? true
+  let supportsVision = currentProviderPreset.value?.supportsVision ?? false
+
+  if (normalizedProvider === 'hunyuan') {
+    supportsToolCall = normalizedModel.includes('functioncall')
+    supportsVision = normalizedModel.includes('vision')
+  } else if (normalizedProvider === 'moonshot') {
+    supportsToolCall = normalizedModel !== '' && !normalizedModel.includes('kimi-thinking-preview')
+    supportsVision = normalizedModel.includes('vision') || normalizedModel.includes('vl')
+  } else {
+    if (['gpt-5', '4o', '4.1', 'vision', 'omni', '3.5-plus', '1-8', '4.6v', '4.5v', '4v', 'vl'].some((keyword) => normalizedModel.includes(keyword))) {
+      supportsVision = true
+    }
+    if (['openai', 'dashscope', 'deepseek', 'ark', 'minimax', 'zhipu', 'custom'].includes(normalizedProvider)) {
+      supportsToolCall = true
+    }
+  }
+
+  return {
+    supportsStream,
+    supportsToolCall,
+    supportsVision
+  }
 }
 </script>

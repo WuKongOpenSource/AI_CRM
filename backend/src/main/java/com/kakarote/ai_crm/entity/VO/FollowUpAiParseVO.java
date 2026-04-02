@@ -15,10 +15,10 @@ public class FollowUpAiParseVO {
     @Schema(description = "跟进类型: call/meeting/email/visit/other")
     private String type;
 
-    @Schema(description = "跟进时间 yyyy-MM-dd HH:mm")
+    @Schema(description = "跟进时间 yyyy-MM-dd HH:mm:ss")
     private String followTime;
 
-    @Schema(description = "建议下次跟进时间 yyyy-MM-dd HH:mm")
+    @Schema(description = "建议下次跟进时间 yyyy-MM-dd HH:mm:ss")
     private String nextFollowTime;
 
     @Schema(description = "关键要点")

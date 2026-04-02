@@ -3,8 +3,10 @@ package com.kakarote.ai_crm.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
+import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
 import com.kakarote.ai_crm.entity.PO.Schedule;
+import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 
 import java.util.List;
@@ -33,4 +35,9 @@ public interface IScheduleService extends IService<Schedule> {
      * 分页查询日程
      */
     BasePage<ScheduleVO> queryPageList(ScheduleQueryBO queryBO);
+
+    /**
+     * AI 解析日程
+     */
+    ScheduleAiParseVO aiParseSchedule(ScheduleAiParseBO parseBO);
 }

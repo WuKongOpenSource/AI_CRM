@@ -1,13 +1,11 @@
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
     <div class="w-full max-w-md">
-      <!-- Logo and Title -->
-      <div class="text-center mb-8">
+      <div class="mb-8 text-center">
         <h1 class="text-3xl font-bold text-gray-900">AI CRM</h1>
         <p class="mt-2 text-gray-600">智能客户关系管理系统</p>
       </div>
 
-      <!-- Login Card -->
       <el-card class="shadow-lg">
         <template #header>
           <span class="text-lg font-semibold">登录</span>
@@ -54,7 +52,7 @@
           </el-form-item>
         </el-form>
 
-        <div class="text-center text-sm text-gray-500 mt-4">
+        <div class="mt-4 text-center text-sm text-gray-500">
           <p>测试账号: admin / 123456a</p>
         </div>
       </el-card>
@@ -63,12 +61,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { Lock, User } from '@element-plus/icons-vue'
 import { getOidcSessionToken } from '@/api/auth'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const route = useRoute()
@@ -83,9 +81,7 @@ const formData = reactive({
 })
 
 const rules: FormRules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
-  ],
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少6位', trigger: 'blur' }
@@ -106,14 +102,10 @@ async function handleLogin() {
 
     ElMessage.success('登录成功')
 
-    // Redirect to original page or home
     let redirect = (route.query.redirect as string) || '/'
-
-    // 如果是 OIDC 授权 URL，需要先获取 session_token 并添加到 URL 中
     if (redirect.includes('/oauth2/authorize')) {
       try {
         const { sessionToken } = await getOidcSessionToken()
-        // 将 session_token 添加到 URL 参数中
         const url = new URL(redirect)
         url.searchParams.set('session_token', sessionToken)
         redirect = url.toString()
@@ -122,7 +114,6 @@ async function handleLogin() {
       }
     }
 
-    // 如果是完整的外部 URL（如 OIDC 授权回调），使用 window.location 跳转
     if (redirect.startsWith('http://') || redirect.startsWith('https://')) {
       window.location.href = redirect
     } else {
@@ -130,7 +121,6 @@ async function handleLogin() {
     }
   } catch (error) {
     console.error('Login error:', error)
-    // Error is already handled in the interceptor
   } finally {
     loading.value = false
   }

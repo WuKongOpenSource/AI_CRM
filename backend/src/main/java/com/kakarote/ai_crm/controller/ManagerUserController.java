@@ -1,12 +1,12 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
 import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
-import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.service.ManageUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,55 +17,58 @@ import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/managerUser")
 @RestController
-@Tag(name = "用户信息控制器")
+@Tag(name = "User APIs")
 public class ManagerUserController {
 
     @Autowired
     private ManageUserService manageUserService;
 
     @PostMapping("/addUser")
-    @Operation(summary = "添加用户")
+    @Operation(summary = "Add user")
+    @RequirePermission("user:create")
     public Result<String> addUser(@RequestBody UserAddBO userAddBO) {
         manageUserService.addUser(userAddBO);
         return Result.ok();
     }
 
     @PostMapping("/queryLoginUser")
-    @Operation(summary = "查询当前登录用户")
+    @Operation(summary = "Query current login user")
     public Result<ManageUserVO> queryLoginUser() {
         return Result.ok(manageUserService.queryLoginUser());
     }
 
     @PostMapping("/queryPageList")
-    @Operation(summary = "查询列表页数据")
+    @Operation(summary = "Query user page")
     public Result<BasePage<ManageUserVO>> queryPageList(@RequestBody UserQueryBO userQueryBO) {
         return Result.ok(manageUserService.queryPageList(userQueryBO));
     }
 
     @PostMapping("/updateUser")
-    @Operation(summary = "修改用户基本信息")
+    @Operation(summary = "Update user basic info")
     public Result<String> updateUser(@RequestBody UserUpdateBO updateBO) {
         manageUserService.updateUser(updateBO);
         return Result.ok();
     }
 
     @PostMapping("/updatePassword")
-    @Operation(summary = "修改密码")
-    public Result<String> updatePassword(@Parameter(name = "oldPassword", description = "旧密码") @RequestParam("oldPassword") String oldPassword,
-                                         @Parameter(name = "newPassword", description = "新密码") @RequestParam("newPassword") String newPassword) {
+    @Operation(summary = "Update password")
+    public Result<String> updatePassword(@Parameter(name = "oldPassword", description = "Old password") @RequestParam("oldPassword") String oldPassword,
+                                         @Parameter(name = "newPassword", description = "New password") @RequestParam("newPassword") String newPassword) {
         manageUserService.updatePassword(oldPassword, newPassword);
         return Result.ok();
     }
 
     @PostMapping("/setUserStatus")
-    @Operation(summary = "设置用户状态")
+    @Operation(summary = "Set user status")
+    @RequirePermission("user:status")
     public Result setUserStatus(@RequestBody UserStatusBO userStatusBO) {
         manageUserService.setUserStatus(userStatusBO);
         return Result.ok();
     }
 
     @PostMapping("/deleteByIds")
-    @Operation(summary = "删除用户")
+    @Operation(summary = "Delete users")
+    @RequirePermission("user:delete")
     public Result deleteByIds(@RequestBody Long[] userIds) {
         manageUserService.deleteByIds(userIds);
         return Result.ok();

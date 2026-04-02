@@ -15,7 +15,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import java.util.concurrent.TimeUnit;
 
 /**
- * WeKnora 配置类 - 支持从数据库动态读取配置，fallback 到 application.yml
+ * WeKnora 配置类，支持数据库覆盖 application.yml。
  */
 @Setter
 @Slf4j
@@ -46,12 +46,18 @@ public class WeKnoraConfig {
         private double vectorThreshold = 0.5;
         private boolean autoRagEnabled = true;
 
-        public int getMatchCount() { return matchCount; }
-        public double getVectorThreshold() { return vectorThreshold; }
-        public boolean isAutoRagEnabled() { return autoRagEnabled; }
-    }
+        public int getMatchCount() {
+            return matchCount;
+        }
 
-    // getter 优先从数据库读取，fallback 到 application.yml
+        public double getVectorThreshold() {
+            return vectorThreshold;
+        }
+
+        public boolean isAutoRagEnabled() {
+            return autoRagEnabled;
+        }
+    }
 
     public boolean isEnabled() {
         String dbValue = getDbConfigValue("weknora_enabled");
@@ -128,6 +134,7 @@ public class WeKnoraConfig {
                     return cachedValue;
                 }
             }
+
             if (systemConfigMapper != null) {
                 LambdaQueryWrapper<SystemConfig> wrapper = new LambdaQueryWrapper<>();
                 wrapper.eq(SystemConfig::getConfigKey, key);
@@ -135,16 +142,22 @@ public class WeKnoraConfig {
                 if (config != null && StrUtil.isNotBlank(config.getConfigValue())) {
                     if (redisTemplate != null) {
                         try {
-                            redisTemplate.opsForValue().set(CACHE_KEY_PREFIX + key,
-                                    config.getConfigValue(), CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-                        } catch (Exception ignored) {}
+                            redisTemplate.opsForValue().set(
+                                    CACHE_KEY_PREFIX + key,
+                                    config.getConfigValue(),
+                                    CACHE_EXPIRE_MINUTES,
+                                    TimeUnit.MINUTES
+                            );
+                        } catch (Exception ignored) {
+                        }
                     }
                     return config.getConfigValue();
                 }
             }
+
             return null;
         } catch (Exception e) {
-            log.debug("读取动态配置失败: {}", e.getMessage());
+            log.debug("读取 WeKnora 动态配置失败: {}", e.getMessage());
             return null;
         }
     }

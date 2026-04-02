@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
@@ -7,6 +8,8 @@ import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * 知识库Mapper
@@ -23,4 +26,28 @@ public interface KnowledgeMapper extends BaseMapper<Knowledge> {
      * 查询知识详情
      */
     KnowledgeVO getKnowledgeById(@Param("knowledgeId") Long knowledgeId);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_knowledge WHERE knowledge_id = #{knowledgeId}")
+    Knowledge selectByIdIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Update("""
+            UPDATE crm_knowledge
+            SET weknora_knowledge_id = #{weKnoraKnowledgeId},
+                weknora_parse_status = #{parseStatus}
+            WHERE knowledge_id = #{knowledgeId}
+            """)
+    int updateWeKnoraInfoIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId,
+                                              @Param("weKnoraKnowledgeId") String weKnoraKnowledgeId,
+                                              @Param("parseStatus") String parseStatus);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Update("""
+            UPDATE crm_knowledge
+            SET weknora_parse_status = #{parseStatus}
+            WHERE knowledge_id = #{knowledgeId}
+            """)
+    int updateParseStatusIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId,
+                                              @Param("parseStatus") String parseStatus);
 }

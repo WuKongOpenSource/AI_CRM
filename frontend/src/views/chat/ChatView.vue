@@ -40,7 +40,7 @@
       <div class="flex-1 overflow-y-auto px-3 space-y-1">
         <p class="px-3 text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">最近对话</p>
 
-        <div v-if="chatStore.loading" class="flex justify-center py-8">
+        <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-8">
           <span class="material-symbols-outlined text-slate-300 animate-spin">progress_activity</span>
         </div>
 
@@ -141,9 +141,53 @@
         </template>
       </div>
 
-      <!-- AI Model Status -->
+      <!-- AI Quota -->
       <div class="p-4 border-t border-slate-100">
-        <div class="p-3 bg-primary/5 rounded-xl border border-primary/10">
+        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
+          <div
+            class="flex items-center justify-between gap-3 mb-3"
+          >
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 额度</p>
+            <span
+              class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold"
+              :class="aiStatusBadgeClass"
+            >
+              {{ aiStatusBadgeText }}
+            </span>
+          </div>
+
+          <template v-if="currentAiMode === 'gift'">
+            <div class="mb-1 flex flex-wrap items-baseline gap-1">
+              <span class="text-xs font-semibold tabular-nums text-slate-900">{{ giftTokenRemainingWan }}</span>
+              <span class="text-xs font-medium text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
+            </div>
+            <p v-if="giftTokenRemaining <= 0" class="mb-3 text-xs text-slate-500">
+              赠送额度已用完，可配置 AI 服务后继续使用。
+            </p>
+            <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                class="h-full rounded-full transition-all"
+                :class="giftTokenProgressClass"
+                :style="{ width: `${giftTokenProgressPercent}%` }"
+              />
+            </div>
+          </template>
+
+          <div class="flex gap-2">
+            <button
+              class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50"
+              @click="goToAiSettings"
+            >
+              AI 设置
+            </button>
+            <button
+              class="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="!canManageAiConfig"
+              @click="openApiKeySetup"
+            >
+              配置 AI 服务
+            </button>
+          </div>
           <p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
           <div class="flex items-center gap-2">
             <div
@@ -151,7 +195,7 @@
               :class="hasAiApiKeyConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'"
             ></div>
             <span class="text-xs font-medium text-slate-600">
-              {{ hasAiApiKeyConfigured ? 'AI 模型已就绪' : '请先配置千问 API Key' }}
+              {{ hasAiApiKeyConfigured ? 'AI 模型已就绪' : '请先配置 AI 服务' }}
             </span>
           </div>
         </div>
@@ -197,9 +241,11 @@
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
                     <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
-                      <div class="whitespace-pre-wrap" :class="{ 'streaming-cursor': message.isStreaming }">
-                        {{ message.content || '...' }}
-                      </div>
+                      <div
+                        class="wk-markdown"
+                        :class="{ 'streaming-cursor': message.isStreaming }"
+                        v-html="renderAssistantMessage(message.content || '...')"
+                      />
                     </div>
                     <!-- Attachments -->
                     <div v-if="message.attachments && message.attachments.length > 0" class="space-y-2">
@@ -237,7 +283,16 @@
                 <!-- User Message -->
                 <div v-else class="flex gap-4 md:gap-5 flex-row-reverse">
                   <div class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-slate-400">person</span>
+                    <img
+                      v-if="showUserAvatarImage"
+                      :src="userStore.avatar"
+                      class="h-full w-full object-cover"
+                      alt="user avatar"
+                      @error="userAvatarLoadFailed = true"
+                    />
+                    <span v-else class="text-sm font-bold text-slate-600">
+                      {{ userAvatarFallback }}
+                    </span>
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
                     <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed">
@@ -286,7 +341,7 @@
                 <button
                   v-for="action in quickActions"
                   :key="action.label"
-                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm font-bold text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
+                  class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
                   @click="sendQuickMessage(action.text)"
                 >
                   {{ action.label }}
@@ -340,6 +395,23 @@
                     @keydown.enter.exact.prevent="handleSend"
                   />
                   <div class="flex items-center gap-2 pr-1">
+                    <button
+                      type="button"
+                      class="h-10 rounded-full border px-3.5 text-sm shadow-sm transition-all"
+                      :class="chatStore.ragEnabled
+                        ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+                      :aria-pressed="chatStore.ragEnabled"
+                      :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
+                      @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
+                    >
+                      <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] leading-none">
+                          menu_book
+                        </span>
+                        <span>知识库检索</span>
+                      </span>
+                    </button>
                     <button
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
                       :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
@@ -457,7 +529,8 @@
     <ApiKeySetupModal
       :model-value="isApiKeyModalOpen"
       :loading="savingApiKey"
-      :initial-api-key="apiKeyDraft"
+      :provider-options="apiKeySetupProviderOptions"
+      :initial-config="apiKeySetupInitialConfig"
       @update:model-value="handleApiKeyModalVisibleChange"
       @save="handleSaveApiKey"
     />
@@ -469,17 +542,21 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
-import { getAiConfig, updateAiConfig } from '@/api/systemConfig'
+import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
+import { renderMarkdown } from '@/utils/markdown'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
-import type { AiConfig, AiConfigUpdateBO } from '@/types/systemConfig'
+import type { AiConfig, AiConfigUpdateBO, AiMode, AiProvider, AiProviderPreset } from '@/types/systemConfig'
 
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 const userStore = useUserStore()
+const router = useRouter()
 const { isMobile } = useResponsive()
 
 const inputText = ref('')
@@ -489,10 +566,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
+const userAvatarLoadFailed = ref(false)
 const aiConfig = ref<AiConfig | null>(null)
 const aiConfigLoaded = ref(false)
 const isApiKeyModalOpen = ref(false)
-const apiKeyDraft = ref('')
+const apiKeySetupInitialConfig = ref<Partial<AiConfigUpdateBO> | null>(null)
+const apiKeySetupProviderOptions = ref<AiProviderPreset[]>([])
 const savingApiKey = ref(false)
 const resumeSendAfterApiKeySave = ref(false)
 
@@ -500,9 +579,9 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const MAX_FILE_COUNT = 5
 const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
   provider: 'dashscope',
-  apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/',
+  apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
   apiKey: '',
-  model: 'qwen-max',
+  model: 'qwen3.5-plus',
   temperature: 0.7,
   maxTokens: 4096
 }
@@ -575,7 +654,40 @@ const quickActions = [
   { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
 ]
 
-const hasAiApiKeyConfigured = computed(() => hasApiKeyConfigured(aiConfig.value))
+const currentAiMode = computed<AiMode>(() => aiConfig.value?.mode || 'gift')
+const aiReady = computed(() => Boolean(aiConfig.value?.ready))
+const hasAiApiKeyConfigured = computed(() => aiReady.value)
+const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
+const giftTokenTotal = computed(() => aiConfig.value?.giftTokenTotal ?? 0)
+const giftTokenRemaining = computed(() => aiConfig.value?.giftTokenRemaining ?? 0)
+const giftTokenProgressPercent = computed(() => {
+  if (giftTokenTotal.value <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((giftTokenRemaining.value / giftTokenTotal.value) * 100)))
+})
+const giftTokenRemainingWan = computed(() => formatWanToken(giftTokenRemaining.value))
+const giftTokenTotalWan = computed(() => formatWanToken(giftTokenTotal.value))
+const aiStatusBadgeText = computed(() => {
+  if (currentAiMode.value === 'gift') {
+    return giftTokenRemaining.value > 0 ? '赠送额度' : '已用完'
+  }
+  return aiReady.value ? '自定义模型已就绪' : '待配置'
+})
+const aiStatusBadgeClass = computed(() => {
+  if (currentAiMode.value === 'gift') {
+    return giftTokenRemaining.value > 0
+      ? 'bg-emerald-50 text-emerald-600'
+      : 'bg-amber-50 text-amber-600'
+  }
+  return aiReady.value
+    ? 'bg-blue-50 text-blue-600'
+    : 'bg-slate-100 text-slate-500'
+})
+const giftTokenProgressClass = computed(() => {
+  if (giftTokenRemaining.value <= 0) return 'bg-amber-400'
+  return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
+})
+const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
+const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
 onMounted(async () => {
   await Promise.all([
@@ -608,6 +720,13 @@ watch(
   }
 )
 
+watch(
+  () => userStore.avatar,
+  () => {
+    userAvatarLoadFailed.value = false
+  }
+)
+
 function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO> | null): AiConfig {
   return {
     provider: config?.provider || DEFAULT_CHAT_AI_CONFIG.provider || 'dashscope',
@@ -616,12 +735,22 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     model: config?.model || DEFAULT_CHAT_AI_CONFIG.model,
     temperature: config?.temperature ?? DEFAULT_CHAT_AI_CONFIG.temperature ?? 0.7,
     maxTokens: config?.maxTokens ?? DEFAULT_CHAT_AI_CONFIG.maxTokens ?? 4096,
+    extraHeadersConfigured: (config as Partial<AiConfig> | null)?.extraHeadersConfigured ?? false,
+    extraHeadersJson: (config as Partial<AiConfig> | null)?.extraHeadersJson ?? '',
+    capabilities: (config as Partial<AiConfig> | null)?.capabilities,
+    modelHint: (config as Partial<AiConfig> | null)?.modelHint,
+    extraHeadersHint: (config as Partial<AiConfig> | null)?.extraHeadersHint,
+    availableProviders: (config as Partial<AiConfig> | null)?.availableProviders,
+    mode: (config as Partial<AiConfig> | null)?.mode || 'gift',
+    customConfigSaved: (config as Partial<AiConfig> | null)?.customConfigSaved ?? false,
+    ready: (config as Partial<AiConfig> | null)?.ready ?? Boolean(config?.apiKey?.trim()),
+    giftTokenTotal: (config as Partial<AiConfig> | null)?.giftTokenTotal ?? 0,
+    giftTokenUsed: (config as Partial<AiConfig> | null)?.giftTokenUsed ?? 0,
+    giftTokenRemaining: (config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0,
+    giftTokenAvailable: (config as Partial<AiConfig> | null)?.giftTokenAvailable
+      ?? (((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0) > 0),
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined
   }
-}
-
-function hasApiKeyConfigured(config?: { apiKey?: string } | null): boolean {
-  return Boolean(config?.apiKey?.trim())
 }
 
 async function loadAiConfig(force = false): Promise<AiConfig | null> {
@@ -643,17 +772,26 @@ async function loadAiConfig(force = false): Promise<AiConfig | null> {
   return aiConfig.value
 }
 
-async function ensureAiApiKeyConfigured(): Promise<boolean> {
-  if (!hasApiKeyConfigured(aiConfig.value)) {
+async function ensureAiAvailable(): Promise<boolean> {
+  if (!aiConfigLoaded.value || !aiConfig.value?.ready) {
     await loadAiConfig(true)
   }
 
-  if (hasApiKeyConfigured(aiConfig.value)) {
+  if (aiConfig.value?.ready) {
     return true
   }
 
+  if (!canManageAiConfig.value) {
+    if (currentAiMode.value === 'gift' && giftTokenRemaining.value <= 0) {
+      ElMessage.warning('赠送 token 已用完，请联系管理员配置 AI 服务或购买套餐。')
+    } else {
+      ElMessage.warning('当前 AI 服务未就绪，请联系管理员处理。')
+    }
+    return false
+  }
+
   resumeSendAfterApiKeySave.value = true
-  apiKeyDraft.value = ''
+  await prepareApiKeySetupModal()
   isApiKeyModalOpen.value = true
   return false
 }
@@ -662,32 +800,79 @@ function handleApiKeyModalVisibleChange(visible: boolean) {
   isApiKeyModalOpen.value = visible
 
   if (!visible && !savingApiKey.value) {
-    apiKeyDraft.value = ''
+    apiKeySetupInitialConfig.value = null
     resumeSendAfterApiKeySave.value = false
   }
 }
 
-async function handleSaveApiKey(apiKey: string) {
-  const trimmedApiKey = apiKey.trim()
-  if (!trimmedApiKey) {
-    ElMessage.warning('请输入千问 API Key')
+async function prepareApiKeySetupModal() {
+  if (!canManageAiConfig.value) return
+
+  try {
+    const detailConfig = await getAiConfigDetail()
+    apiKeySetupProviderOptions.value = detailConfig.availableProviders?.length
+      ? detailConfig.availableProviders
+      : []
+    apiKeySetupInitialConfig.value = {
+      provider: (detailConfig.provider || DEFAULT_CHAT_AI_CONFIG.provider) as AiProvider,
+      apiUrl: detailConfig.apiUrl || DEFAULT_CHAT_AI_CONFIG.apiUrl,
+      apiKey: '',
+      model: detailConfig.model || DEFAULT_CHAT_AI_CONFIG.model,
+      temperature: detailConfig.temperature ?? DEFAULT_CHAT_AI_CONFIG.temperature,
+      maxTokens: detailConfig.maxTokens ?? DEFAULT_CHAT_AI_CONFIG.maxTokens,
+      extraHeadersJson: detailConfig.extraHeadersJson ?? ''
+    }
+  } catch {
+    apiKeySetupProviderOptions.value = []
+    apiKeySetupInitialConfig.value = { ...DEFAULT_CHAT_AI_CONFIG }
+  }
+}
+
+function resolveProviderLabel(provider?: AiProvider): string {
+  return apiKeySetupProviderOptions.value.find((item) => item.value === provider)?.label || 'AI 服务商'
+}
+
+async function handleSaveApiKey(payload: AiConfigUpdateBO) {
+  const resolvedProvider = (payload.provider || DEFAULT_CHAT_AI_CONFIG.provider) as AiProvider
+  const trimmedApiKey = payload.apiKey.trim()
+  const trimmedApiUrl = payload.apiUrl.trim()
+  const trimmedModel = payload.model.trim()
+  const canReuseSavedApiKey = Boolean(
+    trimmedApiKey
+    || apiKeySetupProviderOptions.value.find((item) => item.value === resolvedProvider)?.apiKeyConfigured
+  )
+
+  if (!canReuseSavedApiKey) {
+    ElMessage.warning('请输入 API Key，或先保存当前服务商的 API Key')
+    return
+  }
+  if (!trimmedApiUrl) {
+    ElMessage.warning('请输入 API 地址')
+    return
+  }
+  if (!trimmedModel) {
+    ElMessage.warning('请输入模型名称')
     return
   }
 
   savingApiKey.value = true
 
   try {
-    const payload: AiConfigUpdateBO = {
+    const nextPayload: AiConfigUpdateBO = {
       ...DEFAULT_CHAT_AI_CONFIG,
-      apiKey: trimmedApiKey
+      ...payload,
+      provider: resolvedProvider,
+      apiUrl: trimmedApiUrl,
+      apiKey: trimmedApiKey,
+      model: trimmedModel,
+      extraHeadersJson: payload.extraHeadersJson?.trim() || ''
     }
 
-    await updateAiConfig(payload)
-    aiConfig.value = normalizeAiConfig(payload)
-    aiConfigLoaded.value = true
+    await updateAiConfig(nextPayload)
+    await loadAiConfig(true)
     isApiKeyModalOpen.value = false
-    apiKeyDraft.value = ''
-    ElMessage.success('千问 API Key 保存成功')
+    apiKeySetupInitialConfig.value = null
+    ElMessage.success(`${resolveProviderLabel(nextPayload.provider)} 配置保存成功`)
 
     const shouldResumeSend = resumeSendAfterApiKeySave.value
     resumeSendAfterApiKeySave.value = false
@@ -703,11 +888,26 @@ async function handleSaveApiKey(apiKey: string) {
   }
 }
 
+function goToAiSettings() {
+  router.push('/settings/system/api')
+}
+
+function openApiKeySetup() {
+  if (!canManageAiConfig.value) {
+    ElMessage.warning('当前账号没有 AI 配置权限，请联系管理员。')
+    return
+  }
+  resumeSendAfterApiKeySave.value = false
+  prepareApiKeySetupModal().then(() => {
+    isApiKeyModalOpen.value = true
+  })
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
-  if (!(await ensureAiApiKeyConfigured())) return
+  if (!(await ensureAiAvailable())) return
 
   const content = text || '请分析这些文件'
   inputText.value = ''
@@ -749,7 +949,9 @@ async function handleSend() {
       attachmentVOs = results.map(r => r.vo)
     } catch (e) {
       console.error('文件上传失败:', e)
-      ElMessage.error('文件上传失败，请重试')
+      if (!isRequestErrorHandled(e)) {
+        ElMessage.error('文件上传失败，请重试')
+      }
       isUploading.value = false
       return
     }
@@ -758,12 +960,16 @@ async function handleSend() {
 
   // Switch to chat view when sending
   currentView.value = 'chat'
-  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs)
+  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
 }
 
 function sendQuickMessage(text: string) {
   inputText.value = text
   handleSend()
+}
+
+function renderAssistantMessage(content: string): string {
+  return renderMarkdown(content)
 }
 
 function handleUpload() {
@@ -804,6 +1010,10 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+function formatWanToken(value: number): string {
+  return (value / 10000).toFixed(1)
 }
 
 async function handleNewSession() {
@@ -910,5 +1120,10 @@ function formatTime(date: Date): string {
 /* Material Symbols fill variant */
 .fill-1 {
   font-variation-settings: 'FILL' 1;
+}
+
+.border-t.border-slate-100 .rounded-2xl > p.text-xs.font-bold.text-primary.uppercase.tracking-wider.mb-1,
+.border-t.border-slate-100 .rounded-2xl > p.text-xs.font-bold.text-primary.uppercase.tracking-wider.mb-1 + div.flex.items-center.gap-2 {
+  display: none;
 }
 </style>

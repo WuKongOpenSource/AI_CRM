@@ -14,7 +14,7 @@
 
         <!-- Modal Container -->
         <div :class="[
-          'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col',
+          'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
           isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
         ]">
           <!-- Header -->
@@ -54,75 +54,28 @@
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <!-- Left Column -->
               <div :class="[isEdit ? 'lg:col-span-12' : 'lg:col-span-7', 'space-y-5']">
-                <!-- AI 智能录入 (only in create mode) -->
-                <section v-if="!isEdit" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      <WkIcon name="ai" class="text-primary text-lg" />
-                      <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">AI 智能录入</h3>
-                    </div>
-                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">粘贴名片、邮件或简介</span>
-                  </div>
-                  <div class="p-4 space-y-3">
-                    <div class="relative">
-                      <textarea
-                        v-model="aiInputText"
-                        class="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 outline-none resize-none transition-all"
-                        placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
-                        @paste="handleAiPaste"
-                      />
-                      <div v-if="aiImagePreview" class="absolute right-3 bottom-3">
-                        <div class="relative group">
-                          <img :src="aiImagePreview" alt="名片图片" class="h-16 w-24 object-cover rounded-lg border-2 border-primary shadow-lg" />
-                          <button
-                            type="button"
-                            @click="removeAiImage"
-                            class="absolute -top-2 -right-2 size-5 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
-                            aria-label="移除图片"
-                            title="移除图片"
-                          >
-                            <span class="material-symbols-outlined text-[12px] font-bold">close</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="flex justify-end items-center gap-3">
-                      <span v-if="aiImagePreview && !aiParsing" class="text-xs text-primary font-bold flex items-center gap-1 animate-pulse">
-                        <span class="material-symbols-outlined text-sm">image</span>
-                        检测到名片图片，点击智能提取
-                      </span>
-                      <button
-                        type="button"
-                        @click="handleAiExtract"
-                        :disabled="aiParsing || (!aiInputText.trim() && !aiImageFile)"
-                        :class="[
-                          'flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all',
-                          aiParsing
-                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                            : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-900/10'
-                        ]"
-                      >
-                        <template v-if="aiParsing">
-                          <span class="size-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></span>
-                          解析中...
-                        </template>
-                        <template v-else>
-                          <WkIcon name="ai" class="text-sm" />
-                          智能提取
-                        </template>
-                      </button>
-                    </div>
-
-                    <div v-if="isMobile && aiParseResult" class="p-3 bg-primary/5 rounded-xl border border-primary/10 text-xs text-slate-600 space-y-1">
+                <AiSmartEntrySection
+                  v-if="!isEdit"
+                  v-model="aiInputText"
+                  placeholder="在此粘贴客户描述、邮件内容，或直接粘贴 (Ctrl+V) 名片图片..."
+                  :ai-image-preview="aiImagePreview"
+                  :ai-parsing="aiParsing"
+                  :can-extract="Boolean(aiInputText.trim() || aiImageFile)"
+                  :show-image-hint="Boolean(aiImagePreview && !aiParsing)"
+                  @paste="handleAiPaste"
+                  @extract="handleAiExtract"
+                  @remove-image="removeAiImage"
+                >
+                  <template v-if="isMobile && aiParseResult" #after-actions>
+                    <div class="p-3 bg-primary/5 rounded-xl border border-primary/10 text-xs text-slate-600 space-y-1">
                       <div v-if="aiParseResult.score != null" class="font-bold text-primary">潜力评分: {{ aiParseResult.score }}/100</div>
                       <div v-if="aiParseResult.summary">{{ aiParseResult.summary }}</div>
                       <div v-if="aiParseResult.tags?.length" class="flex flex-wrap gap-1 mt-1">
                         <span v-for="tag in aiParseResult.tags" :key="tag" class="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-full">{{ tag }}</span>
                       </div>
                     </div>
-                  </div>
-                </section>
+                  </template>
+                </AiSmartEntrySection>
 
                 <!-- Basic Information -->
                 <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
@@ -133,52 +86,84 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div class="md:col-span-2 space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">公司名称 <span class="text-red-400">*</span></label>
-                      <input
+                      <el-input
                         v-model="formData.companyName"
                         placeholder="请输入公司全称"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">所属行业</label>
-                      <input
+                      <el-input
                         v-model="formData.industry"
                         placeholder="例如：互联网 / 科技"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">客户级别</label>
-                      <select
-                        v-model="formData.level"
-                        class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-                      >
-                        <option value="A">A级客户</option>
-                        <option value="B">B级客户</option>
-                        <option value="C">C级客户</option>
-                      </select>
+                      <el-select v-model="formData.level" class="w-full wk-crm-el-field-select" size="large">
+                        <el-option label="A级客户" value="A" />
+                        <el-option label="B级客户" value="B" />
+                        <el-option label="C级客户" value="C" />
+                      </el-select>
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">商机阶段</label>
-                      <select
-                        v-model="formData.stage"
-                        class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
-                      >
-                        <option value="lead">线索</option>
-                        <option value="qualified">资格审查</option>
-                        <option value="proposal">方案报价</option>
-                        <option value="negotiation">谈判中</option>
-                        <option value="closed">已成交</option>
-                        <option value="lost">已流失</option>
-                      </select>
+                      <el-select v-model="formData.stage" class="w-full wk-crm-el-field-select" size="large">
+                        <el-option label="线索" value="lead" />
+                        <el-option label="资格审查" value="qualified" />
+                        <el-option label="方案报价" value="proposal" />
+                        <el-option label="谈判中" value="negotiation" />
+                        <el-option label="已成交" value="closed" />
+                        <el-option label="已流失" value="lost" />
+                      </el-select>
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">来源</label>
+                      <el-input
+                        v-model="formData.source"
+                        placeholder="例如：官网咨询 / 展会 / 朋友介绍"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">网站</label>
+                      <el-input
+                        v-model="formData.website"
+                        placeholder="例如：https://example.com"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">报价金额</label>
+                      <el-input
+                        v-model.number="formData.quotation"
+                        type="number"
+                        placeholder="请输入报价金额"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
+                      />
+                    </div>
+                    <div class="md:col-span-2 space-y-1.5">
+                      <label class="text-xs font-bold text-slate-500 uppercase ml-1">地址</label>
+                      <el-input
+                        v-model="formData.address"
+                        type="textarea"
+                        :autosize="{ minRows: 2, maxRows: 4 }"
+                        placeholder="请输入客户地址"
+                        class="w-full wk-crm-el-field-input"
+                      />
                     </div>
 
                     <DynamicFieldForm
                       ref="dynamicFieldFormRef"
                       entity-type="customer"
                       v-model="customFieldValues"
-                      :show-divider="false"
-                      native-style
                     />
                   </div>
                 </section>
@@ -192,104 +177,46 @@
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">主要联系人</label>
-                      <input
+                      <el-input
                         v-model="formData.contactName"
                         placeholder="请输入联系人姓名"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">手机号码</label>
-                      <input
+                      <el-input
                         v-model="formData.contactPhone"
                         placeholder="请输入联系电话"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                     <div class="space-y-1.5 md:col-span-2">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">电子邮箱</label>
-                      <input
+                      <el-input
                         v-model="formData.contactEmail"
                         placeholder="请输入邮箱地址"
-                        class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all"
+                        size="large"
+                        class="w-full wk-crm-el-field-input"
                       />
                     </div>
                   </div>
                 </section>
               </div>
 
-              <!-- Right Column: AI Insights (create only, desktop only) -->
               <div v-if="!isEdit" class="lg:col-span-5 space-y-5" :class="{ 'hidden': isMobile }">
-                <template v-if="aiParseResult">
-                  <div v-if="aiParseResult.score != null" class="bg-slate-900 rounded-2xl p-6 text-white relative overflow-hidden">
-                    <div class="relative z-10">
-                      <div class="flex items-center justify-between mb-4">
-                        <span class="text-xs font-bold text-primary uppercase tracking-widest">AI 潜力评分</span>
-                        <span class="material-symbols-outlined text-primary text-lg">verified</span>
-                      </div>
-                      <div class="flex items-baseline gap-2 mb-1">
-                        <span class="text-5xl font-black">{{ aiParseResult.score }}</span>
-                        <span class="text-lg text-slate-400">/ 100</span>
-                      </div>
-                      <p class="text-xs text-slate-400 mb-4">基于行业匹配度、需求迫切度及规模评估</p>
-                      <div v-if="aiParseResult.tags?.length" class="flex flex-wrap gap-1.5">
-                        <span v-for="tag in aiParseResult.tags" :key="tag" class="px-2 py-0.5 bg-white/10 rounded-md text-xs font-bold uppercase tracking-wider">{{ tag }}</span>
-                      </div>
-                    </div>
-                    <div class="absolute -right-8 -bottom-8 size-32 bg-primary/20 rounded-full blur-3xl"></div>
-                  </div>
-
-                  <div v-if="aiParseResult.summary || aiParseResult.nextStep" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-                    <div v-if="aiParseResult.summary">
-                      <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm text-primary">analytics</span>
-                        AI 深度分析
-                      </h4>
-                      <p class="text-xs text-slate-700 leading-relaxed">{{ aiParseResult.summary }}</p>
-                    </div>
-                    <div v-if="aiParseResult.nextStep" :class="{ 'pt-4 border-t border-slate-100': aiParseResult.summary }">
-                      <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm text-primary">rocket_launch</span>
-                        建议下一步行动
-                      </h4>
-                      <p class="text-xs text-slate-700 leading-relaxed">{{ aiParseResult.nextStep }}</p>
-                    </div>
-                  </div>
-
-                  <div v-if="aiParseResult.keyPoints?.length" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <span class="material-symbols-outlined text-sm text-primary">checklist</span>
-                      关键要点
-                    </h4>
-                    <ul class="space-y-2">
-                      <li v-for="(point, i) in aiParseResult.keyPoints" :key="i" class="text-xs text-slate-700 flex items-start gap-2 leading-relaxed">
-                        <span class="text-primary mt-0.5 shrink-0">•</span> {{ point }}
-                      </li>
-                    </ul>
-                  </div>
-                </template>
-
-                <div v-else class="bg-white rounded-2xl border border-slate-200 border-dashed p-8 text-center space-y-3 min-h-[300px] flex flex-col items-center justify-center">
-                  <div class="size-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto">
-                    <WkIcon name="ai" class="text-slate-300 text-2xl" />
-                  </div>
-                  <div>
-                    <h4 class="text-xs font-bold text-slate-900">等待 AI 分析</h4>
-                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-                      录入客户信息或使用智能提取后，AI 将在此为您提供<br />深度洞察与潜力评估。
+                <AiParseInsightSidebar
+                  :result="aiParseResult"
+                  empty-description="录入客户信息或使用智能提取后，AI 将在此为您提供深度洞察与潜力评估。"
+                >
+                  <template #tip>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                      您可以直接粘贴该客户的简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
                     </p>
-                  </div>
-                </div>
-
-                <div class="p-5 bg-primary/5 rounded-2xl border border-primary/10">
-                  <h4 class="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-sm">lightbulb</span>
-                    小提示
-                  </h4>
-                  <p class="text-xs text-slate-600 leading-relaxed">
-                    您可以直接粘贴该客户的 LinkedIn 简介、公司官网文字，或者<strong>直接在输入框 Ctrl+V 粘贴名片图片</strong>，AI 会自动识别并补全信息。
-                  </p>
-                </div>
+                  </template>
+                </AiParseInsightSidebar>
               </div>
             </div>
           </div>
@@ -307,7 +234,10 @@ import { useCustomerStore } from '@/stores/customer'
 import { aiParseCustomer } from '@/api/customer'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
+import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
+import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
 import type { CustomerAddBO, CustomerDetailVO, CustomerLevel, CustomerListVO, CustomerStage } from '@/types/customer'
 
 type Mode = 'create' | 'edit'
@@ -338,8 +268,11 @@ const formData = reactive<CustomerAddBO>({
   industry: '',
   level: 'B',
   stage: 'lead',
+  source: '',
   website: '',
   address: '',
+  quotation: undefined,
+  remark: '',
   description: '',
   contactName: '',
   contactPhone: '',
@@ -371,8 +304,11 @@ function hydrateFromCustomer() {
     industry: c?.industry || '',
     level: (c?.level || 'B') as CustomerLevel,
     stage: (c?.stage || 'lead') as CustomerStage,
+    source: (c?.source || '') as any,
     website: (c?.website || '') as any,
     address: (c?.address || '') as any,
+    quotation: (c?.quotation ?? undefined) as any,
+    remark: ((c as any)?.remark || '') as any,
     description: (c?.description || '') as any
   })
   const pc = getPrimaryContactFromCustomer(c)
@@ -388,8 +324,11 @@ function resetAll() {
     industry: '',
     level: 'B',
     stage: 'lead',
+    source: '',
     website: '',
     address: '',
+    quotation: undefined,
+    remark: '',
     description: '',
     contactName: '',
     contactPhone: '',
@@ -467,13 +406,19 @@ async function handleAiExtract() {
     if (result.industry) formData.industry = result.industry
     if (result.level && ['A', 'B', 'C'].includes(result.level)) formData.level = result.level as CustomerLevel
     if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost'].includes(result.stage)) formData.stage = result.stage as CustomerStage
+    if (result.source) formData.source = result.source
+    if (result.remark) formData.remark = result.remark
     if (result.contactName) formData.contactName = result.contactName
     if (result.contactPhone) formData.contactPhone = result.contactPhone
     if (result.contactEmail) formData.contactEmail = result.contactEmail
 
     ElMessage.success('AI 提取完成，信息已自动填充')
-  } catch (err: any) {
-    ElMessage.error('AI 解析失败: ' + (err.message || '未知错误'))
+  } catch (error: unknown) {
+    console.error('AI parse customer failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      ElMessage.error('AI 解析失败: ' + message)
+    }
   } finally {
     aiParsing.value = false
   }

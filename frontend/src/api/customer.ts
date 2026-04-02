@@ -6,9 +6,12 @@ import type {
   CustomerAddBO,
   CustomerUpdateBO,
   CustomerQueryBO,
+  CustomerExportBO,
   CustomerImportPreview,
   CustomerImportRow,
-  CustomerImportResult
+  CustomerImportResult,
+  CustomerAiSearchParseBO,
+  CustomerAiSearchParseVO
 } from '@/types/customer'
 
 /**
@@ -84,7 +87,7 @@ export function getCustomerStatistics(): Promise<any> {
 /**
  * Export customers to Excel
  */
-export function exportCustomers(data: { customerIds?: string[], keyword?: string, stage?: string, level?: string }): Promise<Blob> {
+export function exportCustomers(data: CustomerExportBO): Promise<Blob> {
   return post('/customer/export', data, { responseType: 'blob' })
 }
 
@@ -140,4 +143,8 @@ export interface CustomerAiParseVO {
 
 export function aiParseCustomer(data: CustomerAiParseBO): Promise<CustomerAiParseVO> {
   return post('/customer/ai-parse', data)
+}
+
+export function aiParseCustomerSearch(data: CustomerAiSearchParseBO): Promise<CustomerAiSearchParseVO> {
+  return post('/customer/ai-search/parse', data)
 }

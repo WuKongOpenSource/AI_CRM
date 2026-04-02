@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 联系人新增参数
@@ -42,4 +43,7 @@ public class ContactAddBO {
 
     @Schema(description = "标签列表")
     private List<String> tags;
+
+    @Schema(description = "自定义字段值")
+    private Map<String, Object> customFields;
 }

@@ -62,7 +62,7 @@
                   class="p-3 rounded-xl border border-primary/20 bg-primary/5 shadow-sm hover:shadow-md hover:bg-primary/10 transition-all cursor-pointer"
                 >
                   <p class="text-xs font-bold text-primary mb-1 truncate">{{ event.title }}</p>
-                  <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || '' }}</p>
+                  <p class="text-xs text-slate-500 truncate">{{ formatTime(event.startTime) }} • {{ event.customerName || event.participantNames || '' }}</p>
                 </div>
                 <!-- Tasks -->
                 <div
@@ -451,8 +451,8 @@ async function handleToggleTask(task: Task) {
   try {
     await updateTaskStatus(task.taskId, newStatus.toLowerCase())
     await loadTasks()
-  } catch (e: any) {
-    ElMessage.error('更新任务状态失败')
+  } catch (error) {
+    console.error('Update task status failed:', error)
   }
 }
 
@@ -644,8 +644,8 @@ async function handleAiParse() {
     if (result.description) formData.description = result.description
     if (result.assignedToName) formData.assignedToName = result.assignedToName
     ElMessage.success('AI 解析完成，请确认并补充信息')
-  } catch {
-    ElMessage.error('AI 解析失败，请手动填写')
+  } catch (error) {
+    console.error('AI parse task failed:', error)
   } finally {
     aiParsing.value = false
   }

@@ -2,19 +2,26 @@
   <el-dialog
     v-model="dialogVisible"
     :title="editingAgent ? '编辑智能体' : '添加智能体'"
-    :width="isMobile ? '95%' : '500px'"
+    :width="isMobile ? '95%' : '460px'"
     :fullscreen="isMobile"
-    class="wk-dialog--flush"
+    class="wk-dialog--flush wk-crm-el-field-scope"
   >
-    <el-form :model="agentForm" label-width="80px">
+    <el-form :model="agentForm" label-position="top">
       <el-form-item label="名称">
-        <el-input v-model="agentForm.label" placeholder="智能体名称" />
+        <el-input v-model="agentForm.label" placeholder="智能体名称" class="w-full wk-crm-el-field-input" size="large" />
       </el-form-item>
       <el-form-item label="提示词">
-        <el-input v-model="agentForm.prompt" type="textarea" :rows="4" placeholder="AI 提示词或快捷指令" />
+        <el-input
+          v-model="agentForm.prompt"
+          type="textarea"
+          :rows="4"
+          resize="none"
+          placeholder="AI 提示词或快捷指令"
+          class="w-full wk-crm-el-field-input"
+        />
       </el-form-item>
       <el-form-item label="图标">
-        <el-input v-model="agentForm.iconName" placeholder="图标名称（如 Promotion）" />
+        <el-input v-model="agentForm.iconName" placeholder="图标名称（如 Promotion）" class="w-full wk-crm-el-field-input" size="large" />
       </el-form-item>
       <el-form-item label="启用">
         <el-switch v-model="agentForm.enabled" />

@@ -62,10 +62,10 @@ export function addKnowledgeTag(knowledgeId: string, tagName: string): Promise<v
 }
 
 /**
- * Get knowledge file presigned URL
+ * Get knowledge preview content
  */
-export function getKnowledgeFileUrl(id: string): Promise<string> {
-  return get(`/knowledge/url/${id}`)
+export function getKnowledgePreview(id: string): Promise<Blob> {
+  return get(`/knowledge/preview/${id}`, { responseType: 'blob' })
 }
 
 /**
@@ -87,31 +87,13 @@ export async function askKnowledgeQuestion(
   onError?: (error: Error) => void
 ): Promise<void> {
   const token = getToken()
-  const abortController = new AbortController()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-  let idleTimeoutId: ReturnType<typeof setTimeout> | null = null
-  let isCompleted = false
-  const IDLE_TIMEOUT_MS = 3000
 
   const cleanup = () => {
-    if (idleTimeoutId) {
-      clearTimeout(idleTimeoutId)
-      idleTimeoutId = null
-    }
     if (reader) {
       try { reader.releaseLock() } catch { /* ignore */ }
       reader = null
     }
-  }
-
-  const resetIdleTimeout = () => {
-    if (idleTimeoutId) clearTimeout(idleTimeoutId)
-    idleTimeoutId = setTimeout(() => {
-      if (!isCompleted) {
-        isCompleted = true
-        abortController.abort()
-      }
-    }, IDLE_TIMEOUT_MS)
   }
 
   try {
@@ -119,10 +101,10 @@ export async function askKnowledgeQuestion(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ question, history }),
-      signal: abortController.signal
+      body: JSON.stringify({ question, history })
     })
 
     if (!response.ok) {
@@ -137,17 +119,8 @@ export async function askKnowledgeQuestion(
     const decoder = new TextDecoder()
     let buffer = ''
 
-    resetIdleTimeout()
-
     while (true) {
-      let readResult: ReadableStreamReadResult<Uint8Array>
-      try {
-        readResult = await reader.read()
-      } catch (e) {
-        if (abortController.signal.aborted) break
-        throw e
-      }
-
+      const readResult = await reader.read()
       const { done, value } = readResult
       if (done) {
         if (buffer.trim()) {
@@ -157,7 +130,6 @@ export async function askKnowledgeQuestion(
         break
       }
 
-      resetIdleTimeout()
       buffer += decoder.decode(value, { stream: true })
 
       const events = buffer.split('\n\n')
@@ -169,26 +141,21 @@ export async function askKnowledgeQuestion(
       }
     }
 
-    isCompleted = true
     onComplete?.()
   } catch (error) {
-    if (abortController.signal.aborted && isCompleted) {
-      onComplete?.()
-      return
-    }
     onError?.(error as Error)
+    throw error
   } finally {
     cleanup()
   }
 }
 
 function parseSSEEvent(event: string): string | null {
-  const lines = event.split('\n')
+  const lines = event.split(/\r?\n/)
   const dataLines: string[] = []
   for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('data:')) {
-      const content = trimmed.slice(5)
+    if (line.startsWith('data:')) {
+      const content = line.slice(5)
       dataLines.push(content.startsWith(' ') ? content.slice(1) : content)
     }
   }

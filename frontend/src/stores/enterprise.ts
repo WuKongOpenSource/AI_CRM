@@ -42,7 +42,7 @@ export const useEnterpriseStore = defineStore('enterprise', () => {
   const displayName = computed(() => name.value || '悟空AI CRM')
   const hasLogo = computed(() => !!logoUrl.value)
   const displayDescription = computed(() => {
-    const text = description.value || 'WUKONG AI CRM'
+    const text = description.value || 'WUKONG CRM'
     return text.length > 12 ? text.slice(0, 12) + '...' : text
   })
 

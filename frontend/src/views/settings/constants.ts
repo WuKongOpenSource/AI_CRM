@@ -7,7 +7,6 @@ export const SETTINGS_MAIN_TABS: SettingsTabItem<SettingsMainTab>[] = [
 ]
 
 export const SYSTEM_SETTINGS_TABS: SettingsTabItem<SystemSettingsTab>[] = [
-  { value: 'profile', label: '个人资料' },
   { value: 'enterprise', label: '企业信息' },
   { value: 'api', label: 'AI/API 配置' },
   { value: 'agent', label: '智能体' },

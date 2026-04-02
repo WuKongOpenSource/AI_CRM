@@ -1,14 +1,20 @@
 package com.kakarote.ai_crm.service;
 
+import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.config.WeKnoraConfig;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -18,19 +24,25 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
- * WeKnora REST 客户端
- * 封装与 WeKnora 知识库服务的 HTTP 交互
+ * WeKnora REST 客户端。
  */
 @Slf4j
 @Service
 public class WeKnoraClient {
 
-    /**
-     * WeKnora 支持的文件扩展名（小写）
-     */
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of(
             "pdf", "doc", "docx", "txt", "md", "markdown",
             "xls", "xlsx", "csv",
@@ -40,19 +52,32 @@ public class WeKnoraClient {
     private final RestTemplate restTemplate;
     private final WeKnoraConfig config;
     private final ObjectMapper objectMapper;
+    private final ConcurrentHashMap<String, String> conversationSessionCache = new ConcurrentHashMap<>();
 
     public WeKnoraClient(WeKnoraConfig config) {
-        this.config = config;
-        this.restTemplate = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
+        this(config, new RestTemplate(), new ObjectMapper());
     }
 
-    /**
-     * 检查文件类型是否被 WeKnora 支持
-     *
-     * @param filename 文件名
-     * @return 是否支持
-     */
+    WeKnoraClient(WeKnoraConfig config, RestTemplate restTemplate, ObjectMapper objectMapper) {
+        this.config = config;
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
+    }
+
+    @Data
+    public static class WeKnoraChatResult {
+        private final String answer;
+        private final List<WeKnoraChunk> references;
+        private final boolean completed;
+    }
+
+    @Data
+    public static class WeKnoraPreviewResult {
+        private final byte[] body;
+        private final MediaType contentType;
+        private final String contentDisposition;
+    }
+
     public boolean isSupportedFileType(String filename) {
         if (filename == null || !filename.contains(".")) {
             return false;
@@ -61,62 +86,49 @@ public class WeKnoraClient {
         return SUPPORTED_EXTENSIONS.contains(ext);
     }
 
-    /**
-     * 获取支持的文件扩展名列表（用于前端提示）
-     */
     public Set<String> getSupportedExtensions() {
         return SUPPORTED_EXTENSIONS;
     }
 
-    /**
-     * 检查 WeKnora 是否启用
-     */
     public boolean isEnabled() {
-        return config.isEnabled() && config.getApiKey() != null && !config.getApiKey().isEmpty();
+        return config.isEnabled()
+                && StrUtil.isNotBlank(config.getApiKey())
+                && StrUtil.isNotBlank(config.getKnowledgeBaseId());
     }
 
-    /**
-     * 上传文档到 WeKnora
-     *
-     * @param file 文件
-     * @return WeKnora 中的知识信息
-     */
     public WeKnoraKnowledge uploadDocument(MultipartFile file) throws IOException {
         return uploadDocument(file.getBytes(), file.getOriginalFilename());
     }
 
-    /**
-     * 上传文档到 WeKnora（从文件路径）
-     *
-     * @param filePath 文件路径
-     * @param originalFilename 原始文件名
-     * @return WeKnora 中的知识信息
-     */
     public WeKnoraKnowledge uploadDocument(String filePath, String originalFilename) throws IOException {
         File file = new File(filePath);
         byte[] fileBytes = Files.readAllBytes(file.toPath());
         return uploadDocument(fileBytes, originalFilename);
     }
 
-    /**
-     * 上传文档到 WeKnora（从字节数组）
-     *
-     * @param fileBytes 文件字节数组
-     * @param originalFilename 原始文件名
-     * @return WeKnora 中的知识信息
-     */
+    public WeKnoraKnowledge uploadDocument(String filePath, String originalFilename,
+                                           String knowledgeBaseId, String apiKey) throws IOException {
+        File file = new File(filePath);
+        byte[] fileBytes = Files.readAllBytes(file.toPath());
+        return uploadDocument(fileBytes, originalFilename, knowledgeBaseId, apiKey);
+    }
+
     public WeKnoraKnowledge uploadDocument(byte[] fileBytes, String originalFilename) throws IOException {
-        if (!isEnabled()) {
+        return uploadDocument(fileBytes, originalFilename, config.getKnowledgeBaseId(), config.getApiKey());
+    }
+
+    public WeKnoraKnowledge uploadDocument(byte[] fileBytes, String originalFilename,
+                                           String knowledgeBaseId, String apiKey) throws IOException {
+        if (!isAvailable(knowledgeBaseId, apiKey)) {
             log.debug("WeKnora 未启用，跳过上传");
             return null;
         }
 
-        String url = config.getBaseUrl() + "/knowledge-bases/" + config.getKnowledgeBaseId() + "/knowledge/file";
+        String url = config.getBaseUrl() + "/knowledge-bases/" + knowledgeBaseId + "/knowledge/file";
 
-        HttpHeaders headers = createHeaders();
+        HttpHeaders headers = createHeaders(apiKey);
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
-        // 构建 multipart 请求
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", new ByteArrayResource(fileBytes) {
             @Override
@@ -129,13 +141,7 @@ public class WeKnoraClient {
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    requestEntity,
-                    String.class
-            );
-
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 if (root.has("success") && root.get("success").asBoolean() && root.has("data")) {
@@ -145,7 +151,6 @@ public class WeKnoraClient {
             log.error("WeKnora 上传失败: {}", response.getBody());
             return null;
         } catch (org.springframework.web.client.HttpClientErrorException.Conflict e) {
-            // 409 Conflict - 文件已存在，解析返回的已有知识信息
             log.info("WeKnora 文件已存在，使用已有记录: {}", originalFilename);
             try {
                 JsonNode root = objectMapper.readTree(e.getResponseBodyAsString());
@@ -162,29 +167,20 @@ public class WeKnoraClient {
         }
     }
 
-    /**
-     * 删除 WeKnora 中的知识
-     *
-     * @param weKnoraKnowledgeId WeKnora 知识 ID
-     */
     public void deleteKnowledge(String weKnoraKnowledgeId) {
-        if (!isEnabled() || weKnoraKnowledgeId == null) {
+        deleteKnowledge(weKnoraKnowledgeId, config.getApiKey());
+    }
+
+    public void deleteKnowledge(String weKnoraKnowledgeId, String apiKey) {
+        if (!isAvailable(config.getKnowledgeBaseId(), apiKey) || weKnoraKnowledgeId == null) {
             return;
         }
 
         String url = config.getBaseUrl() + "/knowledge/" + weKnoraKnowledgeId;
-
-        HttpHeaders headers = createHeaders();
-        HttpEntity<?> requestEntity = new HttpEntity<>(headers);
+        HttpEntity<?> requestEntity = new HttpEntity<>(createHeaders(apiKey));
 
         try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.DELETE,
-                    requestEntity,
-                    String.class
-            );
-
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.DELETE, requestEntity, String.class);
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("WeKnora 知识删除成功: {}", weKnoraKnowledgeId);
             } else {
@@ -195,43 +191,35 @@ public class WeKnoraClient {
         }
     }
 
-    /**
-     * 语义搜索 - 在知识库中搜索相关文档片段
-     *
-     * @param query 搜索查询
-     * @return 相关文档片段列表
-     */
     public List<WeKnoraChunk> searchKnowledge(String query) {
-        if (!isEnabled()) {
-            log.debug("WeKnora 未启用，跳过搜索");
+        return searchKnowledge(query, config.getKnowledgeBaseId(), config.getApiKey());
+    }
+
+    public List<WeKnoraChunk> searchKnowledge(String query, String knowledgeBaseId, String apiKey) {
+        if (!isAvailable(knowledgeBaseId, apiKey)) {
             return Collections.emptyList();
         }
 
         String url = config.getBaseUrl() + "/knowledge-search";
 
-        HttpHeaders headers = createHeaders();
+        HttpHeaders headers = createHeaders(apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("query", query);
-        requestBody.put("knowledge_base_id", config.getKnowledgeBaseId());
+        requestBody.put("knowledge_base_id", knowledgeBaseId);
 
         HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
 
         try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    requestEntity,
-                    String.class
-            );
-
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 if (root.has("success") && root.get("success").asBoolean() && root.has("data")) {
                     List<WeKnoraChunk> chunks = objectMapper.convertValue(
                             root.get("data"),
-                            new TypeReference<List<WeKnoraChunk>>() {}
+                            new TypeReference<List<WeKnoraChunk>>() {
+                            }
                     );
                     double threshold = config.getSearch().getVectorThreshold();
                     int maxCount = config.getSearch().getMatchCount();
@@ -249,21 +237,18 @@ public class WeKnoraClient {
         }
     }
 
-    /**
-     * 混合搜索 - 向量 + 关键词
-     *
-     * @param query 搜索查询
-     * @return 相关文档片段列表
-     */
     public List<WeKnoraChunk> hybridSearch(String query) {
-        if (!isEnabled()) {
-            log.debug("WeKnora 未启用，跳过混合搜索");
+        return hybridSearch(query, config.getKnowledgeBaseId(), config.getApiKey());
+    }
+
+    public List<WeKnoraChunk> hybridSearch(String query, String knowledgeBaseId, String apiKey) {
+        if (!isAvailable(knowledgeBaseId, apiKey)) {
             return Collections.emptyList();
         }
 
-        String url = config.getBaseUrl() + "/knowledge-bases/" + config.getKnowledgeBaseId() + "/hybrid-search";
+        String url = config.getBaseUrl() + "/knowledge-bases/" + knowledgeBaseId + "/hybrid-search";
 
-        HttpHeaders headers = createHeaders();
+        HttpHeaders headers = createHeaders(apiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -274,20 +259,14 @@ public class WeKnoraClient {
         HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
 
         try {
-            // WeKnora hybrid-search 使用 GET 但带 body，用 exchange 发送
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    requestEntity,
-                    String.class
-            );
-
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 if (root.has("success") && root.get("success").asBoolean() && root.has("data")) {
                     return objectMapper.convertValue(
                             root.get("data"),
-                            new TypeReference<List<WeKnoraChunk>>() {}
+                            new TypeReference<List<WeKnoraChunk>>() {
+                            }
                     );
                 }
             }
@@ -299,30 +278,20 @@ public class WeKnoraClient {
         }
     }
 
-    /**
-     * 获取知识详情
-     *
-     * @param weKnoraKnowledgeId WeKnora 知识 ID
-     * @return 知识详情
-     */
     public WeKnoraKnowledge getKnowledgeDetail(String weKnoraKnowledgeId) {
-        if (!isEnabled() || weKnoraKnowledgeId == null) {
+        return getKnowledgeDetail(weKnoraKnowledgeId, config.getApiKey());
+    }
+
+    public WeKnoraKnowledge getKnowledgeDetail(String weKnoraKnowledgeId, String apiKey) {
+        if (!isAvailable(config.getKnowledgeBaseId(), apiKey) || weKnoraKnowledgeId == null) {
             return null;
         }
 
         String url = config.getBaseUrl() + "/knowledge/" + weKnoraKnowledgeId;
-
-        HttpHeaders headers = createHeaders();
-        HttpEntity<?> requestEntity = new HttpEntity<>(headers);
+        HttpEntity<?> requestEntity = new HttpEntity<>(createHeaders(apiKey));
 
         try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    requestEntity,
-                    String.class
-            );
-
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 if (root.has("success") && root.get("success").asBoolean() && root.has("data")) {
@@ -336,12 +305,308 @@ public class WeKnoraClient {
         }
     }
 
-    /**
-     * 创建带认证的请求头
-     */
-    private HttpHeaders createHeaders() {
+    public WeKnoraPreviewResult getKnowledgePreview(String weKnoraKnowledgeId) {
+        return getKnowledgePreview(weKnoraKnowledgeId, config.getApiKey());
+    }
+
+    public WeKnoraPreviewResult getKnowledgePreview(String weKnoraKnowledgeId, String apiKey) {
+        if (!isAvailable(config.getKnowledgeBaseId(), apiKey) || StrUtil.isBlank(weKnoraKnowledgeId)) {
+            return null;
+        }
+
+        String url = config.getBaseUrl() + "/knowledge/" + weKnoraKnowledgeId + "/preview";
+        HttpEntity<?> requestEntity = new HttpEntity<>(createHeaders(apiKey));
+
+        try {
+            ResponseEntity<byte[]> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, byte[].class);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.warn("WeKnora preview returned non-success status: {} - {}", weKnoraKnowledgeId, response.getStatusCode());
+                return null;
+            }
+            byte[] body = response.getBody();
+            if (body == null || body.length == 0) {
+                log.warn("WeKnora preview returned empty body: {}", weKnoraKnowledgeId);
+                return null;
+            }
+            return new WeKnoraPreviewResult(
+                    body,
+                    response.getHeaders().getContentType(),
+                    response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)
+            );
+        } catch (Exception e) {
+            log.error("WeKnora preview request failed: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    public WeKnoraChatResult askKnowledgeQuestion(Long conversationId, String query) {
+        return askKnowledgeQuestion(conversationId, query, Collections.emptyList());
+    }
+
+    public WeKnoraChatResult askKnowledgeQuestion(Long conversationId, String query, List<String> knowledgeIds) {
+        if (!isEnabled() || StrUtil.isBlank(query)) {
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+
+        String sessionId = getOrCreateConversationSession(conversationId);
+        boolean useAgentChat = knowledgeIds != null && !knowledgeIds.isEmpty();
+        log.debug(
+                "RAG问答请求开始: conversationId={}, sessionId={}, kbId={}, useAgentChat={}, knowledgeIds={}, query={}",
+                conversationId,
+                sessionId,
+                config.getKnowledgeBaseId(),
+                useAgentChat,
+                knowledgeIds,
+                abbreviateForLog(query)
+        );
+        try {
+            WeKnoraChatResult result = executeKnowledgeChat(sessionId, query, knowledgeIds, useAgentChat);
+            if (useAgentChat && isUnavailableChatResult(result)) {
+                log.warn("WeKnora 定向知识问答未返回可用结果，降级为通用知识库问答: sessionId={}", sessionId);
+                result = executeKnowledgeChat(sessionId, query, Collections.emptyList(), false);
+            }
+            log.debug(
+                    "RAG问答请求完成: conversationId={}, sessionId={}, answerLength={}, references={}, completed={}",
+                    conversationId,
+                    sessionId,
+                    result.getAnswer() != null ? result.getAnswer().length() : 0,
+                    result.getReferences() != null ? result.getReferences().size() : 0,
+                    result.isCompleted()
+            );
+            return result;
+        } catch (Exception e) {
+            log.error("WeKnora 问答异常: sessionId={}, error={}", sessionId, e.getMessage(), e);
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+    }
+
+    public void clearConversationSession(Long conversationId) {
+        if (conversationId == null) {
+            return;
+        }
+        conversationSessionCache.remove(buildConversationSessionKey(conversationId));
+    }
+
+    private boolean isAvailable(String knowledgeBaseId, String apiKey) {
+        return config.isEnabled()
+                && StrUtil.isNotBlank(apiKey)
+                && StrUtil.isNotBlank(knowledgeBaseId);
+    }
+
+    private String getOrCreateConversationSession(Long conversationId) {
+        String cacheKey = buildConversationSessionKey(conversationId);
+        String cachedSessionId = conversationSessionCache.get(cacheKey);
+        if (StrUtil.isNotBlank(cachedSessionId)) {
+            return cachedSessionId;
+        }
+
+        synchronized (conversationSessionCache) {
+            cachedSessionId = conversationSessionCache.get(cacheKey);
+            if (StrUtil.isNotBlank(cachedSessionId)) {
+                return cachedSessionId;
+            }
+
+            String sessionId = createConversationSession(config.getKnowledgeBaseId(), config.getApiKey());
+            conversationSessionCache.put(cacheKey, sessionId);
+            return sessionId;
+        }
+    }
+
+    private String createConversationSession(String knowledgeBaseId, String apiKey) {
+        String url = config.getBaseUrl() + "/sessions";
+
+        HttpHeaders headers = createHeaders(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("knowledge_base_id", knowledgeBaseId);
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                JsonNode data = root.path("data");
+                String sessionId = data.path("id").asText(null);
+                if (StrUtil.isBlank(sessionId)) {
+                    sessionId = root.path("id").asText(null);
+                }
+                if (StrUtil.isNotBlank(sessionId)) {
+                    return sessionId;
+                }
+            }
+            throw new RuntimeException("WeKnora 创建会话失败: " + response.getBody());
+        } catch (Exception e) {
+            log.error("WeKnora 创建会话异常: {}", e.getMessage(), e);
+            throw new RuntimeException("WeKnora 创建会话失败: " + e.getMessage(), e);
+        }
+    }
+
+    private WeKnoraChatResult executeKnowledgeChat(String sessionId, String query,
+                                                   List<String> knowledgeIds, boolean useAgentChat) {
+        String url = config.getBaseUrl() + (useAgentChat ? "/agent-chat/" : "/knowledge-chat/") + sessionId;
+
+        HttpHeaders headers = createHeaders(config.getApiKey());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON));
+
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("query", query);
+        if (useAgentChat) {
+            requestBody.put("knowledge_base_ids", List.of(config.getKnowledgeBaseId()));
+            requestBody.put("knowledge_ids", knowledgeIds);
+            requestBody.put("agent_enabled", false);
+            requestBody.put("web_search_enabled", false);
+        }
+
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+            throw new RuntimeException("WeKnora 问答返回异常: " + response.getStatusCode());
+        }
+        return parseChatResult(response.getBody());
+    }
+
+    private WeKnoraChatResult parseChatResult(String responseBody) {
+        if (StrUtil.isBlank(responseBody)) {
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+
+        String answer = "";
+        List<WeKnoraChunk> references = new ArrayList<>();
+        boolean completed = false;
+
+        try {
+            String trimmed = responseBody.trim();
+            if (trimmed.startsWith("{")) {
+                JsonNode root = objectMapper.readTree(trimmed);
+                answer = appendAnswer(answer, root);
+                references.addAll(extractReferences(root));
+                completed = root.path("done").asBoolean(false);
+            } else {
+                String[] events = responseBody.split("\\r?\\n\\r?\\n");
+                for (String event : events) {
+                    String payload = Arrays.stream(event.split("\\r?\\n"))
+                            .map(String::trim)
+                            .filter(line -> line.startsWith("data:"))
+                            .map(line -> line.substring(5).trim())
+                            .filter(StrUtil::isNotBlank)
+                            .collect(Collectors.joining("\n"));
+
+                    if (StrUtil.isBlank(payload) || "[DONE]".equalsIgnoreCase(payload)) {
+                        continue;
+                    }
+
+                    JsonNode node = objectMapper.readTree(payload);
+                    if ("error".equalsIgnoreCase(node.path("response_type").asText())) {
+                        throw new RuntimeException(node.path("content").asText("WeKnora 问答失败"));
+                    }
+
+                    answer = appendAnswer(answer, node);
+                    references.addAll(extractReferences(node));
+                    if (node.path("done").asBoolean(false)) {
+                        completed = true;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("解析 WeKnora 问答结果失败: {}", e.getMessage());
+            return new WeKnoraChatResult("", Collections.emptyList(), false);
+        }
+
+        List<WeKnoraChunk> uniqueReferences = references.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(
+                                chunk -> String.format(
+                                        "%s:%s:%s",
+                                        StrUtil.blankToDefault(chunk.getKnowledgeId(), ""),
+                                        chunk.getChunkIndex(),
+                                        chunk.getStartAt()
+                                ),
+                                chunk -> chunk,
+                                (left, right) -> left,
+                                LinkedHashMap::new
+                        ),
+                        map -> new ArrayList<>(map.values())
+                ));
+
+        return new WeKnoraChatResult(answer.trim(), uniqueReferences, completed);
+    }
+
+    private String appendAnswer(String currentAnswer, JsonNode node) {
+        if (node == null || node.isMissingNode()) {
+            return currentAnswer;
+        }
+
+        String responseType = node.path("response_type").asText("");
+        String content = node.path("content").asText("");
+
+        if (StrUtil.isBlank(content)) {
+            JsonNode data = node.path("data");
+            if (!data.isMissingNode()) {
+                content = data.path("content").asText("");
+                if (StrUtil.isBlank(content)) {
+                    content = data.path("answer").asText("");
+                }
+            }
+        }
+
+        if (StrUtil.isBlank(content)) {
+            return currentAnswer;
+        }
+
+        if (StrUtil.isBlank(responseType)
+                || "answer".equalsIgnoreCase(responseType)
+                || "final".equalsIgnoreCase(responseType)
+                || "message".equalsIgnoreCase(responseType)) {
+            return currentAnswer + content;
+        }
+        return currentAnswer;
+    }
+
+    private List<WeKnoraChunk> extractReferences(JsonNode node) {
+        if (node == null || node.isMissingNode()) {
+            return Collections.emptyList();
+        }
+
+        JsonNode referenceNode = node.get("knowledge_references");
+        if ((referenceNode == null || referenceNode.isMissingNode() || referenceNode.isNull()) && node.has("data")) {
+            referenceNode = node.path("data").get("knowledge_references");
+        }
+
+        if (referenceNode != null && referenceNode.isArray()) {
+            return objectMapper.convertValue(referenceNode, new TypeReference<List<WeKnoraChunk>>() {
+            });
+        }
+        return Collections.emptyList();
+    }
+
+    private boolean isUnavailableChatResult(WeKnoraChatResult result) {
+        if (result == null || StrUtil.isBlank(result.getAnswer())) {
+            return true;
+        }
+        return result.getAnswer().contains("NO_MATCH");
+    }
+
+    private String buildConversationSessionKey(Long conversationId) {
+        return String.valueOf(conversationId != null ? conversationId : 0L);
+    }
+
+    private String abbreviateForLog(String text) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        return normalized.length() > 120 ? normalized.substring(0, 120) + "..." : normalized;
+    }
+
+    private HttpHeaders createHeaders(String apiKey) {
         HttpHeaders headers = new HttpHeaders();
-        headers.set("X-API-Key", config.getApiKey());
+        if (StrUtil.isNotBlank(apiKey)) {
+            headers.set("X-API-Key", apiKey);
+        }
         return headers;
     }
 }

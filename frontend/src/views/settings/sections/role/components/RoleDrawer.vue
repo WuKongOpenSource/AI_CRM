@@ -42,26 +42,27 @@
               <div class="flex gap-8 relative">
                 <button
                   class="pb-4 text-sm font-bold transition-colors relative"
-                  :class="roleDrawerTab === 'members' ? 'text-primary' : 'text-slate-500 hover:text-slate-800'"
+                  :class="activeRoleDrawerTab === 'members' ? 'text-primary' : 'text-slate-500 hover:text-slate-800'"
                   @click="$emit('update:tab', 'members')"
                 >
                   角色成员
                   <span class="ml-2 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">{{ roleDrawerRole?.userCount || 0 }}</span>
-                  <div v-if="roleDrawerTab === 'members'" class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
+                  <div v-if="activeRoleDrawerTab === 'members'" class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
                 </button>
                 <button
+                  v-if="canConfigurePermissions"
                   class="pb-4 text-sm font-bold transition-colors relative"
-                  :class="roleDrawerTab === 'permissions' ? 'text-primary' : 'text-slate-500 hover:text-slate-800'"
+                  :class="activeRoleDrawerTab === 'permissions' ? 'text-primary' : 'text-slate-500 hover:text-slate-800'"
                   @click="$emit('update:tab', 'permissions')"
                 >
                   权限配置
-                  <div v-if="roleDrawerTab === 'permissions'" class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
+                  <div v-if="activeRoleDrawerTab === 'permissions'" class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full"></div>
                 </button>
               </div>
             </div>
 
             <div class="flex-1 overflow-y-auto p-8">
-              <div v-if="roleDrawerTab === 'members'" class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div v-if="activeRoleDrawerTab === 'members'" class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                 <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
                   <div class="relative">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
@@ -218,10 +219,15 @@ const drawerVisible = computed({
   set: (value: boolean) => emit('update:visible', value)
 })
 
+// 将抽屉内的成员搜索输入同步回父级状态，便于直接在当前组件里使用 v-model。
 const roleUserSearchValue = computed({
   get: () => props.roleUserSearch,
   set: (value: string) => emit('update:roleUserSearch', value)
 })
 
+// 超级管理员属于系统预设角色，这里不提供权限配置入口。
+const canConfigurePermissions = computed(() => !!props.roleDrawerRole && props.roleDrawerRole.realm !== 'super_admin')
+// 当当前角色不可配置权限时，统一回退到成员页，避免外部 tab 状态残留到权限页。
+const activeRoleDrawerTab = computed<'members' | 'permissions'>(() => (canConfigurePermissions.value ? props.roleDrawerTab : 'members'))
 const role = computed(() => props.roleDrawerRole?.roleName || '')
 </script>

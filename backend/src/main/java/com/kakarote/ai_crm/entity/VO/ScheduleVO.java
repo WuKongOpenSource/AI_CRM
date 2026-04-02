@@ -1,9 +1,13 @@
 package com.kakarote.ai_crm.entity.VO;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 日程视图对象
@@ -47,6 +51,20 @@ public class ScheduleVO {
 
     @Schema(description = "地点")
     private String location;
+
+    @JsonIgnore
+    @Schema(description = "参与人员工ID（逗号分隔）", hidden = true)
+    private String participantUserIdsText;
+
+    @Schema(description = "参与人名称（逗号分隔）")
+    private String participantNames;
+
+    @Schema(description = "参与人员工ID列表")
+    @JsonSerialize(contentUsing = ToStringSerializer.class)
+    private List<Long> participantUserIds;
+
+    @Schema(description = "参与人员工")
+    private List<ScheduleParticipantUserVO> participantUsers;
 
     @Schema(description = "创建人ID")
     private Long createUserId;

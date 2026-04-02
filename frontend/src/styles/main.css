@@ -142,6 +142,72 @@ html, body, #app {
   box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3) inset !important;
 }
 
+/* el-input type="textarea" 使用 .el-textarea__inner，与单行 input 的 0.5rem 圆角对齐 */
+.el-textarea__inner {
+  border-radius: 0.5rem !important;
+}
+
+/* 带 prepend/append 时：全局圆角用了 !important，会盖掉 EP 分组规则，接缝处需重新压平 */
+.el-input-group.el-input-group--prepend > .el-input__wrapper {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+.el-input-group .el-input-group__prepend {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.el-input-group.el-input-group--append > .el-input__wrapper {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+.el-input-group .el-input-group__append {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+}
+
+/*
+ * el-input-number：± 盖在 wrapper 上，全周 inset 与按钮外侧 border 会叠成双边框。
+ * 用根节点单层外描边包一整块；wrapper 去掉 inset，保留 EP 按钮上的内侧分割线。
+ */
+.el-input-number {
+  border-radius: var(--el-border-radius-base);
+  box-shadow: 0 0 0 1px #e2e8f0;
+}
+
+.el-input-number:hover:not(:has(.el-input__wrapper.is-focus)) {
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.el-input-number:has(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(19, 127, 236, 0.3);
+}
+
+.el-input-number.is-disabled {
+  box-shadow: 0 0 0 1px var(--el-disabled-border-color);
+}
+
+.el-input-number.is-disabled:hover {
+  box-shadow: 0 0 0 1px var(--el-disabled-border-color);
+}
+
+.el-input-number .el-input__wrapper {
+  border-radius: var(--el-border-radius-base) !important;
+  box-shadow: none !important;
+}
+
+.el-input-number .el-input__wrapper:hover,
+.el-input-number .el-input__wrapper.is-focus {
+  box-shadow: none !important;
+}
+
+/* 与 el-input 一致：选择框默认圆角更小，统一为 0.5rem（含 el-select / el-tree-select） */
+.el-select__wrapper {
+  border-radius: 0.5rem !important;
+}
+
 .el-dialog {
   border-radius: 1rem !important;
 }
@@ -201,4 +267,164 @@ html, body, #app {
 .el-button--primary:hover {
   background-color: rgba(19, 127, 236, 0.9) !important;
   border-color: rgba(19, 127, 236, 0.9) !important;
+}
+
+.wk-markdown {
+  color: inherit;
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.wk-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.wk-markdown > *:last-child {
+  margin-bottom: 0;
+}
+
+.wk-markdown h1,
+.wk-markdown h2,
+.wk-markdown h3,
+.wk-markdown h4,
+.wk-markdown h5,
+.wk-markdown h6 {
+  margin: 1em 0 0.5em;
+  font-weight: 700;
+  line-height: 1.35;
+  color: inherit;
+}
+
+.wk-markdown h1 {
+  font-size: 1.5rem;
+}
+
+.wk-markdown h2 {
+  font-size: 1.25rem;
+}
+
+.wk-markdown h3 {
+  font-size: 1.1rem;
+}
+
+.wk-markdown p,
+.wk-markdown ul,
+.wk-markdown ol,
+.wk-markdown blockquote,
+.wk-markdown pre,
+.wk-markdown table,
+.wk-markdown hr {
+  margin: 0.75em 0;
+}
+
+.wk-markdown ul,
+.wk-markdown ol {
+  padding-left: 1.4em;
+}
+
+.wk-markdown ul {
+  list-style-type: disc;
+  list-style-position: outside;
+}
+
+.wk-markdown ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+}
+
+.wk-markdown ul ul {
+  list-style-type: circle;
+}
+
+.wk-markdown ul ul ul {
+  list-style-type: square;
+}
+
+.wk-markdown ol ol {
+  list-style-type: lower-alpha;
+}
+
+.wk-markdown ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.wk-markdown li + li {
+  margin-top: 0.25em;
+}
+
+.wk-markdown li::marker {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.wk-markdown blockquote {
+  padding: 0.75em 1em;
+  border-left: 3px solid #93c5fd;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+}
+
+.wk-markdown code {
+  padding: 0.12em 0.4em;
+  border-radius: 0.4rem;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 0.92em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.wk-markdown pre {
+  overflow-x: auto;
+  padding: 0.9em 1em;
+  border-radius: 0.9rem;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.wk-markdown pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.wk-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid #dbe5f0;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.wk-markdown th,
+.wk-markdown td {
+  padding: 0.7em 0.85em;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.wk-markdown th {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.wk-markdown tr:last-child td {
+  border-bottom: none;
+}
+
+.wk-markdown a {
+  color: #137fec;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.wk-markdown hr {
+  border: none;
+  border-top: 1px solid #dbe5f0;
+}
+
+.wk-markdown strong {
+  font-weight: 700;
 }

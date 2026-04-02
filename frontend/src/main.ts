@@ -20,6 +20,7 @@ import App from './App.vue'
 import router from './router'
 import './styles/iconfont.css'
 import './styles/main.css'
+import './styles/wk-crm-el-field-skin.css'
 
 const app = createApp(App)
 

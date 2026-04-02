@@ -15,6 +15,7 @@
             s.contact_id,
             ct.name AS contact_name,
             s.location,
+            s.participant_user_ids AS participant_user_ids_text,
             s.create_user_id,
             u.realname AS create_user_name,
             s.create_time
@@ -51,6 +52,7 @@
             s.contact_id,
             ct.name AS contact_name,
             s.location,
+            s.participant_user_ids AS participant_user_ids_text,
             s.create_user_id,
             u.realname AS create_user_name,
             s.create_time

@@ -43,21 +43,14 @@ export async function sendMessageStream(
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
-  attachments?: ChatAttachmentDTO[]
+  attachments?: ChatAttachmentDTO[],
+  ragEnabled?: boolean
 ): Promise<void> {
   const token = getToken()
-  const abortController = new AbortController()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-  let idleTimeoutId: ReturnType<typeof setTimeout> | null = null
-  let isCompleted = false
-  const IDLE_TIMEOUT_MS = 3000 // 3 seconds idle = stream ended
 
   // Cleanup function
   const cleanup = () => {
-    if (idleTimeoutId) {
-      clearTimeout(idleTimeoutId)
-      idleTimeoutId = null
-    }
     if (reader) {
       try {
         reader.releaseLock()
@@ -68,29 +61,15 @@ export async function sendMessageStream(
     }
   }
 
-  // Reset idle timeout when data is received
-  const resetIdleTimeout = () => {
-    if (idleTimeoutId) {
-      clearTimeout(idleTimeoutId)
-    }
-    idleTimeoutId = setTimeout(() => {
-      // No data for IDLE_TIMEOUT_MS, consider stream complete
-      if (!isCompleted) {
-        isCompleted = true
-        abortController.abort()
-      }
-    }, IDLE_TIMEOUT_MS)
-  }
-
   try {
     const response = await fetch(`${getApiBaseUrl()}/chat/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined }),
-      signal: abortController.signal
+      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined, ragEnabled })
     })
 
     if (!response.ok) {
@@ -105,22 +84,8 @@ export async function sendMessageStream(
     const decoder = new TextDecoder()
     let buffer = ''
 
-    // Start idle timeout
-    resetIdleTimeout()
-
     while (true) {
-      let readResult: ReadableStreamReadResult<Uint8Array>
-
-      try {
-        readResult = await reader.read()
-      } catch (e) {
-        // If aborted due to idle timeout, treat as complete
-        if (abortController.signal.aborted) {
-          break
-        }
-        throw e
-      }
-
+      const readResult = await reader.read()
       const { done, value } = readResult
 
       if (done) {
@@ -133,9 +98,6 @@ export async function sendMessageStream(
         }
         break
       }
-
-      // Reset idle timeout since we received data
-      resetIdleTimeout()
 
       // Decode the chunk and add to buffer
       buffer += decoder.decode(value, { stream: true })
@@ -154,14 +116,8 @@ export async function sendMessageStream(
     }
 
     // Stream completed successfully
-    isCompleted = true
     onComplete?.()
   } catch (error) {
-    // Don't report error if it was caused by our abort (idle timeout)
-    if (abortController.signal.aborted && isCompleted) {
-      onComplete?.()
-      return
-    }
     onError?.(error as Error)
     throw error
   } finally {
@@ -175,14 +131,13 @@ export async function sendMessageStream(
  * These should be joined with newlines according to SSE spec
  */
 function parseSSEEvent(event: string): string | null {
-  const lines = event.split('\n')
+  const lines = event.split(/\r?\n/)
   const dataLines: string[] = []
 
   for (const line of lines) {
-    const trimmed = line.trim()
-    if (trimmed.startsWith('data:')) {
-      const content = trimmed.slice(5)
-      // Handle "data: " (with space) vs "data:" (without space)
+    if (line.startsWith('data:')) {
+      const content = line.slice(5)
+      // Per SSE spec, strip at most one leading space after "data:"
       dataLines.push(content.startsWith(' ') ? content.slice(1) : content)
     }
   }
@@ -195,6 +150,6 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[]): Promise<string> {
-  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined })
+export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean): Promise<string> {
+  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined, ragEnabled })
 }

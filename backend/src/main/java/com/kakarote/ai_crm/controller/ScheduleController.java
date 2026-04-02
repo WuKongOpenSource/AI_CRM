@@ -1,9 +1,12 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
+import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
+import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.service.IScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +31,7 @@ public class ScheduleController {
 
     @PostMapping("/add")
     @Operation(summary = "创建日程")
+    @RequirePermission("schedule:create")
     public Result<Long> add(@Valid @RequestBody ScheduleAddBO scheduleAddBO) {
         Long scheduleId = scheduleService.addSchedule(scheduleAddBO);
         return Result.ok(scheduleId);
@@ -35,6 +39,7 @@ public class ScheduleController {
 
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除日程")
+    @RequirePermission("schedule:delete")
     public Result<String> delete(@PathVariable("id") Long id) {
         scheduleService.deleteSchedule(id);
         return Result.ok();
@@ -42,14 +47,23 @@ public class ScheduleController {
 
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询日程")
+    @RequirePermission("schedule:view")
     public Result<BasePage<ScheduleVO>> queryPageList(@RequestBody ScheduleQueryBO queryBO) {
         return Result.ok(scheduleService.queryPageList(queryBO));
     }
 
     @GetMapping("/mySchedules")
     @Operation(summary = "查询我的日程")
+    @RequirePermission("schedule:view")
     public Result<List<ScheduleVO>> mySchedules(
-            @Parameter(description = "筛选: all/today/thisWeek") @RequestParam(defaultValue = "all") String filter) {
+            @Parameter(description = "筛选 all/today/thisWeek") @RequestParam(defaultValue = "all") String filter) {
         return Result.ok(scheduleService.getMySchedules(filter));
+    }
+
+    @PostMapping("/ai-parse")
+    @Operation(summary = "AI智能解析日程")
+    @RequirePermission("schedule:create")
+    public Result<ScheduleAiParseVO> aiParse(@Valid @RequestBody ScheduleAiParseBO parseBO) {
+        return Result.ok(scheduleService.aiParseSchedule(parseBO));
     }
 }

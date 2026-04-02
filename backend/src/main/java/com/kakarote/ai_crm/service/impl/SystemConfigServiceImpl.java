@@ -2,16 +2,21 @@ package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.AiMode;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
+import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
+import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
+import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
-import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
@@ -23,8 +28,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.web.client.RestTemplate;
-
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * 系统配置服务实现
+ * 系统配置服务实现。
  */
 @Slf4j
 @Service
@@ -42,9 +46,20 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     private static final String CACHE_KEY_PREFIX = "system:config:";
     private static final String AI_CONFIG_TYPE = "ai";
-    private static final String WEKNORA_CONFIG_TYPE = "weknora";
     private static final String ENTERPRISE_CONFIG_TYPE = "enterprise";
     private static final long CACHE_EXPIRE_MINUTES = 30;
+
+    private static final String AI_MODE_KEY = "ai_mode";
+    private static final String AI_PROVIDER_KEY = "ai_provider";
+    private static final String AI_API_URL_KEY = "ai_api_url";
+    private static final String AI_API_KEY_KEY = "ai_api_key";
+    private static final String AI_MODEL_KEY = "ai_model";
+    private static final String AI_TEMPERATURE_KEY = "ai_temperature";
+    private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
+    private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
+    private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -55,11 +70,13 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     @Autowired
     private FileStorageService fileStorageService;
 
-    // 从 application.yml 读取默认值，确保与 DynamicChatClientProvider 一致
-    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/}")
+    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}")
     private String defaultApiUrl;
 
-    @Value("${spring.ai.openai.chat.options.model:qwen-max}")
+    @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
+    private String defaultApiKey;
+
+    @Value("${spring.ai.openai.chat.options.model:qwen3.5-plus}")
     private String defaultModel;
 
     @Value("${spring.ai.openai.chat.options.temperature:0.7}")
@@ -68,27 +85,18 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
 
-    // WeKnora 默认配置
-    @Value("${weknora.enabled:false}")
-    private boolean defaultWeKnoraEnabled;
+    @Value("${weknora.init-models.chat.base-url:}")
+    private String giftApiUrl;
 
-    @Value("${weknora.base-url:http://localhost:8080/api/v1}")
-    private String defaultWeKnoraBaseUrl;
+    @Value("${weknora.init-models.chat.api-key:}")
+    private String giftApiKey;
 
-    @Value("${weknora.api-key:}")
-    private String defaultWeKnoraApiKey;
+    @Value("${weknora.init-models.chat.name:}")
+    private String giftModel;
 
-    @Value("${weknora.knowledge-base-id:}")
-    private String defaultWeKnoraKnowledgeBaseId;
-
-    @Value("${weknora.search.match-count:5}")
-    private Integer defaultWeKnoraMatchCount;
-
-    @Value("${weknora.search.vector-threshold:0.5}")
-    private Double defaultWeKnoraVectorThreshold;
-
-    @Value("${weknora.search.auto-rag-enabled:true}")
-    private boolean defaultWeKnoraAutoRagEnabled;
+    private String buildCacheKey(String configKey) {
+        return CACHE_KEY_PREFIX + configKey;
+    }
 
     @Override
     public String getConfigValue(String configKey) {
@@ -97,20 +105,17 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Override
     public String getConfigValue(String configKey, String defaultValue) {
-        // 1. 先从 Redis 缓存查询
-        String cacheKey = CACHE_KEY_PREFIX + configKey;
+        String cacheKey = buildCacheKey(configKey);
         String cachedValue = redisTemplate.opsForValue().get(cacheKey);
         if (cachedValue != null) {
             return cachedValue;
         }
 
-        // 2. 从数据库查询
         SystemConfig config = lambdaQuery()
                 .eq(SystemConfig::getConfigKey, configKey)
                 .one();
 
         if (config != null && StrUtil.isNotBlank(config.getConfigValue())) {
-            // 缓存到 Redis
             redisTemplate.opsForValue().set(cacheKey, config.getConfigValue(),
                     CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES);
             return config.getConfigValue();
@@ -141,20 +146,17 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                 .one();
 
         if (config == null) {
-            // 新增配置
             config = new SystemConfig();
             config.setConfigKey(configKey);
             config.setConfigValue(configValue);
             config.setConfigType(AI_CONFIG_TYPE);
             save(config);
         } else {
-            // 更新配置
             config.setConfigValue(configValue);
             updateById(config);
         }
 
-        // 清除缓存
-        redisTemplate.delete(CACHE_KEY_PREFIX + configKey);
+        redisTemplate.delete(buildCacheKey(configKey));
     }
 
     @Override
@@ -165,101 +167,132 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Override
     public AiConfigVO getAiConfig() {
-        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
+        return buildAiConfig(false, false);
+    }
 
-        AiConfigVO vo = new AiConfigVO();
-
-        // 如果 ai_provider 存在，说明用户已通过设置页面保存过配置，使用 DB 值
-        // 如果不存在，说明从未通过设置页面配置，全部使用 application.yml 默认值
-        boolean hasExplicitConfig = configs.containsKey("ai_provider");
-
-        if (hasExplicitConfig) {
-            vo.setProvider(configs.get("ai_provider"));
-            vo.setApiUrl(configs.getOrDefault("ai_api_url", defaultApiUrl));
-            vo.setApiKey(maskApiKey(configs.get("ai_api_key")));
-            vo.setModel(configs.getOrDefault("ai_model", defaultModel));
-            vo.setTemperature(parseDouble(configs.get("ai_temperature"), defaultTemperature));
-            vo.setMaxTokens(parseInt(configs.get("ai_max_tokens"), defaultMaxTokens));
-        } else {
-            // 未通过设置页面配置过，返回 application.yml 默认值（通义千问）
-            vo.setProvider("dashscope");
-            vo.setApiUrl(defaultApiUrl);
-            vo.setApiKey(maskApiKey(configs.get("ai_api_key")));
-            vo.setModel(defaultModel);
-            vo.setTemperature(defaultTemperature);
-            vo.setMaxTokens(defaultMaxTokens);
-        }
-
-        // 获取最后更新时间
-        SystemConfig anyConfig = lambdaQuery()
-                .eq(SystemConfig::getConfigType, AI_CONFIG_TYPE)
-                .orderByDesc(SystemConfig::getUpdateTime)
-                .last("LIMIT 1")
-                .one();
-        if (anyConfig != null) {
-            vo.setUpdateTime(anyConfig.getUpdateTime());
-        }
-
-        return vo;
+    @Override
+    public AiConfigVO getAiConfigDetail() {
+        return buildAiConfig(true, true);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateAiConfig(AiConfigUpdateBO updateBO) {
-        Map<String, String> configs = new HashMap<>();
+        String normalizedApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(updateBO.getApiUrl());
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(updateBO.getProvider(), normalizedApiUrl);
+        Map<String, String> existingConfigs = getConfigsByType(AI_CONFIG_TYPE);
+        Map<String, StoredProviderConfig> providerConfigs = loadWritableProviderConfigs(existingConfigs);
+        String normalizedApiKey = resolveApiKeyForSave(descriptor.getCode(), updateBO.getApiKey(), providerConfigs);
+        updateBO.setApiKey(normalizedApiKey);
+        AiModelCapabilities capabilities = validateAiConfig(descriptor, updateBO);
 
-        if (StrUtil.isNotBlank(updateBO.getProvider())) {
-            configs.put("ai_provider", updateBO.getProvider());
-        }
-        if (StrUtil.isNotBlank(updateBO.getApiUrl())) {
-            configs.put("ai_api_url", updateBO.getApiUrl());
-        }
-        if (StrUtil.isNotBlank(updateBO.getApiKey())) {
-            configs.put("ai_api_key", updateBO.getApiKey());
-        }
-        if (StrUtil.isNotBlank(updateBO.getModel())) {
-            configs.put("ai_model", updateBO.getModel());
-        }
-        if (updateBO.getTemperature() != null) {
-            configs.put("ai_temperature", String.valueOf(updateBO.getTemperature()));
-        }
-        if (updateBO.getMaxTokens() != null) {
-            configs.put("ai_max_tokens", String.valueOf(updateBO.getMaxTokens()));
-        }
+        String normalizedModel = updateBO.getModel().trim();
+        Double resolvedTemperature = updateBO.getTemperature() != null ? updateBO.getTemperature() : defaultTemperature;
+        Integer resolvedMaxTokens = updateBO.getMaxTokens() != null ? updateBO.getMaxTokens() : defaultMaxTokens;
+        String normalizedExtraHeaders = StrUtil.nullToEmpty(updateBO.getExtraHeadersJson()).trim();
+
+        providerConfigs.put(descriptor.getCode(), new StoredProviderConfig(
+                descriptor.getCode(),
+                normalizedApiUrl,
+                normalizedApiKey,
+                normalizedModel,
+                resolvedTemperature,
+                resolvedMaxTokens,
+                normalizedExtraHeaders
+        ));
+
+        Map<String, String> configs = new HashMap<>();
+        configs.put(AI_MODE_KEY, AiMode.CUSTOM.getCode());
+        configs.put(AI_PROVIDER_KEY, descriptor.getCode());
+        configs.put(AI_API_URL_KEY, normalizedApiUrl);
+        configs.put(AI_API_KEY_KEY, normalizedApiKey);
+        configs.put(AI_MODEL_KEY, normalizedModel);
+        configs.put(AI_TEMPERATURE_KEY, String.valueOf(resolvedTemperature));
+        configs.put(AI_MAX_TOKENS_KEY, String.valueOf(resolvedMaxTokens));
+        configs.put(AI_EXTRA_HEADERS_KEY, normalizedExtraHeaders);
+        configs.put(AI_PROVIDER_CONFIGS_KEY, serializeProviderConfigs(providerConfigs));
 
         updateConfigs(configs);
-
-        // 重要：通知 DynamicChatClientProvider 刷新 ChatClient
         chatClientProvider.refreshChatClient();
 
-        log.info("AI 配置已更新，ChatClient 已刷新");
+        log.info("AI 配置已更新: mode=custom, provider={}, model={}, supportsToolCall={}, supportsVision={}",
+                descriptor.getCode(), updateBO.getModel(),
+                capabilities.isSupportsToolCall(), capabilities.isSupportsVision());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void activateAiProvider(String provider) {
+        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
+        SavedProviderConfigSnapshot targetConfig = resolveProviderToActivate(configs, provider);
+        if (targetConfig == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "所选服务商尚未保存可用的 AI 配置");
+        }
+
+        updateConfigs(buildActivationConfigMap(targetConfig, true));
+        chatClientProvider.refreshChatClient();
+        log.info("AI 自定义服务商已激活: provider={}, model={}",
+                targetConfig.providerCode(), targetConfig.model());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void useGiftAiConfig() {
+        updateConfig(AI_MODE_KEY, AiMode.GIFT.getCode());
+        chatClientProvider.refreshChatClient();
+        log.info("AI 模式已切换为赠送额度");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void useCustomAiConfig() {
+        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
+        SavedProviderConfigSnapshot targetConfig = resolveProviderToActivate(configs, configs.get(AI_PROVIDER_KEY));
+        if (targetConfig == null) {
+            targetConfig = resolveSelectedSavedProvider(configs, loadSavedProviderConfigs(configs));
+        }
+        if (targetConfig == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前租户还没有保存可用的自定义 AI 配置");
+        }
+        updateConfigs(buildActivationConfigMap(targetConfig, true));
+        chatClientProvider.refreshChatClient();
+        log.info("AI 模式已切换为自定义模型: provider={}, model={}",
+                targetConfig.providerCode(), targetConfig.model());
     }
 
     @Override
     public AiConnectionTestVO testAiConnection(AiConfigUpdateBO configBO) {
         AiConnectionTestVO result = new AiConnectionTestVO();
         long startTime = System.currentTimeMillis();
+        String normalizedApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(configBO.getApiUrl());
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(configBO.getProvider(), normalizedApiUrl);
+        result.setProvider(descriptor.getCode());
 
         try {
-            // 创建临时 ChatClient 进行测试
+            AiModelCapabilities capabilities = validateAiConfig(descriptor, configBO);
+
             ChatClient testClient = chatClientProvider.createTestChatClient(
-                    configBO.getApiUrl(),
-                    configBO.getApiKey(),
-                    configBO.getModel(),
+                    descriptor.getCode(),
+                    normalizedApiUrl,
+                    configBO.getApiKey().trim(),
+                    configBO.getModel().trim(),
                     configBO.getTemperature(),
-                    configBO.getMaxTokens()
+                    configBO.getMaxTokens(),
+                    configBO.getExtraHeadersJson(),
+                    capabilities
             );
 
-            // 发送简单测试消息
             String response = testClient.prompt()
-                    .user("请回复 OK")
+                    .user("请只回复 OK")
                     .call()
                     .content();
 
             result.setSuccess(true);
             result.setMessage(response);
             result.setModel(configBO.getModel());
-
+        } catch (BusinessException e) {
+            result.setSuccess(false);
+            result.setMessage(e.getMsg());
         } catch (Exception e) {
             log.error("AI 连接测试失败: {}", e.getMessage(), e);
             result.setSuccess(false);
@@ -279,44 +312,27 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
     }
 
-    // ==================== WeKnora 配置相关方法 ====================
-
     @Override
-    public WeKnoraConfigVO getWeKnoraConfig() {
-        Map<String, String> configs = getConfigsByType(WEKNORA_CONFIG_TYPE);
+    public EnterpriseConfigVO getEnterpriseConfig() {
+        Map<String, String> configs = getConfigsByType(ENTERPRISE_CONFIG_TYPE);
 
-        WeKnoraConfigVO vo = new WeKnoraConfigVO();
+        EnterpriseConfigVO vo = new EnterpriseConfigVO();
+        vo.setName(configs.getOrDefault("enterprise_name", null));
+        vo.setDescription(configs.getOrDefault("enterprise_description", null));
 
-        // 检查是否有显式配置
-        boolean hasExplicitConfig = configs.containsKey("weknora_enabled");
-
-        if (hasExplicitConfig) {
-            vo.setEnabled(parseBoolean(configs.get("weknora_enabled"), defaultWeKnoraEnabled));
-            vo.setBaseUrl(configs.getOrDefault("weknora_base_url", defaultWeKnoraBaseUrl));
-            vo.setApiKey(maskApiKey(configs.get("weknora_api_key")));
-            vo.setKnowledgeBaseId(configs.getOrDefault("weknora_knowledge_base_id", defaultWeKnoraKnowledgeBaseId));
-            vo.setMatchCount(parseInt(configs.get("weknora_match_count"), defaultWeKnoraMatchCount));
-            vo.setVectorThreshold(parseDouble(configs.get("weknora_vector_threshold"), defaultWeKnoraVectorThreshold));
-            vo.setAutoRagEnabled(parseBoolean(configs.get("weknora_auto_rag_enabled"), defaultWeKnoraAutoRagEnabled));
-        } else {
-            // 返回 application.yml 默认值
-            vo.setEnabled(defaultWeKnoraEnabled);
-            vo.setBaseUrl(defaultWeKnoraBaseUrl);
-            vo.setApiKey(maskApiKey(defaultWeKnoraApiKey));
-            vo.setKnowledgeBaseId(defaultWeKnoraKnowledgeBaseId);
-            vo.setMatchCount(defaultWeKnoraMatchCount);
-            vo.setVectorThreshold(defaultWeKnoraVectorThreshold);
-            vo.setAutoRagEnabled(defaultWeKnoraAutoRagEnabled);
+        String logo = configs.getOrDefault("enterprise_logo", null);
+        vo.setLogo(logo);
+        if (StrUtil.isNotBlank(logo)) {
+            vo.setLogoUrl(fileStorageService.getUrl(logo));
         }
 
-        // 获取最后更新时间
-        SystemConfig anyConfig = lambdaQuery()
-                .eq(SystemConfig::getConfigType, WEKNORA_CONFIG_TYPE)
+        SystemConfig latestConfig = lambdaQuery()
+                .eq(SystemConfig::getConfigType, ENTERPRISE_CONFIG_TYPE)
                 .orderByDesc(SystemConfig::getUpdateTime)
                 .last("LIMIT 1")
                 .one();
-        if (anyConfig != null) {
-            vo.setUpdateTime(anyConfig.getUpdateTime());
+        if (latestConfig != null) {
+            vo.setUpdateTime(latestConfig.getUpdateTime());
         }
 
         return vo;
@@ -324,89 +340,25 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateWeKnoraConfig(WeKnoraConfigUpdateBO updateBO) {
+    public void updateEnterpriseConfig(EnterpriseConfigUpdateBO updateBO) {
         Map<String, String> configs = new HashMap<>();
 
-        if (updateBO.getEnabled() != null) {
-            configs.put("weknora_enabled", String.valueOf(updateBO.getEnabled()));
+        if (updateBO.getName() != null) {
+            configs.put("enterprise_name", updateBO.getName());
         }
-        if (StrUtil.isNotBlank(updateBO.getBaseUrl())) {
-            configs.put("weknora_base_url", updateBO.getBaseUrl());
+        if (updateBO.getLogo() != null) {
+            configs.put("enterprise_logo", updateBO.getLogo());
         }
-        if (StrUtil.isNotBlank(updateBO.getApiKey())) {
-            configs.put("weknora_api_key", updateBO.getApiKey());
-        }
-        if (StrUtil.isNotBlank(updateBO.getKnowledgeBaseId())) {
-            configs.put("weknora_knowledge_base_id", updateBO.getKnowledgeBaseId());
-        }
-        if (updateBO.getMatchCount() != null) {
-            configs.put("weknora_match_count", String.valueOf(updateBO.getMatchCount()));
-        }
-        if (updateBO.getVectorThreshold() != null) {
-            configs.put("weknora_vector_threshold", String.valueOf(updateBO.getVectorThreshold()));
-        }
-        if (updateBO.getAutoRagEnabled() != null) {
-            configs.put("weknora_auto_rag_enabled", String.valueOf(updateBO.getAutoRagEnabled()));
+        if (updateBO.getDescription() != null) {
+            configs.put("enterprise_description", updateBO.getDescription());
         }
 
-        updateConfigsWithType(configs, WEKNORA_CONFIG_TYPE);
-
-        log.info("WeKnora 配置已更新");
+        if (!configs.isEmpty()) {
+            updateConfigsWithType(configs, ENTERPRISE_CONFIG_TYPE);
+            log.info("企业信息配置已更新");
+        }
     }
 
-    @Override
-    public WeKnoraConnectionTestVO testWeKnoraConnection(WeKnoraConfigUpdateBO configBO) {
-        WeKnoraConnectionTestVO result = new WeKnoraConnectionTestVO();
-        long startTime = System.currentTimeMillis();
-
-        try {
-            String baseUrl = configBO.getBaseUrl();
-            String apiKey = configBO.getApiKey();
-
-            if (StrUtil.isBlank(baseUrl) || StrUtil.isBlank(apiKey)) {
-                result.setSuccess(false);
-                result.setMessage("API 地址和 API Key 不能为空");
-                result.setResponseTime(System.currentTimeMillis() - startTime);
-                return result;
-            }
-
-            // 调用 WeKnora 健康检查或获取知识库信息
-            RestTemplate restTemplate = new RestTemplate();
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("X-API-Key", apiKey);
-            org.springframework.http.HttpEntity<?> entity = new org.springframework.http.HttpEntity<>(headers);
-
-            // 尝试获取知识库列表
-            String testUrl = baseUrl + "/knowledge-bases";
-            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(
-                    testUrl,
-                    org.springframework.http.HttpMethod.GET,
-                    entity,
-                    String.class
-            );
-
-            if (response.getStatusCode().is2xxSuccessful()) {
-                result.setSuccess(true);
-                result.setMessage("连接成功");
-                // 可以解析返回值获取知识库数量
-                result.setKnowledgeCount(0);
-            } else {
-                result.setSuccess(false);
-                result.setMessage("连接失败: HTTP " + response.getStatusCode());
-            }
-        } catch (Exception e) {
-            log.error("WeKnora 连接测试失败: {}", e.getMessage(), e);
-            result.setSuccess(false);
-            result.setMessage("连接失败: " + extractErrorMessage(e));
-        }
-
-        result.setResponseTime(System.currentTimeMillis() - startTime);
-        return result;
-    }
-
-    /**
-     * 更新配置并指定配置类型
-     */
     @Transactional(rollbackFor = Exception.class)
     public void updateConfigsWithType(Map<String, String> configs, String configType) {
         for (Map.Entry<String, String> entry : configs.entrySet()) {
@@ -428,21 +380,387 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
                 updateById(config);
             }
 
-            // 清除缓存
-            redisTemplate.delete(CACHE_KEY_PREFIX + configKey);
+            redisTemplate.delete(buildCacheKey(configKey));
         }
     }
 
-    private boolean parseBoolean(String value, boolean defaultValue) {
-        if (StrUtil.isBlank(value)) {
-            return defaultValue;
-        }
-        return Boolean.parseBoolean(value);
+    private AiConfigVO buildAiConfig(boolean includeSensitiveExtraHeaders, boolean detailView) {
+        Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
+        Map<String, SavedProviderConfigSnapshot> savedProviderConfigs = loadSavedProviderConfigs(configs);
+        boolean customConfigSaved = !savedProviderConfigs.isEmpty();
+        SavedProviderConfigSnapshot selectedSavedProvider = resolveSelectedSavedProvider(configs, savedProviderConfigs);
+        EffectiveAiConfigSnapshot effectiveSnapshot = resolveEffectiveAiSnapshot(configs, selectedSavedProvider);
+        DisplayAiConfigSnapshot displaySnapshot = detailView
+                ? resolveDetailDisplaySnapshot(selectedSavedProvider, effectiveSnapshot)
+                : DisplayAiConfigSnapshot.fromEffective(effectiveSnapshot);
+
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(displaySnapshot.providerCode(), displaySnapshot.apiUrl());
+        AiModelCapabilities capabilities = descriptor.resolveCapabilities(displaySnapshot.model());
+
+        long giftTokenTotal = 0L;
+        long giftTokenUsed = 0L;
+        long giftTokenRemaining = 0L;
+
+        AiConfigVO vo = new AiConfigVO();
+        vo.setProvider(descriptor.getCode());
+        vo.setProviderLabel(descriptor.getDisplayName());
+        vo.setApiUrl(displaySnapshot.apiUrl());
+        vo.setApiKey(maskApiKey(displaySnapshot.apiKey()));
+        vo.setModel(displaySnapshot.model());
+        vo.setTemperature(displaySnapshot.temperature());
+        vo.setMaxTokens(displaySnapshot.maxTokens());
+        vo.setExtraHeadersConfigured(StrUtil.isNotBlank(displaySnapshot.extraHeadersJson()));
+        vo.setExtraHeadersJson(includeSensitiveExtraHeaders ? StrUtil.blankToDefault(displaySnapshot.extraHeadersJson(), "") : null);
+        vo.setCapabilities(toCapabilitiesVO(capabilities));
+        vo.setModelHint(descriptor.getModelHint());
+        vo.setExtraHeadersHint(descriptor.getExtraHeadersHint());
+        vo.setAvailableProviders(buildProviderOptions(
+                detailView ? savedProviderConfigs : Map.of(),
+                detailView && includeSensitiveExtraHeaders,
+                selectedSavedProvider != null ? selectedSavedProvider.providerCode() : null
+        ));
+        vo.setMode(effectiveSnapshot.mode().getCode());
+        vo.setCustomConfigSaved(customConfigSaved);
+        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), giftTokenRemaining));
+        vo.setGiftTokenTotal(giftTokenTotal);
+        vo.setGiftTokenUsed(giftTokenUsed);
+        vo.setGiftTokenRemaining(giftTokenRemaining);
+        vo.setGiftTokenAvailable(giftTokenRemaining > 0);
+        vo.setUpdateTime(getLatestAiConfigUpdateTime());
+        return vo;
     }
 
-    /**
-     * API Key 脱敏处理
-     */
+    private EffectiveAiConfigSnapshot resolveEffectiveAiSnapshot(Map<String, String> configs,
+                                                                 SavedProviderConfigSnapshot selectedSavedProvider) {
+        AiMode requestedMode = AiMode.resolve(configs.get(AI_MODE_KEY));
+        if (requestedMode == AiMode.CUSTOM && selectedSavedProvider != null) {
+            return new EffectiveAiConfigSnapshot(
+                    AiMode.CUSTOM,
+                    selectedSavedProvider.providerCode(),
+                    selectedSavedProvider.apiUrl(),
+                    selectedSavedProvider.apiKey(),
+                    selectedSavedProvider.model(),
+                    selectedSavedProvider.temperature(),
+                    selectedSavedProvider.maxTokens(),
+                    selectedSavedProvider.extraHeadersJson()
+            );
+        }
+
+        String normalizedDefaultApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(
+                StrUtil.blankToDefault(giftApiUrl, defaultApiUrl)
+        );
+        String providerCode = AiProviderRegistry.resolve(null, normalizedDefaultApiUrl).getCode();
+        String resolvedGiftApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
+        String resolvedGiftModel = StrUtil.blankToDefault(giftModel, defaultModel);
+        return new EffectiveAiConfigSnapshot(
+                AiMode.GIFT,
+                providerCode,
+                normalizedDefaultApiUrl,
+                resolvedGiftApiKey,
+                resolvedGiftModel,
+                defaultTemperature,
+                defaultMaxTokens,
+                null
+        );
+    }
+
+    private DisplayAiConfigSnapshot resolveDetailDisplaySnapshot(SavedProviderConfigSnapshot selectedSavedProvider,
+                                                                 EffectiveAiConfigSnapshot effectiveSnapshot) {
+        if (selectedSavedProvider != null) {
+            return new DisplayAiConfigSnapshot(
+                    selectedSavedProvider.providerCode(),
+                    selectedSavedProvider.apiUrl(),
+                    selectedSavedProvider.apiKey(),
+                    selectedSavedProvider.model(),
+                    selectedSavedProvider.temperature(),
+                    selectedSavedProvider.maxTokens(),
+                    selectedSavedProvider.extraHeadersJson()
+            );
+        }
+        return DisplayAiConfigSnapshot.fromEffective(effectiveSnapshot);
+    }
+
+    private boolean isAiReady(AiMode mode, String apiKey, long giftTokenRemaining) {
+        return StrUtil.isNotBlank(apiKey);
+    }
+
+    private List<AiConfigVO.ProviderOptionVO> buildProviderOptions(Map<String, SavedProviderConfigSnapshot> savedProviderConfigs,
+                                                                  boolean includeSensitiveExtraHeaders,
+                                                                  String activeProviderCode) {
+        return AiProviderRegistry.list().stream()
+                .map(descriptor -> {
+                    AiConfigVO.ProviderOptionVO option = new AiConfigVO.ProviderOptionVO();
+                    option.setValue(descriptor.getCode());
+                    option.setLabel(descriptor.getDisplayName());
+                    option.setDescription(descriptor.getDescription());
+                    option.setBaseUrl(descriptor.getBaseUrl());
+                    option.setModels(descriptor.getRecommendedModels());
+                    option.setModelHint(descriptor.getModelHint());
+                    option.setExtraHeadersHint(descriptor.getExtraHeadersHint());
+                    AiModelCapabilities capabilities = descriptor.getDefaultCapabilities();
+                    option.setSupportsStream(capabilities.isSupportsStream());
+                    option.setSupportsToolCall(capabilities.isSupportsToolCall());
+                    option.setSupportsVision(capabilities.isSupportsVision());
+
+                    SavedProviderConfigSnapshot savedConfig = savedProviderConfigs.get(descriptor.getCode());
+                    option.setConfigured(savedConfig != null);
+                    option.setActive(savedConfig != null
+                            && StrUtil.isNotBlank(activeProviderCode)
+                            && descriptor.getCode().equalsIgnoreCase(activeProviderCode));
+                    option.setApiKeyConfigured(savedConfig != null && StrUtil.isNotBlank(savedConfig.apiKey()));
+                    option.setSavedApiUrl(savedConfig != null ? savedConfig.apiUrl() : null);
+                    option.setSavedModel(savedConfig != null ? savedConfig.model() : null);
+                    option.setSavedTemperature(savedConfig != null ? savedConfig.temperature() : null);
+                    option.setSavedMaxTokens(savedConfig != null ? savedConfig.maxTokens() : null);
+                    option.setSavedExtraHeadersConfigured(savedConfig != null && StrUtil.isNotBlank(savedConfig.extraHeadersJson()));
+                    option.setSavedExtraHeadersJson(savedConfig != null && includeSensitiveExtraHeaders
+                            ? StrUtil.blankToDefault(savedConfig.extraHeadersJson(), "")
+                            : null);
+                    return option;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private AiConfigVO.CapabilitiesVO toCapabilitiesVO(AiModelCapabilities capabilities) {
+        AiConfigVO.CapabilitiesVO vo = new AiConfigVO.CapabilitiesVO();
+        vo.setSupportsStream(capabilities.isSupportsStream());
+        vo.setSupportsToolCall(capabilities.isSupportsToolCall());
+        vo.setSupportsVision(capabilities.isSupportsVision());
+        return vo;
+    }
+
+    private AiModelCapabilities validateAiConfig(AiProviderDescriptor descriptor, AiConfigUpdateBO updateBO) {
+        if (StrUtil.isBlank(updateBO.getApiUrl())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "API 地址不能为空");
+        }
+        if (StrUtil.isBlank(updateBO.getApiKey())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "API Key 不能为空");
+        }
+        if (StrUtil.isBlank(updateBO.getModel())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "模型名称不能为空");
+        }
+
+        validateExtraHeadersJson(updateBO.getExtraHeadersJson());
+
+        AiModelCapabilities capabilities = descriptor.resolveCapabilities(updateBO.getModel());
+        if (!capabilities.isSupportsToolCall()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    "当前模型不支持工具调用，不适合作为 CRM 主对话模型，请改用支持 Tool Calling 的模型");
+        }
+        return capabilities;
+    }
+
+    private String resolveApiKeyForSave(String providerCode, String inputApiKey,
+                                        Map<String, StoredProviderConfig> providerConfigs) {
+        String normalizedApiKey = StrUtil.nullToEmpty(inputApiKey).trim();
+        if (StrUtil.isNotBlank(normalizedApiKey)) {
+            return normalizedApiKey;
+        }
+
+        StoredProviderConfig savedConfig = providerConfigs.get(providerCode);
+        if (savedConfig == null) {
+            return normalizedApiKey;
+        }
+        return StrUtil.nullToEmpty(savedConfig.apiKey()).trim();
+    }
+
+    private void validateExtraHeadersJson(String extraHeadersJson) {
+        if (StrUtil.isBlank(extraHeadersJson)) {
+            return;
+        }
+
+        try {
+            Map<String, Object> headerMap = objectMapper.readValue(
+                    extraHeadersJson,
+                    new TypeReference<Map<String, Object>>() {
+                    }
+            );
+            headerMap.forEach((key, value) -> {
+                if (StrUtil.isBlank(key)) {
+                    throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "额外请求头 JSON 中存在空键名");
+                }
+                if (value == null) {
+                    throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                            String.format("额外请求头 %s 的值不能为空", key));
+                }
+            });
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    "额外请求头 JSON 格式不正确，请传入对象格式，例如 {\"appid\":\"your-app-id\"}");
+        }
+    }
+
+    private boolean hasSavedCustomAiConfig(Map<String, String> configs) {
+        return !loadSavedProviderConfigs(configs).isEmpty();
+    }
+
+    private SavedProviderConfigSnapshot resolveProviderToActivate(Map<String, String> configs, String provider) {
+        Map<String, SavedProviderConfigSnapshot> savedProviderConfigs = loadSavedProviderConfigs(configs);
+        if (savedProviderConfigs.isEmpty()) {
+            return null;
+        }
+
+        if (StrUtil.isNotBlank(provider)) {
+            return savedProviderConfigs.get(provider.trim().toLowerCase());
+        }
+
+        return resolveSelectedSavedProvider(configs, savedProviderConfigs);
+    }
+
+    private SavedProviderConfigSnapshot resolveSelectedSavedProvider(Map<String, String> configs,
+                                                                    Map<String, SavedProviderConfigSnapshot> savedProviderConfigs) {
+        if (savedProviderConfigs.isEmpty()) {
+            return null;
+        }
+
+        String activeProviderCode = StrUtil.nullToEmpty(configs.get(AI_PROVIDER_KEY)).trim().toLowerCase();
+        if (StrUtil.isNotBlank(activeProviderCode)) {
+            SavedProviderConfigSnapshot activeConfig = savedProviderConfigs.get(activeProviderCode);
+            if (activeConfig != null) {
+                return activeConfig;
+            }
+        }
+
+        return savedProviderConfigs.values().stream().findFirst().orElse(null);
+    }
+
+    private Map<String, SavedProviderConfigSnapshot> loadSavedProviderConfigs(Map<String, String> configs) {
+        Map<String, SavedProviderConfigSnapshot> savedConfigs = new HashMap<>();
+        parseStoredProviderConfigs(configs.get(AI_PROVIDER_CONFIGS_KEY)).forEach((providerCode, storedConfig) -> {
+            SavedProviderConfigSnapshot snapshot = toSavedProviderConfigSnapshot(providerCode, storedConfig);
+            if (snapshot != null) {
+                savedConfigs.put(snapshot.providerCode(), snapshot);
+            }
+        });
+
+        SavedProviderConfigSnapshot legacySnapshot = buildLegacyProviderSnapshot(configs);
+        if (legacySnapshot != null) {
+            savedConfigs.putIfAbsent(legacySnapshot.providerCode(), legacySnapshot);
+        }
+        return savedConfigs;
+    }
+
+    private Map<String, StoredProviderConfig> loadWritableProviderConfigs(Map<String, String> configs) {
+        Map<String, StoredProviderConfig> storedConfigs = new HashMap<>(parseStoredProviderConfigs(configs.get(AI_PROVIDER_CONFIGS_KEY)));
+        SavedProviderConfigSnapshot legacySnapshot = buildLegacyProviderSnapshot(configs);
+        if (legacySnapshot != null) {
+            storedConfigs.putIfAbsent(legacySnapshot.providerCode(), toStoredProviderConfig(legacySnapshot));
+        }
+        return storedConfigs;
+    }
+
+    private Map<String, StoredProviderConfig> parseStoredProviderConfigs(String providerConfigsJson) {
+        if (StrUtil.isBlank(providerConfigsJson)) {
+            return new HashMap<>();
+        }
+
+        try {
+            Map<String, StoredProviderConfig> storedConfigs = objectMapper.readValue(
+                    providerConfigsJson,
+                    new TypeReference<Map<String, StoredProviderConfig>>() {
+                    }
+            );
+            return storedConfigs != null ? storedConfigs : new HashMap<>();
+        } catch (Exception e) {
+            log.warn("解析多服务商 AI 配置失败，将回退到旧版单配置: {}", e.getMessage());
+            return new HashMap<>();
+        }
+    }
+
+    private String serializeProviderConfigs(Map<String, StoredProviderConfig> providerConfigs) {
+        try {
+            return objectMapper.writeValueAsString(providerConfigs);
+        } catch (Exception e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "序列化 AI 服务商配置失败");
+        }
+    }
+
+    private SavedProviderConfigSnapshot buildLegacyProviderSnapshot(Map<String, String> configs) {
+        String apiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(configs.get(AI_API_URL_KEY));
+        String apiKey = StrUtil.nullToEmpty(configs.get(AI_API_KEY_KEY)).trim();
+        String model = StrUtil.nullToEmpty(configs.get(AI_MODEL_KEY)).trim();
+        if (StrUtil.hasBlank(apiUrl, apiKey, model)) {
+            return null;
+        }
+
+        String providerCode = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), apiUrl).getCode();
+        return new SavedProviderConfigSnapshot(
+                providerCode,
+                apiUrl,
+                apiKey,
+                model,
+                parseDouble(configs.get(AI_TEMPERATURE_KEY), defaultTemperature),
+                parseInt(configs.get(AI_MAX_TOKENS_KEY), defaultMaxTokens),
+                StrUtil.blankToDefault(configs.get(AI_EXTRA_HEADERS_KEY), null)
+        );
+    }
+
+    private SavedProviderConfigSnapshot toSavedProviderConfigSnapshot(String fallbackProviderCode, StoredProviderConfig storedConfig) {
+        if (storedConfig == null) {
+            return null;
+        }
+
+        String apiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(storedConfig.apiUrl());
+        String apiKey = StrUtil.nullToEmpty(storedConfig.apiKey()).trim();
+        String model = StrUtil.nullToEmpty(storedConfig.model()).trim();
+        if (StrUtil.hasBlank(apiUrl, apiKey, model)) {
+            return null;
+        }
+
+        String providerCode = AiProviderRegistry.resolve(
+                StrUtil.blankToDefault(storedConfig.provider(), fallbackProviderCode),
+                apiUrl
+        ).getCode();
+
+        return new SavedProviderConfigSnapshot(
+                providerCode,
+                apiUrl,
+                apiKey,
+                model,
+                storedConfig.temperature() != null ? storedConfig.temperature() : defaultTemperature,
+                storedConfig.maxTokens() != null ? storedConfig.maxTokens() : defaultMaxTokens,
+                StrUtil.blankToDefault(storedConfig.extraHeadersJson(), null)
+        );
+    }
+
+    private StoredProviderConfig toStoredProviderConfig(SavedProviderConfigSnapshot snapshot) {
+        return new StoredProviderConfig(
+                snapshot.providerCode(),
+                snapshot.apiUrl(),
+                snapshot.apiKey(),
+                snapshot.model(),
+                snapshot.temperature(),
+                snapshot.maxTokens(),
+                StrUtil.nullToEmpty(snapshot.extraHeadersJson())
+        );
+    }
+
+    private Map<String, String> buildActivationConfigMap(SavedProviderConfigSnapshot snapshot, boolean includeMode) {
+        Map<String, String> configs = new HashMap<>();
+        if (includeMode) {
+            configs.put(AI_MODE_KEY, AiMode.CUSTOM.getCode());
+        }
+        configs.put(AI_PROVIDER_KEY, snapshot.providerCode());
+        configs.put(AI_API_URL_KEY, snapshot.apiUrl());
+        configs.put(AI_API_KEY_KEY, snapshot.apiKey());
+        configs.put(AI_MODEL_KEY, snapshot.model());
+        configs.put(AI_TEMPERATURE_KEY, String.valueOf(snapshot.temperature()));
+        configs.put(AI_MAX_TOKENS_KEY, String.valueOf(snapshot.maxTokens()));
+        configs.put(AI_EXTRA_HEADERS_KEY, StrUtil.nullToEmpty(snapshot.extraHeadersJson()));
+        return configs;
+    }
+
+    private Date getLatestAiConfigUpdateTime() {
+        SystemConfig anyConfig = lambdaQuery()
+                .eq(SystemConfig::getConfigType, AI_CONFIG_TYPE)
+                .orderByDesc(SystemConfig::getUpdateTime)
+                .last("LIMIT 1")
+                .one();
+        return anyConfig != null ? anyConfig.getUpdateTime() : null;
+    }
+
     private String maskApiKey(String apiKey) {
         if (StrUtil.isBlank(apiKey)) {
             return "";
@@ -475,31 +793,11 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
     }
 
-    /**
-     * 根据 API URL 推断服务提供商
-     */
-    private String detectProvider(String apiUrl) {
-        if (StrUtil.isBlank(apiUrl)) {
-            return "dashscope";
-        }
-        if (apiUrl.contains("dashscope.aliyuncs.com")) {
-            return "dashscope";
-        }
-        if (apiUrl.contains("api.openai.com")) {
-            return "openai";
-        }
-        return "custom";
-    }
-
-    /**
-     * 提取异常中的关键错误信息
-     */
     private String extractErrorMessage(Exception e) {
         String message = e.getMessage();
         if (message == null) {
             return "未知错误";
         }
-        // 处理常见错误
         if (message.contains("401")) {
             return "API Key 无效或已过期";
         }
@@ -510,63 +808,72 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             return "请求频率超限，请稍后重试";
         }
         if (message.contains("Connection refused") || message.contains("UnknownHost")) {
-            return "无法连接到 API 服务器，请检查地址";
+            return "无法连接到 API 服务，请检查地址";
         }
         if (message.contains("timeout")) {
             return "连接超时";
         }
-        // 截取关键信息
         if (message.length() > 100) {
             return message.substring(0, 100) + "...";
         }
         return message;
     }
 
-    @Override
-    public EnterpriseConfigVO getEnterpriseConfig() {
-        Map<String, String> configs = getConfigsByType(ENTERPRISE_CONFIG_TYPE);
-
-        EnterpriseConfigVO vo = new EnterpriseConfigVO();
-        vo.setName(configs.getOrDefault("enterprise_name", null));
-        vo.setDescription(configs.getOrDefault("enterprise_description", null));
-
-        String logo = configs.getOrDefault("enterprise_logo", null);
-        vo.setLogo(logo);
-        if (StrUtil.isNotBlank(logo)) {
-            vo.setLogoUrl(fileStorageService.getUrl(logo));
-        }
-
-        // 获取最近更新时间
-        SystemConfig latestConfig = lambdaQuery()
-                .eq(SystemConfig::getConfigType, ENTERPRISE_CONFIG_TYPE)
-                .orderByDesc(SystemConfig::getUpdateTime)
-                .last("LIMIT 1")
-                .one();
-        if (latestConfig != null) {
-            vo.setUpdateTime(latestConfig.getUpdateTime());
-        }
-
-        return vo;
+    private record EffectiveAiConfigSnapshot(
+            AiMode mode,
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void updateEnterpriseConfig(EnterpriseConfigUpdateBO updateBO) {
-        Map<String, String> configs = new HashMap<>();
+    private record DisplayAiConfigSnapshot(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
+        private static DisplayAiConfigSnapshot fromEffective(EffectiveAiConfigSnapshot snapshot) {
+            String apiKey = snapshot.mode() == AiMode.CUSTOM ? snapshot.apiKey() : "";
+            String extraHeadersJson = snapshot.mode() == AiMode.CUSTOM ? snapshot.extraHeadersJson() : null;
+            return new DisplayAiConfigSnapshot(
+                    snapshot.providerCode(),
+                    snapshot.apiUrl(),
+                    apiKey,
+                    snapshot.model(),
+                    snapshot.temperature(),
+                    snapshot.maxTokens(),
+                    extraHeadersJson
+            );
+        }
+    }
 
-        if (updateBO.getName() != null) {
-            configs.put("enterprise_name", updateBO.getName());
-        }
-        if (updateBO.getLogo() != null) {
-            configs.put("enterprise_logo", updateBO.getLogo());
-        }
-        if (updateBO.getDescription() != null) {
-            configs.put("enterprise_description", updateBO.getDescription());
-        }
+    private record StoredProviderConfig(
+            String provider,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
+    }
 
-        if (!configs.isEmpty()) {
-            updateConfigsWithType(configs, ENTERPRISE_CONFIG_TYPE);
-            log.info("企业信息配置已更新");
-        }
+    private record SavedProviderConfigSnapshot(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
     }
 }

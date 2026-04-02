@@ -579,8 +579,8 @@ async function handleAiParse() {
     if (result.description) formData.description = result.description
     if (result.assignedToName) formData.assignedToName = result.assignedToName
     ElMessage.success('AI 解析完成，请确认并补充信息')
-  } catch {
-    ElMessage.error('AI 解析失败，请手动填写')
+  } catch (error) {
+    console.error('AI parse task failed:', error)
   } finally {
     aiParsing.value = false
   }

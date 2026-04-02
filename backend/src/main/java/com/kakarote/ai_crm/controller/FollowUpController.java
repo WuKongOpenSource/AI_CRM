@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
@@ -30,6 +31,7 @@ public class FollowUpController {
 
     @PostMapping("/add")
     @Operation(summary = "添加跟进记录")
+    @RequirePermission("followup:create")
     public Result<Long> add(@Valid @RequestBody FollowUpAddBO followUpAddBO) {
         Long followUpId = followUpService.addFollowUp(followUpAddBO);
         return Result.ok(followUpId);
@@ -37,12 +39,14 @@ public class FollowUpController {
 
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询跟进记录")
+    @RequirePermission("followup:view")
     public Result<BasePage<FollowUpVO>> queryPageList(@RequestBody FollowUpQueryBO queryBO) {
         return Result.ok(followUpService.queryPageList(queryBO));
     }
 
     @PostMapping("/queryByCustomer")
     @Operation(summary = "按客户查询跟进记录")
+    @RequirePermission("followup:view")
     public Result<List<FollowUpVO>> queryByCustomer(
             @Parameter(description = "客户ID") @RequestParam Long customerId) {
         return Result.ok(followUpService.queryByCustomer(customerId));
@@ -50,6 +54,7 @@ public class FollowUpController {
 
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除跟进记录")
+    @RequirePermission("followup:delete")
     public Result<String> delete(@PathVariable("id") Long id) {
         followUpService.deleteFollowUp(id);
         return Result.ok();
@@ -57,6 +62,7 @@ public class FollowUpController {
 
     @PostMapping("/ai-parse")
     @Operation(summary = "AI 解析跟进内容")
+    @RequirePermission("followup:create")
     public Result<FollowUpAiParseVO> aiParse(@Valid @RequestBody FollowUpAiParseBO parseBO) {
         return Result.ok(followUpService.aiParseFollowUp(parseBO));
     }

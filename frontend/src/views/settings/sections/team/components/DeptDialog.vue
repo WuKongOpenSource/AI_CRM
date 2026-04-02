@@ -2,16 +2,16 @@
   <el-dialog
     v-model="dialogVisible"
     :title="editingDept ? '编辑部门' : '添加部门'"
-    :width="isMobile ? '95%' : '420px'"
+    :width="isMobile ? '95%' : '460px'"
     :fullscreen="isMobile"
-    class="wk-dialog--flush"
+    class="wk-dialog--flush wk-crm-el-field-scope"
   >
-    <el-form :model="deptForm" label-width="80px">
+    <el-form :model="deptForm" label-position="top">
       <el-form-item label="部门名称" required>
-        <el-input v-model="deptForm.deptName" placeholder="请输入部门名称" />
+        <el-input v-model="deptForm.deptName" placeholder="请输入部门名称" class="w-full wk-crm-el-field-input" size="large" />
       </el-form-item>
       <el-form-item label="排序号">
-        <el-input-number v-model="deptForm.sortOrder" :min="0" :max="999" class="w-full" />
+        <el-input-number v-model="deptForm.sortOrder" :min="0" :max="999" class="w-full" size="large" />
       </el-form-item>
     </el-form>
     <template #footer>

@@ -65,4 +65,10 @@ public class CustomFieldVO {
 
     @Schema(description = "修改时间")
     private Date updateTime;
+
+    @Schema(description = "当前用户是否隐藏")
+    private Boolean hidden;
+
+    @Schema(description = "用户自定义排序")
+    private Integer userSortOrder;
 }

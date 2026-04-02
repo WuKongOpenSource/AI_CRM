@@ -44,7 +44,7 @@ public class Result<T> implements Serializable {
         this.msg = msg;
     }
 
-    private Result(int code, String msg) {
+    public Result(int code, String msg) {
         this.code = code;
         this.msg = msg;
     }

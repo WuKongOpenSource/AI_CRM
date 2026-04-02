@@ -43,9 +43,11 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
 
     /**
      * 允许的列名正则（防止 SQL 注入）
-     * 格式：cf_ + 小写字母开头 + 小写字母/数字/下划线
+     * 支持两种格式：
+     *   - 旧格式：cf_ + 小写字母开头 + 小写字母/数字/下划线
+     *   - 新格式：field_ + 6位小写字母数字（字段池生成）
      */
-    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile("^cf_[a-z][a-z0-9_]*$");
+    private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile("^(cf_[a-z][a-z0-9_]*|field_[a-z0-9]{6})$");
 
     @Override
     public void addColumn(String tableName, String columnName, String columnType, String comment) {
@@ -54,7 +56,8 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         validateColumnName(columnName);
 
         if (columnExists(tableName, columnName)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "列已存在: " + columnName);
+            // 幂等：池模式下多租户共用同一物理列，列已存在时跳过
+            return;
         }
 
         // PostgreSQL: 先添加列，再添加注释

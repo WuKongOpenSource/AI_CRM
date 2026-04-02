@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 日程新增参数
@@ -39,4 +40,7 @@ public class ScheduleAddBO {
 
     @Schema(description = "地点")
     private String location;
+
+    @Schema(description = "参与人员工ID列表")
+    private List<Long> participantUserIds;
 }

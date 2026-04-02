@@ -92,7 +92,7 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
         } else {
             // 系统预设角色不允许修改标识符
             ManagerRole existing = getById(setRoleBO.getRoleId());
-            if (existing != null && Const.SUPER_ADMIN_REALM.equals(existing.getRealm())) {
+            if (existing != null && "super_admin".equals(existing.getRealm())) {
                 setRoleBO.setRealm(existing.getRealm());
             }
             lambdaUpdate().eq(ManagerRole::getRoleId,setRoleBO.getRoleId()).set(ManagerRole::getRoleName, setRoleBO.getRoleName())
@@ -134,7 +134,7 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
         // 系统预设角色不允许删除
         long sysCount = lambdaQuery()
                 .in(ManagerRole::getRoleId, ids)
-                .eq(ManagerRole::getRealm, Const.SUPER_ADMIN_REALM)
+                .eq(ManagerRole::getRealm, "super_admin")
                 .count();
         if (sysCount > 0) {
             throw new BusinessException(AdminCodeEnum.ADMIN_SYSTEM_ROLE_CANNOT_DELETE);

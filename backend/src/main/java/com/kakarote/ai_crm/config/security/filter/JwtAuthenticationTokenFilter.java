@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.config.security.filter;
 
 import cn.hutool.core.util.ObjectUtil;
+import com.kakarote.ai_crm.common.auth.DataPermissionHolder;
 import com.kakarote.ai_crm.config.security.service.TokenService;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -32,10 +33,18 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
         LoginUser loginUser = tokenService.getLoginUser(request);
         if (ObjectUtil.isNotNull(loginUser) && ObjectUtil.isNull(UserUtil.getAuthentication())) {
             tokenService.verifyToken(loginUser);
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(loginUser, null, loginUser.getAuthorities());
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    loginUser,
+                    null,
+                    loginUser.getAuthorities()
+            );
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
         }
-        chain.doFilter(request, response);
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            DataPermissionHolder.clear();
+        }
     }
 }

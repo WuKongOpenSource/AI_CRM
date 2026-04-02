@@ -10,8 +10,8 @@
     class="employee-detail-drawer"
   >
     <div v-if="member" class="h-full flex flex-col bg-white shadow-2xl">
-      <div class="flex items-center justify-between p-6 border-b border-slate-100">
-        <h3 class="text-lg font-bold text-slate-900">员工详情</h3>
+      <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <h3 class="text-base font-bold text-slate-900">员工详情</h3>
         <button
           class="size-9 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           aria-label="关闭员工详情"
@@ -115,7 +115,7 @@
         </div>
       </div>
 
-      <div class="p-6 border-t border-slate-100 flex gap-3">
+      <div class="flex gap-3 border-t border-slate-100 px-4 py-3">
         <el-button class="flex-1" type="primary" size="large" @click="$emit('edit', member)">
           <span class="material-symbols-outlined text-base mr-1">edit</span>
           编辑资料
@@ -150,8 +150,9 @@ const drawerVisible = computed({
 })
 </script>
 
-<style scoped>
-:deep(.employee-detail-drawer .el-drawer__body) {
+<style>
+/* el-drawer is teleported; keep global so body padding resets apply */
+.employee-detail-drawer .el-drawer__body {
   padding: 0 !important;
 }
 </style>

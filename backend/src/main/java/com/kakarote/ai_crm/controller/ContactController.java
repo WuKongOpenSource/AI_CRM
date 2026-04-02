@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
@@ -29,6 +30,7 @@ public class ContactController {
 
     @PostMapping("/add")
     @Operation(summary = "创建联系人")
+    @RequirePermission("contact:create")
     public Result<Long> add(@Valid @RequestBody ContactAddBO contactAddBO) {
         Long contactId = contactService.addContact(contactAddBO);
         return Result.ok(contactId);
@@ -36,12 +38,14 @@ public class ContactController {
 
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询联系人")
+    @RequirePermission("contact:view")
     public Result<BasePage<ContactVO>> queryPageList(@RequestBody ContactQueryBO queryBO) {
         return Result.ok(contactService.queryPageList(queryBO));
     }
 
     @PostMapping("/update")
     @Operation(summary = "更新联系人")
+    @RequirePermission("contact:edit")
     public Result<String> update(@Valid @RequestBody ContactUpdateBO contactUpdateBO) {
         contactService.updateContact(contactUpdateBO);
         return Result.ok();
@@ -49,6 +53,7 @@ public class ContactController {
 
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除联系人")
+    @RequirePermission("contact:delete")
     public Result<String> delete(@PathVariable("id") Long id) {
         contactService.deleteContact(id);
         return Result.ok();
@@ -56,6 +61,7 @@ public class ContactController {
 
     @PostMapping("/queryByCustomer")
     @Operation(summary = "按客户查询联系人")
+    @RequirePermission("contact:view")
     public Result<List<ContactVO>> queryByCustomer(
             @Parameter(description = "客户ID") @RequestParam Long customerId) {
         return Result.ok(contactService.queryByCustomer(customerId));
@@ -63,6 +69,7 @@ public class ContactController {
 
     @PostMapping("/setPrimary/{id}")
     @Operation(summary = "设置为主联系人")
+    @RequirePermission("contact:set_primary")
     public Result<String> setPrimary(@PathVariable("id") Long id) {
         contactService.setPrimary(id);
         return Result.ok();

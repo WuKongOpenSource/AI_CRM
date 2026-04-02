@@ -6,7 +6,7 @@
     destroy-on-close
     top="10vh"
     :fullscreen="isMobile"
-    class="!rounded-2xl !p-0 overflow-hidden task-dialog"
+    class="!rounded-2xl !p-0 overflow-hidden task-dialog wk-crm-el-field-scope"
   >
     <template #header>
       <div class="flex items-center justify-between">
@@ -46,10 +46,13 @@
           <span class="text-xs font-bold text-primary">AI 智能解析 (可选)</span>
         </div>
         <div class="relative">
-          <textarea
+          <el-input
             v-model="aiParseInput"
+            type="textarea"
+            :rows="5"
+            resize="none"
             placeholder="例如：明天下午两点前给科技创新有限公司的张总发一份 Q4 扩容方案的报价单，标记为高优先级..."
-            class="w-full text-sm text-slate-600 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-2xl px-4 py-4 outline-none transition-all resize-none h-28"
+            class="wk-crm-el-field-input wk-crm-el-field-ai w-full"
           />
           <button
             @click="$emit('ai-parse')"
@@ -68,53 +71,56 @@
       <div class="space-y-5">
         <div>
           <label class="text-xs font-bold text-slate-500 mb-1.5 block">任务标题 <span class="text-red-500">*</span></label>
-          <input
+          <el-input
             v-model="formData.title"
-            type="text"
             placeholder="请输入任务标题"
-            class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
+            size="large"
+            class="w-full wk-crm-el-field-input"
           />
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">截止时间 <span class="text-red-500">*</span></label>
-            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-primary focus-within:bg-white rounded-lg px-3 py-2.5 transition-all">
-              <span class="material-symbols-outlined text-slate-400 text-sm">calendar_today</span>
-              <input
-                v-model="formData.dueDate"
-                type="datetime-local"
-                class="w-full text-sm text-slate-900 bg-transparent outline-none"
-              />
-            </div>
+            <el-date-picker
+              v-model="formData.dueDate"
+              type="datetime"
+              placeholder="选择截止时间"
+              value-format="YYYY-MM-DDTHH:mm"
+              format="YYYY-MM-DD HH:mm"
+              size="large"
+              class="w-full wk-crm-el-field-date"
+            />
           </div>
           <div>
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">优先级</label>
-            <select
+            <el-select
               v-model="formData.priority"
-              class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
+              class="w-full wk-crm-el-field-select"
+              size="large"
             >
-              <option value="HIGH">高</option>
-              <option value="MEDIUM">中</option>
-              <option value="LOW">低</option>
-            </select>
+              <el-option label="高" value="HIGH" />
+              <el-option label="中" value="MEDIUM" />
+              <el-option label="低" value="LOW" />
+            </el-select>
           </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">任务类型</label>
-            <select
+            <el-select
               v-model="formData.taskType"
-              class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
+              class="w-full wk-crm-el-field-select"
+              size="large"
             >
-              <option value="">请选择</option>
-              <option value="跟进">跟进</option>
-              <option value="文档">文档</option>
-              <option value="会议">会议</option>
-              <option value="电话">电话</option>
-              <option value="其他">其他</option>
-            </select>
+              <el-option label="请选择" :value="''" />
+              <el-option label="跟进" value="跟进" />
+              <el-option label="文档" value="文档" />
+              <el-option label="会议" value="会议" />
+              <el-option label="电话" value="电话" />
+              <el-option label="其他" value="其他" />
+            </el-select>
           </div>
           <div>
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">关联客户</label>
@@ -128,7 +134,7 @@
               placeholder="搜索客户名称"
               :remote-method="searchCustomers"
               :loading="customerSearchLoading"
-              class="w-full "
+              class="w-full wk-crm-el-field-select"
               size="large"
             >
               <el-option
@@ -156,7 +162,7 @@
               placeholder="搜索或输入用户名称"
               :remote-method="searchUsers"
               :loading="userSearchLoading"
-              class="w-full"
+              class="w-full wk-crm-el-field-select"
               size="large"
             >
               <el-option
@@ -169,21 +175,24 @@
           </div>
           <div v-if="editingTask">
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">负责人</label>
-            <input
+            <el-input
               v-model="formData.assignedToName"
-              type="text"
               placeholder="请输入负责人"
-              class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all"
+              size="large"
+              class="w-full wk-crm-el-field-input"
             />
           </div>
         </div>
 
         <div>
           <label class="text-xs font-bold text-slate-500 mb-1.5 block">任务描述</label>
-          <textarea
+          <el-input
             v-model="formData.description"
+            type="textarea"
+            :rows="4"
+            resize="none"
             placeholder="请输入详细描述..."
-            class="w-full text-sm text-slate-900 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white rounded-lg px-3 py-2.5 outline-none transition-all resize-none h-24"
+            class="w-full wk-crm-el-field-input"
           />
         </div>
       </div>
@@ -274,22 +283,6 @@ const participants = computed({
 /* Prevent overlay from scrolling — dialog body scrolls internally */
 .el-overlay:has(.task-dialog) {
   overflow: hidden;
-}
-
-/* Unify form control radius in this dialog */
-.task-dialog input,
-.task-dialog select,
-.task-dialog textarea,
-.task-dialog .el-input__wrapper,
-.task-dialog .el-select__wrapper {
-  border-radius: 8px !important; /* align with rounded-lg */
-}
-
-/* Match el-select height to other form fields (e.g. 截止时间 / 任务类型) */
-.task-dialog .task-edit-form-select .el-input__wrapper,
-.task-dialog .task-edit-form-select .el-select__wrapper {
-  min-height: 40px;
-  padding: 0 12px;
 }
 
 

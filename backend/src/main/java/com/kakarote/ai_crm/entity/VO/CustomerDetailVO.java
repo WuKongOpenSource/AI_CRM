@@ -71,6 +71,12 @@ public class CustomerDetailVO {
     @Schema(description = "负责人头像")
     private String ownerAvatar;
 
+    @Schema(description = "创建人ID")
+    private Long createUserId;
+
+    @Schema(description = "创建人姓名")
+    private String createUserName;
+
     @Schema(description = "标签列表")
     private List<CustomerTag> tags;
 

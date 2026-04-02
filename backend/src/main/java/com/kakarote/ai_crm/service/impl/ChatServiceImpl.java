@@ -7,9 +7,11 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
+import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
+import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
-import com.kakarote.ai_crm.config.WeKnoraConfig;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.PO.ChatAttachment;
@@ -17,13 +19,9 @@ import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
-import com.kakarote.ai_crm.service.FileStorageService;
-import com.kakarote.ai_crm.service.IChatAttachmentService;
-import com.kakarote.ai_crm.service.IChatService;
-import com.kakarote.ai_crm.service.WeKnoraClient;
+import com.kakarote.ai_crm.service.*;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
@@ -74,7 +72,10 @@ public class ChatServiceImpl implements IChatService {
     private WeKnoraClient weKnoraClient;
 
     @Autowired
-    private WeKnoraConfig weKnoraConfig;
+    private PendingCustomerCreationStore pendingCustomerCreationStore;
+
+    @Autowired
+    private KnowledgeTools knowledgeTools;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
 
@@ -160,7 +161,21 @@ public class ChatServiceImpl implements IChatService {
             today.toString(),
             dayOfWeek,
             weekCalendar
-        );
+        ) + """
+
+        【重复客户确认规则】
+        1. 当你准备创建客户时，先调用 createCustomer，让系统检查是否存在同名客户。
+        2. 如果 createCustomer 返回“已存在同名客户”“待确认”“尚未创建”等信息，你必须明确告诉用户发现了重复客户，并询问是否继续创建；此时绝不能声称已经创建成功。
+        3. 只有当用户明确表示“确认创建”“继续创建”“仍然创建”“是，创建新客户”等同意语义时，才调用 confirmPendingCustomerCreation。
+        4. 如果用户表示“不创建”“取消”“算了”，调用 cancelPendingCustomerCreation。
+        5. 在重复客户尚未确认前，不要把该客户当作已经创建成功，也不要把后续依赖这个新客户的动作当成已完成。
+        
+        【工具结果回写规则】
+        1. 当工具返回系统中的客户名称、联系人名称、时间、ID等字段时，回复中必须优先使用工具返回的原始值。
+        2. 尤其是客户名称，必须展示系统匹配到的完整公司全称，禁止简称、缩写、省略“有限公司”“科技”“集团”等后缀。
+        3. 如果工具结果中包含“系统客户全称”字段，必须原样展示该字段对应的名称，不要改写成更短的客户名。
+        4. 不要根据用户原话重新生成客户简称；创建成功、查询结果、摘要说明里的客户名都以工具返回结果为准。
+        """;
     }
 
     private String buildWeekCalendar(LocalDate today) {
@@ -216,6 +231,8 @@ public class ChatServiceImpl implements IChatService {
                 .eq(ChatMessage::getSessionId, sessionId)
         );
         chatSessionMapper.deleteById(sessionId);
+        pendingCustomerCreationStore.clear(sessionId);
+        weKnoraClient.clearConversationSession(sessionId);
         AiContextHolder.clearSession(sessionId);
     }
 
@@ -280,23 +297,50 @@ public class ChatServiceImpl implements IChatService {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
         }
 
+        boolean ragEnabled = Boolean.TRUE.equals(sendBO.getRagEnabled());
+        log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
+
+        String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
+        if (routedKnowledgeResponse != null) {
+            saveMessage(sessionId, "assistant", routedKnowledgeResponse);
+            updateSessionTime(sessionId);
+            AiContextHolder.clear();
+            return Flux.just(routedKnowledgeResponse);
+        }
+
         List<Message> history = buildMessageHistory(sessionId);
 
+        String knowledgeToolPrompt = buildKnowledgeToolPrompt(ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
         // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
         String enhancedSystemPrompt = buildSystemPrompt();
+        if (StrUtil.isNotBlank(knowledgeToolPrompt)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + knowledgeToolPrompt;
+        }
 
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
-            enhancedContent = content + "\n\n" + attachmentContext;
+            enhancedContent = enhancedContent + "\n\n" + attachmentContext;
         }
 
-        List<Media> mediaList = buildMediaList(attachments);
+        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
+            enhancedContent = enhancedContent + "\n\n[系统提示] 当前配置的模型不支持图片直传，请仅基于可提取文本回答；如需图片理解，请切换到支持视觉的模型。";
+        }
+
+        List<Media> mediaList = buildMediaList(attachments, capabilities);
         StringBuilder fullResponse = new StringBuilder();
         AtomicReference<Integer> promptTokensRef = new AtomicReference<>(0);
         AtomicReference<Integer> completionTokensRef = new AtomicReference<>(0);
         AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
+
+        String unavailableTip = resolveAiUnavailableTip();
+        if (unavailableTip != null) {
+            saveMessage(sessionId, "assistant", unavailableTip);
+            AiContextHolder.clear();
+            return Flux.just(unavailableTip);
+        }
 
         log.debug("开始 AI 对话，启用工具调用...");
 
@@ -309,9 +353,10 @@ public class ChatServiceImpl implements IChatService {
 
         ChatClient chatClient = chatClientProvider.getChatClient();
 
+        final String finalSystemPrompt = enhancedSystemPrompt;
         final String finalContent = enhancedContent;
         ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
-            .system(enhancedSystemPrompt)
+            .system(finalSystemPrompt)
             .messages(history);
 
         if (CollUtil.isNotEmpty(mediaList)) {
@@ -354,11 +399,20 @@ public class ChatServiceImpl implements IChatService {
                 return null;
             })
             .doOnComplete(() -> {
+                TokenUsageSnapshot usage = resolveTokenUsage(
+                    promptTokensRef.get(),
+                    completionTokensRef.get(),
+                    totalTokensRef.get(),
+                    finalSystemPrompt,
+                    history,
+                    finalContent,
+                    fullResponse.toString()
+                );
                 log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
-                    fullResponse.length(), promptTokensRef.get(), completionTokensRef.get(), totalTokensRef.get());
+                    fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
                 saveMessage(sessionId, "assistant", fullResponse.toString(),
-                    promptTokensRef.get(), completionTokensRef.get(),
-                    totalTokensRef.get(), modelNameRef.get());
+                    usage.promptTokens(), usage.completionTokens(),
+                    usage.totalTokens(), modelNameRef.get());
                 updateSessionTime(sessionId);
                 AiContextHolder.clear();
             })
@@ -388,25 +442,51 @@ public class ChatServiceImpl implements IChatService {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
         }
 
+        boolean ragEnabled = Boolean.TRUE.equals(sendBO.getRagEnabled());
+        log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
+
+        String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
+        if (routedKnowledgeResponse != null) {
+            saveMessage(sessionId, "assistant", routedKnowledgeResponse);
+            updateSessionTime(sessionId);
+            return routedKnowledgeResponse;
+        }
+
         List<Message> history = buildMessageHistory(sessionId);
 
+        String knowledgeToolPrompt = buildKnowledgeToolPrompt(ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
         // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
         String enhancedSystemPrompt = buildSystemPrompt();
+        if (StrUtil.isNotBlank(knowledgeToolPrompt)) {
+            enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + knowledgeToolPrompt;
+        }
 
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
-            enhancedContent = content + "\n\n" + attachmentContext;
+            enhancedContent = enhancedContent + "\n\n" + attachmentContext;
         }
 
-        List<Media> mediaList = buildMediaList(attachments);
+        AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
+        if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
+            enhancedContent = enhancedContent + "\n\n[系统提示] 当前配置的模型不支持图片直传，请仅基于可提取文本回答；如需图片理解，请切换到支持视觉的模型。";
+        }
+
+        List<Media> mediaList = buildMediaList(attachments, capabilities);
+
+        String unavailableTip = resolveAiUnavailableTip();
+        if (unavailableTip != null) {
+            saveMessage(sessionId, "assistant", unavailableTip);
+            return unavailableTip;
+        }
 
         try {
             ChatClient chatClient = chatClientProvider.getChatClient();
 
+            final String finalSystemPrompt = enhancedSystemPrompt;
             final String finalContent = enhancedContent;
             ChatClient.ChatClientRequestSpec requestSpec = chatClient.prompt()
-                .system(enhancedSystemPrompt)
+                .system(finalSystemPrompt)
                 .messages(history);
 
             if (CollUtil.isNotEmpty(mediaList)) {
@@ -430,7 +510,18 @@ public class ChatServiceImpl implements IChatService {
                 modelName = chatResponse.getMetadata().getModel();
             }
 
-            saveMessage(sessionId, "assistant", response, promptTokens, completionTokens, totalTokens, modelName);
+            TokenUsageSnapshot usageSnapshot = resolveTokenUsage(
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                finalSystemPrompt,
+                history,
+                finalContent,
+                response
+            );
+
+            saveMessage(sessionId, "assistant", response,
+                usageSnapshot.promptTokens(), usageSnapshot.completionTokens(), usageSnapshot.totalTokens(), modelName);
             updateSessionTime(sessionId);
 
             return response;
@@ -485,8 +576,8 @@ public class ChatServiceImpl implements IChatService {
     /**
      * 构建图片 Media 列表（用于多模态模型）
      */
-    private List<Media> buildMediaList(List<ChatSendBO.AttachmentDTO> attachments) {
-        if (CollUtil.isEmpty(attachments)) {
+    private List<Media> buildMediaList(List<ChatSendBO.AttachmentDTO> attachments, AiModelCapabilities capabilities) {
+        if (CollUtil.isEmpty(attachments) || capabilities == null || !capabilities.isSupportsVision()) {
             return Collections.emptyList();
         }
 
@@ -508,6 +599,13 @@ public class ChatServiceImpl implements IChatService {
             }
         }
         return mediaList;
+    }
+
+    private boolean containsImageAttachment(List<ChatSendBO.AttachmentDTO> attachments) {
+        if (CollUtil.isEmpty(attachments)) {
+            return false;
+        }
+        return attachments.stream().anyMatch(att -> att.getMimeType() != null && att.getMimeType().startsWith("image/"));
     }
 
     private boolean isTextFile(String mimeType, String fileName) {
@@ -655,39 +753,165 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
-    private String buildRagContext(String query) {
-        if (!weKnoraClient.isEnabled() || !weKnoraConfig.getSearch().isAutoRagEnabled()) {
-            return "";
+    private String tryHandleKnowledgeQuestion(String content, List<ChatSendBO.AttachmentDTO> attachments, boolean ragEnabled) {
+        Long sessionId = AiContextHolder.getCurrentSessionId();
+        log.debug("知识库前置路由检查: sessionId={}, ragEnabled={}, hasAttachments={}, content={}",
+                sessionId, ragEnabled, CollUtil.isNotEmpty(attachments), abbreviateForLog(content));
+
+        if (!ragEnabled) {
+            log.debug("知识库前置路由跳过: RAG 开关未开启, sessionId={}", sessionId);
+            return null;
+        }
+
+        if (CollUtil.isNotEmpty(attachments)) {
+            log.debug("检测到知识库问题，但当前消息包含附件，保留通用聊天链路处理: sessionId={}", sessionId);
+            return null;
         }
 
         try {
-            log.debug("RAG 检索开始: query={}", query);
-            List<WeKnoraChunk> chunks = weKnoraClient.searchKnowledge(query);
-
-            if (chunks.isEmpty()) {
-                log.debug("RAG 检索无结果");
-                return "";
+            String searchResponse = knowledgeTools.searchKnowledgeContent(content);
+            if (isUsableKnowledgeSearchResponse(searchResponse)) {
+                log.debug("知识库问题优先由 searchKnowledgeContent 命中: sessionId={}, responseLength={}",
+                        sessionId, searchResponse.length());
+                return searchResponse;
             }
 
-            StringBuilder context = new StringBuilder();
-            context.append("\n\n## 相关文档参考\n");
-            context.append("以下是与用户问题相关的知识库文档内容，请基于这些内容来辅助回答用户问题：\n\n");
-
-            for (int i = 0; i < chunks.size(); i++) {
-                WeKnoraChunk chunk = chunks.get(i);
-                context.append(String.format("### [%d] %s\n", i + 1, chunk.getKnowledgeTitle()));
-                context.append(chunk.getContent());
-                context.append("\n\n");
+            log.debug("searchKnowledgeContent 未命中或结果不可用，回退 askKnowledgeQuestion: sessionId={}", sessionId);
+            String askResponse = knowledgeTools.askKnowledgeQuestion(content, null);
+            if (StrUtil.isBlank(askResponse)) {
+                log.debug("知识库前置路由已触发，但 askKnowledgeQuestion 返回空结果: sessionId={}", sessionId);
+                return null;
             }
-
-            context.append("---\n");
-            context.append("注意：以上内容仅供参考，请结合用户问题进行准确回答。如果文档内容与用户问题无关，可忽略。\n");
-
-            log.debug("RAG 上下文构建完成: {} 个片段", chunks.size());
-            return context.toString();
+            log.debug("知识库问题已由 askKnowledgeQuestion 兜底处理: sessionId={}, responseLength={}",
+                    sessionId, askResponse.length());
+            return askResponse;
         } catch (Exception e) {
-            log.warn("RAG 检索失败: {}", e.getMessage());
+            log.warn("服务端前置处理知识库问题失败，将回退到通用聊天链路: sessionId={}, error={}",
+                    sessionId, e.getMessage(), e);
+            return null;
+        }
+    }
+
+    private boolean isUsableKnowledgeSearchResponse(String response) {
+        if (StrUtil.isBlank(response)) {
+            return false;
+        }
+        return !response.contains("未找到与")
+                && !response.contains("语义检索失败")
+                && !response.contains("功能未启用");
+    }
+
+    private String resolveAiUnavailableTip() {
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            return "请先在系统设置中配置 AI 服务。";
+        }
+        return null;
+    }
+
+    private TokenUsageSnapshot resolveTokenUsage(Integer promptTokens, Integer completionTokens, Integer totalTokens,
+                                                 String systemPrompt, List<Message> history,
+                                                 String currentContent, String responseContent) {
+        int resolvedPromptTokens = promptTokens != null && promptTokens > 0
+                ? promptTokens
+                : estimatePromptTokens(systemPrompt, history, currentContent);
+        int resolvedCompletionTokens = completionTokens != null && completionTokens > 0
+                ? completionTokens
+                : estimateTokens(responseContent);
+        int resolvedTotalTokens = totalTokens != null && totalTokens > 0
+                ? totalTokens
+                : resolvedPromptTokens + resolvedCompletionTokens;
+
+        if ((totalTokens == null || totalTokens <= 0) && resolvedTotalTokens > 0) {
+            log.debug("模型未返回 usage，使用估算 token: prompt={}, completion={}, total={}",
+                    resolvedPromptTokens, resolvedCompletionTokens, resolvedTotalTokens);
+        }
+
+        return new TokenUsageSnapshot(resolvedPromptTokens, resolvedCompletionTokens, resolvedTotalTokens);
+    }
+
+    private int estimatePromptTokens(String systemPrompt, List<Message> history, String currentContent) {
+        int total = estimateTokens(systemPrompt);
+        if (history != null) {
+            for (Message message : history) {
+                total += estimateTokens(extractMessageContent(message)) + 4;
+            }
+        }
+        total += estimateTokens(currentContent);
+        return total;
+    }
+
+    private String extractMessageContent(Message message) {
+        if (message == null) {
+            return null;
+        }
+        try {
+            Object value = message.getClass().getMethod("getContent").invoke(message);
+            return value != null ? String.valueOf(value) : null;
+        } catch (Exception ignored) {
+        }
+        try {
+            Object value = message.getClass().getMethod("getText").invoke(message);
+            return value != null ? String.valueOf(value) : null;
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private int estimateTokens(String text) {
+        if (StrUtil.isBlank(text)) {
+            return 0;
+        }
+
+        int cjkChars = 0;
+        int otherChars = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (Character.isWhitespace(current)) {
+                continue;
+            }
+            if (isCjkCharacter(current)) {
+                cjkChars++;
+            } else {
+                otherChars++;
+            }
+        }
+
+        int estimated = cjkChars + (int) Math.ceil(otherChars / 4.0);
+        return Math.max(estimated, 1);
+    }
+
+    private boolean isCjkCharacter(char value) {
+        Character.UnicodeScript script = Character.UnicodeScript.of(value);
+        return script == Character.UnicodeScript.HAN
+                || script == Character.UnicodeScript.HIRAGANA
+                || script == Character.UnicodeScript.KATAKANA
+                || script == Character.UnicodeScript.HANGUL;
+    }
+
+    private String buildKnowledgeToolPrompt(boolean ragEnabled) {
+        if (!ragEnabled) {
+            log.debug("跳过知识库工具提示: RAG 开关未开启");
             return "";
         }
+        log.debug("构建知识库工具提示: RAG 开关已开启");
+
+        return """
+                【知识库问题处理规则】
+                1. 优先使用知识库工具，不要直接凭空回答。
+                2. 优先先调用 searchKnowledgeContent 获取相关文档片段。
+                3. 如果已经拿到相关片段，但用户仍然需要结论性总结、条款归纳、反馈汇总，再调用 askKnowledgeQuestion。
+                4. 若 searchKnowledgeContent 没有找到结果，再尝试 askKnowledgeQuestion；仍未命中时再告知用户换关键词。
+                """;
+    }
+
+    private String abbreviateForLog(String text) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        String normalized = text.replaceAll("\\s+", " ").trim();
+        return normalized.length() > 120 ? normalized.substring(0, 120) + "..." : normalized;
+    }
+
+    private record TokenUsageSnapshot(int promptTokens, int completionTokens, int totalTokens) {
     }
 }

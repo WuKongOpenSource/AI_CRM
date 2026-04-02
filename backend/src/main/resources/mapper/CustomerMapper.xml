@@ -2,30 +2,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.kakarote.ai_crm.mapper.CustomerMapper">
 
-    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.CustomerListVO">
-        SELECT
-            c.customer_id,
-            c.company_name,
-            c.industry,
-            c.stage,
-            c.level,
-            c.source,
-            c.quotation,
-            c.contract_amount,
-            c.revenue,
-            c.last_contact_time,
-            c.next_follow_time,
-            c.owner_id,
-            u.realname AS owner_name,
-            c.create_time,
-            c.primary_contact_name,
-            c.primary_contact_phone,
-            c.primary_contact_position,
-            c.contact_count,
-            c.tag_names
-        FROM crm_customer c
-        LEFT JOIN manager_user u ON c.owner_id = u.user_id
-        WHERE c.status = 1
+    <!-- 可复用的 WHERE 条件片段 -->
+    <sql id="customerQueryConditions">
         <if test="query.keyword != null and query.keyword != ''">
             AND (
                 c.company_name LIKE CONCAT('%', #{query.keyword}, '%')
@@ -56,12 +34,104 @@
             AND c.source = #{query.source}
         </if>
         <if test="query.tag != null and query.tag != ''">
-            AND EXISTS (SELECT 1 FROM crm_customer_tag t WHERE t.customer_id = c.customer_id AND t.tag_name = #{query.tag})
+            AND EXISTS (
+                SELECT 1
+                FROM crm_customer_tag t
+                WHERE t.customer_id = c.customer_id
+                  AND t.tag_name = #{query.tag}
+            )
         </if>
-        ORDER BY c.create_time DESC
-    </select>
+        <if test="query.quotationMin != null">
+            AND c.quotation <![CDATA[>=]]> #{query.quotationMin}
+        </if>
+        <if test="query.quotationMax != null">
+            AND c.quotation <![CDATA[<=]]> #{query.quotationMax}
+        </if>
+        <if test="query.contractAmountMin != null">
+            AND c.contract_amount <![CDATA[>=]]> #{query.contractAmountMin}
+        </if>
+        <if test="query.contractAmountMax != null">
+            AND c.contract_amount <![CDATA[<=]]> #{query.contractAmountMax}
+        </if>
+        <if test="query.revenueMin != null">
+            AND c.revenue <![CDATA[>=]]> #{query.revenueMin}
+        </if>
+        <if test="query.revenueMax != null">
+            AND c.revenue <![CDATA[<=]]> #{query.revenueMax}
+        </if>
+        <if test="query.lastContactStart != null">
+            AND c.last_contact_time <![CDATA[>=]]> #{query.lastContactStart}
+        </if>
+        <if test="query.lastContactEnd != null">
+            <choose>
+                <when test="query.includeNoLastContact != null and query.includeNoLastContact">
+                    AND (c.last_contact_time <![CDATA[<=]]> #{query.lastContactEnd} OR c.last_contact_time IS NULL)
+                </when>
+                <otherwise>
+                    AND c.last_contact_time <![CDATA[<=]]> #{query.lastContactEnd}
+                </otherwise>
+            </choose>
+        </if>
+        <if test="query.nextFollowStart != null">
+            AND c.next_follow_time <![CDATA[>=]]> #{query.nextFollowStart}
+        </if>
+        <if test="query.nextFollowEnd != null">
+            AND c.next_follow_time <![CDATA[<=]]> #{query.nextFollowEnd}
+        </if>
+        <if test="query.createTimeStart != null">
+            AND c.create_time <![CDATA[>=]]> #{query.createTimeStart}
+        </if>
+        <if test="query.createTimeEnd != null">
+            AND c.create_time <![CDATA[<=]]> #{query.createTimeEnd}
+        </if>
+        <if test="query.contactCountMin != null">
+            AND c.contact_count <![CDATA[>=]]> #{query.contactCountMin}
+        </if>
+        <if test="query.contactCountMax != null">
+            AND c.contact_count <![CDATA[<=]]> #{query.contactCountMax}
+        </if>
+    </sql>
 
-    <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerListVO">
+    <!-- 可复用的 ORDER BY 片段 -->
+    <sql id="customerQueryOrderBy">
+        <choose>
+            <when test="query.sortBy == 'quotation'">
+                ORDER BY c.quotation
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'contractAmount'">
+                ORDER BY c.contract_amount
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'revenue'">
+                ORDER BY c.revenue
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'lastContactTime'">
+                ORDER BY c.last_contact_time
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'nextFollowTime'">
+                ORDER BY c.next_follow_time
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <when test="query.sortBy == 'contactCount'">
+                ORDER BY c.contact_count
+                <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
+                NULLS LAST, c.create_time DESC
+            </when>
+            <otherwise>
+                ORDER BY c.create_time DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.CustomerListVO">
         SELECT
             c.customer_id,
             c.company_name,
@@ -76,9 +146,77 @@
             c.next_follow_time,
             c.owner_id,
             u.realname AS owner_name,
-            c.create_time
+            c.create_time,
+            c.primary_contact_name,
+            c.primary_contact_phone,
+            c.primary_contact_position,
+            c.contact_count,
+            c.tag_names
         FROM crm_customer c
         LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        WHERE c.status = 1
+        <include refid="customerQueryConditions"/>
+        <include refid="customerQueryOrderBy"/>
+    </select>
+
+    <select id="queryPageListWithCf" resultType="map">
+        SELECT
+            c.customer_id,
+            c.company_name,
+            c.industry,
+            c.stage,
+            c.level,
+            c.source,
+            c.quotation,
+            c.contract_amount,
+            c.revenue,
+            c.last_contact_time,
+            c.next_follow_time,
+            c.owner_id,
+            u.realname AS owner_name,
+            c.create_time,
+            c.primary_contact_name,
+            c.primary_contact_phone,
+            c.primary_contact_position,
+            c.contact_count,
+            c.tag_names
+            <if test="cfColumns != null and cfColumns.size() > 0">
+                <foreach collection="cfColumns" item="col" separator="">
+                    , c.${col}
+                </foreach>
+            </if>
+        FROM crm_customer c
+        LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        WHERE c.status = 1
+        <include refid="customerQueryConditions"/>
+        <include refid="customerQueryOrderBy"/>
+    </select>
+
+    <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerDetailVO">
+        SELECT
+            c.customer_id,
+            c.company_name,
+            c.industry,
+            c.stage,
+            c.level,
+            c.source,
+            c.address,
+            c.website,
+            c.quotation,
+            c.contract_amount,
+            c.revenue,
+            c.last_contact_time,
+            c.next_follow_time,
+            c.remark,
+            c.owner_id,
+            u.realname AS owner_name,
+            c.create_user_id,
+            cu.realname AS create_user_name,
+            c.create_time,
+            c.update_time
+        FROM crm_customer c
+        LEFT JOIN manager_user u ON c.owner_id = u.user_id
+        LEFT JOIN manager_user cu ON c.create_user_id = cu.user_id
         WHERE c.customer_id = #{customerId} AND c.status = 1
     </select>
 

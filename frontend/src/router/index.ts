@@ -3,6 +3,13 @@ import { getToken } from '@/utils/request'
 import { getOidcSessionToken } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 
+const settingsComponent = () => import('@/views/settings/SettingsView.vue')
+const settingsMeta = {
+  title: '系统设置',
+  icon: 'settings',
+  permission: ['user', 'role', 'config', 'dept', 'customField']
+}
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -56,9 +63,33 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'settings',
-        name: 'Settings',
-        component: () => import('@/views/settings/SettingsView.vue'),
-        meta: { title: '系统设置', icon: 'settings', permission: ['user', 'role', 'config', 'dept', 'customField'] }
+        redirect: '/settings/team'
+      },
+      {
+        path: 'settings/team',
+        name: 'SettingsTeam',
+        component: settingsComponent,
+        meta: settingsMeta
+      },
+      {
+        path: 'settings/role',
+        name: 'SettingsRole',
+        component: settingsComponent,
+        meta: settingsMeta
+      },
+      {
+        path: 'settings/system',
+        redirect: '/settings/system/enterprise'
+      },
+      {
+        path: 'settings/system/profile',
+        redirect: '/settings/system/enterprise'
+      },
+      {
+        path: 'settings/system/:systemTab(enterprise|api|agent|storage|customField)',
+        name: 'SettingsSystem',
+        component: settingsComponent,
+        meta: settingsMeta
       }
     ]
   },
@@ -80,7 +111,7 @@ router.beforeEach(async (to, _from, next) => {
 
   if (requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if ((to.name === 'Login' || to.name === 'Register') && token) {
+  } else if (to.name === 'Login' && token) {
     // 用户已登录访问登录页，检查是否有 redirect 参数
     let redirect = to.query.redirect as string
     if (redirect) {
@@ -107,7 +138,7 @@ router.beforeEach(async (to, _from, next) => {
   } else if (requiresAuth && token) {
     // 有 token 但可能没有用户信息，需要获取
     const userStore = useUserStore()
-    if (!userStore.userInfo) {
+    if (!userStore.userInfo || !userStore.permissionsLoaded) {
       try {
         await userStore.fetchUserInfo()
       } catch (e) {

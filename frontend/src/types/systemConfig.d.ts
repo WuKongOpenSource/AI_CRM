@@ -1,24 +1,68 @@
-/**
- * AI 服务提供商类型
- */
-export type AiProvider = 'openai' | 'dashscope' | 'custom'
+export type AiProvider =
+  | 'openai'
+  | 'dashscope'
+  | 'moonshot'
+  | 'deepseek'
+  | 'ark'
+  | 'hunyuan'
+  | 'minimax'
+  | 'zhipu'
+  | 'custom'
 
-/**
- * AI 配置信息（从后端获取，API Key 脱敏）
- */
+export type AiMode = 'gift' | 'custom'
+
+export interface AiModelCapabilities {
+  supportsStream: boolean
+  supportsToolCall: boolean
+  supportsVision: boolean
+}
+
+export interface AiProviderPreset {
+  label: string
+  value: AiProvider
+  description?: string
+  baseUrl: string
+  models: string[]
+  modelHint?: string
+  extraHeadersHint?: string
+  supportsStream: boolean
+  supportsToolCall: boolean
+  supportsVision: boolean
+  configured?: boolean
+  active?: boolean
+  apiKeyConfigured?: boolean
+  savedApiUrl?: string | null
+  savedModel?: string | null
+  savedTemperature?: number | null
+  savedMaxTokens?: number | null
+  savedExtraHeadersConfigured?: boolean
+  savedExtraHeadersJson?: string | null
+}
+
 export interface AiConfig {
   provider: AiProvider
+  providerLabel?: string
   apiUrl: string
   apiKey: string
   model: string
   temperature: number
   maxTokens: number
+  extraHeadersConfigured?: boolean
+  extraHeadersJson?: string | null
+  capabilities?: AiModelCapabilities
+  modelHint?: string
+  extraHeadersHint?: string
+  availableProviders?: AiProviderPreset[]
+  mode?: AiMode
+  customConfigSaved?: boolean
+  ready?: boolean
+  giftTokenTotal?: number
+  giftTokenUsed?: number
+  giftTokenRemaining?: number
+  giftTokenAvailable?: boolean
   updateTime?: string
 }
 
-/**
- * AI 配置更新参数
- */
 export interface AiConfigUpdateBO {
   provider?: AiProvider
   apiUrl: string
@@ -26,76 +70,26 @@ export interface AiConfigUpdateBO {
   model: string
   temperature?: number
   maxTokens?: number
+  extraHeadersJson?: string
 }
 
-/**
- * AI 连接测试结果
- */
+export interface AiProviderActivateBO {
+  provider: AiProvider
+}
+
 export interface AiConnectionTestResult {
   success: boolean
   responseTime: number
   message: string
   model?: string
+  provider?: AiProvider
 }
 
-/**
- * 预设的 AI 服务提供商配置
- */
-export interface AiProviderPreset {
-  label: string
-  value: AiProvider
-  baseUrl: string
-  models: string[]
-}
-
-/**
- * MinIO 控制台配置
- */
 export interface MinioConsoleConfig {
   enabled: boolean
   consoleUrl: string
 }
 
-/**
- * WeKnora 配置信息（从后端获取，API Key 脱敏）
- */
-export interface WeKnoraConfig {
-  enabled: boolean
-  baseUrl: string
-  apiKey: string
-  knowledgeBaseId: string
-  matchCount: number
-  vectorThreshold: number
-  autoRagEnabled: boolean
-  updateTime?: string
-}
-
-/**
- * WeKnora 配置更新参数
- */
-export interface WeKnoraConfigUpdateBO {
-  enabled?: boolean
-  baseUrl?: string
-  apiKey?: string
-  knowledgeBaseId?: string
-  matchCount?: number
-  vectorThreshold?: number
-  autoRagEnabled?: boolean
-}
-
-/**
- * WeKnora 连接测试结果
- */
-export interface WeKnoraConnectionTestResult {
-  success: boolean
-  responseTime: number
-  message: string
-  knowledgeCount?: number
-}
-
-/**
- * 企业信息配置
- */
 export interface EnterpriseConfig {
   name: string | null
   logo: string | null
@@ -104,9 +98,6 @@ export interface EnterpriseConfig {
   updateTime?: string
 }
 
-/**
- * 企业信息配置更新参数
- */
 export interface EnterpriseConfigUpdateBO {
   name?: string
   logo?: string

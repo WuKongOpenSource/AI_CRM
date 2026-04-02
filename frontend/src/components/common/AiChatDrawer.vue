@@ -112,9 +112,11 @@
                   </div>
                   <div class="flex-1 space-y-2 min-w-0">
                     <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-3 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
-                      <div class="whitespace-pre-wrap" :class="{ 'streaming-cursor': message.isStreaming }">
-                        {{ message.content || '...' }}
-                      </div>
+                      <div
+                        class="wk-markdown"
+                        :class="{ 'streaming-cursor': message.isStreaming }"
+                        v-html="renderAssistantMessage(message.content || '...')"
+                      />
                     </div>
                     <!-- Attachments -->
                     <div v-if="message.attachments && message.attachments.length > 0" class="space-y-1">
@@ -146,8 +148,17 @@
 
                 <!-- User Message -->
                 <div v-else class="flex gap-3 flex-row-reverse">
-                  <div class="size-8 rounded-lg bg-slate-100 shrink-0 border border-slate-200 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-slate-400 text-base">person</span>
+                  <div class="size-8 rounded-lg bg-slate-100 shrink-0 border border-slate-200 flex items-center justify-center overflow-hidden">
+                    <img
+                      v-if="showUserAvatarImage"
+                      :src="userStore.avatar"
+                      class="h-full w-full object-cover"
+                      alt="user avatar"
+                      @error="userAvatarLoadFailed = true"
+                    />
+                    <span v-else class="text-xs font-bold text-slate-600">
+                      {{ userAvatarFallback }}
+                    </span>
                   </div>
                   <div class="space-y-2 min-w-0 max-w-[80%]">
                     <div class="bg-primary text-white rounded-2xl rounded-tr-none p-3 shadow-sm shadow-primary/10 text-sm leading-relaxed">
@@ -230,6 +241,23 @@
                 @keydown.enter.exact.prevent="handleSend"
               />
               <button
+                type="button"
+                class="h-9 rounded-full border px-3 text-xs font-semibold shadow-sm transition-all"
+                :class="chatStore.ragEnabled
+                  ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+                :aria-pressed="chatStore.ragEnabled"
+                :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
+                @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
+              >
+                <span class="flex items-center gap-1">
+                  <span class="material-symbols-outlined text-[16px] leading-none">
+                    menu_book
+                  </span>
+                  <span>知识库检索</span>
+                </span>
+              </button>
+              <button
                 class="size-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all disabled:opacity-50"
                 :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
                 @click="handleSend"
@@ -294,7 +322,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useChatStore } from '@/stores/chat'
@@ -303,6 +331,8 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { renderMarkdown } from '@/utils/markdown'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 
 const router = useRouter()
@@ -318,9 +348,12 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
 const currentTab = ref<'chat' | 'notifications'>('chat')
+const userAvatarLoadFailed = ref(false)
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024
 const MAX_FILE_COUNT = 5
+const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
+const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
 const quickActions = [
   { label: '分析客户意向', text: '帮我分析客户意向' },
@@ -386,6 +419,13 @@ watch(
   }
 )
 
+watch(
+  () => userStore.avatar,
+  () => {
+    userAvatarLoadFailed.value = false
+  }
+)
+
 function handleOpenFullPage() {
   closeChatDrawer()
   router.push('/chat')
@@ -435,19 +475,25 @@ async function handleSend() {
       attachmentVOs = results.map(r => r.vo)
     } catch (e) {
       console.error('文件上传失败:', e)
-      ElMessage.error('文件上传失败，请重试')
+      if (!isRequestErrorHandled(e)) {
+        ElMessage.error('文件上传失败，请重试')
+      }
       isUploading.value = false
       return
     }
     isUploading.value = false
   }
 
-  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs)
+  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
 }
 
 function sendQuickMessage(text: string) {
   inputText.value = text
   handleSend()
+}
+
+function renderAssistantMessage(content: string): string {
+  return renderMarkdown(content)
 }
 
 function handleUpload() {

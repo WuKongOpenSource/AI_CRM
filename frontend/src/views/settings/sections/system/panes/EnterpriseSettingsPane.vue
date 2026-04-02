@@ -87,6 +87,7 @@ import { Upload } from '@element-plus/icons-vue'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getEnterpriseConfig, updateEnterpriseConfig } from '@/api/systemConfig'
 import { useEnterpriseStore } from '@/stores/enterprise'
+import { isRequestErrorHandled } from '@/utils/requestError'
 
 const enterpriseStore = useEnterpriseStore()
 
@@ -143,8 +144,11 @@ async function handleLogoChange(event: Event) {
     enterpriseForm.logo = presigned.objectKey
     enterpriseForm.logoUrl = presigned.accessUrl
     ElMessage.success('Logo 上传成功')
-  } catch {
-    ElMessage.error('Logo 上传失败')
+  } catch (error) {
+    console.error('Logo upload failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('Logo 上传失败')
+    }
   } finally {
     input.value = ''
   }

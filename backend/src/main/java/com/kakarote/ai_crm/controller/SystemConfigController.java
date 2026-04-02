@@ -1,16 +1,15 @@
 package com.kakarote.ai_crm.controller;
 
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.config.OidcConfig;
+import com.kakarote.ai_crm.entity.BO.AiProviderActivateBO;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
-import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
-import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.OidcService;
 import com.kakarote.ai_crm.utils.RequestContextUtil;
@@ -26,12 +25,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 系统配置控制器
- */
 @RestController
 @RequestMapping("/systemConfig")
-@Tag(name = "系统配置")
+@Tag(name = "System Config APIs")
 public class SystemConfigController {
 
     @Autowired
@@ -47,51 +43,87 @@ public class SystemConfigController {
     private boolean minioEnabled;
 
     @GetMapping("/ai")
-    @Operation(summary = "获取AI配置")
+    @Operation(summary = "Get AI config")
     public Result<AiConfigVO> getAiConfig() {
         return Result.ok(systemConfigService.getAiConfig());
     }
 
+    @GetMapping("/ai/detail")
+    @Operation(summary = "Get AI config detail")
+    @RequirePermission("config:ai")
+    public Result<AiConfigVO> getAiConfigDetail() {
+        return Result.ok(systemConfigService.getAiConfigDetail());
+    }
+
     @PostMapping("/ai/update")
-    @Operation(summary = "更新AI配置")
+    @Operation(summary = "Update AI config")
+    @RequirePermission("config:ai")
     public Result<String> updateAiConfig(@Valid @RequestBody AiConfigUpdateBO updateBO) {
         systemConfigService.updateAiConfig(updateBO);
         return Result.ok();
     }
 
+    @PostMapping("/ai/activate")
+    @Operation(summary = "Activate saved AI provider")
+    @RequirePermission("config:ai")
+    public Result<String> activateAiProvider(@Valid @RequestBody AiProviderActivateBO activateBO) {
+        systemConfigService.activateAiProvider(activateBO.getProvider());
+        return Result.ok();
+    }
+
+    @PostMapping("/ai/useGift")
+    @Operation(summary = "Use gift AI quota")
+    @RequirePermission("config:ai")
+    public Result<String> useGiftAiConfig() {
+        systemConfigService.useGiftAiConfig();
+        return Result.ok();
+    }
+
+    @PostMapping("/ai/useCustom")
+    @Operation(summary = "Use saved custom AI config")
+    @RequirePermission("config:ai")
+    public Result<String> useCustomAiConfig() {
+        systemConfigService.useCustomAiConfig();
+        return Result.ok();
+    }
+
     @PostMapping("/ai/test")
-    @Operation(summary = "测试AI连接")
+    @Operation(summary = "Test AI connection")
+    @RequirePermission("config:ai")
     public Result<AiConnectionTestVO> testAiConnection(@Valid @RequestBody AiConfigUpdateBO configBO) {
         return Result.ok(systemConfigService.testAiConnection(configBO));
     }
 
     @GetMapping("/byType/{type}")
-    @Operation(summary = "按类型获取配置")
+    @Operation(summary = "Get config by type")
+    @RequirePermission("config")
     public Result<Map<String, String>> getConfigsByType(
-            @PathVariable("type") @Parameter(description = "配置类型") String type) {
+            @PathVariable("type") @Parameter(description = "Config type") String type) {
         return Result.ok(systemConfigService.getConfigsByType(type));
     }
 
     @PostMapping("/clearCache")
-    @Operation(summary = "清除配置缓存")
+    @Operation(summary = "Clear config cache")
+    @RequirePermission("config")
     public Result<String> clearCache() {
         systemConfigService.clearConfigCache();
         return Result.ok();
     }
 
     @GetMapping("/minio/consoleUrl")
-    @Operation(summary = "获取MinIO控制台地址")
+    @Operation(summary = "Get MinIO console url")
+    @RequirePermission("config:storage")
     public Result<Map<String, Object>> getMinioConsoleUrl() {
         Map<String, Object> result = new HashMap<>();
         result.put("enabled", minioEnabled);
-        // 动态获取 MinIO Console URL
         String consoleUrl = RequestContextUtil.getMinioConsoleUrl(oidcConfig.getMinioConsolePort());
         result.put("consoleUrl", consoleUrl);
         return Result.ok(result);
     }
 
     @GetMapping("/minio/ssoUrl")
-    @Operation(summary = "获取MinIO SSO登录URL")
+    @Operation(summary = "Get MinIO SSO url")
+    @RequirePermission("config:storage")
     public Result<Map<String, Object>> getMinioSsoUrl() {
         Map<String, Object> result = new HashMap<>();
         result.put("enabled", minioEnabled);
@@ -101,48 +133,24 @@ public class SystemConfigController {
             return Result.ok(result);
         }
 
-        // 获取当前登录用户并创建 OIDC Session
         LoginUser loginUser = UserUtil.getLoginUser();
         String sessionToken = oidcService.createSession(loginUser);
 
-        // 返回带 session_token 的 MinIO SSO 跳转端点（动态获取 base URL）
         String baseUrl = RequestContextUtil.getBaseUrl();
         String ssoUrl = baseUrl + "/oauth2/minio-sso?session_token=" + sessionToken;
         result.put("ssoUrl", ssoUrl);
         return Result.ok(result);
     }
 
-    // ==================== WeKnora 配置接口 ====================
-
-    @GetMapping("/weknora")
-    @Operation(summary = "获取WeKnora配置")
-    public Result<WeKnoraConfigVO> getWeKnoraConfig() {
-        return Result.ok(systemConfigService.getWeKnoraConfig());
-    }
-
-    @PostMapping("/weknora/update")
-    @Operation(summary = "更新WeKnora配置")
-    public Result<String> updateWeKnoraConfig(@Valid @RequestBody WeKnoraConfigUpdateBO updateBO) {
-        systemConfigService.updateWeKnoraConfig(updateBO);
-        return Result.ok();
-    }
-
-    @PostMapping("/weknora/test")
-    @Operation(summary = "测试WeKnora连接")
-    public Result<WeKnoraConnectionTestVO> testWeKnoraConnection(@Valid @RequestBody WeKnoraConfigUpdateBO configBO) {
-        return Result.ok(systemConfigService.testWeKnoraConnection(configBO));
-    }
-
-    // ==================== 企业信息配置接口 ====================
-
     @GetMapping("/enterprise")
-    @Operation(summary = "获取企业信息配置")
+    @Operation(summary = "Get enterprise config")
     public Result<EnterpriseConfigVO> getEnterpriseConfig() {
         return Result.ok(systemConfigService.getEnterpriseConfig());
     }
 
     @PostMapping("/enterprise/update")
-    @Operation(summary = "更新企业信息配置")
+    @Operation(summary = "Update enterprise config")
+    @RequirePermission("config:storage")
     public Result<String> updateEnterpriseConfig(@Valid @RequestBody EnterpriseConfigUpdateBO updateBO) {
         systemConfigService.updateEnterpriseConfig(updateBO);
         return Result.ok();

@@ -4,6 +4,7 @@ import type {
   CustomFieldAddBO,
   CustomFieldUpdateBO,
   FieldSortBO,
+  FieldSortUpdateBO,
   EntityType
 } from '@/types/customField'
 
@@ -61,4 +62,25 @@ export function getEnabledFieldsByEntity(entityType: EntityType): Promise<Custom
  */
 export function updateFieldSort(sortList: FieldSortBO[]): Promise<void> {
   return post('/custom-field/sort', sortList)
+}
+
+/**
+ * Get current user's column config (sorted, hidden filtered)
+ */
+export function getUserColumns(entityType: EntityType): Promise<CustomField[]> {
+  return get(`/custom-field/user-columns/${entityType}`)
+}
+
+/**
+ * Get current user's all field config (including hidden, for settings)
+ */
+export function getUserColumnsAll(entityType: EntityType): Promise<CustomField[]> {
+  return get(`/custom-field/user-columns-all/${entityType}`)
+}
+
+/**
+ * Save user's field sort and visibility config
+ */
+export function saveUserSort(data: FieldSortUpdateBO): Promise<void> {
+  return post('/custom-field/user-sort', data)
 }

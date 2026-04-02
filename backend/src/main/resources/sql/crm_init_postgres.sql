@@ -512,9 +512,9 @@ INSERT INTO crm_task (task_id, title, description, due_date, priority, status, a
 
 -- 插入系统配置
 INSERT INTO crm_system_config (config_id, config_key, config_value, config_type, description, create_time) VALUES
-(1, 'ai_api_url', 'https://api.openai.com/v1', 'ai', 'AI API地址', NOW()),
+(1, 'ai_api_url', 'https://dashscope.aliyuncs.com/compatible-mode', 'ai', 'AI API地址', NOW()),
 (2, 'ai_api_key', '', 'ai', 'AI API密钥', NOW()),
-(3, 'ai_model', 'gpt-3.5-turbo', 'ai', 'AI模型名称', NOW()),
+(3, 'ai_model', 'qwen3.5-plus', 'ai', 'AI模型名称', NOW()),
 (4, 'ai_max_tokens', '2000', 'ai', '最大Token数', NOW()),
 (5, 'ai_temperature', '0.7', 'ai', 'AI温度参数', NOW()),
 (6, 'file_upload_path', '/uploads', 'file', '文件上传路径', NOW()),

@@ -5,6 +5,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -15,16 +17,16 @@ import java.util.List;
 @Schema(name = "CustomerQueryBO", description = "客户查询参数")
 public class CustomerQueryBO extends PageEntity {
 
-    @Schema(description = "公司名称关键词")
+    @Schema(description = "关键词")
     private String keyword;
 
-    @Schema(description = "阶段")
+    @Schema(description = "单个阶段")
     private String stage;
 
     @Schema(description = "阶段列表")
     private List<String> stages;
 
-    @Schema(description = "客户等级")
+    @Schema(description = "客户级别")
     private String level;
 
     @Schema(description = "负责人ID")
@@ -38,4 +40,55 @@ public class CustomerQueryBO extends PageEntity {
 
     @Schema(description = "客户来源")
     private String source;
+
+    @Schema(description = "报价金额下限")
+    private BigDecimal quotationMin;
+
+    @Schema(description = "报价金额上限")
+    private BigDecimal quotationMax;
+
+    @Schema(description = "合同金额下限")
+    private BigDecimal contractAmountMin;
+
+    @Schema(description = "合同金额上限")
+    private BigDecimal contractAmountMax;
+
+    @Schema(description = "收入金额下限")
+    private BigDecimal revenueMin;
+
+    @Schema(description = "收入金额上限")
+    private BigDecimal revenueMax;
+
+    @Schema(description = "最后联系时间开始 yyyy-MM-dd HH:mm:ss")
+    private Date lastContactStart;
+
+    @Schema(description = "最后联系时间结束 yyyy-MM-dd HH:mm:ss")
+    private Date lastContactEnd;
+
+    @Schema(description = "是否包含从未跟进客户")
+    private Boolean includeNoLastContact;
+
+    @Schema(description = "下次跟进时间开始 yyyy-MM-dd HH:mm:ss")
+    private Date nextFollowStart;
+
+    @Schema(description = "下次跟进时间结束 yyyy-MM-dd HH:mm:ss")
+    private Date nextFollowEnd;
+
+    @Schema(description = "创建时间开始 yyyy-MM-dd HH:mm:ss")
+    private Date createTimeStart;
+
+    @Schema(description = "创建时间结束 yyyy-MM-dd HH:mm:ss")
+    private Date createTimeEnd;
+
+    @Schema(description = "联系人数量下限")
+    private Integer contactCountMin;
+
+    @Schema(description = "联系人数量上限")
+    private Integer contactCountMax;
+
+    @Schema(description = "排序字段: createTime/quotation/contractAmount/revenue/lastContactTime/nextFollowTime/contactCount")
+    private String sortBy;
+
+    @Schema(description = "排序方向: asc/desc")
+    private String sortOrder;
 }

@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
@@ -31,6 +32,7 @@ public class TaskController {
 
     @PostMapping("/add")
     @Operation(summary = "创建任务")
+    @RequirePermission("task:create")
     public Result<Long> add(@Valid @RequestBody TaskAddBO taskAddBO) {
         Long taskId = taskService.addTask(taskAddBO);
         return Result.ok(taskId);
@@ -38,6 +40,7 @@ public class TaskController {
 
     @PostMapping("/update")
     @Operation(summary = "更新任务")
+    @RequirePermission("task:edit")
     public Result<String> update(@Valid @RequestBody TaskUpdateBO taskUpdateBO) {
         taskService.updateTask(taskUpdateBO);
         return Result.ok();
@@ -45,6 +48,7 @@ public class TaskController {
 
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除任务")
+    @RequirePermission("task:delete")
     public Result<String> delete(@PathVariable("id") Long id) {
         taskService.deleteTask(id);
         return Result.ok();
@@ -52,12 +56,14 @@ public class TaskController {
 
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询任务")
+    @RequirePermission("task:view")
     public Result<BasePage<TaskVO>> queryPageList(@RequestBody TaskQueryBO queryBO) {
         return Result.ok(taskService.queryPageList(queryBO));
     }
 
     @PostMapping("/updateStatus")
     @Operation(summary = "更新任务状态")
+    @RequirePermission("task:update_status")
     public Result<String> updateStatus(
             @Parameter(description = "任务ID") @RequestParam Long taskId,
             @Parameter(description = "状态") @RequestParam String status) {
@@ -67,6 +73,7 @@ public class TaskController {
 
     @GetMapping("/myTasks")
     @Operation(summary = "查询我的任务")
+    @RequirePermission("task:view")
     public Result<List<TaskVO>> myTasks(
             @Parameter(description = "筛选: all/today/thisWeek/overdue") @RequestParam(defaultValue = "all") String filter) {
         return Result.ok(taskService.getMyTasks(filter));
@@ -74,6 +81,7 @@ public class TaskController {
 
     @PostMapping("/ai-parse")
     @Operation(summary = "AI智能解析任务")
+    @RequirePermission("task:create")
     public Result<TaskAiParseVO> aiParse(@Valid @RequestBody TaskAiParseBO parseBO) {
         return Result.ok(taskService.aiParseTask(parseBO));
     }

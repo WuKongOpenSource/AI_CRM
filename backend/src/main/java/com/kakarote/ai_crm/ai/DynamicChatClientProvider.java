@@ -2,6 +2,11 @@ package com.kakarote.ai_crm.ai;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
+import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
+import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.ai.tools.ContactTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
@@ -22,21 +27,35 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 动态 ChatClient 提供者
- * 支持运行时热更新 AI 配置
+ * 动态 ChatClient 提供者。
  */
 @Slf4j
 @Component
 public class DynamicChatClientProvider {
 
+    private static final String AI_MODE_KEY = "ai_mode";
+    private static final String AI_PROVIDER_KEY = "ai_provider";
+    private static final String AI_API_URL_KEY = "ai_api_url";
+    private static final String AI_API_KEY_KEY = "ai_api_key";
+    private static final String AI_MODEL_KEY = "ai_model";
+    private static final String AI_TEMPERATURE_KEY = "ai_temperature";
+    private static final String AI_MAX_TOKENS_KEY = "ai_max_tokens";
+    private static final String AI_EXTRA_HEADERS_KEY = "ai_extra_headers";
+    private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
+    private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
+    private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
+
     private volatile ChatClient currentChatClient;
     private final Object lock = new Object();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private SystemConfigMapper systemConfigMapper;
@@ -65,14 +84,13 @@ public class DynamicChatClientProvider {
     @Autowired(required = false)
     private ObservationRegistry observationRegistry;
 
-    // 默认配置（从 application.yml 读取，作为后备）
-    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode/}")
+    @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}")
     private String defaultBaseUrl;
 
-    @Value("${spring.ai.openai.api-key:}")
+    @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
     private String defaultApiKey;
 
-    @Value("${spring.ai.openai.chat.options.model:qwen-max}")
+    @Value("${spring.ai.openai.chat.options.model:qwen3.5-plus}")
     private String defaultModel;
 
     @Value("${spring.ai.openai.chat.options.temperature:0.7}")
@@ -81,112 +99,337 @@ public class DynamicChatClientProvider {
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
 
-    /**
-     * 获取当前生效的 ChatClient
-     * 如果还没初始化，会自动从数据库加载配置创建
-     */
+    @Value("${weknora.init-models.chat.base-url:}")
+    private String giftBaseUrl;
+
+    @Value("${weknora.init-models.chat.api-key:}")
+    private String giftApiKey;
+
+    @Value("${weknora.init-models.chat.name:}")
+    private String giftModel;
+
     public ChatClient getChatClient() {
-        if (currentChatClient == null) {
+        ChatClient client = currentChatClient;
+        if (client == null) {
             synchronized (lock) {
-                if (currentChatClient == null) {
+                client = currentChatClient;
+                if (client == null) {
                     refreshChatClient();
+                    client = currentChatClient;
                 }
             }
         }
-        return currentChatClient;
+        return client;
     }
 
-    /**
-     * 刷新 ChatClient（配置变更后调用）
-     */
     public void refreshChatClient() {
         synchronized (lock) {
-            log.info("开始刷新 ChatClient...");
+            AiRuntimeConfig runtimeConfig = resolveRuntimeConfig(loadAiConfigsFromDB());
 
-            // 从数据库加载 AI 配置
-            Map<String, String> configs = loadAiConfigsFromDB();
-
-            String apiUrl = configs.getOrDefault("ai_api_url", defaultBaseUrl);
-            String apiKey = configs.getOrDefault("ai_api_key", defaultApiKey);
-            String model = configs.getOrDefault("ai_model", defaultModel);
-            double temperature = parseDouble(configs.get("ai_temperature"), defaultTemperature);
-            int maxTokens = parseInt(configs.get("ai_max_tokens"), defaultMaxTokens);
-
-            if (StrUtil.isBlank(apiKey)) {
-                log.warn("AI API Key 未配置，ChatClient 将使用默认配置");
-                apiKey = defaultApiKey;
+            if (StrUtil.isBlank(runtimeConfig.apiKey())) {
+                log.warn("AI 运行 Key 未配置，mode={}", runtimeConfig.mode().getCode());
             }
 
-            if (StrUtil.isBlank(apiKey)) {
-                log.error("AI API Key 未配置且无默认值，ChatClient 将无法正常工作");
-            }
-
-            currentChatClient = createChatClient(apiUrl, apiKey, model, temperature, maxTokens);
-
-            log.info("ChatClient 刷新完成: baseUrl={}, model={}", apiUrl, model);
+            currentChatClient = createChatClient(runtimeConfig);
+            log.info(
+                    "ChatClient 刷新完成: mode={}, provider={}, baseUrl={}, model={}",
+                    runtimeConfig.mode().getCode(),
+                    runtimeConfig.providerCode(),
+                    runtimeConfig.apiUrl(),
+                    runtimeConfig.model()
+            );
         }
     }
 
-    /**
-     * 创建 ChatClient 实例
-     * 用于正式使用和测试连接
-     */
-    public ChatClient createChatClient(String baseUrl, String apiKey, String model,
-                                        Double temperature, Integer maxTokens) {
-        // 创建 OpenAiApi
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .build();
+    public boolean isApiKeyConfigured() {
+        return StrUtil.isNotBlank(resolveRuntimeConfig(loadAiConfigsFromDB()).apiKey());
+    }
 
-        // 创建 ChatModel 配置
+    public AiModelCapabilities getCurrentCapabilities() {
+        return resolveRuntimeConfig(loadAiConfigsFromDB()).capabilities();
+    }
+
+    public AiMode getCurrentMode() {
+        return resolveRuntimeConfig(loadAiConfigsFromDB()).mode();
+    }
+
+    public boolean isUsingGiftMode() {
+        return getCurrentMode() == AiMode.GIFT;
+    }
+
+    public void evictChatClient() {
+        currentChatClient = null;
+    }
+
+    public ChatClient createChatClient(String baseUrl, String apiKey, String model,
+                                       Double temperature, Integer maxTokens) {
+        String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        String providerCode = AiProviderRegistry.resolve(null, normalizedBaseUrl).getCode();
+        return createChatClient(
+                providerCode,
+                normalizedBaseUrl,
+                apiKey,
+                model,
+                temperature,
+                maxTokens,
+                null,
+                defaultCapabilities(),
+                true
+        );
+    }
+
+    public ChatClient createChatClient(String providerCode, String baseUrl, String apiKey, String model,
+                                       Double temperature, Integer maxTokens,
+                                       String extraHeadersJson, AiModelCapabilities capabilities,
+                                       boolean registerTools) {
+        OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
+
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(model)
                 .temperature(temperature)
-                .maxTokens(maxTokens)
+                .maxCompletionTokens(maxTokens)
                 .build();
-
-        // 创建 ChatModel（Spring AI 1.0.0 需要 5 个参数）
-        ObservationRegistry obsRegistry = observationRegistry != null
-                ? observationRegistry : ObservationRegistry.NOOP;
-        OpenAiChatModel chatModel = new OpenAiChatModel(
-                openAiApi, options, toolCallingManager,
-                RetryTemplate.builder().build(), obsRegistry);
-
-        // 创建 ChatClient 并注册工具
-        return ChatClient.builder(chatModel)
-                .defaultTools(customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools)
-                .build();
-    }
-
-    /**
-     * 创建用于测试连接的简单 ChatClient（不注册工具）
-     */
-    public ChatClient createTestChatClient(String baseUrl, String apiKey, String model,
-                                            Double temperature, Integer maxTokens) {
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .build();
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(model)
-                .temperature(temperature != null ? temperature : 0.7)
-                .maxTokens(maxTokens != null ? maxTokens : 100) // 测试用小 token
-                .build();
+        options.setStreamUsage(Boolean.TRUE);
 
         ObservationRegistry obsRegistry = observationRegistry != null
-                ? observationRegistry : ObservationRegistry.NOOP;
+                ? observationRegistry
+                : ObservationRegistry.NOOP;
         OpenAiChatModel chatModel = new OpenAiChatModel(
-                openAiApi, options, toolCallingManager,
-                RetryTemplate.builder().build(), obsRegistry);
+                openAiApi,
+                options,
+                toolCallingManager,
+                RetryTemplate.builder().build(),
+                obsRegistry
+        );
 
-        return ChatClient.builder(chatModel).build();
+        ChatClient.Builder builder = ChatClient.builder(chatModel);
+        if (registerTools && capabilities != null && capabilities.isSupportsToolCall()) {
+            builder.defaultTools(customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools);
+        }
+        return builder.build();
     }
 
-    /**
-     * 从数据库加载 AI 配置
-     */
+    public ChatClient createTestChatClient(String providerCode, String baseUrl, String apiKey, String model,
+                                           Double temperature, Integer maxTokens,
+                                           String extraHeadersJson, AiModelCapabilities capabilities) {
+        return createChatClient(
+                providerCode,
+                baseUrl,
+                apiKey,
+                model,
+                temperature != null ? temperature : 0.7,
+                maxTokens != null ? maxTokens : 100,
+                extraHeadersJson,
+                capabilities != null ? capabilities : defaultCapabilities(),
+                false
+        );
+    }
+
+    private ChatClient createChatClient(AiRuntimeConfig runtimeConfig) {
+        return createChatClient(
+                runtimeConfig.providerCode(),
+                runtimeConfig.apiUrl(),
+                runtimeConfig.apiKey(),
+                runtimeConfig.model(),
+                runtimeConfig.temperature(),
+                runtimeConfig.maxTokens(),
+                runtimeConfig.extraHeadersJson(),
+                runtimeConfig.capabilities(),
+                true
+        );
+    }
+
+    private OpenAiApi buildOpenAiApi(String providerCode, String baseUrl, String apiKey, String extraHeadersJson) {
+        String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(providerCode, normalizedBaseUrl);
+        String actualRequestBaseUrl = resolveActualRequestBaseUrl(descriptor.getCode(), normalizedBaseUrl);
+        OpenAiApi.Builder builder = OpenAiApi.builder()
+                .baseUrl(actualRequestBaseUrl)
+                .apiKey(apiKey);
+
+        if (StrUtil.isNotBlank(descriptor.getCompletionsPath())) {
+            builder.completionsPath(descriptor.getCompletionsPath());
+        }
+        if (StrUtil.isNotBlank(descriptor.getEmbeddingsPath())) {
+            builder.embeddingsPath(descriptor.getEmbeddingsPath());
+        }
+
+        MultiValueMap<String, String> headers = parseExtraHeaders(extraHeadersJson);
+        if (!headers.isEmpty()) {
+            builder.headers(headers);
+        }
+        return builder.build();
+    }
+
+    public static String resolveActualRequestBaseUrl(String providerCode, String baseUrl) {
+        String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        if ("openai".equalsIgnoreCase(providerCode) && OPENAI_PUBLIC_BASE_URL.equalsIgnoreCase(normalizedBaseUrl)) {
+            return OPENAI_PROXY_BASE_URL;
+        }
+        return normalizedBaseUrl;
+    }
+
+    private MultiValueMap<String, String> parseExtraHeaders(String extraHeadersJson) {
+        LinkedMultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
+        if (StrUtil.isBlank(extraHeadersJson)) {
+            return headers;
+        }
+
+        try {
+            Map<String, Object> values = objectMapper.readValue(
+                    extraHeadersJson,
+                    new TypeReference<Map<String, Object>>() {
+                    }
+            );
+            values.forEach((key, value) -> {
+                if (StrUtil.isNotBlank(key) && value != null) {
+                    headers.add(key.trim(), String.valueOf(value));
+                }
+            });
+        } catch (Exception e) {
+            log.warn("解析额外请求头失败，将忽略该配置: {}", e.getMessage());
+        }
+        return headers;
+    }
+
+    private AiRuntimeConfig resolveRuntimeConfig(Map<String, String> configs) {
+        Map<String, SavedProviderConfigSnapshot> savedProviderConfigs = loadSavedProviderConfigs(configs);
+        AiMode requestedMode = AiMode.resolve(configs.get(AI_MODE_KEY));
+        SavedProviderConfigSnapshot selectedSavedProvider = resolveSelectedSavedProvider(configs, savedProviderConfigs);
+        if (requestedMode == AiMode.CUSTOM && selectedSavedProvider != null) {
+            AiProviderDescriptor descriptor = AiProviderRegistry.resolve(
+                    selectedSavedProvider.providerCode(),
+                    selectedSavedProvider.apiUrl()
+            );
+            return new AiRuntimeConfig(
+                    selectedSavedProvider.providerCode(),
+                    selectedSavedProvider.apiUrl(),
+                    selectedSavedProvider.apiKey(),
+                    selectedSavedProvider.model(),
+                    selectedSavedProvider.temperature(),
+                    selectedSavedProvider.maxTokens(),
+                    selectedSavedProvider.extraHeadersJson(),
+                    descriptor.resolveCapabilities(selectedSavedProvider.model()),
+                    AiMode.CUSTOM
+            );
+        }
+
+        String resolvedApiUrl = normalizeCompatibleBaseUrl(StrUtil.blankToDefault(giftBaseUrl, defaultBaseUrl));
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, resolvedApiUrl);
+        String resolvedApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
+        String resolvedModel = StrUtil.blankToDefault(giftModel, defaultModel);
+        return new AiRuntimeConfig(
+                descriptor.getCode(),
+                resolvedApiUrl,
+                resolvedApiKey,
+                resolvedModel,
+                defaultTemperature,
+                defaultMaxTokens,
+                null,
+                descriptor.resolveCapabilities(resolvedModel),
+                AiMode.GIFT
+        );
+    }
+
+    private Map<String, SavedProviderConfigSnapshot> loadSavedProviderConfigs(Map<String, String> configs) {
+        Map<String, SavedProviderConfigSnapshot> savedConfigs = new java.util.HashMap<>();
+        parseStoredProviderConfigs(configs.get(AI_PROVIDER_CONFIGS_KEY)).forEach((providerCode, storedConfig) -> {
+            SavedProviderConfigSnapshot snapshot = toSavedProviderConfigSnapshot(providerCode, storedConfig);
+            if (snapshot != null) {
+                savedConfigs.put(snapshot.providerCode(), snapshot);
+            }
+        });
+
+        SavedProviderConfigSnapshot legacySnapshot = buildLegacyProviderSnapshot(configs);
+        if (legacySnapshot != null) {
+            savedConfigs.putIfAbsent(legacySnapshot.providerCode(), legacySnapshot);
+        }
+        return savedConfigs;
+    }
+
+    private SavedProviderConfigSnapshot resolveSelectedSavedProvider(Map<String, String> configs,
+                                                                    Map<String, SavedProviderConfigSnapshot> savedProviderConfigs) {
+        if (savedProviderConfigs.isEmpty()) {
+            return null;
+        }
+
+        String activeProviderCode = StrUtil.nullToEmpty(configs.get(AI_PROVIDER_KEY)).trim().toLowerCase();
+        if (StrUtil.isNotBlank(activeProviderCode)) {
+            SavedProviderConfigSnapshot activeConfig = savedProviderConfigs.get(activeProviderCode);
+            if (activeConfig != null) {
+                return activeConfig;
+            }
+        }
+
+        return savedProviderConfigs.values().stream().findFirst().orElse(null);
+    }
+
+    private Map<String, StoredProviderConfig> parseStoredProviderConfigs(String providerConfigsJson) {
+        if (StrUtil.isBlank(providerConfigsJson)) {
+            return Map.of();
+        }
+
+        try {
+            Map<String, StoredProviderConfig> storedConfigs = objectMapper.readValue(
+                    providerConfigsJson,
+                    new TypeReference<Map<String, StoredProviderConfig>>() {
+                    }
+            );
+            return storedConfigs != null ? storedConfigs : Map.of();
+        } catch (Exception e) {
+            log.warn("解析多服务商 AI 配置失败，将回退到旧版单配置: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private SavedProviderConfigSnapshot buildLegacyProviderSnapshot(Map<String, String> configs) {
+        String apiUrl = normalizeCompatibleBaseUrl(configs.get(AI_API_URL_KEY));
+        String apiKey = StrUtil.nullToEmpty(configs.get(AI_API_KEY_KEY)).trim();
+        String model = StrUtil.nullToEmpty(configs.get(AI_MODEL_KEY)).trim();
+        if (StrUtil.hasBlank(apiUrl, apiKey, model)) {
+            return null;
+        }
+
+        String providerCode = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), apiUrl).getCode();
+        return new SavedProviderConfigSnapshot(
+                providerCode,
+                apiUrl,
+                apiKey,
+                model,
+                parseDouble(configs.get(AI_TEMPERATURE_KEY), defaultTemperature),
+                parseInt(configs.get(AI_MAX_TOKENS_KEY), defaultMaxTokens),
+                StrUtil.blankToDefault(configs.get(AI_EXTRA_HEADERS_KEY), null)
+        );
+    }
+
+    private SavedProviderConfigSnapshot toSavedProviderConfigSnapshot(String fallbackProviderCode, StoredProviderConfig storedConfig) {
+        if (storedConfig == null) {
+            return null;
+        }
+
+        String apiUrl = normalizeCompatibleBaseUrl(storedConfig.apiUrl());
+        String apiKey = StrUtil.nullToEmpty(storedConfig.apiKey()).trim();
+        String model = StrUtil.nullToEmpty(storedConfig.model()).trim();
+        if (StrUtil.hasBlank(apiUrl, apiKey, model)) {
+            return null;
+        }
+
+        String providerCode = AiProviderRegistry.resolve(
+                StrUtil.blankToDefault(storedConfig.provider(), fallbackProviderCode),
+                apiUrl
+        ).getCode();
+
+        return new SavedProviderConfigSnapshot(
+                providerCode,
+                apiUrl,
+                apiKey,
+                model,
+                storedConfig.temperature() != null ? storedConfig.temperature() : defaultTemperature,
+                storedConfig.maxTokens() != null ? storedConfig.maxTokens() : defaultMaxTokens,
+                StrUtil.blankToDefault(storedConfig.extraHeadersJson(), null)
+        );
+    }
+
     private Map<String, String> loadAiConfigsFromDB() {
         LambdaQueryWrapper<SystemConfig> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SystemConfig::getConfigType, "ai");
@@ -223,24 +466,75 @@ public class DynamicChatClientProvider {
         }
     }
 
-    /**
-     * 检查当前租户的 API Key 是否已配置
-     */
-    public boolean isApiKeyConfigured() {
-        Map<String, String> configs = loadAiConfigsFromDB();
-        String apiKey = configs.getOrDefault("ai_api_key", defaultApiKey);
-        return StrUtil.isNotBlank(apiKey);
+    private AiModelCapabilities defaultCapabilities() {
+        return AiModelCapabilities.builder()
+                .supportsStream(true)
+                .supportsToolCall(true)
+                .supportsVision(false)
+                .build();
     }
 
-    /**
-     * 应用启动时初始化
-     */
+    public static String normalizeCompatibleBaseUrl(String baseUrl) {
+        if (StrUtil.isBlank(baseUrl)) {
+            return baseUrl;
+        }
+
+        String normalized = baseUrl.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        if (normalized.matches("(?i).*/v1$")) {
+            normalized = normalized.substring(0, normalized.length() - 3);
+        }
+
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
     @PostConstruct
     public void init() {
         try {
             refreshChatClient();
         } catch (Exception e) {
-            log.warn("初始化 ChatClient 失败（可能配置尚未设置）: {}", e.getMessage());
+            log.warn("初始化 ChatClient 失败（可能配置尚未准备好）: {}", e.getMessage());
         }
+    }
+
+    private record AiRuntimeConfig(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson,
+            AiModelCapabilities capabilities,
+            AiMode mode
+    ) {
+    }
+
+    private record StoredProviderConfig(
+            String provider,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
+    }
+
+    private record SavedProviderConfigSnapshot(
+            String providerCode,
+            String apiUrl,
+            String apiKey,
+            String model,
+            Double temperature,
+            Integer maxTokens,
+            String extraHeadersJson
+    ) {
     }
 }

@@ -74,16 +74,22 @@
           </section>
 
           <section v-if="task.customerName">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">关联客户</h3>
-            <div class="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 hover:bg-slate-50 transition-colors">
-              <div class="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+            <div class="mb-4 flex items-center gap-2">
+              <span class="material-symbols-outlined text-[18px] text-slate-400">corporate_fare</span>
+              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">关联客户</h3>
+            </div>
+            <div
+              class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition-colors"
+              :class="task.customerId ? 'cursor-pointer hover:bg-slate-50' : ''"
+              @click="handleGoToCustomerDetail"
+            >
+              <div class="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
                 {{ task.customerName.charAt(0) }}
               </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-bold text-slate-900 truncate">{{ task.customerName }}</p>
-                <p class="text-xs text-slate-400">点击查看客户详情</p>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-sm font-bold text-slate-900">{{ task.customerName }}</p>
               </div>
-              <span class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
+              <span v-if="task.customerId" class="material-symbols-outlined ml-auto text-slate-300">chevron_right</span>
             </div>
           </section>
 
@@ -184,12 +190,22 @@
       </div>
 
       <div v-if="task.customerName" class="mb-6">
-        <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">关联客户</h3>
-        <div class="p-3 bg-white border border-slate-200 rounded-xl flex items-center gap-3">
-          <div class="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+        <div class="mb-2 flex items-center gap-2">
+          <span class="material-symbols-outlined text-base text-slate-400">corporate_fare</span>
+          <h3 class="text-xs font-bold uppercase text-slate-400">关联客户</h3>
+        </div>
+        <div
+          class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors"
+          :class="task.customerId ? 'cursor-pointer active:bg-slate-50' : ''"
+          role="button"
+          :tabindex="task.customerId ? 0 : -1"
+          @click="handleGoToCustomerDetail"
+        >
+          <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
             {{ task.customerName.charAt(0) }}
           </div>
-          <p class="text-sm font-bold text-slate-900">{{ task.customerName }}</p>
+          <p class="min-w-0 flex-1 text-sm font-bold text-slate-900">{{ task.customerName }}</p>
+          <span v-if="task.customerId" class="material-symbols-outlined shrink-0 text-slate-300">chevron_right</span>
         </div>
       </div>
 
@@ -245,7 +261,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Task, TaskPriority, TaskStatus } from '@/types/common'
+
+const router = useRouter()
 
 const props = withDefaults(defineProps<{
   modelValue: boolean
@@ -275,6 +294,12 @@ const open = computed({
   get: () => props.modelValue,
   set: (v: boolean) => emit('update:modelValue', v)
 })
+
+function handleGoToCustomerDetail() {
+  if (!props.task?.customerId) return
+  const href = router.resolve({ path: `/customer/${props.task.customerId}` }).href
+  window.open(href, '_blank', 'noopener,noreferrer')
+}
 
 function formatDateTime(dateStr: string): string {
   if (!dateStr) return ''

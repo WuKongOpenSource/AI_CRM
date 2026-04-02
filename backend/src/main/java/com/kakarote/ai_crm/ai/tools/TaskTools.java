@@ -1,13 +1,12 @@
 package com.kakarote.ai_crm.ai.tools;
 
-import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
+import cn.hutool.core.util.StrUtil;
+import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
+import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
-import com.kakarote.ai_crm.entity.VO.CustomerListVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
-import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.ITaskService;
-import com.kakarote.ai_crm.common.BasePage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -28,11 +27,12 @@ public class TaskTools {
     private ITaskService taskService;
 
     @Autowired
-    private ICustomerService customerService;
+    private AiCustomerMatcher aiCustomerMatcher;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
     @Tool(description = "获取待办任务列表。当用户查询任务、待办事项、今日任务、本周任务时调用。")
+    @AiToolPermission(value = "task:view", action = "查看任务")
     public String getTasks(
             @ToolParam(description = "筛选条件：all(全部)/today(今天)/thisWeek(本周)/overdue(已逾期)，默认all", required = false) String filter) {
 
@@ -81,23 +81,30 @@ public class TaskTools {
         }
     }
 
-    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期（如'本周完成''周五之前''月底前'）也用此工具，将截止日期设为dueDate。注意：有具体时间点的（如'下午3点''10:00'）应使用createSchedule而非此工具。直接传入客户名称即可，无需先查询ID。")
+    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期也用此工具。直接传入客户名称即可，无需先查询ID。")
+    @AiToolPermission(value = "task:create", action = "创建任务")
     public String createTask(
             @ToolParam(description = "任务标题，必填") String title,
             @ToolParam(description = "任务描述", required = false) String description,
             @ToolParam(description = "关联客户名称（公司名）", required = false) String customerName,
-            @ToolParam(description = "优先级：high(高)/medium(中)/low(低)，默认medium", required = false) String priority,
+            @ToolParam(description = "优先级：high/medium/low，默认medium", required = false) String priority,
             @ToolParam(description = "截止日期，格式：yyyy-MM-dd", required = false) String dueDate) {
 
         log.info("【Tool调用】createTask 被调用: title={}, customerName={}, priority={}, dueDate={}",
             title, customerName, priority, dueDate);
 
         try {
-            // 根据客户名称查找客户ID
             Long customerId = null;
-            if (customerName != null && !customerName.isEmpty() && !"null".equalsIgnoreCase(customerName)) {
-                customerId = findCustomerIdByName(customerName);
-                if (customerId == null) {
+            String matchedCompanyName = null;
+            if (StrUtil.isNotBlank(customerName) && !"null".equalsIgnoreCase(customerName)) {
+                AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
+                if (customerMatch.isAmbiguous()) {
+                    return "创建任务失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
+                }
+                if (customerMatch.isMatched()) {
+                    customerId = customerMatch.getCustomer().getCustomerId();
+                    matchedCompanyName = customerMatch.getCustomer().getCompanyName();
+                } else {
                     log.info("未找到客户「{}」，将不关联客户", customerName);
                 }
             }
@@ -108,21 +115,24 @@ public class TaskTools {
             bo.setCustomerId(customerId);
             bo.setPriority(priority != null ? priority : "medium");
 
-            if (dueDate != null && !dueDate.isEmpty() && !"null".equalsIgnoreCase(dueDate)) {
+            if (StrUtil.isNotBlank(dueDate) && !"null".equalsIgnoreCase(dueDate)) {
                 bo.setDueDate(dateFormat.parse(dueDate));
             }
 
-            // Mark as AI generated
             bo.setGeneratedByAi(1);
 
             Long taskId = taskService.addTask(bo);
 
-            log.info("【Tool调用】createTask 成功: taskId={}", taskId);
-            return String.format("任务「%s」创建成功！任务ID: %d。优先级: %s。%s",
-                title,
-                taskId,
-                getPriorityLabel(priority != null ? priority : "medium"),
-                dueDate != null && !dueDate.isEmpty() && !"null".equalsIgnoreCase(dueDate) ? "截止日期: " + dueDate : "");
+            StringBuilder result = new StringBuilder();
+            result.append(String.format("任务「%s」创建成功！任务ID: %d。", title, taskId));
+            result.append("\n- 优先级: ").append(getPriorityLabel(priority != null ? priority : "medium"));
+            if (matchedCompanyName != null) {
+                result.append("\n- 公司名称: ").append(matchedCompanyName);
+            }
+            if (StrUtil.isNotBlank(dueDate) && !"null".equalsIgnoreCase(dueDate)) {
+                result.append("\n- 截止日期: ").append(dueDate);
+            }
+            return result.toString();
         } catch (Exception e) {
             log.error("【Tool调用】createTask 失败: {}", e.getMessage(), e);
             return "创建任务失败: " + e.getMessage();
@@ -130,19 +140,19 @@ public class TaskTools {
     }
 
     @Tool(description = "修改任务信息。当用户要修改、编辑任务的截止日期、标题、描述、优先级、状态等信息时调用。")
+    @AiToolPermission(value = "task:edit", action = "编辑任务")
     public String updateTask(
             @ToolParam(description = "任务ID，数字类型，必填") String taskIdStr,
             @ToolParam(description = "任务标题", required = false) String title,
             @ToolParam(description = "任务描述", required = false) String description,
             @ToolParam(description = "截止日期，格式：yyyy-MM-dd", required = false) String dueDate,
-            @ToolParam(description = "优先级：high(高)/medium(中)/low(低)", required = false) String priority,
-            @ToolParam(description = "状态：pending(待处理)/in_progress(进行中)/completed(已完成)", required = false) String status) {
+            @ToolParam(description = "优先级：high/medium/low", required = false) String priority,
+            @ToolParam(description = "状态：pending/in_progress/completed", required = false) String status) {
 
         log.info("【Tool调用】updateTask 被调用: taskId={}, title={}, dueDate={}, priority={}, status={}",
             taskIdStr, title, dueDate, priority, status);
 
         try {
-            // 参数验证
             if (taskIdStr == null || taskIdStr.isEmpty() || "null".equalsIgnoreCase(taskIdStr)) {
                 return "修改任务失败: 缺少任务ID参数";
             }
@@ -157,7 +167,6 @@ public class TaskTools {
             TaskUpdateBO bo = new TaskUpdateBO();
             bo.setTaskId(taskId);
 
-            // 只设置非空的字段
             if (title != null && !title.isEmpty() && !"null".equalsIgnoreCase(title)) {
                 bo.setTitle(title);
             }
@@ -171,7 +180,6 @@ public class TaskTools {
                 bo.setStatus(status);
             }
 
-            // 处理日期字段
             if (dueDate != null && !dueDate.isEmpty() && !"null".equalsIgnoreCase(dueDate)) {
                 try {
                     bo.setDueDate(dateFormat.parse(dueDate));
@@ -183,9 +191,6 @@ public class TaskTools {
 
             taskService.updateTask(bo);
 
-            log.info("【Tool调用】updateTask 成功: taskId={}", taskId);
-
-            // 构建返回信息
             StringBuilder result = new StringBuilder();
             result.append("任务已修改成功！");
             if (title != null && !title.isEmpty() && !"null".equalsIgnoreCase(title)) {
@@ -209,12 +214,12 @@ public class TaskTools {
     }
 
     @Tool(description = "更新任务状态。当用户只需要完成任务、标记任务状态时调用（简化版）。")
+    @AiToolPermission(value = "task:update_status", action = "更新任务状态")
     public String updateTaskStatus(
             @ToolParam(description = "任务ID，数字类型") String taskIdStr,
-            @ToolParam(description = "新状态：pending(待处理)/in_progress(进行中)/completed(已完成)") String status) {
+            @ToolParam(description = "新状态：pending/in_progress/completed") String status) {
 
         try {
-            // 将 String 转换为 Long，处理 null 和 "null" 字符串
             if (taskIdStr == null || taskIdStr.isEmpty() || "null".equalsIgnoreCase(taskIdStr)) {
                 return "更新任务状态失败: 缺少任务ID参数";
             }
@@ -226,7 +231,6 @@ public class TaskTools {
             }
 
             taskService.updateStatus(taskId, status);
-
             return String.format("任务状态已更新为「%s」。", getStatusLabel(status));
         } catch (Exception e) {
             return "更新任务状态失败: " + e.getMessage();
@@ -234,7 +238,9 @@ public class TaskTools {
     }
 
     private String getStatusLabel(String status) {
-        if (status == null) return "未知";
+        if (status == null) {
+            return "未知";
+        }
         return switch (status.toLowerCase()) {
             case "pending" -> "待处理";
             case "in_progress" -> "进行中";
@@ -244,35 +250,14 @@ public class TaskTools {
     }
 
     private String getPriorityLabel(String priority) {
-        if (priority == null) return "中";
+        if (priority == null) {
+            return "中";
+        }
         return switch (priority.toLowerCase()) {
             case "high" -> "高";
             case "medium" -> "中";
             case "low" -> "低";
             default -> priority;
         };
-    }
-
-    private Long findCustomerIdByName(String companyName) {
-        if (companyName == null || companyName.isEmpty()) {
-            return null;
-        }
-        CustomerQueryBO queryBO = new CustomerQueryBO();
-        queryBO.setKeyword(companyName);
-        queryBO.setPage(1);
-        queryBO.setLimit(5);
-
-        BasePage<CustomerListVO> page = customerService.queryPageList(queryBO);
-        if (page.getList().isEmpty()) {
-            return null;
-        }
-
-        for (CustomerListVO customer : page.getList()) {
-            if (companyName.equals(customer.getCompanyName())) {
-                return customer.getCustomerId();
-            }
-        }
-
-        return page.getList().get(0).getCustomerId();
     }
 }

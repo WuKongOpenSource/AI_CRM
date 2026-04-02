@@ -1,14 +1,14 @@
 <template>
   <div class="flex h-screen bg-background-light">
     <!-- Desktop Sidebar -->
-    <aside v-if="!isMobile" class="w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
+    <aside v-if="!isMobile" class="relative w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
       <!-- Logo -->
       <div class="p-6 flex items-center gap-3 ">
         <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
-          <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
+          <img :src="defaultLogoImg" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div class="min-w-0">
           <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
@@ -66,16 +66,56 @@
           </div>
           <span class="material-symbols-outlined text-slate-400 text-sm">unfold_more</span>
         </div>
-        <!-- User dropdown -->
-        <Transition name="dropdown">
-          <div v-if="showUserMenu" class="mt-2 bg-white border border-slate-200 rounded-lg shadow-lg py-1">
-            <button @click="handleLogout" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-              <span class="material-symbols-outlined text-sm">logout</span>
-              退出登录
-            </button>
-          </div>
-        </Transition>
       </div>
+
+      <Transition name="profile-drawer">
+        <div
+          v-if="showUserMenu"
+          class="absolute bottom-0 left-0 right-0 z-20 bg-white border-t border-slate-200 shadow-[0_-8px_30px_rgb(0,0,0,0.12)] rounded-t-2xl overflow-hidden"
+        >
+          <div class="p-4">
+            <div class="space-y-1">
+              <div class="px-3 py-2 flex items-center justify-between">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">个人账户</p>
+                <button class="text-slate-300 hover:text-slate-500 transition-colors" @click="showUserMenu = false">
+                  <span class="material-symbols-outlined text-sm">close</span>
+                </button>
+              </div>
+
+              <div class="px-3 py-2 flex items-center gap-3 mb-4">
+                <div v-if="userStore.avatar" class="size-10 rounded-full overflow-hidden bg-slate-300">
+                  <img :src="userStore.avatar" class="w-full h-full object-cover" alt="avatar" />
+                </div>
+                <div v-else class="size-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold">
+                  {{ userStore.realname?.charAt(0) || userStore.username?.charAt(0) || 'U' }}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-bold text-slate-900 truncate">{{ userStore.realname || userStore.username }}</p>
+                  <p class="text-xs text-slate-500 truncate">{{ userStore.userInfo?.deptName || '用户' }}</p>
+                </div>
+              </div>
+
+              <div class="h-px bg-slate-100 mx-3 my-1" />
+
+              <button
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors text-left group"
+                @click="handleOpenAccountSettings"
+              >
+                <WkIcon name="settings" :size="24" class="text-slate-400 group-hover:text-primary transition-colors" />
+                <span class="text-sm font-medium">账号设置</span>
+              </button>
+
+              <button
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-600 hover:bg-rose-50 transition-colors text-left group"
+                @click="handleLogout"
+              >
+                <span class="material-symbols-outlined text-rose-400 group-hover:text-rose-600 transition-colors">logout</span>
+                <span class="text-sm font-medium">退出登录</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </aside>
 
     <!-- Mobile Top Bar -->
@@ -88,7 +128,7 @@
           <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
         </div>
         <div v-else class="size-7 flex-shrink-0 rounded-lg overflow-hidden bg-transparent border border-slate-200">
-          <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
+          <img :src="defaultLogoImg" class="w-full h-full object-cover" alt="logo" />
         </div>
         <span class="text-sm font-bold text-slate-900 truncate">{{ enterpriseStore.displayName }}</span>
       </div>
@@ -109,7 +149,7 @@
               <img :src="enterpriseStore.logoUrl!" class="w-full h-full object-cover" alt="logo" />
             </div>
             <div v-else class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
-              <img src="/logo.png" class="w-full h-full object-cover" alt="logo" />
+              <img :src="defaultLogoImg" class="w-full h-full object-cover" alt="logo" />
             </div>
             <div class="min-w-0">
               <h1 class="text-slate-900 font-bold text-lg leading-tight line-clamp-2">{{ enterpriseStore.displayName }}</h1>
@@ -194,6 +234,8 @@
       @success="handleCreateCustomerSuccess"
     />
 
+    <AccountSettingsModal v-model="showAccountSettingsModal" />
+
     <!-- Floating Action Button (shown on non-chat pages, hidden when drawer is open) -->
     <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
 
@@ -207,6 +249,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useEnterpriseStore } from '@/stores/enterprise'
+import defaultLogoImg from '@/assets/images/logo.png'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatDrawer } from '@/composables/useChatDrawer'
@@ -214,6 +257,7 @@ import { ElMessageBox } from 'element-plus'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { appEvents, APP_EVENT } from '@/utils/events'
 
@@ -231,10 +275,15 @@ watch(() => customerStore.queryParams.keyword, (val) => {
   globalSearchKeyword.value = val || ''
 })
 
+watch(() => route.fullPath, () => {
+  showUserMenu.value = false
+})
+
 onMounted(() => enterpriseStore.loadConfig())
 
 const drawerVisible = ref(false)
 const showUserMenu = ref(false)
+const showAccountSettingsModal = ref(false)
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
 type MainNavItem = {
@@ -277,6 +326,7 @@ const showConfigSection = computed(() => configNavItems.value.length > 0)
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/settings')) return '/settings'
   return path
 })
 
@@ -292,6 +342,11 @@ function navigateTo(path: string) {
 function mobileNavigate(path: string) {
   router.push(path)
   drawerVisible.value = false
+}
+
+function handleOpenAccountSettings() {
+  showUserMenu.value = false
+  showAccountSettingsModal.value = true
 }
 
 function handleGlobalSearch() {
@@ -364,5 +419,16 @@ function handleCreateCustomerSuccess() {
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+.profile-drawer-enter-active,
+.profile-drawer-leave-active {
+  transition: transform 0.28s ease, opacity 0.2s ease;
+}
+
+.profile-drawer-enter-from,
+.profile-drawer-leave-to {
+  opacity: 0;
+  transform: translateY(100%);
 }
 </style>

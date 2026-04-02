@@ -97,7 +97,7 @@ export function deleteUsers(userIds: (number | string)[]): Promise<void> {
 }
 
 /**
- * 获取当前用户权限树
+ * Get current user permissions
  */
 export function getUserAuth(): Promise<Record<string, any>> {
   return post<Record<string, any>>('/managerRole/auth')

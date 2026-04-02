@@ -118,7 +118,7 @@
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
-        WHERE t.assigned_to = #{userId} AND LOWER(t.status) != 'completed'
+        WHERE t.assigned_to = #{userId}
         <if test="filter == 'today'">
             AND DATE(t.due_date) = CURRENT_DATE
         </if>

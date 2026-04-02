@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
@@ -30,6 +31,7 @@ public class ContactTools {
     private ICustomerService customerService;
 
     @Tool(description = "查询联系人。当用户要搜索、查找联系人时调用。支持按姓名和/或手机号搜索。")
+    @AiToolPermission(value = "contact:view", action = "查看联系人")
     public String searchContacts(
             @ToolParam(description = "联系人姓名，支持模糊搜索", required = false) String name,
             @ToolParam(description = "联系人手机号/电话，支持模糊搜索", required = false) String phone) {
@@ -107,6 +109,7 @@ public class ContactTools {
     }
 
     @Tool(description = "获取联系人详细信息。当用户询问某个联系人的具体信息时调用。可以使用联系人ID或姓名查询。")
+    @AiToolPermission(value = "contact:view", action = "查看联系人详情")
     public String getContactDetail(
             @ToolParam(description = "联系人标识，可以是联系人ID（数字）或姓名（文本）。优先使用联系人ID") String contactIdentifier) {
 
@@ -189,6 +192,7 @@ public class ContactTools {
     }
 
     @Tool(description = "修改联系人信息。当用户要修改、编辑、更新联系人的姓名、职位、电话、邮箱、微信、备注等信息时调用。")
+    @AiToolPermission(value = "contact:edit", action = "编辑联系人")
     public String updateContact(
             @ToolParam(description = "联系人ID，数字类型，必填") String contactIdStr,
             @ToolParam(description = "姓名", required = false) String name,
@@ -261,6 +265,7 @@ public class ContactTools {
     }
 
     @Tool(description = "删除联系人。当用户要删除、移除某个联系人时调用。需要提供联系人ID。")
+    @AiToolPermission(value = "contact:delete", action = "删除联系人")
     public String deleteContact(
             @ToolParam(description = "联系人ID，数字类型，必填") String contactIdStr) {
 

@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.controller;
 
+import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.AgentAddBO;
 import com.kakarote.ai_crm.entity.BO.AgentUpdateBO;
@@ -26,6 +27,7 @@ public class AiAgentController {
 
     @PostMapping("/add")
     @Operation(summary = "创建智能体")
+    @RequirePermission("agent:create")
     public Result<Long> add(@Valid @RequestBody AgentAddBO agentAddBO) {
         Long agentId = aiAgentService.addAgent(agentAddBO);
         return Result.ok(agentId);
@@ -33,6 +35,7 @@ public class AiAgentController {
 
     @PostMapping("/update")
     @Operation(summary = "更新智能体")
+    @RequirePermission("agent:edit")
     public Result<String> update(@Valid @RequestBody AgentUpdateBO agentUpdateBO) {
         aiAgentService.updateAgent(agentUpdateBO);
         return Result.ok();
@@ -40,6 +43,7 @@ public class AiAgentController {
 
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除智能体")
+    @RequirePermission("agent:delete")
     public Result<String> delete(@PathVariable("id") Long id) {
         aiAgentService.deleteAgent(id);
         return Result.ok();
@@ -53,6 +57,7 @@ public class AiAgentController {
 
     @GetMapping("/queryAll")
     @Operation(summary = "查询全部智能体")
+    @RequirePermission("agent")
     public Result<List<AgentVO>> queryAll() {
         return Result.ok(aiAgentService.queryAll());
     }

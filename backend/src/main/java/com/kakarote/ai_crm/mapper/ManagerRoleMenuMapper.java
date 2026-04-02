@@ -36,4 +36,15 @@ public interface ManagerRoleMenuMapper extends BaseMapper<ManagerRoleMenu> {
 
     @Select("SELECT id, menu_id, role_id, data_scope FROM manager_role_menu WHERE role_id=#{roleId}")
     List<ManagerRoleMenu> queryRoleMenuWithScopeByRoleId(@Param("roleId") Long roleId);
+
+    @Select("""
+            SELECT rm.data_scope
+            FROM manager_role_menu rm
+            INNER JOIN manager_user_role ur ON ur.role_id = rm.role_id
+            INNER JOIN manager_menu m ON m.menu_id = rm.menu_id
+            WHERE ur.user_id = #{userId}
+              AND rm.data_scope IS NOT NULL
+              AND m.realm LIKE CONCAT(#{module}, ':%')
+            """)
+    List<Integer> queryDataScopesByUserIdAndModule(@Param("userId") Long userId, @Param("module") String module);
 }

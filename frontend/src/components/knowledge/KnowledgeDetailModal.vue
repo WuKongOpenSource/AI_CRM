@@ -102,13 +102,12 @@
                 <span class="material-symbols-outlined text-3xl text-slate-300 animate-spin">progress_activity</span>
               </div>
 
-              <!-- kkFileView iframe preview -->
+              <!-- WeKnora iframe preview -->
               <iframe
                 v-else-if="previewUrl && !previewFailed"
                 :src="previewUrl"
                 class="w-full h-full border-0"
                 @error="previewFailed = true"
-                @load="onIframeLoad"
               />
 
               <!-- Fallback: plain text -->
@@ -280,9 +279,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useResponsive } from '@/composables/useResponsive'
-import { getKnowledgeDetail, getKnowledgeFileUrl, aiAnalyzeKnowledge, askKnowledgeQuestion, downloadKnowledge } from '@/api/knowledge'
+import { getKnowledgeDetail, getKnowledgePreview, aiAnalyzeKnowledge, askKnowledgeQuestion, downloadKnowledge } from '@/api/knowledge'
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 
 const props = defineProps<{
@@ -309,14 +308,20 @@ const chatInput = ref('')
 const isStreaming = ref(false)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 
-// kkFileView base URL (proxied through nginx)
-function getKkfileviewUrl(): string {
-  return `${window.location.origin}/kkfileview`
+function revokePreviewUrl() {
+  if (previewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(previewUrl.value)
+  }
+  previewUrl.value = ''
 }
 
 function close() {
   emit('update:modelValue', false)
 }
+
+onBeforeUnmount(() => {
+  revokePreviewUrl()
+})
 
 // Watch for modal open
 watch(
@@ -328,7 +333,7 @@ watch(
       // Reset state on close
       knowledge.value = null
       analysis.value = null
-      previewUrl.value = ''
+      revokePreviewUrl()
       previewFailed.value = false
       chatMessages.value = []
       chatInput.value = ''
@@ -338,33 +343,56 @@ watch(
   { immediate: true }
 )
 
+async function loadPreviewUrl(id: string): Promise<string | null> {
+  try {
+    const blob = await getKnowledgePreview(id)
+    if (!blob || blob.size === 0) {
+      return null
+    }
+
+    const contentType = (blob.type || '').toLowerCase()
+    if (contentType.includes('application/json')) {
+      const payload = JSON.parse(await blob.text())
+      console.warn('Knowledge preview returned JSON payload:', payload)
+      return null
+    }
+
+    return URL.createObjectURL(blob)
+  } catch (error) {
+    console.error('Failed to load knowledge preview:', error)
+    return null
+  }
+}
+
 async function loadDocument(id: string) {
   loadingDetail.value = true
   loadingAnalysis.value = true
+  revokePreviewUrl()
   previewFailed.value = false
 
   try {
-    // Load detail and file URL in parallel
-    const [detail, fileUrl] = await Promise.all([
+    const [detailResult, previewResult] = await Promise.allSettled([
       getKnowledgeDetail(id),
-      getKnowledgeFileUrl(id).catch(() => null)
+      loadPreviewUrl(id)
     ])
 
-    knowledge.value = detail
-
-    // Construct kkFileView preview URL
-    if (fileUrl) {
-      try {
-        const encoded = encodeURIComponent(btoa(fileUrl))
-        previewUrl.value = `${getKkfileviewUrl()}/onlinePreview?url=${encoded}`
-      } catch {
-        previewFailed.value = true
+    if (detailResult.status !== 'fulfilled') {
+      if (previewResult.status === 'fulfilled' && previewResult.value) {
+        URL.revokeObjectURL(previewResult.value)
       }
+      throw detailResult.reason
+    }
+
+    knowledge.value = detailResult.value
+
+    if (previewResult.status === 'fulfilled' && previewResult.value) {
+      previewUrl.value = previewResult.value
     } else {
       previewFailed.value = true
     }
   } catch (error) {
     console.error('Failed to load knowledge detail:', error)
+    revokePreviewUrl()
     previewFailed.value = true
   } finally {
     loadingDetail.value = false
@@ -385,22 +413,6 @@ async function loadDocument(id: string) {
     }
   } finally {
     loadingAnalysis.value = false
-  }
-}
-
-function onIframeLoad(event: Event) {
-  // Check if iframe loaded successfully by trying to detect error pages
-  const iframe = event.target as HTMLIFrameElement
-  try {
-    // If kkFileView is not available, the iframe might show an error
-    // We use a timeout to detect non-loading
-    setTimeout(() => {
-      if (!iframe.contentDocument && !iframe.contentWindow) {
-        previewFailed.value = true
-      }
-    }, 10000)
-  } catch {
-    // Cross-origin - kkFileView loaded fine
   }
 }
 

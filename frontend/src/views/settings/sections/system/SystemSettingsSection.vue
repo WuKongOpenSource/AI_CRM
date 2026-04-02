@@ -12,7 +12,6 @@
 import { computed } from 'vue'
 import SystemSubTabs from '../../components/SystemSubTabs.vue'
 import type { SystemSettingsTab } from '../../types'
-import ProfileSettingsPane from './panes/ProfileSettingsPane.vue'
 import EnterpriseSettingsPane from './panes/EnterpriseSettingsPane.vue'
 import AiConfigSettingsPane from './panes/AiConfigSettingsPane.vue'
 import AgentSettingsPane from './panes/AgentSettingsPane.vue'
@@ -28,7 +27,6 @@ defineEmits<{
 }>()
 
 const paneMap = {
-  profile: ProfileSettingsPane,
   enterprise: EnterpriseSettingsPane,
   api: AiConfigSettingsPane,
   agent: AgentSettingsPane,

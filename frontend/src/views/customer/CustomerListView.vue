@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageRootRef" class="flex flex-col gap-6 px-6 py-6">
+  <div ref="pageRootRef" data-customer-page-root class="flex flex-col gap-6 px-6 py-6">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -19,6 +19,80 @@
             @input="debouncedSearch"
           />
         </div>
+        <el-popover
+          v-model:visible="showAiSearchPopover"
+          trigger="click"
+          placement="bottom-end"
+          :width="420"
+          popper-class="wk-ai-search-popover"
+        >
+          <template #reference>
+            <button
+              class="h-10 px-4 bg-white border border-primary/30 text-primary rounded-xl text-sm font-bold hover:bg-primary/5 transition-all shadow-sm flex items-center gap-2"
+              type="button"
+            >
+              <WkIcon name="ai" class="text-sm" />
+              AI 搜索
+            </button>
+          </template>
+
+          <div class="space-y-4">
+            <div class="space-y-2">
+              <p class="text-sm font-bold text-slate-900">AI 搜索场景示例</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="example in AI_SEARCH_EXAMPLES"
+                  :key="example"
+                  type="button"
+                  class="px-3 py-1.5 rounded-full bg-slate-50 text-slate-600 text-xs font-medium hover:bg-primary/10 hover:text-primary transition-colors"
+                  @click="applyAiSearchExample(example)"
+                >
+                  {{ example }}
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">场景描述</label>
+              <textarea
+                v-model="aiSearchInput"
+                rows="3"
+                placeholder="例如：30 天未跟进的制造业客户"
+                class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                @keydown.enter.exact.prevent="handleAiSearch"
+              />
+              <p class="text-xs text-slate-500 leading-5">{{ aiSearchStatusText }}</p>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+              <button
+                v-if="hasAiSearchState"
+                class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors"
+                type="button"
+                @click="clearAiSearch"
+              >
+                清空 AI 条件
+              </button>
+              <div class="flex items-center gap-2 ml-auto">
+                <button
+                  class="px-3 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                  type="button"
+                  @click="showAiSearchPopover = false"
+                >
+                  取消
+                </button>
+                <button
+                  class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  :disabled="!aiSearchInput.trim() || aiSearchLoading"
+                  type="button"
+                  @click="handleAiSearch"
+                >
+                  {{ aiSearchLoading ? '解析中...' : 'AI 搜索' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </el-popover>
         <!-- Import/Export - desktop only -->
         <div v-if="!isMobile" class="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
           <button class="h-10 px-4 text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2" @click="showImportDialog = true">
@@ -41,10 +115,42 @@
       </div>
     </div>
 
+    <div v-if="hasAiSearchState" class="bg-white border border-primary/10 rounded-2xl px-4 py-3 shadow-sm">
+      <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+            <WkIcon name="ai" class="text-[12px]" />
+            AI 筛选
+          </span>
+          <el-tag
+            v-for="chip in aiSearchState?.displayChips || []"
+            :key="chip.key"
+            closable
+            size="small"
+            class="wk-ai-chip"
+            @close="handleRemoveAiChip(chip.key)"
+          >
+            {{ chip.label }}
+          </el-tag>
+        </div>
+
+        <button
+          class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors self-start"
+          type="button"
+          @click="clearAiSearch"
+        >
+          清空
+        </button>
+      </div>
+      <p v-if="aiSearchExplanation" class="mt-2 text-xs text-slate-500 leading-5">
+        {{ aiSearchExplanation }}
+      </p>
+    </div>
+
     <!-- Main Content: Table + AI Sidebar -->
-    <div class="flex flex-col xl:flex-row gap-6 items-start relative">
+    <div class="flex flex-col xl:flex-row gap-6 items-start relative overflow-x-hidden">
       <!-- Table Area -->
-      <div class="flex-1 min-w-0 w-full space-y-6">
+      <div class="flex-1 min-w-0 space-y-6">
         <div
           ref="tableCardRef"
           class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden"
@@ -120,11 +226,11 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="报价金额" min-width="130" align="right">
+              <!-- <el-table-column label="报价金额" min-width="130" align="right">
                 <template #default="{ row }">
                   <span class="text-sm font-medium text-slate-900 whitespace-nowrap">{{ row.quotation ? formatMoney(row.quotation) : '-' }}</span>
                 </template>
-              </el-table-column>
+              </el-table-column> -->
 
               <el-table-column label="最后跟进" min-width="120">
                 <template #default="{ row }">
@@ -174,8 +280,35 @@
                 :label="field.fieldLabel"
                 min-width="140"
               >
+                <template #header>
+                  <span class="normal-case tracking-normal">{{ field.fieldLabel }}</span>
+                </template>
                 <template #default="{ row }">
-                  <span class="text-sm text-slate-600 whitespace-nowrap">{{ row.customFields?.[field.fieldName] ?? '-' }}</span>
+                  <template v-if="field.fieldType === 'checkbox'">
+                    <span
+                      v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
+                      :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-slate-600'"
+                    >
+                      <span
+                        class="size-1.5 rounded-full"
+                        :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-400'"
+                      ></span>
+                      {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
+                    </span>
+                    <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                  </template>
+                  <span
+                    v-else
+                    class="block text-sm text-slate-600 truncate"
+                    :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
+                  >
+                    {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
+                  </span>
                 </template>
               </el-table-column>
 
@@ -243,105 +376,13 @@
         </div>
       </div>
 
-      <!-- AI Insight Sidebar -->
-      <div
+      <CustomerInsightSidebar
         v-if="!isMobile"
-        :class="[
-          'w-full xl:shrink-0 overflow-hidden transition-[width] duration-300 ease-out',
-          isAiSidebarExpanded ? 'xl:w-80' : 'xl:w-12'
-        ]"
-      >
-        <div
-          :class="[
-            'w-full xl:w-auto rounded-2xl xl:rounded-none p-1 xl:p-0 border border-transparent xl:border-none',
-            isAiSidebarExpanded ? 'bg-slate-50/50 xl:bg-transparent' : 'bg-transparent'
-          ]"
-        >
-          <div class="flex items-center justify-between px-1 mb-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <h3 v-if="isAiSidebarExpanded" class="text-xs font-bold text-slate-400 uppercase tracking-widest truncate">
-                AI 智能洞察预警
-              </h3>
-              <span v-if="isAiSidebarExpanded" class="size-2 rounded-full bg-primary animate-pulse"></span>
-            </div>
-
-            <button
-              type="button"
-              class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-200/50 text-slate-400 hover:text-slate-600 transition-colors"
-              :title="isAiSidebarExpanded ? '收起面板' : '展开面板'"
-              @click="isAiSidebarExpanded = !isAiSidebarExpanded"
-            >
-              <span class="material-symbols-outlined text-xl">
-                {{ isAiSidebarExpanded ? 'last_page' : 'first_page' }}
-              </span>
-            </button>
-          </div>
-
-          <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            enter-from-class="opacity-0 -translate-y-1"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition-all duration-150 ease-in"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 -translate-y-1"
-          >
-            <div v-if="isAiSidebarExpanded" class="space-y-4">
-              <!-- High Potential Warning -->
-              <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
-                <div class="flex items-center gap-2 mb-2">
-                  <WkIcon name="ai" class="text-primary text-xl" />
-                  <h3 class="text-sm font-bold text-slate-900">高潜力客户预警</h3>
-                </div>
-                <p class="text-xs text-slate-500 leading-relaxed">发现 {{ negotiationCount }} 位客户近期成交概率显著提升，建议优先跟进。</p>
-                <div class="mt-3 flex items-center justify-between">
-                  <span class="text-xs font-bold text-primary bg-primary/5 px-2 py-0.5 rounded">{{ negotiationCount }} 位待处理</span>
-                  <span class="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors text-sm">arrow_forward</span>
-                </div>
-              </div>
-
-              <!-- Auto Follow-up -->
-              <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="material-symbols-outlined text-indigo-600 text-xl">mark_email_unread</span>
-                  <h3 class="text-sm font-bold text-slate-900">自动化跟进生成</h3>
-                </div>
-                <p class="text-xs text-slate-500 leading-relaxed">有 {{ overdueCount }} 个客户超过7天未跟进，建议尽快安排跟进计划。</p>
-                <div class="mt-3 flex items-center justify-between">
-                  <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{{ overdueCount }} 个待跟进</span>
-                  <span class="material-symbols-outlined text-slate-300 group-hover:text-indigo-600 transition-colors text-sm">arrow_forward</span>
-                </div>
-              </div>
-
-              <!-- Forecast Update -->
-              <div class="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden group cursor-pointer hover:border-emerald-400 hover:shadow-md transition-all">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="material-symbols-outlined text-emerald-600 text-xl">insights</span>
-                  <h3 class="text-sm font-bold text-slate-900">成交预测更新</h3>
-                </div>
-                <p class="text-xs text-slate-500 leading-relaxed">当前成交转化率 {{ conversionRate }}%，共 {{ closedCount }} 个客户已成交。</p>
-                <div class="mt-3 flex items-center justify-between">
-                  <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{{ conversionRate }}% 转化率</span>
-                  <span class="material-symbols-outlined text-slate-300 group-hover:text-emerald-600 transition-colors text-sm">arrow_forward</span>
-                </div>
-              </div>
-
-              <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-                <p class="text-xs text-slate-400 leading-relaxed text-center italic">
-                  AI 助手正在实时分析您的客户数据，预警信息将在此处即时更新。
-                </p>
-              </div>
-            </div>
-          </Transition>
-
-          <div v-if="!isAiSidebarExpanded" class="hidden xl:flex flex-col items-center gap-6 pt-4">
-            <WkIcon name="ai" class="text-primary/40 text-xl animate-pulse" />
-            <div class="h-20 w-px bg-slate-200"></div>
-            <span class="[writing-mode:vertical-rl] text-xs font-bold text-slate-400 tracking-widest">
-              <span class="[text-combine-upright:all]">AI</span> 智能洞察
-            </span>
-          </div>
-        </div>
-      </div>
+        :negotiation-count="negotiationCount"
+        :overdue-count="overdueCount"
+        :closed-count="closedCount"
+        :conversion-rate="conversionRate"
+      />
     </div>
 
     <!-- Add/Edit Dialog -->
@@ -353,128 +394,10 @@
     />
 
     <!-- Import Dialog -->
-    <el-dialog
+    <CustomerImportDialog
       v-model="showImportDialog"
-      title="导入客户"
-      :width="isMobile ? '95%' : '800px'"
-      :fullscreen="isMobile"
-      class="wk-dialog--flush"
-      @close="resetImport"
-    >
-      <!-- Step 1: Upload -->
-      <div v-if="importStep === 1" class="text-center py-6">
-        <el-upload
-          ref="importUploadRef"
-          :auto-upload="false"
-          :limit="1"
-          accept=".xlsx,.xls"
-          :on-change="handleImportFileChange"
-          drag
-        >
-          <span class="material-symbols-outlined text-4xl text-slate-400 mb-2">upload_file</span>
-          <div class="text-slate-600">将 Excel 文件拖到此处，或<em class="text-primary not-italic">点击上传</em></div>
-          <template #tip>
-            <div class="text-xs text-slate-400 mt-2">支持 .xlsx / .xls 格式，表头需包含「公司名称」列</div>
-            <div class="mt-2">
-              <button class="text-primary text-sm font-medium hover:underline" @click.stop="handleDownloadTemplate">
-                下载导入模板
-              </button>
-            </div>
-          </template>
-        </el-upload>
-      </div>
-
-      <!-- Step 2: Preview -->
-      <div v-if="importStep === 2">
-        <div class="flex gap-4 mb-4 flex-wrap">
-          <span class="text-xs font-bold px-2 py-1 bg-slate-100 rounded">总计 {{ importPreview!.totalRows }} 行</span>
-          <span class="text-xs font-bold px-2 py-1 bg-emerald-50 text-emerald-600 rounded">有效 {{ importPreview!.validRows }} 行</span>
-          <span v-if="importPreview!.duplicateRows > 0" class="text-xs font-bold px-2 py-1 bg-amber-50 text-amber-600 rounded">重复 {{ importPreview!.duplicateRows }} 行</span>
-          <span v-if="importPreview!.errorRows > 0" class="text-xs font-bold px-2 py-1 bg-red-50 text-red-600 rounded">错误 {{ importPreview!.errorRows }} 行</span>
-        </div>
-
-        <div v-if="importPreview!.duplicateRows > 0" class="mb-4 p-3 bg-yellow-50 rounded-lg">
-          <span class="text-sm text-yellow-700 mr-3">重复行统一处理：</span>
-          <el-radio-group v-model="globalDuplicateMode" @change="applyGlobalDuplicateMode">
-            <el-radio value="skip">全部跳过</el-radio>
-            <el-radio value="overwrite">全部覆盖</el-radio>
-          </el-radio-group>
-        </div>
-
-        <el-table
-          :data="importPreview!.rows"
-          :max-height="400"
-          size="small"
-          :row-class-name="importRowClassName"
-        >
-          <el-table-column label="行号" prop="rowNum" width="60" />
-          <el-table-column label="公司名称" prop="companyName" min-width="120" />
-          <el-table-column label="行业" prop="industry" width="100" />
-          <el-table-column label="阶段" prop="stage" width="90">
-            <template #default="{ row }">{{ getStageLabel(row.stage) || row.stage }}</template>
-          </el-table-column>
-          <el-table-column label="联系人" prop="contactName" width="90" />
-          <el-table-column label="状态" width="150">
-            <template #default="{ row }">
-              <span v-if="row.errors && row.errors.length > 0" class="text-xs font-bold px-2 py-0.5 bg-red-50 text-red-600 rounded">{{ row.errors[0] }}</span>
-              <template v-else-if="row.duplicate">
-                <el-radio-group v-model="row.handleMode" size="small">
-                  <el-radio value="skip">跳过</el-radio>
-                  <el-radio value="overwrite">覆盖</el-radio>
-                </el-radio-group>
-              </template>
-              <span v-else class="text-xs font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded">正常</span>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div v-if="importPreview!.errors && importPreview!.errors.length > 0" class="mt-3">
-          <el-alert
-            v-for="(err, idx) in importPreview!.errors"
-            :key="idx"
-            :title="err"
-            type="error"
-            :closable="false"
-            class="mb-1"
-          />
-        </div>
-      </div>
-
-      <!-- Step 3: Result -->
-      <div v-if="importStep === 3" class="text-center py-6">
-        <span class="material-symbols-outlined text-5xl text-green-500 mb-3">check_circle</span>
-        <h3 class="text-lg font-bold mb-4">导入完成</h3>
-        <div class="flex justify-center gap-6 text-sm">
-          <div>新增 <span class="text-primary font-bold text-lg">{{ importResult!.imported }}</span> 条</div>
-          <div>更新 <span class="text-orange-500 font-bold text-lg">{{ importResult!.updated }}</span> 条</div>
-          <div>跳过 <span class="text-slate-500 font-bold text-lg">{{ importResult!.skipped }}</span> 条</div>
-        </div>
-        <div v-if="importResult!.errors && importResult!.errors.length > 0" class="mt-4 text-left">
-          <el-alert
-            v-for="(err, idx) in importResult!.errors"
-            :key="idx"
-            :title="err"
-            type="warning"
-            :closable="false"
-            class="mb-1"
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <template v-if="importStep === 1">
-          <el-button @click="showImportDialog = false">取消</el-button>
-          <el-button type="primary" :loading="importLoading" :disabled="!importFile" @click="handleImportPreview">解析文件</el-button>
-        </template>
-        <template v-else-if="importStep === 2">
-          <el-button @click="importStep = 1">上一步</el-button>
-          <el-button type="primary" :loading="importLoading" @click="handleImportConfirm">确认导入</el-button>
-        </template>
-        <template v-else>
-          <el-button type="primary" @click="showImportDialog = false">完成</el-button>
-        </template>
-      </template>
-    </el-dialog>
+      @success="handleImportSuccess"
+    />
 
     <!-- AI Follow-up Drawer -->
     <AiFollowUpDrawer
@@ -491,15 +414,25 @@ import { useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { UploadInstance, UploadFile } from 'element-plus'
-import type { CustomerListVO, CustomerImportPreview, CustomerImportRow, CustomerImportResult } from '@/types/customer'
+import type {
+  CustomerAiSearchDisplayChip,
+  CustomerAiSearchParseVO,
+  CustomerAiSearchQuery,
+  CustomerExportBO,
+  CustomerListVO,
+  CustomerImportResult,
+  CustomerQueryBO
+} from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import { getEnabledFieldsByEntity } from '@/api/customField'
-import { transferCustomer, exportCustomers, downloadImportTemplate, importCustomerPreview, confirmCustomerImport } from '@/api/customer'
+import { getUserColumns } from '@/api/customField'
+import { aiParseCustomerSearch, transferCustomer, exportCustomers } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
+import CustomerImportDialog from '@/views/customer/components/CustomerImportDialog.vue'
+import CustomerInsightSidebar from '@/views/customer/components/CustomerInsightSidebar.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
 
 const router = useRouter()
 const route = useRoute()
@@ -512,28 +445,6 @@ const tableHeight = ref<number | undefined>(undefined)
 let layoutObserver: ResizeObserver | null = null
 let tableHeightRaf = 0
 
-// UI only: AI sidebar expand/collapse (persisted)
-const AI_SIDEBAR_STORAGE_KEY = 'wk_ai_crm:customer_ai_sidebar_expanded:v1'
-function getInitialAiSidebarExpanded() {
-  try {
-    const raw = localStorage.getItem(AI_SIDEBAR_STORAGE_KEY)
-    if (raw === null) return true
-    return raw === '1'
-  } catch {
-    return true
-  }
-}
-
-const isAiSidebarExpanded = ref(getInitialAiSidebarExpanded())
-
-watch(isAiSidebarExpanded, (val) => {
-  try {
-    localStorage.setItem(AI_SIDEBAR_STORAGE_KEY, val ? '1' : '0')
-  } catch {
-    // ignore
-  }
-})
-
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)
 const listCustomFields = ref<CustomField[]>([])
@@ -541,13 +452,202 @@ const listCustomFields = ref<CustomField[]>([])
 // Import/Export state
 const exporting = ref(false)
 const showImportDialog = ref(false)
-const importStep = ref(1)
-const importFile = ref<File | null>(null)
-const importLoading = ref(false)
-const importPreview = ref<CustomerImportPreview | null>(null)
-const importResult = ref<CustomerImportResult | null>(null)
-const globalDuplicateMode = ref('')
-const importUploadRef = ref<UploadInstance>()
+const AI_SEARCH_EXAMPLES = [
+  '报价大于 50 万的高价值客户',
+  '30 天未跟进的制造业客户',
+  '最近一周新增的客户',
+  '活跃阶段的 A 级客户'
+]
+const showAiSearchPopover = ref(false)
+const aiSearchInput = ref('')
+const aiSearchLoading = ref(false)
+const aiSearchState = ref<CustomerAiSearchParseVO | null>(null)
+
+const hasAiSearchState = computed(() => {
+  return Boolean(aiSearchState.value?.displayChips.length || aiSearchState.value?.explanation)
+})
+
+function buildAiSearchExplanation(chips: CustomerAiSearchDisplayChip[] = []) {
+  if (!chips.length) return ''
+
+  const filterLabels = chips
+    .filter(chip => chip.key !== 'sort' && chip.label)
+    .map(chip => chip.label.trim())
+  const sortLabel = chips.find(chip => chip.key === 'sort' && chip.label)?.label.trim()
+
+  const parts: string[] = []
+  if (filterLabels.length) {
+    parts.push(`已识别筛选条件：${filterLabels.join('，')}`)
+  }
+  if (sortLabel) {
+    parts.push(`已识别${sortLabel.replace(/^排序[:：]\s*/, '排序规则：')}`)
+  }
+  return parts.join('；')
+}
+
+const aiSearchExplanation = computed(() => {
+  const state = aiSearchState.value
+  if (!state) return ''
+  if (state.fallbackKeywordSearch) return state.explanation || '本次已回退为关键词搜索'
+  return buildAiSearchExplanation(state.displayChips || []) || state.explanation || ''
+})
+
+const aiSearchStatusText = computed(() => {
+  if (aiSearchLoading.value) return '正在解析自然语言并生成筛选条件...'
+  if (aiSearchExplanation.value) return aiSearchExplanation.value
+  return '支持“30天未跟进的制造业客户”这类自然语言描述'
+})
+
+function normalizeCustomerQuery(query: CustomerAiSearchQuery): Partial<CustomerQueryBO> {
+  const normalized: Partial<CustomerQueryBO> = {}
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') continue
+    if (Array.isArray(value) && value.length === 0) continue
+    normalized[key as keyof CustomerQueryBO] = value as never
+  }
+  return normalized
+}
+
+function buildExportPayload(): CustomerExportBO {
+  return {
+    ...customerStore.queryParams
+  }
+}
+
+async function applyAiSearchResult(result: CustomerAiSearchParseVO) {
+  aiSearchState.value = result
+  aiSearchInput.value = result.normalizedQuery || result.originalQuery || aiSearchInput.value
+  const normalizedQuery = normalizeCustomerQuery(result.parsedQuery || {})
+  customerStore.replaceQueryParams(normalizedQuery)
+  await customerStore.fetchCustomerList(true)
+  showAiSearchPopover.value = false
+}
+
+async function handleAiSearch() {
+  const query = aiSearchInput.value.trim()
+  if (!query || aiSearchLoading.value) return
+  aiSearchLoading.value = true
+  try {
+    const result = await aiParseCustomerSearch({ query })
+    await applyAiSearchResult(result)
+  } finally {
+    aiSearchLoading.value = false
+  }
+}
+
+function applyAiSearchExample(example: string) {
+  aiSearchInput.value = example
+  void handleAiSearch()
+}
+
+function syncAiKeywordChip(keyword: string) {
+  if (!aiSearchState.value) return
+  const chips = aiSearchState.value.displayChips.filter(chip => chip.key !== 'keyword')
+  const parsedQuery = { ...aiSearchState.value.parsedQuery }
+
+  if (keyword) {
+    parsedQuery.keyword = keyword
+    chips.unshift({ key: 'keyword', label: `关键词: ${keyword}` })
+  } else {
+    delete parsedQuery.keyword
+  }
+
+  aiSearchState.value = {
+    ...aiSearchState.value,
+    parsedQuery,
+    displayChips: chips
+  }
+}
+
+async function clearAiSearch() {
+  aiSearchState.value = null
+  aiSearchInput.value = ''
+  customerStore.resetQueryParams()
+  await customerStore.fetchCustomerList(true)
+}
+
+function clearAiQueryField(query: CustomerAiSearchQuery, key: string) {
+  switch (key) {
+    case 'keyword':
+      delete query.keyword
+      break
+    case 'industry':
+      delete query.industry
+      break
+    case 'level':
+      delete query.level
+      break
+    case 'stage':
+      delete query.stage
+      delete query.stages
+      break
+    case 'stages':
+      delete query.stages
+      delete query.stage
+      break
+    case 'tag':
+      delete query.tag
+      break
+    case 'source':
+      delete query.source
+      break
+    case 'quotation':
+      delete query.quotationMin
+      delete query.quotationMax
+      break
+    case 'contractAmount':
+      delete query.contractAmountMin
+      delete query.contractAmountMax
+      break
+    case 'revenue':
+      delete query.revenueMin
+      delete query.revenueMax
+      break
+    case 'lastContact':
+      delete query.lastContactStart
+      delete query.lastContactEnd
+      delete query.includeNoLastContact
+      break
+    case 'nextFollow':
+      delete query.nextFollowStart
+      delete query.nextFollowEnd
+      break
+    case 'createTime':
+      delete query.createTimeStart
+      delete query.createTimeEnd
+      break
+    case 'contactCount':
+      delete query.contactCountMin
+      delete query.contactCountMax
+      break
+    case 'sort':
+      delete query.sortBy
+      delete query.sortOrder
+      break
+  }
+}
+
+async function handleRemoveAiChip(key: string) {
+  if (!aiSearchState.value) return
+
+  const parsedQuery: CustomerAiSearchQuery = { ...aiSearchState.value.parsedQuery }
+  clearAiQueryField(parsedQuery, key)
+
+  const displayChips = aiSearchState.value.displayChips.filter(chip => chip.key !== key)
+  aiSearchState.value = {
+    ...aiSearchState.value,
+    parsedQuery,
+    displayChips
+  }
+
+  if (displayChips.length === 0) {
+    await clearAiSearch()
+    return
+  }
+
+  customerStore.replaceQueryParams(normalizeCustomerQuery(parsedQuery))
+  await customerStore.fetchCustomerList(true)
+}
 
 function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   // keep original behavior: refresh list after submit
@@ -683,8 +783,7 @@ const overdueCount = computed(() => {
 
 async function loadListCustomFields() {
   try {
-    const allFields = await getEnabledFieldsByEntity('customer')
-    listCustomFields.value = allFields.filter(f => f.isShowInList)
+    listCustomFields.value = await getUserColumns('customer')
   } catch {
     // Error handled by interceptor
   }
@@ -736,6 +835,7 @@ onBeforeUnmount(() => {
 })
 
 function handleSearch() {
+  syncAiKeywordChip((customerStore.queryParams.keyword || '').trim())
   customerStore.queryParams.page = 1
   customerStore.fetchCustomerList(true)
 }
@@ -799,14 +899,6 @@ function getStageDotClass(stage: string): string {
   return classes[stage] || 'bg-slate-400'
 }
 
-function formatMoney(value: number | undefined): string {
-  if (!value) return '¥0'
-  if (value >= 10000) {
-    return `¥${(value / 10000).toFixed(1)}万`
-  }
-  return `¥${value.toLocaleString()}`
-}
-
 function formatRelativeTime(dateStr: string | undefined): string {
   if (!dateStr) return '暂无'
   const date = new Date(dateStr)
@@ -850,30 +942,10 @@ async function handleTransfer(customer: CustomerListVO, user: any) {
 
 // ==================== Import / Export ====================
 
-async function handleDownloadTemplate() {
-  try {
-    const blob = await downloadImportTemplate()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = '客户导入模板.xlsx'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch {
-    // Error handled by interceptor
-  }
-}
-
 async function handleExport() {
   exporting.value = true
   try {
-    const blob = await exportCustomers({
-      keyword: customerStore.queryParams.keyword || undefined,
-      stage: customerStore.queryParams.stage || undefined,
-      level: customerStore.queryParams.level || undefined
-    })
+    const blob = await exportCustomers(buildExportPayload())
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -891,66 +963,8 @@ async function handleExport() {
   }
 }
 
-function handleImportFileChange(uploadFile: UploadFile) {
-  importFile.value = uploadFile.raw || null
-}
-
-async function handleImportPreview() {
-  if (!importFile.value) return
-  importLoading.value = true
-  try {
-    importPreview.value = await importCustomerPreview(importFile.value)
-    importStep.value = 2
-    if (importPreview.value.rows) {
-      importPreview.value.rows.forEach(row => {
-        if (row.duplicate && !row.handleMode) {
-          row.handleMode = 'skip'
-        }
-      })
-    }
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    importLoading.value = false
-  }
-}
-
-function applyGlobalDuplicateMode(mode: string) {
-  if (!importPreview.value) return
-  importPreview.value.rows.forEach(row => {
-    if (row.duplicate) {
-      row.handleMode = mode as 'skip' | 'overwrite'
-    }
-  })
-}
-
-function importRowClassName({ row }: { row: CustomerImportRow }): string {
-  if (row.errors && row.errors.length > 0) return 'bg-red-50'
-  if (row.duplicate) return 'bg-yellow-50'
-  return ''
-}
-
-async function handleImportConfirm() {
-  if (!importPreview.value) return
-  importLoading.value = true
-  try {
-    importResult.value = await confirmCustomerImport(importPreview.value.rows)
-    importStep.value = 3
-    await customerStore.fetchCustomerList(true)
-  } catch {
-    // Error handled by interceptor
-  } finally {
-    importLoading.value = false
-  }
-}
-
-function resetImport() {
-  importStep.value = 1
-  importFile.value = null
-  importPreview.value = null
-  importResult.value = null
-  globalDuplicateMode.value = ''
-  importUploadRef.value?.clearFiles()
+async function handleImportSuccess(_result: CustomerImportResult) {
+  await customerStore.fetchCustomerList(true)
 }
 </script>
 
@@ -991,5 +1005,16 @@ function resetImport() {
 
 .wk-customer-table :deep(.el-table__empty-block) {
   min-height: 220px;
+}
+
+.wk-ai-chip :deep(.el-tag__content) {
+  color: #137fec;
+}
+
+:deep(.wk-ai-search-popover) {
+  border-radius: 20px;
+  border: 1px solid #dbeafe;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+  padding: 16px;
 }
 </style>

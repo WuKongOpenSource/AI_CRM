@@ -181,6 +181,7 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
+        <!-- 验证码接口 -->
     </dependencies>
 
     <repositories>

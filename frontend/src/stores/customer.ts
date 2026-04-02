@@ -10,6 +10,39 @@ import {
 } from '@/api/customer'
 import type { CustomerListVO, CustomerDetailVO, CustomerQueryBO, CustomerAddBO, CustomerUpdateBO } from '@/types/customer'
 
+const DEFAULT_CUSTOMER_PAGE_SIZE = 10
+
+function createDefaultCustomerQueryParams(): CustomerQueryBO {
+  return {
+    page: 1,
+    limit: DEFAULT_CUSTOMER_PAGE_SIZE,
+    keyword: '',
+    stage: undefined,
+    stages: undefined,
+    level: undefined,
+    industry: undefined,
+    tag: undefined,
+    source: undefined,
+    quotationMin: undefined,
+    quotationMax: undefined,
+    contractAmountMin: undefined,
+    contractAmountMax: undefined,
+    revenueMin: undefined,
+    revenueMax: undefined,
+    lastContactStart: undefined,
+    lastContactEnd: undefined,
+    includeNoLastContact: undefined,
+    nextFollowStart: undefined,
+    nextFollowEnd: undefined,
+    createTimeStart: undefined,
+    createTimeEnd: undefined,
+    contactCountMin: undefined,
+    contactCountMax: undefined,
+    sortBy: undefined,
+    sortOrder: undefined
+  }
+}
+
 export const useCustomerStore = defineStore('customer', () => {
   // State
   const customerList = ref<CustomerListVO[]>([])
@@ -19,13 +52,7 @@ export const useCustomerStore = defineStore('customer', () => {
   const statistics = ref<any>(null)
 
   // Query params
-  const queryParams = ref<CustomerQueryBO>({
-    page: 1,
-    limit: 10,
-    keyword: '',
-    stage: undefined,
-    level: undefined
-  })
+  const queryParams = ref<CustomerQueryBO>(createDefaultCustomerQueryParams())
 
   // Getters
   const hasMore = computed(() => {
@@ -95,6 +122,22 @@ export const useCustomerStore = defineStore('customer', () => {
     queryParams.value = { ...queryParams.value, ...params, page: 1 }
   }
 
+  function replaceQueryParams(params: Partial<CustomerQueryBO>) {
+    queryParams.value = {
+      ...createDefaultCustomerQueryParams(),
+      limit: queryParams.value.limit || DEFAULT_CUSTOMER_PAGE_SIZE,
+      ...params,
+      page: params.page ?? 1
+    }
+  }
+
+  function resetQueryParams() {
+    queryParams.value = {
+      ...createDefaultCustomerQueryParams(),
+      limit: queryParams.value.limit || DEFAULT_CUSTOMER_PAGE_SIZE
+    }
+  }
+
   function loadMore() {
     if (hasMore.value && !loading.value) {
       queryParams.value.page = (queryParams.value.page || 1) + 1
@@ -124,6 +167,8 @@ export const useCustomerStore = defineStore('customer', () => {
     removeCustomer,
     fetchStatistics,
     setQueryParams,
+    replaceQueryParams,
+    resetQueryParams,
     loadMore,
     clearCurrentCustomer
   }

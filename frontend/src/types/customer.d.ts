@@ -48,6 +48,8 @@ export interface CustomerDetailVO extends Customer {
   nextFollowTime?: string
   remark?: string
   ownerAvatar?: string
+  createUserId?: string | number
+  createUserName?: string
   contacts: ContactVO[]
   recentFollowUps: FollowUpVO[]
   tags: CustomerTag[]
@@ -90,8 +92,11 @@ export interface CustomerAddBO {
   level?: CustomerLevel
   phone?: string
   email?: string
+  source?: string
   website?: string
   address?: string
+  quotation?: number | null
+  remark?: string
   description?: string
   // Primary contact
   contactName?: string
@@ -109,10 +114,90 @@ export interface CustomerUpdateBO extends CustomerAddBO {
 export interface CustomerQueryBO {
   keyword?: string
   stage?: CustomerStage
+  stages?: CustomerStage[]
   level?: CustomerLevel
+  industry?: string
+  tag?: string
+  source?: string
+  quotationMin?: number
+  quotationMax?: number
+  contractAmountMin?: number
+  contractAmountMax?: number
+  revenueMin?: number
+  revenueMax?: number
+  lastContactStart?: string
+  lastContactEnd?: string
+  includeNoLastContact?: boolean
+  nextFollowStart?: string
+  nextFollowEnd?: string
+  createTimeStart?: string
+  createTimeEnd?: string
+  contactCountMin?: number
+  contactCountMax?: number
+  sortBy?: CustomerQuerySortBy
+  sortOrder?: 'asc' | 'desc'
   ownerId?: string
   page?: number
   limit?: number
+}
+
+export type CustomerQuerySortBy =
+  | 'createTime'
+  | 'quotation'
+  | 'contractAmount'
+  | 'revenue'
+  | 'lastContactTime'
+  | 'nextFollowTime'
+  | 'contactCount'
+
+export interface CustomerExportBO extends CustomerQueryBO {
+  customerIds?: string[]
+}
+
+export interface CustomerAiSearchParseBO {
+  query: string
+}
+
+export interface CustomerAiSearchQuery {
+  keyword?: string
+  stage?: CustomerStage
+  stages?: CustomerStage[]
+  level?: CustomerLevel
+  industry?: string
+  tag?: string
+  source?: string
+  quotationMin?: number
+  quotationMax?: number
+  contractAmountMin?: number
+  contractAmountMax?: number
+  revenueMin?: number
+  revenueMax?: number
+  lastContactStart?: string
+  lastContactEnd?: string
+  includeNoLastContact?: boolean
+  nextFollowStart?: string
+  nextFollowEnd?: string
+  createTimeStart?: string
+  createTimeEnd?: string
+  contactCountMin?: number
+  contactCountMax?: number
+  sortBy?: CustomerQuerySortBy
+  sortOrder?: 'asc' | 'desc'
+}
+
+export interface CustomerAiSearchDisplayChip {
+  key: string
+  label: string
+}
+
+export interface CustomerAiSearchParseVO {
+  originalQuery: string
+  normalizedQuery: string
+  parsedQuery: CustomerAiSearchQuery
+  displayChips: CustomerAiSearchDisplayChip[]
+  explanation?: string
+  confidence?: number
+  fallbackKeywordSearch?: boolean
 }
 
 // Contact types
@@ -126,6 +211,7 @@ export interface Contact {
   wechat?: string
   isPrimary: boolean
   notes?: string
+  customFields?: Record<string, any>
   createTime: string
 }
 

@@ -100,7 +100,6 @@ async function handleOpenMinioConsole() {
     }
   } catch (error) {
     console.error('Failed to get SSO URL:', error)
-    ElMessage.error('获取 SSO 登录地址失败')
   }
 }
 </script>

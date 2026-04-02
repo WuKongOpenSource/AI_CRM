@@ -1,0 +1,128 @@
+/**
+ * Scoped Element Plus field skin (AddTaskDrawer-style borders).
+ * Wrap a dialog/form root with .wk-crm-el-field-scope, then add modifiers on controls:
+ *   - .wk-crm-el-field-input     → el-input (single-line) or el-textarea (type="textarea", EP 2.x root)
+ *   - .wk-crm-el-field-select    → el-select
+ *   - .wk-crm-el-field-date      → el-date-picker
+ *   - .wk-crm-el-field-ai       → optional extra class on AI textarea el-input (shadow-sm)
+ * Reference: border border-slate-200 bg-slate-50 rounded-xl;
+ * focus: border-primary + ring-2 ring-primary/20.
+ */
+
+.wk-crm-el-field-scope {
+  --wk-field-bg: rgb(248 250 252);
+  --wk-field-border: rgb(226 232 240);
+  --wk-field-radius: 0.75rem;
+  --wk-field-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  /* ring-primary/20 — matches Tailwind primary #137fec @ 20% */
+  --wk-field-focus-ring: rgba(19, 127, 236, 0.2);
+}
+
+@supports (color: color-mix(in srgb, red, blue)) {
+  .wk-crm-el-field-scope {
+    --wk-field-focus-ring: color-mix(in srgb, var(--el-color-primary, #137fec) 20%, transparent);
+  }
+}
+
+/* —— el-input single line —— */
+.wk-crm-el-field-scope .wk-crm-el-field-input:not(.el-input--textarea) .el-input__wrapper {
+  background-color: var(--wk-field-bg) !important;
+  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  border-radius: var(--wk-field-radius) !important;
+  transition:
+    box-shadow 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-input:not(.el-input--textarea) .el-input__wrapper.is-focus {
+  background-color: #fff !important;
+  box-shadow:
+    0 0 0 1px var(--el-color-primary) inset,
+    0 0 0 2px var(--wk-field-focus-ring) !important;
+}
+
+/* —— el-input type=textarea: root is .el-textarea (not .el-input--textarea) in Element Plus 2.x —— */
+.wk-crm-el-field-scope .wk-crm-el-field-input.el-textarea .el-textarea__inner {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: rgb(15 23 42);
+  background-color: var(--wk-field-bg) !important;
+  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  border-radius: var(--wk-field-radius) !important;
+  border: none !important;
+  outline: none !important;
+  padding: 0.625rem 0.75rem;
+  min-height: 8rem;
+  transition:
+    box-shadow 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-input.el-textarea .el-textarea__inner:focus {
+  background-color: #fff !important;
+  box-shadow:
+    0 0 0 1px var(--el-color-primary) inset,
+    0 0 0 2px var(--wk-field-focus-ring) !important;
+}
+
+/* —— AI parse textarea: + shadow-sm, slate-700 text, taller —— */
+.wk-crm-el-field-scope .wk-crm-el-field-input.wk-crm-el-field-ai.el-textarea .el-textarea__inner {
+  color: rgb(51 65 85);
+  padding: 1rem 1.25rem;
+  min-height: 7rem;
+  box-shadow:
+    0 0 0 1px var(--wk-field-border) inset,
+    var(--wk-field-shadow-sm) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-input.wk-crm-el-field-ai.el-textarea .el-textarea__inner:focus {
+  color: rgb(15 23 42);
+  box-shadow:
+    0 0 0 1px var(--el-color-primary) inset,
+    0 0 0 2px var(--wk-field-focus-ring),
+    var(--wk-field-shadow-sm) !important;
+}
+
+/* —— el-select —— */
+.wk-crm-el-field-scope .wk-crm-el-field-select .el-select__wrapper {
+  background-color: var(--wk-field-bg) !important;
+  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  border-radius: var(--wk-field-radius) !important;
+  min-height: 40px;
+  padding: 0 12px;
+  transition:
+    box-shadow 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-select .el-select__wrapper.is-focused {
+  background-color: #fff !important;
+  box-shadow:
+    0 0 0 1px var(--el-color-primary) inset,
+    0 0 0 2px var(--wk-field-focus-ring) !important;
+}
+
+/* —— el-date-picker (editor uses .el-input__wrapper) —— */
+.wk-crm-el-field-scope .wk-crm-el-field-date.el-date-editor,
+.wk-crm-el-field-scope .wk-crm-el-field-date {
+  width: 100%;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-date .el-input__wrapper {
+  width: 100%;
+  background-color: var(--wk-field-bg) !important;
+  box-shadow: 0 0 0 1px var(--wk-field-border) inset !important;
+  border-radius: var(--wk-field-radius) !important;
+  min-height: 40px;
+  padding: 0 12px;
+  transition:
+    box-shadow 0.2s ease,
+    background-color 0.2s ease !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-date .el-input__wrapper.is-focus {
+  background-color: #fff !important;
+  box-shadow:
+    0 0 0 1px var(--el-color-primary) inset,
+    0 0 0 2px var(--wk-field-focus-ring) !important;
+}

@@ -33,11 +33,24 @@ export interface CustomField {
   validation?: FieldValidation
   sortOrder: number
   status: number
+  hidden?: boolean
+  userSortOrder?: number
+}
+
+export interface FieldSortItem {
+  fieldId: string
+  sortOrder: number
+  hidden?: boolean
+}
+
+export interface FieldSortUpdateBO {
+  entityType: EntityType
+  items: FieldSortItem[]
 }
 
 export interface CustomFieldAddBO {
   entityType: EntityType
-  fieldName: string
+  fieldName?: string
   fieldLabel: string
   fieldType: FieldType
   defaultValue?: string

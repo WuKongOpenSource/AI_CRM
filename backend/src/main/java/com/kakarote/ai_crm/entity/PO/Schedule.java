@@ -1,6 +1,10 @@
 package com.kakarote.ai_crm.entity.PO;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -46,6 +50,9 @@ public class Schedule implements Serializable {
 
     @Schema(description = "地点")
     private String location;
+
+    @Schema(description = "参与人员工ID（逗号分隔）")
+    private String participantUserIds;
 
     @TableField(fill = FieldFill.INSERT)
     @Schema(description = "创建人ID")

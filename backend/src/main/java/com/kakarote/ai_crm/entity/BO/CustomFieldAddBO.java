@@ -2,7 +2,6 @@ package com.kakarote.ai_crm.entity.BO;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.util.List;
@@ -18,9 +17,7 @@ public class CustomFieldAddBO {
     @Schema(description = "实体类型: customer, contact", requiredMode = Schema.RequiredMode.REQUIRED)
     private String entityType;
 
-    @NotBlank(message = "字段标识不能为空")
-    @Pattern(regexp = "^[a-zA-Z][a-zA-Z0-9_]*$", message = "字段标识只能包含字母数字下划线，且以字母开头")
-    @Schema(description = "字段标识(英文，用于代码)", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "字段标识(已废弃，后端自动生成)")
     private String fieldName;
 
     @NotBlank(message = "字段标签不能为空")

@@ -10,8 +10,13 @@ import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
+import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import com.kakarote.ai_crm.service.IContactService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +43,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addContact(ContactAddBO contactAddBO) {
+        Customer customer = customerService.getById(contactAddBO.getCustomerId());
+        if (ObjectUtil.isNull(customer)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+        }
         Contact contact = BeanUtil.copyProperties(contactAddBO, Contact.class);
         contact.setStatus(1);
         if (contact.getIsPrimary() == null) {
@@ -51,6 +60,10 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
                 .ne(Contact::getContactId, contact.getContactId())
                 .set(Contact::getIsPrimary, 0)
                 .update();
+        }
+        // 保存自定义字段
+        if (contactAddBO.getCustomFields() != null && !contactAddBO.getCustomFields().isEmpty()) {
+            customFieldService.updateCustomFieldValues("contact", contact.getContactId(), contactAddBO.getCustomFields());
         }
         // 同步客户冗余字段
         customerService.syncContactCache(contact.getCustomerId());
@@ -106,10 +119,11 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
             .list();
         List<ContactVO> voList = BeanUtil.copyToList(contacts, ContactVO.class);
 
-        // 获取每个联系人的自定义字段
+        // 批量获取联系人的自定义字段（避免N+1）
+        List<Long> contactIds = voList.stream().map(ContactVO::getContactId).toList();
+        Map<Long, Map<String, Object>> cfMap = customFieldService.getBatchCustomFieldValues("contact", contactIds);
         for (ContactVO vo : voList) {
-            Map<String, Object> customFields = customFieldService.getCustomFieldValues("contact", vo.getContactId());
-            vo.setCustomFields(customFields);
+            vo.setCustomFields(cfMap.getOrDefault(vo.getContactId(), Collections.emptyMap()));
         }
 
         return voList;
@@ -140,6 +154,16 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
     public BasePage<ContactVO> queryPageList(ContactQueryBO queryBO) {
         BasePage<ContactVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
+
+        List<ContactVO> records = page.getRecords();
+        if (records != null && !records.isEmpty()) {
+            List<Long> contactIds = records.stream().map(ContactVO::getContactId).toList();
+            Map<Long, Map<String, Object>> cfMap = customFieldService.getBatchCustomFieldValues("contact", contactIds);
+            for (ContactVO vo : records) {
+                vo.setCustomFields(cfMap.getOrDefault(vo.getContactId(), Collections.emptyMap()));
+            }
+        }
+
         return page;
     }
 }

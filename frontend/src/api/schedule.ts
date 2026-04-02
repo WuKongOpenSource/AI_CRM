@@ -1,4 +1,10 @@
-import { post, get } from '@/utils/request'
+import { get, post } from '@/utils/request'
+
+export interface ScheduleParticipantUser {
+  userId: string
+  realname: string
+  username?: string
+}
 
 export interface ScheduleVO {
   scheduleId: string
@@ -13,6 +19,9 @@ export interface ScheduleVO {
   contactId: string
   contactName: string
   location: string
+  participantNames?: string
+  participantUserIds?: string[]
+  participantUsers?: ScheduleParticipantUser[]
   createUserId: string
   createUserName: string
   createTime: string
@@ -27,6 +36,21 @@ export interface ScheduleAddBO {
   contactId?: string
   location?: string
   description?: string
+  participantUserIds?: string[]
+}
+
+export interface ScheduleAiParseVO {
+  title: string
+  startTime: string
+  endTime: string
+  type: string
+  customerName: string
+  participantNames: string
+  participantUserIds?: string[]
+  participantUsers?: ScheduleParticipantUser[]
+  unmatchedParticipantNames?: string
+  location: string
+  description: string
 }
 
 /**
@@ -48,4 +72,11 @@ export function deleteSchedule(id: string): Promise<void> {
  */
 export function getMySchedules(filter: string = 'all'): Promise<ScheduleVO[]> {
   return get('/schedule/mySchedules', { params: { filter } })
+}
+
+/**
+ * AI 智能解析日程
+ */
+export function aiParseSchedule(content: string): Promise<ScheduleAiParseVO> {
+  return post('/schedule/ai-parse', { content })
 }

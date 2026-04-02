@@ -8,9 +8,9 @@ import com.kakarote.ai_crm.config.security.service.TokenService;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.LoginUserBO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
-import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -65,7 +65,7 @@ public class AuthController {
         // Authenticate
         Authentication authentication;
         try {
-            authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginUserBO.getUsername(), loginUserBO.getPassword()));
+            authentication = authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginUserBO.getUsername().trim(), loginUserBO.getPassword().trim()));
         } catch (DisabledException e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DISABLED);
         } catch (BadCredentialsException e) {
