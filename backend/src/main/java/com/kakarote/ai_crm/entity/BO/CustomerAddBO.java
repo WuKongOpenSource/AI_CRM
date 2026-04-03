@@ -40,6 +40,12 @@ public class CustomerAddBO {
     @Schema(description = "报价金额")
     private BigDecimal quotation;
 
+    private BigDecimal contractAmount;
+
+    private BigDecimal revenue;
+
+    private String nextFollowTime;
+
     @Schema(description = "备注")
     private String remark;
 

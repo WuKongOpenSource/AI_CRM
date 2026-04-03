@@ -58,6 +58,20 @@ export function getEnabledFieldsByEntity(entityType: EntityType): Promise<Custom
 }
 
 /**
+ * Get fields visible in list pages
+ */
+export function getListFieldsByEntity(entityType: EntityType): Promise<CustomField[]> {
+  return get(`/custom-field/list-visible/${entityType}`)
+}
+
+/**
+ * Get fields used in forms
+ */
+export function getFormFieldsByEntity(entityType: EntityType): Promise<CustomField[]> {
+  return get(`/custom-field/form/${entityType}`)
+}
+
+/**
  * Update fields sort order
  */
 export function updateFieldSort(sortList: FieldSortBO[]): Promise<void> {

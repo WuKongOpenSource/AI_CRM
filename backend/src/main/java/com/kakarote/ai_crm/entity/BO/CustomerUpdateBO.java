@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -51,7 +50,7 @@ public class CustomerUpdateBO {
     private BigDecimal revenue;
 
     @Schema(description = "下次跟进时间")
-    private Date nextFollowTime;
+    private String nextFollowTime;
 
     @Schema(description = "备注")
     private String remark;

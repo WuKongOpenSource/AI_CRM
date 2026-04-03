@@ -3,7 +3,7 @@
     <div
       v-for="field in fields"
       :key="field.fieldId"
-      :class="field.fieldType === 'textarea' ? 'md:col-span-2' : ''"
+      :class="getFieldWrapperClass(field)"
       class="space-y-1.5"
     >
       <label class="text-xs font-bold text-slate-500 ml-1">
@@ -101,15 +101,21 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import type { CustomField, EntityType } from '@/types/customField'
-import { getEnabledFieldsByEntity } from '@/api/customField'
+import { getEnabledFieldsByEntity, getFormFieldsByEntity } from '@/api/customField'
 
 // 与新建任务一致：父级需带 wk-crm-el-field-scope 才应用 wk-crm-el-field-skin.css
 
 const props = withDefaults(defineProps<{
   entityType: EntityType
   modelValue?: Record<string, any>
+  fields?: CustomField[] | null
+  mode?: 'custom' | 'form'
+  fullSpanFieldNames?: string[]
 }>(), {
-  modelValue: () => ({})
+  modelValue: () => ({}),
+  fields: null,
+  mode: 'custom',
+  fullSpanFieldNames: () => []
 })
 
 const emit = defineEmits<{
@@ -119,6 +125,13 @@ const emit = defineEmits<{
 
 const fields = ref<CustomField[]>([])
 const localValues = ref<Record<string, any>>({})
+
+function getFieldWrapperClass(field: CustomField): string {
+  if (field.fieldType === 'textarea' || props.fullSpanFieldNames.includes(field.fieldName)) {
+    return 'md:col-span-2'
+  }
+  return ''
+}
 
 function normalizeMultiselectValue(value: unknown): string[] {
   if (value === null || value === undefined || value === '') return []
@@ -182,17 +195,17 @@ function normalizeFieldValue(field: CustomField, value: unknown): any {
 }
 
 function applyModelValue(modelValue?: Record<string, any>) {
-  if (!modelValue) return
+  const sourceValues = modelValue || {}
 
   if (fields.value.length === 0) {
-    Object.assign(localValues.value, modelValue)
+    localValues.value = { ...sourceValues }
     return
   }
 
-  const nextValues = { ...localValues.value }
+  const nextValues: Record<string, any> = {}
   const fieldMap = new Map(fields.value.map(field => [field.fieldName, field]))
 
-  for (const [fieldName, rawValue] of Object.entries(modelValue)) {
+  for (const [fieldName, rawValue] of Object.entries(sourceValues)) {
     const field = fieldMap.get(fieldName)
     nextValues[fieldName] = field ? normalizeFieldValue(field, rawValue) : rawValue
   }
@@ -246,7 +259,13 @@ function applyFieldDefaults() {
 // Load custom fields
 async function loadFields() {
   try {
-    fields.value = await getEnabledFieldsByEntity(props.entityType)
+    if (props.fields && props.fields.length > 0) {
+      fields.value = props.fields
+    } else {
+      fields.value = props.mode === 'form'
+        ? await getFormFieldsByEntity(props.entityType)
+        : await getEnabledFieldsByEntity(props.entityType)
+    }
     // 先按字段类型归一化编辑态已有值，再补默认值
     applyModelValue(props.modelValue)
     applyFieldDefaults()
@@ -262,10 +281,18 @@ function emitChange() {
 
 // Watch for external value changes
 watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    applyModelValue(newVal)
-  }
+  applyModelValue(newVal)
+  applyFieldDefaults()
 }, { deep: true, immediate: true })
+
+watch(() => props.fields, (newFields) => {
+  if (newFields && newFields.length > 0) {
+    fields.value = newFields
+    applyModelValue(props.modelValue)
+    applyFieldDefaults()
+    emit('fieldsLoaded', fields.value)
+  }
+}, { deep: true })
 
 onMounted(() => {
   loadFields()

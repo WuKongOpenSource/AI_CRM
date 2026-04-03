@@ -142,6 +142,12 @@ public class Customer implements Serializable {
     private String tagNames;
 
     /**
+     * Aggregated text used for keyword search
+     */
+    @Schema(description = "Aggregated text used for keyword search")
+    private String searchText;
+
+    /**
      * 状态: 0-禁用, 1-正常
      */
     @Schema(description = "状态: 0-禁用, 1-正常")

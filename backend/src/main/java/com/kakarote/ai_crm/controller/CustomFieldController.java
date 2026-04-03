@@ -86,6 +86,20 @@ public class CustomFieldController {
         return Result.ok(customFieldService.getEnabledFieldsByEntity(entityType));
     }
 
+    @GetMapping("/list-visible/{entityType}")
+    @Operation(summary = "List fields visible in list pages")
+    public Result<List<CustomFieldVO>> listVisible(
+            @Parameter(description = "Entity type, such as customer or contact") @PathVariable("entityType") String entityType) {
+        return Result.ok(customFieldService.getListFieldsByEntity(entityType));
+    }
+
+    @GetMapping("/form/{entityType}")
+    @Operation(summary = "List fields used in forms")
+    public Result<List<CustomFieldVO>> form(
+            @Parameter(description = "Entity type, such as customer or contact") @PathVariable("entityType") String entityType) {
+        return Result.ok(customFieldService.getFormFieldsByEntity(entityType));
+    }
+
     @PostMapping("/sort")
     @Operation(summary = "Sort custom fields")
     @RequirePermission("customField:edit")

@@ -166,29 +166,81 @@
               empty-text="暂无客户数据"
               @row-click="handleCustomerRowClick"
             >
-              <el-table-column label="公司名称" fixed="left" min-width="240">
-                <template #default="{ row }">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
-                      {{ row.companyName?.charAt(0) || '?' }}
-                    </div>
-                    <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName }}</span>
-                  </div>
+              <el-table-column
+                v-for="field in listFields"
+                :key="field.fieldId"
+                :label="field.fieldLabel"
+                :fixed="getFieldFixed(field)"
+                :min-width="getFieldMinWidth(field)"
+                :align="getFieldAlign(field)"
+              >
+                <template #header>
+                  <span class="normal-case tracking-normal">{{ field.fieldLabel }}</span>
                 </template>
-              </el-table-column>
-
-              <el-table-column label="客户级别" width="110" align="center">
                 <template #default="{ row }">
+                  <template v-if="field.fieldSource === 'custom'">
+                    <template v-if="field.fieldType === 'checkbox'">
+                      <span
+                        v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
+                        :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-slate-100 text-slate-600'"
+                      >
+                        <span
+                          class="size-1.5 rounded-full"
+                          :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                            ? 'bg-emerald-500'
+                            : 'bg-slate-400'"
+                        ></span>
+                        {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
+                      </span>
+                      <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                    </template>
+                    <span
+                      v-else
+                      class="block text-sm text-slate-600 truncate"
+                      :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
+                    >
+                      {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
+                    </span>
+                  </template>
+                  <template v-else-if="field.fieldName === 'companyName'">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
+                        {{ row.companyName?.charAt(0) || '?' }}
+                      </div>
+                      <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName || '-' }}</span>
+                    </div>
+                  </template>
+                  <template v-else-if="field.fieldName === 'level'">
+                    <span
+                      v-if="row.level"
+                      class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                      :class="getLevelBadgeClass(row.level)"
+                    >
+                      {{ getLevelLabel(field, row.level) }}
+                    </span>
+                    <span v-else class="text-slate-300">-</span>
+                  </template>
+                  <template v-else-if="field.fieldName === 'stage'">
+                    <span
+                      v-if="row.stage"
+                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                      :class="getStageBadgeClass(row.stage)"
+                    >
+                      <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
+                      {{ getConfiguredStageLabel(field, row.stage) }}
+                    </span>
+                    <span v-else class="text-slate-300">-</span>
+                  </template>
                   <span
-                    v-if="row.level"
-                    class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
-                    :class="{
-                      'bg-emerald-50 text-emerald-600': row.level === 'A',
-                      'bg-blue-50 text-blue-600': row.level === 'B',
-                      'bg-slate-100 text-slate-500': row.level === 'C'
-                    }"
-                  >{{ row.level }}级</span>
-                  <span v-else class="text-slate-300">-</span>
+                    v-else
+                    class="block text-sm text-slate-600 truncate whitespace-nowrap"
+                    :title="getListFieldDisplayValue(field, row)"
+                  >
+                    {{ getListFieldDisplayValue(field, row) }}
+                  </span>
                 </template>
               </el-table-column>
 
@@ -205,36 +257,6 @@
               <el-table-column label="电话" min-width="140">
                 <template #default="{ row }">
                   <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
-                </template>
-              </el-table-column>
-
-              <el-table-column label="行业" min-width="120">
-                <template #default="{ row }">
-                  <span class="text-sm text-slate-600 whitespace-nowrap">{{ row.industry || '-' }}</span>
-                </template>
-              </el-table-column>
-
-              <el-table-column label="商机阶段" min-width="130">
-                <template #default="{ row }">
-                  <span
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
-                    :class="getStageBadgeClass(row.stage)"
-                  >
-                    <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
-                    {{ getStageLabel(row.stage) }}
-                  </span>
-                </template>
-              </el-table-column>
-
-              <!-- <el-table-column label="报价金额" min-width="130" align="right">
-                <template #default="{ row }">
-                  <span class="text-sm font-medium text-slate-900 whitespace-nowrap">{{ row.quotation ? formatMoney(row.quotation) : '-' }}</span>
-                </template>
-              </el-table-column> -->
-
-              <el-table-column label="最后跟进" min-width="120">
-                <template #default="{ row }">
-                  <span class="text-sm text-slate-500 whitespace-nowrap">{{ formatRelativeTime(row.lastContactTime) }}</span>
                 </template>
               </el-table-column>
 
@@ -271,44 +293,6 @@
                       </div>
                     </el-popover>
                   </div>
-                </template>
-              </el-table-column>
-
-              <el-table-column
-                v-for="field in listCustomFields"
-                :key="field.fieldId"
-                :label="field.fieldLabel"
-                min-width="140"
-              >
-                <template #header>
-                  <span class="normal-case tracking-normal">{{ field.fieldLabel }}</span>
-                </template>
-                <template #default="{ row }">
-                  <template v-if="field.fieldType === 'checkbox'">
-                    <span
-                      v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
-                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
-                      :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
-                        ? 'bg-emerald-50 text-emerald-700'
-                        : 'bg-slate-100 text-slate-600'"
-                    >
-                      <span
-                        class="size-1.5 rounded-full"
-                        :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
-                          ? 'bg-emerald-500'
-                          : 'bg-slate-400'"
-                      ></span>
-                      {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
-                    </span>
-                    <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
-                  </template>
-                  <span
-                    v-else
-                    class="block text-sm text-slate-600 truncate"
-                    :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
-                  >
-                    {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
-                  </span>
                 </template>
               </el-table-column>
 
@@ -424,7 +408,7 @@ import type {
   CustomerQueryBO
 } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import { getUserColumns } from '@/api/customField'
+import { getListFieldsByEntity } from '@/api/customField'
 import { aiParseCustomerSearch, transferCustomer, exportCustomers } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -447,7 +431,7 @@ let tableHeightRaf = 0
 
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)
-const listCustomFields = ref<CustomField[]>([])
+const listFields = ref<CustomField[]>([])
 
 // Import/Export state
 const exporting = ref(false)
@@ -781,9 +765,86 @@ const overdueCount = computed(() => {
   }).length
 })
 
+function getFieldFixed(field: CustomField): 'left' | undefined {
+  return field.fieldName === 'companyName' ? 'left' : undefined
+}
+
+function getFieldAlign(field: CustomField): 'left' | 'center' | 'right' {
+  if (field.fieldName === 'level') return 'center'
+  if (field.fieldType === 'number' || ['quotation', 'contractAmount', 'revenue'].includes(field.fieldName)) return 'right'
+  return 'left'
+}
+
+function getFieldMinWidth(field: CustomField): number {
+  const widthMap: Record<string, number> = {
+    companyName: 240,
+    industry: 120,
+    stage: 130,
+    level: 110,
+    source: 140,
+    website: 180,
+    quotation: 130,
+    contractAmount: 140,
+    revenue: 140,
+    lastContactTime: 120,
+    nextFollowTime: 160,
+    address: 180,
+    remark: 180
+  }
+
+  return widthMap[field.fieldName] || 140
+}
+
+function getListFieldRawValue(field: CustomField, row: CustomerListVO): unknown {
+  if (field.fieldSource === 'custom') {
+    return row.customFields?.[field.fieldName]
+  }
+
+  return (row as unknown as Record<string, unknown>)[field.fieldName]
+}
+
+function getFieldOptionLabel(field: CustomField, value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const normalizedValue = String(value)
+  return field.options?.find(option => option.value === normalizedValue)?.label || normalizedValue
+}
+
+function getLevelLabel(field: CustomField, level: string): string {
+  return getFieldOptionLabel(field, level)
+}
+
+function formatMoney(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  const amount = Number(value)
+  if (Number.isNaN(amount)) return String(value)
+
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(amount)
+}
+
+function getListFieldDisplayValue(field: CustomField, row: CustomerListVO): string {
+  const rawValue = getListFieldRawValue(field, row)
+
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return '-'
+  }
+
+  if (field.fieldName === 'lastContactTime') {
+    return formatRelativeTime(String(rawValue))
+  }
+
+  if (['quotation', 'contractAmount', 'revenue'].includes(field.fieldName)) {
+    return formatMoney(rawValue)
+  }
+
+  return formatCustomFieldValue(field, rawValue)
+}
+
 async function loadListCustomFields() {
   try {
-    listCustomFields.value = await getUserColumns('customer')
+    listFields.value = await getListFieldsByEntity('customer')
   } catch {
     // Error handled by interceptor
   }
@@ -873,6 +934,20 @@ function getStageLabel(stage: string): string {
     lost: '已流失'
   }
   return labels[stage] || stage
+}
+
+function getConfiguredStageLabel(field: CustomField, stage: string): string {
+  const optionLabel = getFieldOptionLabel(field, stage)
+  return optionLabel !== stage ? optionLabel : getStageLabel(stage)
+}
+
+function getLevelBadgeClass(level: string): string {
+  const classes: Record<string, string> = {
+    A: 'bg-emerald-50 text-emerald-600',
+    B: 'bg-blue-50 text-blue-600',
+    C: 'bg-slate-100 text-slate-500'
+  }
+  return classes[level] || 'bg-slate-100 text-slate-500'
 }
 
 function getStageBadgeClass(stage: string): string {

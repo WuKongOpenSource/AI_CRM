@@ -50,6 +50,14 @@ public class BasePage<T> implements IPage<T>, Serializable {
      */
     private final List<OrderItem> orders = new ArrayList<>();
 
+    private boolean searchCount = true;
+
+    private boolean optimizeCountSql = true;
+
+    private boolean optimizeJoinOfCountSql = true;
+
+    private String countId;
+
     /**
      * 额外数据
      */
@@ -170,6 +178,50 @@ public class BasePage<T> implements IPage<T>, Serializable {
     @Override
     public List<OrderItem> orders() {
         return orders;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean searchCount() {
+        return searchCount;
+    }
+
+    public BasePage<T> setSearchCount(boolean searchCount) {
+        this.searchCount = searchCount;
+        return this;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean optimizeCountSql() {
+        return optimizeCountSql;
+    }
+
+    public BasePage<T> setOptimizeCountSql(boolean optimizeCountSql) {
+        this.optimizeCountSql = optimizeCountSql;
+        return this;
+    }
+
+    @Override
+    @JsonIgnore
+    public boolean optimizeJoinOfCountSql() {
+        return optimizeJoinOfCountSql;
+    }
+
+    public BasePage<T> setOptimizeJoinOfCountSql(boolean optimizeJoinOfCountSql) {
+        this.optimizeJoinOfCountSql = optimizeJoinOfCountSql;
+        return this;
+    }
+
+    @Override
+    @JsonIgnore
+    public String countId() {
+        return countId;
+    }
+
+    public BasePage<T> setCountId(String countId) {
+        this.countId = countId;
+        return this;
     }
 
 

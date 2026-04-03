@@ -4,12 +4,19 @@
 
     <!-- 可复用的 WHERE 条件片段 -->
     <sql id="customerQueryConditions">
+        <if test="query.tenantId != null">
+            AND c.tenant_id = #{query.tenantId}
+        </if>
+        <if test="query.authorizedOwnerIds != null and query.authorizedOwnerIds.size() > 0">
+            AND c.owner_id IN
+            <foreach collection="query.authorizedOwnerIds" item="ownerId" open="(" separator="," close=")">
+                #{ownerId}
+            </foreach>
+        </if>
         <if test="query.keyword != null and query.keyword != ''">
             AND (
-                c.company_name LIKE CONCAT('%', #{query.keyword}, '%')
-                OR c.primary_contact_name LIKE CONCAT('%', #{query.keyword}, '%')
-                OR c.primary_contact_phone LIKE CONCAT('%', #{query.keyword}, '%')
-                OR c.tag_names LIKE CONCAT('%', #{query.keyword}, '%')
+                c.search_text::pdb.alias('customer_search_cjk') &amp;&amp;&amp; #{query.keyword}::pdb.boost(2)
+                OR c.search_text::pdb.alias('customer_search_ngram') &amp;&amp;&amp; #{query.keyword}
             )
         </if>
         <if test="query.stage != null and query.stage != ''">
@@ -98,35 +105,54 @@
             <when test="query.sortBy == 'quotation'">
                 ORDER BY c.quotation
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST, c.create_time DESC
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
             </when>
             <when test="query.sortBy == 'contractAmount'">
                 ORDER BY c.contract_amount
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST, c.create_time DESC
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
             </when>
             <when test="query.sortBy == 'revenue'">
                 ORDER BY c.revenue
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST, c.create_time DESC
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
             </when>
             <when test="query.sortBy == 'lastContactTime'">
                 ORDER BY c.last_contact_time
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST, c.create_time DESC
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
             </when>
             <when test="query.sortBy == 'nextFollowTime'">
                 ORDER BY c.next_follow_time
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST, c.create_time DESC
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
             </when>
             <when test="query.sortBy == 'contactCount'">
                 ORDER BY c.contact_count
                 <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>
-                NULLS LAST, c.create_time DESC
+                NULLS LAST
+                <if test="query.keyword != null and query.keyword != ''">, pdb.score(c.customer_id) DESC</if>
+                , c.create_time DESC
             </when>
             <otherwise>
-                ORDER BY c.create_time DESC
+                <choose>
+                    <when test="query.keyword != null and query.keyword != ''">
+                        ORDER BY pdb.score(c.customer_id) DESC, c.create_time DESC
+                    </when>
+                    <otherwise>
+                        ORDER BY c.create_time DESC
+                    </otherwise>
+                </choose>
             </otherwise>
         </choose>
     </sql>
@@ -139,11 +165,14 @@
             c.stage,
             c.level,
             c.source,
+            c.website,
+            c.address,
             c.quotation,
             c.contract_amount,
             c.revenue,
             c.last_contact_time,
             c.next_follow_time,
+            c.remark,
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
@@ -167,11 +196,14 @@
             c.stage,
             c.level,
             c.source,
+            c.website,
+            c.address,
             c.quotation,
             c.contract_amount,
             c.revenue,
             c.last_contact_time,
             c.next_follow_time,
+            c.remark,
             c.owner_id,
             u.realname AS owner_name,
             c.create_time,
@@ -190,6 +222,13 @@
         WHERE c.status = 1
         <include refid="customerQueryConditions"/>
         <include refid="customerQueryOrderBy"/>
+    </select>
+
+    <select id="queryPageListCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_customer c
+        WHERE c.status = 1
+        <include refid="customerQueryConditions"/>
     </select>
 
     <select id="getCustomerById" resultType="com.kakarote.ai_crm.entity.VO.CustomerDetailVO">

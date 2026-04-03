@@ -91,4 +91,10 @@ public class CustomerQueryBO extends PageEntity {
 
     @Schema(description = "排序方向: asc/desc")
     private String sortOrder;
+
+    @Schema(hidden = true)
+    private Long tenantId;
+
+    @Schema(hidden = true)
+    private List<Long> authorizedOwnerIds;
 }

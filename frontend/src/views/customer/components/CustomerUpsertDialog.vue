@@ -83,7 +83,15 @@
                     <span class="w-1 h-3 bg-primary rounded-full"></span>
                     基础信息
                   </h3>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  <DynamicFieldForm
+                    ref="dynamicFieldFormRef"
+                    entity-type="customer"
+                    mode="form"
+                    v-model="customerFieldValues"
+                    :full-span-field-names="['companyName', 'address', 'remark']"
+                    class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"
+                  />
+                  <div v-if="false" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <div class="md:col-span-2 space-y-1.5">
                       <label class="text-xs font-bold text-slate-500 uppercase ml-1">公司名称 <span class="text-red-400">*</span></label>
                       <el-input
@@ -163,7 +171,7 @@
                     <DynamicFieldForm
                       ref="dynamicFieldFormRef"
                       entity-type="customer"
-                      v-model="customFieldValues"
+                      v-model="customerFieldValues"
                     />
                   </div>
                 </section>
@@ -239,6 +247,7 @@ import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
 import AiSmartEntrySection from '@/components/crm/AiSmartEntrySection.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
 import type { CustomerAddBO, CustomerDetailVO, CustomerLevel, CustomerListVO, CustomerStage } from '@/types/customer'
+import type { CustomField } from '@/types/customField'
 
 type Mode = 'create' | 'edit'
 type CustomerLike = CustomerListVO | CustomerDetailVO | null
@@ -261,7 +270,7 @@ const isEdit = computed(() => props.mode === 'edit')
 
 const submitting = ref(false)
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm>>()
-const customFieldValues = ref<Record<string, any>>({})
+const customerFieldValues = ref<Record<string, any>>({})
 
 const formData = reactive<CustomerAddBO>({
   companyName: '',
@@ -272,6 +281,9 @@ const formData = reactive<CustomerAddBO>({
   website: '',
   address: '',
   quotation: undefined,
+  contractAmount: undefined,
+  revenue: undefined,
+  nextFollowTime: undefined,
   remark: '',
   description: '',
   contactName: '',
@@ -285,6 +297,124 @@ const aiParsing = ref(false)
 const aiParseResult = ref<CustomerAiParseVO | null>(null)
 const aiImageFile = ref<File | null>(null)
 const aiImagePreview = ref<string | null>(null)
+
+const CUSTOMER_SYSTEM_FIELD_NAMES = new Set([
+  'companyName',
+  'industry',
+  'stage',
+  'level',
+  'source',
+  'website',
+  'quotation',
+  'contractAmount',
+  'revenue',
+  'address',
+  'nextFollowTime',
+  'remark'
+])
+
+function padDateTimePart(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function normalizeDateTimeValue(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === '') {
+    return undefined
+  }
+
+  const rawValue = String(value).trim()
+  if (!rawValue) {
+    return undefined
+  }
+
+  const normalizedValue = rawValue.replace('T', ' ').replace(/\.\d+Z?$/, '')
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(normalizedValue)) {
+    return normalizedValue
+  }
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalizedValue)) {
+    return `${normalizedValue}:00`
+  }
+
+  const parsedDate = new Date(rawValue)
+  if (Number.isNaN(parsedDate.getTime())) {
+    return rawValue
+  }
+
+  return [
+    parsedDate.getFullYear(),
+    padDateTimePart(parsedDate.getMonth() + 1),
+    padDateTimePart(parsedDate.getDate())
+  ].join('-') + ` ${[
+    padDateTimePart(parsedDate.getHours()),
+    padDateTimePart(parsedDate.getMinutes()),
+    padDateTimePart(parsedDate.getSeconds())
+  ].join(':')}`
+}
+
+function buildCustomerFieldValues(c: CustomerLike): Record<string, any> {
+  if (!c) {
+    return {}
+  }
+
+  const anyCustomer = c as any
+  return {
+    companyName: c.companyName || '',
+    industry: c.industry || '',
+    level: (c.level || 'B') as CustomerLevel,
+    stage: (c.stage || 'lead') as CustomerStage,
+    source: anyCustomer.source || '',
+    website: anyCustomer.website || '',
+    quotation: anyCustomer.quotation ?? undefined,
+    contractAmount: anyCustomer.contractAmount ?? undefined,
+    revenue: anyCustomer.revenue ?? undefined,
+    address: anyCustomer.address || '',
+    nextFollowTime: normalizeDateTimeValue(anyCustomer.nextFollowTime),
+    remark: anyCustomer.remark || '',
+    ...(c.customFields ? { ...c.customFields } : {})
+  }
+}
+
+function getDynamicFormFields(): CustomField[] {
+  const exposedFields = dynamicFieldFormRef.value?.fields as CustomField[] | { value?: CustomField[] } | undefined
+  if (Array.isArray(exposedFields)) {
+    return exposedFields
+  }
+  if (exposedFields && Array.isArray(exposedFields.value)) {
+    return exposedFields.value
+  }
+  return []
+}
+
+function getDynamicFormValues(): Record<string, any> {
+  const exposedValues = dynamicFieldFormRef.value?.localValues as Record<string, any> | { value?: Record<string, any> } | undefined
+  if (exposedValues && typeof exposedValues === 'object' && !Array.isArray(exposedValues)) {
+    if ('value' in exposedValues && exposedValues.value && typeof exposedValues.value === 'object') {
+      return { ...exposedValues.value }
+    }
+    return { ...exposedValues }
+  }
+  return { ...customerFieldValues.value }
+}
+
+function splitCustomerFieldValues() {
+  const fieldMap = new Map(getDynamicFormFields().map(field => [field.fieldName, field]))
+  const currentValues = getDynamicFormValues()
+  const systemValues: Record<string, any> = {}
+  const customValues: Record<string, any> = {}
+
+  for (const [fieldName, fieldValue] of Object.entries(currentValues)) {
+    const field = fieldMap.get(fieldName)
+    const isSystemField = field ? field.fieldSource === 'system' : CUSTOMER_SYSTEM_FIELD_NAMES.has(fieldName)
+
+    if (isSystemField) {
+      systemValues[fieldName] = fieldValue
+    } else {
+      customValues[fieldName] = fieldValue
+    }
+  }
+
+  return { systemValues, customValues }
+}
 
 function getPrimaryContactFromCustomer(c: CustomerLike): { name?: string; phone?: string; email?: string } {
   if (!c) return {}
@@ -308,6 +438,9 @@ function hydrateFromCustomer() {
     website: (c?.website || '') as any,
     address: (c?.address || '') as any,
     quotation: (c?.quotation ?? undefined) as any,
+    contractAmount: ((c as any)?.contractAmount ?? undefined) as any,
+    revenue: ((c as any)?.revenue ?? undefined) as any,
+    nextFollowTime: normalizeDateTimeValue((c as any)?.nextFollowTime) as any,
     remark: ((c as any)?.remark || '') as any,
     description: (c?.description || '') as any
   })
@@ -315,7 +448,7 @@ function hydrateFromCustomer() {
   formData.contactName = pc.name || ''
   formData.contactPhone = pc.phone || ''
   formData.contactEmail = pc.email || ''
-  customFieldValues.value = c?.customFields ? { ...c.customFields } : {}
+  customerFieldValues.value = buildCustomerFieldValues(c)
 }
 
 function resetAll() {
@@ -328,13 +461,16 @@ function resetAll() {
     website: '',
     address: '',
     quotation: undefined,
+    contractAmount: undefined,
+    revenue: undefined,
+    nextFollowTime: undefined,
     remark: '',
     description: '',
     contactName: '',
     contactPhone: '',
     contactEmail: ''
   })
-  customFieldValues.value = {}
+  customerFieldValues.value = {}
   aiInputText.value = ''
   aiParsing.value = false
   aiParseResult.value = null
@@ -402,12 +538,30 @@ async function handleAiExtract() {
     })
     aiParseResult.value = result
 
-    if (result.companyName) formData.companyName = result.companyName
-    if (result.industry) formData.industry = result.industry
-    if (result.level && ['A', 'B', 'C'].includes(result.level)) formData.level = result.level as CustomerLevel
-    if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost'].includes(result.stage)) formData.stage = result.stage as CustomerStage
-    if (result.source) formData.source = result.source
-    if (result.remark) formData.remark = result.remark
+    if (result.companyName) {
+      formData.companyName = result.companyName
+      customerFieldValues.value.companyName = result.companyName
+    }
+    if (result.industry) {
+      formData.industry = result.industry
+      customerFieldValues.value.industry = result.industry
+    }
+    if (result.level && ['A', 'B', 'C'].includes(result.level)) {
+      formData.level = result.level as CustomerLevel
+      customerFieldValues.value.level = result.level as CustomerLevel
+    }
+    if (result.stage && ['lead', 'qualified', 'proposal', 'negotiation', 'closed', 'lost'].includes(result.stage)) {
+      formData.stage = result.stage as CustomerStage
+      customerFieldValues.value.stage = result.stage as CustomerStage
+    }
+    if (result.source) {
+      formData.source = result.source
+      customerFieldValues.value.source = result.source
+    }
+    if (result.remark) {
+      formData.remark = result.remark
+      customerFieldValues.value.remark = result.remark
+    }
     if (result.contactName) formData.contactName = result.contactName
     if (result.contactPhone) formData.contactPhone = result.contactPhone
     if (result.contactEmail) formData.contactEmail = result.contactEmail
@@ -425,7 +579,10 @@ async function handleAiExtract() {
 }
 
 async function handleSubmit() {
-  if (!formData.companyName?.trim()) {
+  const currentFieldValues = getDynamicFormValues()
+  const companyName = String(currentFieldValues.companyName ?? formData.companyName ?? '').trim()
+
+  if (!companyName) {
     ElMessage.warning('请输入公司名称')
     return
   }
@@ -440,9 +597,12 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
+    const { systemValues, customValues } = splitCustomerFieldValues()
     const submitData = {
       ...formData,
-      customFields: customFieldValues.value
+      ...systemValues,
+      companyName,
+      customFields: customValues
     }
 
     if (props.mode === 'edit') {

@@ -48,10 +48,55 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     @Autowired
     private ICustomFieldSortService customFieldSortService;
 
-    /**
+    @Lazy
+    @Autowired
+    private CustomerServiceImpl customerService;
+
+    private static final Set<String> CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
+    private static final String FIELD_SOURCE_SYSTEM = "system";
+    private static final String FIELD_SOURCE_CUSTOM = "custom";
+    /*
+
      * 单个实体最大自定义字段数
      */
     private static final int MAX_FIELDS_PER_ENTITY = 50;
+
+    /*
+            "customer", List.of(
+                    systemField("companyName", "公司名称", "text", "company_name", "VARCHAR(255)", null, "请输入公司名称", true, true, true, null, 10),
+                    systemField("industry", "所属行业", "text", "industry", "VARCHAR(100)", null, "请输入所属行业", false, true, true, null, 20),
+                    systemField("stage", "商机阶段", "select", "stage", "VARCHAR(50)", "lead", null, false, false, true, List.of(
+                            option("lead", "线索"),
+                            option("qualified", "资格审核"),
+                            option("proposal", "方案报价"),
+                            option("negotiation", "谈判中"),
+                            option("closed", "已成交"),
+                            option("lost", "已流失")
+                    ), 30),
+                    systemField("level", "客户级别", "select", "level", "CHAR(1)", "B", null, false, false, true, List.of(
+                            option("A", "A级客户"),
+                            option("B", "B级客户"),
+                            option("C", "C级客户")
+                    ), 40),
+                    systemField("source", "来源", "text", "source", "VARCHAR(100)", null, "请输入客户来源", false, true, true, null, 50),
+                    systemField("website", "网站", "text", "website", "VARCHAR(255)", null, "请输入网站地址", false, false, true, null, 60),
+                    systemField("quotation", "报价金额", "number", "quotation", "DECIMAL(15,2)", null, "请输入报价金额", false, false, true, null, 70),
+                    systemField("contractAmount", "合同金额", "number", "contract_amount", "DECIMAL(15,2)", null, "请输入合同金额", false, false, true, null, 80),
+                    systemField("revenue", "收入金额", "number", "revenue", "DECIMAL(15,2)", null, "请输入收入金额", false, false, true, null, 90),
+                    systemField("address", "地址", "textarea", "address", "VARCHAR(500)", null, "请输入客户地址", false, false, false, null, 100),
+                    systemField("nextFollowTime", "下次跟进时间", "datetime", "next_follow_time", "TIMESTAMP", null, "请选择下次跟进时间", false, false, true, null, 110),
+                    systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, false, false, null, 120)
+            ),
+            "contact", List.of(
+                    systemField("name", "姓名", "text", "name", "VARCHAR(100)", null, "请输入姓名", true, true, true, null, 10),
+                    systemField("position", "职位", "text", "position", "VARCHAR(100)", null, "请输入职位", false, true, true, null, 20),
+                    systemField("phone", "电话", "text", "phone", "VARCHAR(50)", null, "请输入电话", false, true, true, null, 30),
+                    systemField("email", "邮箱", "text", "email", "VARCHAR(100)", null, "请输入邮箱", false, true, true, null, 40),
+                    systemField("wechat", "微信", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, false, null, 50),
+                    systemField("isPrimary", "主联系人", "checkbox", "is_primary", "SMALLINT", "0", null, false, false, true, null, 60),
+                    systemField("notes", "备注", "textarea", "notes", "TEXT", null, "请输入备注", false, false, false, null, 70)
+            )
+    ); */
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -63,7 +108,8 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
         // 2. 检查字段数量限制
         long count = count(new LambdaQueryWrapper<CustomField>()
-                .eq(CustomField::getEntityType, bo.getEntityType()));
+                .eq(CustomField::getEntityType, bo.getEntityType())
+                .and(this::appendCustomFieldSourceCondition));
         if (count >= MAX_FIELDS_PER_ENTITY) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "自定义字段数量已达上限(" + MAX_FIELDS_PER_ENTITY + "个)");
         }
@@ -78,6 +124,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setFieldName(columnName);
         field.setFieldLabel(bo.getFieldLabel());
         field.setFieldType(bo.getFieldType());
+        field.setFieldSource(FIELD_SOURCE_CUSTOM);
         field.setColumnName(columnName);
         field.setColumnType(poolEntry.getColumnType());
         field.setDefaultValue(bo.getDefaultValue());
@@ -87,7 +134,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setIsShowInList(bo.getIsShowInList() == null || bo.getIsShowInList() ? 1 : 0);
         field.setOptions(bo.getOptions() != null ? JSON.toJSONString(bo.getOptions()) : null);
         field.setValidationRules(bo.getValidation() != null ? JSON.toJSONString(bo.getValidation()) : null);
-        field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : 0);
+        field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : getNextSortOrder(bo.getEntityType()));
         field.setStatus(1);
         save(field);
 
@@ -121,17 +168,27 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         if (bo.getIsShowInList() != null) {
             field.setIsShowInList(bo.getIsShowInList() ? 1 : 0);
         }
-        if (bo.getOptions() != null) {
+        if (bo.getOptions() != null && !isSystemField(field)) {
             field.setOptions(JSON.toJSONString(bo.getOptions()));
         }
-        if (bo.getValidation() != null) {
+        if (bo.getValidation() != null && !isSystemField(field)) {
             field.setValidationRules(JSON.toJSONString(bo.getValidation()));
         }
         if (bo.getSortOrder() != null) {
             field.setSortOrder(bo.getSortOrder());
         }
 
+        boolean needsRefresh = isCustomField(field) && shouldRefreshCustomerSearchText(
+                field.getEntityType(),
+                field.getFieldType(),
+                field.getIsSearchable() != null && field.getIsSearchable() == 1
+        ) && bo.getIsSearchable() != null;
+
         updateById(field);
+
+        if (needsRefresh) {
+            customerService.refreshAllCustomerSearchText();
+        }
     }
 
     @Override
@@ -143,6 +200,11 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
         field.setStatus(0);
         updateById(field);
+
+        if (isCustomField(field)
+                && shouldRefreshCustomerSearchText(field.getEntityType(), field.getFieldType(), field.getIsSearchable() != null && field.getIsSearchable() == 1)) {
+            customerService.refreshAllCustomerSearchText();
+        }
     }
 
     @Override
@@ -154,6 +216,11 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
         field.setStatus(1);
         updateById(field);
+
+        if (isCustomField(field)
+                && shouldRefreshCustomerSearchText(field.getEntityType(), field.getFieldType(), field.getIsSearchable() != null && field.getIsSearchable() == 1)) {
+            customerService.refreshAllCustomerSearchText();
+        }
     }
 
     @Override
@@ -165,10 +232,19 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
 
         // 仅删除元数据，物理列保留在字段池中供其他租户或未来复用
+        if (isSystemField(field)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "系统字段不支持删除");
+        }
+
         removeById(fieldId);
 
         // 清理该字段的所有用户排序记录
         customFieldSortService.removeByFieldId(fieldId);
+
+        if (isCustomField(field)
+                && shouldRefreshCustomerSearchText(field.getEntityType(), field.getFieldType(), field.getIsSearchable() != null && field.getIsSearchable() == 1)) {
+            customerService.refreshAllCustomerSearchText();
+        }
     }
 
     @Override
@@ -182,6 +258,27 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
     @Override
     public List<CustomFieldVO> getEnabledFieldsByEntity(String entityType) {
+        List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, entityType)
+                .eq(CustomField::getStatus, 1)
+                .orderByAsc(CustomField::getSortOrder)
+                .orderByAsc(CustomField::getCreateTime));
+        return convertToVO(fields);
+    }
+
+    @Override
+    public List<CustomFieldVO> getListFieldsByEntity(String entityType) {
+        List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, entityType)
+                .eq(CustomField::getStatus, 1)
+                .eq(CustomField::getIsShowInList, 1)
+                .orderByAsc(CustomField::getSortOrder)
+                .orderByAsc(CustomField::getCreateTime));
+        return convertToVO(fields);
+    }
+
+    @Override
+    public List<CustomFieldVO> getFormFieldsByEntity(String entityType) {
         List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
                 .eq(CustomField::getEntityType, entityType)
                 .eq(CustomField::getStatus, 1)
@@ -342,8 +439,8 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
         return result;
     }
+    /*
 
-    /**
      * 按字段类型将前端传入的值转换为 JDBC 兼容的 Java 类型
      * text/textarea/select → String
      * number → BigDecimal
@@ -393,7 +490,71 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
 
     /**
      * 将PO列表转换为VO列表
-     */
+        List<SystemFieldDefinition> definitions = SYSTEM_FIELD_DEFINITIONS.get(entityType);
+        if (definitions == null || definitions.isEmpty()) {
+            return;
+        }
+
+        synchronized (SYSTEM_FIELD_INIT_LOCK) {
+            Set<String> existingFieldNames = list(new LambdaQueryWrapper<CustomField>()
+                    .eq(CustomField::getEntityType, entityType))
+                    .stream()
+                    .map(CustomField::getFieldName)
+                    .collect(Collectors.toSet());
+
+            List<CustomField> missingFields = definitions.stream()
+                    .filter(definition -> !existingFieldNames.contains(definition.fieldName()))
+                    .map(definition -> buildSystemField(entityType, definition))
+                    .toList();
+
+            boolean refreshCustomerSearchText = false;
+            for (CustomField missingField : missingFields) {
+                try {
+                    save(missingField);
+                    if ("customer".equals(entityType)
+                            && missingField.getIsSearchable() != null
+                            && missingField.getIsSearchable() == 1
+                            && CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES.contains(missingField.getFieldType())) {
+                        refreshCustomerSearchText = true;
+                    }
+                } catch (Exception exception) {
+                    log.warn("初始化系统字段失败: entityType={}, fieldName={}, error={}",
+                            entityType, missingField.getFieldName(), exception.getMessage());
+                }
+            }
+            if (refreshCustomerSearchText) {
+                customerService.refreshAllCustomerSearchText();
+            }
+        }
+    }
+
+    */
+    private int getNextSortOrder(String entityType) {
+        CustomField lastField = getOne(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, entityType)
+                .orderByDesc(CustomField::getSortOrder)
+                .orderByDesc(CustomField::getCreateTime)
+                .last("LIMIT 1"), false);
+        if (lastField == null || lastField.getSortOrder() == null) {
+            return 1;
+        }
+        return lastField.getSortOrder() + 1;
+    }
+
+    private void appendCustomFieldSourceCondition(LambdaQueryWrapper<CustomField> wrapper) {
+        wrapper.isNull(CustomField::getFieldSource)
+                .or()
+                .eq(CustomField::getFieldSource, FIELD_SOURCE_CUSTOM);
+    }
+
+    private boolean isSystemField(CustomField field) {
+        return field != null && FIELD_SOURCE_SYSTEM.equalsIgnoreCase(field.getFieldSource());
+    }
+
+    private boolean isCustomField(CustomField field) {
+        return !isSystemField(field);
+    }
+
     private List<CustomFieldVO> convertToVO(List<CustomField> fields) {
         return fields.stream().map(field -> {
             CustomFieldVO vo = BeanUtil.copyProperties(field, CustomFieldVO.class,"options");
@@ -411,6 +572,12 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             }
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    private boolean shouldRefreshCustomerSearchText(String entityType, String fieldType, boolean searchable) {
+        return searchable
+                && "customer".equals(entityType)
+                && CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES.contains(fieldType);
     }
 
 }

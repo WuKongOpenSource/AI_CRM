@@ -78,7 +78,7 @@
         <el-switch v-model="fieldForm.defaultValue" />
       </el-form-item>
 
-      <el-form-item v-if="['select', 'multiselect'].includes(fieldForm.fieldType)" label="选项配置">
+      <el-form-item v-if="['select', 'multiselect'].includes(fieldForm.fieldType) && !isSystemField" label="选项配置">
         <div class="w-full space-y-2">
           <div v-for="(option, index) in fieldForm.options" :key="index" class="flex gap-2">
             <el-input v-model="option.value" placeholder="值" class="w-1/3 min-w-0 wk-crm-el-field-input" size="large" />
@@ -145,4 +145,6 @@ const dialogVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit('update:visible', value)
 })
+
+const isSystemField = computed(() => props.editingField?.fieldSource === 'system')
 </script>

@@ -282,7 +282,8 @@ public class CustomerTools {
             if (normalizeOptionalText(nextFollowTime) != null) {
                 try {
                     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-                    bo.setNextFollowTime(dateFormat.parse(nextFollowTime.trim()));
+                    dateFormat.parse(nextFollowTime.trim());
+                    bo.setNextFollowTime(nextFollowTime.trim());
                 } catch (Exception e) {
                     log.warn("下次跟进时间格式无效: {}", nextFollowTime);
                 }

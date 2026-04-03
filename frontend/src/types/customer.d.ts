@@ -23,12 +23,14 @@ export interface CustomerListVO extends Customer {
   contactCount: number
   lastFollowUpTime?: string
   lastContactTime?: string
+  nextFollowTime?: string
   tags: string[]
   customFields?: Record<string, any>
   // Financial info
   quotation?: number
   contractAmount?: number
   revenue?: number
+  remark?: string
   // Primary contact info
   primaryContactName?: string
   primaryContactPhone?: string
@@ -96,6 +98,9 @@ export interface CustomerAddBO {
   website?: string
   address?: string
   quotation?: number | null
+  contractAmount?: number | null
+  revenue?: number | null
+  nextFollowTime?: string
   remark?: string
   description?: string
   // Primary contact

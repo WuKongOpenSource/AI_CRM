@@ -67,6 +67,10 @@ public interface ICustomFieldService extends IService<CustomField> {
      */
     List<CustomFieldVO> getEnabledFieldsByEntity(String entityType);
 
+    List<CustomFieldVO> getListFieldsByEntity(String entityType);
+
+    List<CustomFieldVO> getFormFieldsByEntity(String entityType);
+
     /**
      * 调整字段排序
      *

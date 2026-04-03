@@ -37,6 +37,10 @@ public class CustomerListVO {
     @Schema(description = "客户来源")
     private String source;
 
+    private String website;
+
+    private String address;
+
     @Schema(description = "报价金额")
     private BigDecimal quotation;
 
@@ -51,6 +55,8 @@ public class CustomerListVO {
 
     @Schema(description = "下次跟进时间")
     private Date nextFollowTime;
+
+    private String remark;
 
     @Schema(description = "负责人ID")
     private Long ownerId;

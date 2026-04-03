@@ -2,6 +2,7 @@
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'select' | 'multiselect' | 'checkbox'
 export type EntityType = 'customer' | 'contact'
+export type FieldSource = 'system' | 'custom'
 
 export interface FieldOption {
   value: string
@@ -23,6 +24,7 @@ export interface CustomField {
   fieldName: string
   fieldLabel: string
   fieldType: FieldType
+  fieldSource: FieldSource
   columnName: string
   defaultValue?: string
   placeholder?: string

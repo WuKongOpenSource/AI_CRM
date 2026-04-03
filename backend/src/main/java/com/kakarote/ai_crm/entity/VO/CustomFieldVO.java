@@ -30,6 +30,9 @@ public class CustomFieldVO {
     @Schema(description = "字段类型")
     private String fieldType;
 
+    @Schema(description = "字段来源: system/custom")
+    private String fieldSource;
+
     @Schema(description = "实际数据库列名")
     private String columnName;
 
