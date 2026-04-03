@@ -8,6 +8,15 @@ import type { DeptVO } from '@/types/dept'
 import type { RoleVO } from '@/types/role'
 import { TEAM_AVATAR_COLORS } from './constants'
 
+// Keep in sync with com.kakarote.ai_crm.common.Const.AUTH_DATA_RECURSION_NUM
+const AUTH_DATA_RECURSION_NUM = 20
+
+interface DeptOption {
+  label: string
+  value: string
+  depth: number
+}
+
 export function useTeamManagement() {
   const { isMobile } = useResponsive()
 
@@ -23,7 +32,6 @@ export function useTeamManagement() {
   const showDeptDialog = ref(false)
   const submittingDept = ref(false)
   const editingDept = ref<DeptVO | null>(null)
-  const deptFormParentId = ref<number | string>(0)
   const showAddMemberDialog = ref(false)
   const submittingMember = ref(false)
   const editingMember = ref<any>(null)
@@ -35,6 +43,7 @@ export function useTeamManagement() {
 
   const deptForm = reactive({
     deptName: '',
+    parentId: '0',
     sortOrder: 0
   })
 
@@ -70,6 +79,17 @@ export function useTeamManagement() {
     )
   })
 
+  const parentDeptOptions = computed(() => {
+    const excludedDeptIds = new Set<string>()
+
+    if (editingDept.value) {
+      excludedDeptIds.add(String(editingDept.value.deptId))
+      collectDeptIds(editingDept.value.children || [], excludedDeptIds)
+    }
+
+    return flattenDeptOptions(deptTree.value).filter((option) => !excludedDeptIds.has(option.value))
+  })
+
   onMounted(async () => {
     await Promise.all([loadDeptTree(), loadRoleOptions()])
   })
@@ -86,23 +106,80 @@ export function useTeamManagement() {
     return TEAM_AVATAR_COLORS[index]
   }
 
-  function countDepts(tree: any[]): number {
+  function countDepts(tree: any[], depth = AUTH_DATA_RECURSION_NUM, visited = new Set<string>()): number {
+    if (depth <= 0) {
+      return 0
+    }
+
     let count = 0
     for (const node of tree) {
+      const deptId = node?.deptId != null ? String(node.deptId) : null
+      if (deptId && visited.has(deptId)) {
+        continue
+      }
+      if (deptId) {
+        visited.add(deptId)
+      }
+
       count++
       if (node.children) {
-        count += countDepts(node.children)
+        count += countDepts(node.children, depth - 1, visited)
       }
     }
     return count
+  }
+
+  function normalizeDeptId(value?: string | number | null): string {
+    if (value === null || value === undefined || value === '') {
+      return '0'
+    }
+    return String(value)
+  }
+
+  function findDeptById(tree: DeptVO[], deptId: string | number): DeptVO | null {
+    const targetId = String(deptId)
+    for (const node of tree) {
+      if (String(node.deptId) === targetId) {
+        return node
+      }
+      const child = findDeptById(node.children || [], deptId)
+      if (child) {
+        return child
+      }
+    }
+    return null
+  }
+
+  function flattenDeptOptions(tree: DeptVO[], depth = 0): DeptOption[] {
+    return tree.flatMap((node) => {
+      return [
+        {
+          label: node.deptName,
+          value: String(node.deptId),
+          depth
+        },
+        ...flattenDeptOptions(node.children || [], depth + 1)
+      ]
+    })
+  }
+
+  function collectDeptIds(tree: DeptVO[], ids: Set<string>) {
+    for (const node of tree) {
+      ids.add(String(node.deptId))
+      collectDeptIds(node.children || [], ids)
+    }
   }
 
   async function loadDeptTree() {
     loadingDeptTree.value = true
     try {
       deptTree.value = await fetchDeptTree()
-      if (deptTree.value.length > 0 && !selectedDept.value) {
+      if (selectedDept.value) {
+        selectedDept.value = findDeptById(deptTree.value, selectedDept.value.deptId) || deptTree.value[0] || null
+      } else if (deptTree.value.length > 0) {
         selectedDept.value = deptTree.value[0]
+      } else {
+        selectedDept.value = null
       }
       await loadMembers()
     } catch {
@@ -173,15 +250,17 @@ export function useTeamManagement() {
 
   function handleAddDept(parentId: string | number) {
     editingDept.value = null
-    deptFormParentId.value = parentId
-    Object.assign(deptForm, { deptName: '', sortOrder: 0 })
+    Object.assign(deptForm, { deptName: '', parentId: normalizeDeptId(parentId), sortOrder: 0 })
     showDeptDialog.value = true
   }
 
   function handleEditDept(dept: DeptVO) {
     editingDept.value = dept
-    deptFormParentId.value = dept.parentId
-    Object.assign(deptForm, { deptName: dept.deptName, sortOrder: dept.sortOrder || 0 })
+    Object.assign(deptForm, {
+      deptName: dept.deptName,
+      parentId: normalizeDeptId(dept.parentId),
+      sortOrder: dept.sortOrder || 0
+    })
     showDeptDialog.value = true
   }
 
@@ -201,27 +280,29 @@ export function useTeamManagement() {
   }
 
   async function handleSaveDept() {
-    if (!deptForm.deptName.trim()) {
+    const deptName = deptForm.deptName.trim()
+
+    if (!deptName) {
       ElMessage.warning('请输入部门名称')
       return
     }
 
     submittingDept.value = true
     try {
+      const payload = {
+        deptName,
+        parentId: normalizeDeptId(deptForm.parentId),
+        sortOrder: deptForm.sortOrder
+      }
+
       if (editingDept.value) {
         await updateDept({
           deptId: editingDept.value.deptId,
-          deptName: deptForm.deptName,
-          parentId: deptFormParentId.value,
-          sortOrder: deptForm.sortOrder
+          ...payload
         })
         ElMessage.success('部门更新成功')
       } else {
-        await addDept({
-          deptName: deptForm.deptName,
-          parentId: deptFormParentId.value,
-          sortOrder: deptForm.sortOrder
-        })
+        await addDept(payload)
         ElMessage.success('部门添加成功')
       }
       showDeptDialog.value = false
@@ -408,6 +489,7 @@ export function useTeamManagement() {
     submittingDept,
     editingDept,
     deptForm,
+    parentDeptOptions,
     showAddMemberDialog,
     submittingMember,
     editingMember,

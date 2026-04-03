@@ -51,6 +51,7 @@
       :is-mobile="isMobile"
       :editing-dept="editingDept"
       :dept-form="deptForm"
+      :parent-dept-options="parentDeptOptions"
       :submitting="submittingDept"
       @update:visible="showDeptDialog = $event"
       @save="handleSaveDept"
@@ -105,6 +106,7 @@ const {
   submittingDept,
   editingDept,
   deptForm,
+  parentDeptOptions,
   showAddMemberDialog,
   submittingMember,
   editingMember,

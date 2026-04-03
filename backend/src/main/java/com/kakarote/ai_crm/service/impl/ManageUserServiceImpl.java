@@ -91,7 +91,10 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 String password =bCryptPasswordEncoder.encode(userAddBO.getPassword());
                 userAddBO.setPassword(password);
             }
+            Long parentId = normalizeParentUserId(userAddBO.getParentId());
+            validateParentUser(null, parentId);
             manageUser = BeanUtil.copyProperties(userAddBO, ManagerUser.class);
+            manageUser.setParentId(parentId);
             if (userAddBO.getStatus() != null) {
                 manageUser.setStatus(userAddBO.getStatus());
             } else {
@@ -126,9 +129,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         // 如果指定了部门ID，收集该部门及所有下级部门ID
         if (userQueryBO.getDeptId() != null) {
             List<ManagerDept> allDepts = deptMapper.selectList(null);
-            List<Long> deptIds = new ArrayList<>();
-            collectChildDeptIds(allDepts, userQueryBO.getDeptId(), deptIds);
-            userQueryBO.setDeptIds(deptIds);
+            Set<Long> deptIds = new LinkedHashSet<>();
+            collectChildDeptIds(allDepts, userQueryBO.getDeptId(), deptIds, Const.AUTH_DATA_RECURSION_NUM);
+            userQueryBO.setDeptIds(new ArrayList<>(deptIds));
         }
         BasePage<ManageUserVO> page = baseMapper.queryPageList(userQueryBO.parse(), userQueryBO);
         fillRoleInfo(page.getRecords());
@@ -139,11 +142,13 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     /**
      * 递归收集指定部门及其所有下级部门ID
      */
-    private void collectChildDeptIds(List<ManagerDept> allDepts, Long parentId, List<Long> result) {
-        result.add(parentId);
+    private void collectChildDeptIds(List<ManagerDept> allDepts, Long parentId, Set<Long> result, int depth) {
+        if (parentId == null || depth <= 0 || !result.add(parentId)) {
+            return;
+        }
         for (ManagerDept dept : allDepts) {
-            if (parentId.equals(dept.getParentId())) {
-                collectChildDeptIds(allDepts, dept.getDeptId(), result);
+            if (Objects.equals(parentId, dept.getParentId())) {
+                collectChildDeptIds(allDepts, dept.getDeptId(), result, depth - 1);
             }
         }
     }
@@ -213,7 +218,9 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                 userEntity.setStatus(updateBO.getStatus());
             }
             if (updateBO.getParentId() != null){
-                userEntity.setParentId(updateBO.getParentId() == 0 ? null : updateBO.getParentId());
+                Long parentId = normalizeParentUserId(updateBO.getParentId());
+                validateParentUser(updateBO.getUserId(), parentId);
+                userEntity.setParentId(parentId);
             }
             updateById(userEntity);
             // 同步角色
@@ -318,5 +325,50 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         if(CollUtil.isNotEmpty(list)){
             userRoleService.removeByIds(list);
         }
+    }
+
+    private Long normalizeParentUserId(Long parentId) {
+        return parentId == null || Objects.equals(parentId, 0L) ? null : parentId;
+    }
+
+    private void validateParentUser(Long userId, Long parentId) {
+        if (parentId == null) {
+            return;
+        }
+        if (Objects.equals(userId, parentId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不能选择当前员工");
+        }
+
+        Map<Long, Long> parentByUserId = lambdaQuery()
+                .select(ManagerUser::getUserId, ManagerUser::getParentId)
+                .list()
+                .stream()
+                .collect(Collectors.toMap(
+                        ManagerUser::getUserId,
+                        user -> normalizeParentUserId(user.getParentId()),
+                        (left, right) -> left,
+                        HashMap::new
+                ));
+
+        if (!parentByUserId.containsKey(parentId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不存在");
+        }
+
+        if (userId != null && wouldCreateParentCycle(userId, parentId, parentByUserId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "直属上级不能选择当前员工或其下级员工");
+        }
+    }
+
+    private boolean wouldCreateParentCycle(Long userId, Long parentId, Map<Long, Long> parentByUserId) {
+        Set<Long> visited = new HashSet<>();
+        Long currentParentId = parentId;
+
+        while (currentParentId != null && visited.add(currentParentId)) {
+            if (Objects.equals(userId, currentParentId)) {
+                return true;
+            }
+            currentParentId = parentByUserId.get(currentParentId);
+        }
+        return false;
     }
 }

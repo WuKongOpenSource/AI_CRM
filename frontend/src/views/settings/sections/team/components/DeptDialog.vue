@@ -1,22 +1,45 @@
 <template>
   <el-dialog
     v-model="dialogVisible"
-    :title="editingDept ? '编辑部门' : '添加部门'"
-    :width="isMobile ? '95%' : '460px'"
+    :title="editingDept ? '编辑部门' : '新增部门'"
+    :width="isMobile ? '95%' : '420px'"
     :fullscreen="isMobile"
-    class="wk-dialog--flush wk-crm-el-field-scope"
+    class="wk-dialog--flush wk-crm-el-field-scope wk-dept-dialog"
   >
     <el-form :model="deptForm" label-position="top">
       <el-form-item label="部门名称" required>
         <el-input v-model="deptForm.deptName" placeholder="请输入部门名称" class="w-full wk-crm-el-field-input" size="large" />
       </el-form-item>
-      <el-form-item label="排序号">
-        <el-input-number v-model="deptForm.sortOrder" :min="0" :max="999" class="w-full" size="large" />
+      <el-form-item label="上级部门">
+        <el-select
+          v-model="deptForm.parentId"
+          placeholder="请选择上级部门"
+          filterable
+          class="w-full wk-crm-el-field-select"
+          size="large"
+        >
+          <el-option label="无（一级部门）" value="0" />
+          <el-option
+            v-for="option in parentDeptOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          >
+            <span
+              class="wk-dept-dialog__option-label"
+              :style="{ paddingLeft: `${option.depth * 18}px` }"
+            >
+              {{ option.label }}
+            </span>
+          </el-option>
+        </el-select>
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="$emit('save')">保存</el-button>
+      <div class="flex gap-3 w-full">
+        <el-button class="flex-1" size="large" @click="dialogVisible = false">取消</el-button>
+        <el-button class="flex-1" size="large" type="primary" :loading="submitting" @click="$emit('save')">保存</el-button>
+      </div>
     </template>
   </el-dialog>
 </template>
@@ -31,8 +54,14 @@ const props = defineProps<{
   editingDept: DeptVO | null
   deptForm: {
     deptName: string
+    parentId: string
     sortOrder: number
   }
+  parentDeptOptions: Array<{
+    label: string
+    value: string
+    depth: number
+  }>
   submitting: boolean
 }>()
 
@@ -46,3 +75,13 @@ const dialogVisible = computed({
   set: (value: boolean) => emit('update:visible', value)
 })
 </script>
+
+<style>
+.el-dialog.wk-dept-dialog .el-dialog__footer {
+  padding-top: 8px;
+}
+
+.wk-dept-dialog__option-label {
+  display: block;
+}
+</style>
