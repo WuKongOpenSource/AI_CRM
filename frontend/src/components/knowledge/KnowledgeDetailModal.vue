@@ -111,19 +111,28 @@
               </div>
 
               <div
+                v-else-if="showPdfPreview"
+                class="pdf-preview-shell h-full overflow-auto bg-white"
+              >
+                <KnowledgePdfPreview
+                  :blob="previewBlob"
+                  class="pdf-preview-viewer min-h-full"
+                  @rendered="handlePreviewRendered"
+                  @error="handlePreviewError"
+                />
+              </div>
+
+              <div
                 v-else-if="showOfficePreview"
                 :class="[
                   'office-preview-shell h-full overflow-auto',
-                  previewKind === 'pdf' ? 'office-preview-shell--pdf bg-white' : 'bg-slate-100'
+                  'bg-slate-100'
                 ]"
               >
                 <component
                   :is="activePreviewComponent"
                   :src="previewSource"
-                  :class="[
-                    'office-preview-viewer min-h-full',
-                    previewKind === 'pdf' ? 'office-preview-viewer--pdf' : ''
-                  ]"
+                  class="office-preview-viewer min-h-full"
                   @rendered="handlePreviewRendered"
                   @error="handlePreviewError"
                 />
@@ -366,8 +375,8 @@ const VueOfficeExcel = defineAsyncComponent(async () => {
   return module.default
 })
 
-const VueOfficePdf = defineAsyncComponent(async () => {
-  const module = await import('@vue-office/pdf')
+const KnowledgePdfPreview = defineAsyncComponent(async () => {
+  const module = await import('@/components/knowledge/KnowledgePdfPreview.vue')
   return module.default
 })
 
@@ -414,8 +423,6 @@ const activePreviewComponent = computed(() => {
       return VueOfficeDocx
     case 'excel':
       return VueOfficeExcel
-    case 'pdf':
-      return VueOfficePdf
     case 'pptx':
       return VueOfficePptx
     default:
@@ -424,6 +431,10 @@ const activePreviewComponent = computed(() => {
 })
 
 const previewSource = computed(() => previewBlob.value ?? undefined)
+
+const showPdfPreview = computed(() => {
+  return previewKind.value === 'pdf' && Boolean(previewBlob.value) && !previewFailed.value
+})
 
 const showOfficePreview = computed(() => {
   return Boolean(activePreviewComponent.value && previewSource.value && !previewFailed.value)
@@ -779,28 +790,8 @@ function getTypeIconColor(type?: string): string {
   min-height: 100%;
 }
 
-.office-preview-shell--pdf {
-  background: #fff;
-}
-
-:deep(.office-preview-viewer--pdf) {
-  min-height: 100%;
-  background: #fff;
-  padding: 0 !important;
-}
-
-:deep(.office-preview-viewer--pdf > *) {
-  margin: 0 !important;
-  padding: 0 !important;
-  background: #fff;
-}
-
-:deep(.office-preview-viewer--pdf > * > *) {
-  margin-top: 0 !important;
-}
-
-:deep(.office-preview-viewer--pdf canvas) {
-  display: block;
-  margin: 0 auto !important;
+.pdf-preview-shell {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 </style>
