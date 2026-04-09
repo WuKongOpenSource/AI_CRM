@@ -111,6 +111,14 @@ public class Customer implements Serializable {
     @Schema(description = "备注")
     private String remark;
 
+    @Schema(description = "AI状态探测")
+    @TableField("ai_status_detection")
+    private String aiStatusDetection;
+
+    @Schema(description = "AI洞察")
+    @TableField("ai_insight")
+    private String aiInsight;
+
     /**
      * 主联系人姓名(冗余)
      */

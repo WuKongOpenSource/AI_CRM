@@ -11,6 +11,8 @@ export interface Customer {
   email?: string
   website?: string
   address?: string
+  aiStatusDetection?: string
+  aiInsight?: string
   description?: string
   createTime: string
   updateTime: string
@@ -193,6 +195,12 @@ export interface CustomerAiSearchQuery {
 export interface CustomerAiSearchDisplayChip {
   key: string
   label: string
+}
+
+export interface CustomerAiReportVO {
+  customerId: string
+  aiStatusDetection?: string
+  aiInsight?: string
 }
 
 export interface CustomerAiSearchParseVO {

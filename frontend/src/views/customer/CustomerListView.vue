@@ -175,7 +175,7 @@
                 :align="getFieldAlign(field)"
               >
                 <template #header>
-                  <span class="normal-case tracking-normal">{{ field.fieldLabel }}</span>
+                  <span class="normal-case tracking-normal">{{ getListFieldLabel(field) }}</span>
                 </template>
                 <template #default="{ row }">
                   <template v-if="field.fieldSource === 'custom'">
@@ -212,6 +212,39 @@
                       </div>
                       <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName || '-' }}</span>
                     </div>
+                  </template>
+                  <template v-else-if="field.fieldName === 'aiStatusDetection'">
+                    <div class="flex items-center justify-center py-1">
+                      <span
+                        v-if="getAiStatusMeta(row.aiStatusDetection)"
+                        class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold whitespace-nowrap shadow-sm"
+                        :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
+                      >
+                        <span class="size-2 rounded-full" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
+                        {{ getAiStatusMeta(row.aiStatusDetection)?.label }}
+                      </span>
+                      <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                    </div>
+                  </template>
+                  <template v-else-if="field.fieldName === 'aiInsight'">
+                    <div v-if="row.aiInsight" class="py-1">
+                      <el-tooltip
+                        placement="top"
+                        effect="light"
+                        :show-after="150"
+                        popper-class="wk-ai-insight-tooltip"
+                      >
+                        <template #content>
+                          <div class="wk-ai-insight-tooltip__content">
+                            {{ row.aiInsight }}
+                          </div>
+                        </template>
+                        <p class="wk-ai-insight-text text-sm text-slate-600">
+                          {{ getAiInsightPreview(row.aiInsight) }}
+                        </p>
+                      </el-tooltip>
+                    </div>
+                    <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
                   </template>
                   <template v-else-if="field.fieldName === 'level'">
                     <span
@@ -416,6 +449,7 @@ import CustomerImportDialog from '@/views/customer/components/CustomerImportDial
 import CustomerInsightSidebar from '@/views/customer/components/CustomerInsightSidebar.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
 
 const router = useRouter()
@@ -432,6 +466,38 @@ let tableHeightRaf = 0
 const showAddDialog = ref(false)
 const editingCustomer = ref<CustomerListVO | null>(null)
 const listFields = ref<CustomField[]>([])
+
+const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
+  {
+    fieldId: '__ai_status_detection__',
+    entityType: 'customer',
+    fieldName: 'aiStatusDetection',
+    fieldLabel: 'AI状态探测',
+    fieldType: 'text',
+    fieldSource: 'system',
+    columnName: 'ai_status_detection',
+    isRequired: false,
+    isSearchable: true,
+    isShowInList: true,
+    sortOrder: 900,
+    status: 1
+  },
+  {
+    fieldId: '__ai_insight__',
+    entityType: 'customer',
+    fieldName: 'aiInsight',
+    fieldLabel: 'AI洞察',
+    fieldType: 'textarea',
+    fieldSource: 'system',
+    columnName: 'ai_insight',
+    isRequired: false,
+    isSearchable: true,
+    isShowInList: true,
+    sortOrder: 910,
+    status: 1
+  }
+]
+const PINNED_LIST_FIELD_ORDER = ['companyName', 'aiStatusDetection', 'aiInsight'] as const
 
 // Import/Export state
 const exporting = ref(false)
@@ -770,6 +836,7 @@ function getFieldFixed(field: CustomField): 'left' | undefined {
 }
 
 function getFieldAlign(field: CustomField): 'left' | 'center' | 'right' {
+  if (field.fieldName === 'aiStatusDetection') return 'center'
   if (field.fieldName === 'level') return 'center'
   if (field.fieldType === 'number' || ['quotation', 'contractAmount', 'revenue'].includes(field.fieldName)) return 'right'
   return 'left'
@@ -778,6 +845,8 @@ function getFieldAlign(field: CustomField): 'left' | 'center' | 'right' {
 function getFieldMinWidth(field: CustomField): number {
   const widthMap: Record<string, number> = {
     companyName: 240,
+    aiStatusDetection: 160,
+    aiInsight: 320,
     industry: 120,
     stage: 130,
     level: 110,
@@ -807,6 +876,12 @@ function getFieldOptionLabel(field: CustomField, value: unknown): string {
   if (value === null || value === undefined || value === '') return '-'
   const normalizedValue = String(value)
   return field.options?.find(option => option.value === normalizedValue)?.label || normalizedValue
+}
+
+function getListFieldLabel(field: CustomField): string {
+  if (field.fieldName === 'aiStatusDetection') return 'AI 状态探测'
+  if (field.fieldName === 'aiInsight') return 'AI 洞察摘要'
+  return field.fieldLabel
 }
 
 function getLevelLabel(field: CustomField, level: string): string {
@@ -842,9 +917,47 @@ function getListFieldDisplayValue(field: CustomField, row: CustomerListVO): stri
   return formatCustomFieldValue(field, rawValue)
 }
 
+function getAiStatusMeta(value: string | undefined | null) {
+  return getCustomerAiStatusMeta(value)
+}
+
+function getAiInsightPreview(value: string | undefined | null): string {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim()
+  return normalized || '-'
+}
+
+function getPinnedFieldOrder(fieldName: string): number {
+  const index = PINNED_LIST_FIELD_ORDER.indexOf(fieldName as typeof PINNED_LIST_FIELD_ORDER[number])
+  return index >= 0 ? index : Number.MAX_SAFE_INTEGER
+}
+
+function sortListFields(fields: CustomField[]): CustomField[] {
+  return [...fields].sort((left, right) => {
+    const leftPinnedOrder = getPinnedFieldOrder(left.fieldName)
+    const rightPinnedOrder = getPinnedFieldOrder(right.fieldName)
+
+    if (leftPinnedOrder !== rightPinnedOrder) {
+      return leftPinnedOrder - rightPinnedOrder
+    }
+
+    const leftSortOrder = Number(left.sortOrder ?? Number.MAX_SAFE_INTEGER)
+    const rightSortOrder = Number(right.sortOrder ?? Number.MAX_SAFE_INTEGER)
+    if (leftSortOrder !== rightSortOrder) {
+      return leftSortOrder - rightSortOrder
+    }
+
+    return left.fieldName.localeCompare(right.fieldName)
+  })
+}
+
 async function loadListCustomFields() {
   try {
-    listFields.value = await getListFieldsByEntity('customer')
+    const serverFields = await getListFieldsByEntity('customer')
+    const existingFieldNames = new Set(serverFields.map(field => field.fieldName))
+    listFields.value = sortListFields([
+      ...serverFields,
+      ...AI_CUSTOMER_LIST_FIELDS.filter(field => !existingFieldNames.has(field.fieldName))
+    ])
   } catch {
     // Error handled by interceptor
   }
@@ -1080,6 +1193,23 @@ async function handleImportSuccess(_result: CustomerImportResult) {
 
 .wk-customer-table :deep(.el-table__empty-block) {
   min-height: 220px;
+}
+
+.wk-ai-insight-text {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+:deep(.wk-ai-insight-tooltip) {
+  max-width: 420px;
+}
+
+:deep(.wk-ai-insight-tooltip__content) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.6;
 }
 
 .wk-ai-chip :deep(.el-tag__content) {

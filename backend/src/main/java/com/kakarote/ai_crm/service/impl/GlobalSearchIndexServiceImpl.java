@@ -153,7 +153,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         index.setEntityId(customer.getCustomerId());
         index.setTitle(customer.getCompanyName());
         index.setSubtitle(buildSubtitle("客户", firstNonBlank(customer.getIndustry(), getStageLabel(customer.getStage()))));
-        index.setSummary(truncateSummary(firstNonBlank(customer.getRemark(), customer.getPrimaryContactName())));
+        index.setSummary(truncateSummary(firstNonBlank(customer.getAiStatusDetection(), customer.getRemark(), customer.getPrimaryContactName())));
         index.setCustomerId(customer.getCustomerId());
         index.setCustomerName(customer.getCompanyName());
         index.setOwnerUserId(customer.getOwnerId());
@@ -173,7 +173,9 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
                 customer.getPrimaryContactPosition(),
                 userNameMap.get(customer.getOwnerId()),
                 tags,
-                customer.getRemark()
+                customer.getRemark(),
+                customer.getAiStatusDetection(),
+                customer.getAiInsight()
         )));
         baseMapper.upsert(fillSearchFallback(index));
     }

@@ -73,6 +73,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private TaskMapper taskMapper;
 
     @Autowired
+    private FollowUpMapper followUpMapper;
+
+    @Autowired
     private ICustomFieldService customFieldService;
 
     @Autowired
@@ -132,10 +135,53 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         3. score 请根据信息丰富度和客户质量给出合理评分
         """;
 
+    private static final String AI_CUSTOMER_REPORT_PROMPT = """
+        你是一位资深 CRM 销售分析师。请基于下面的客户资料，生成客户 AI 分析报告，并严格返回 JSON：
+        {
+          "aiStatusDetection": "30-80字，概括客户当前状态、推进信号与主要风险",
+          "aiInsight": "120-300字，输出客户需求判断、决策链判断、推进建议和风险提醒"
+        }
+
+        要求：
+        1. 使用中文。
+        2. aiStatusDetection 要简洁明确，适合在客户列表中直接浏览。
+        3. aiInsight 要具体、可执行，适合在客户详情中长期保存。
+        4. 只返回 JSON，不要返回 Markdown、代码块或额外说明。
+
+        客户资料：
+        %s
+        """;
+
+    private static final Set<String> AI_STATUS_DETECTION_OPTIONS = Set.of("高意向", "活跃状态", "需跟进", "休眠");
+    private static final String AI_CUSTOMER_REPORT_PROMPT_V2 = """
+        你是一位资深 CRM 销售分析师。请基于下面的客户资料，生成客户 AI 分析报告，并严格返回 JSON：
+        {
+          "aiStatusDetection": "只能是 高意向、活跃状态、需跟进、休眠 之一",
+          "aiInsight": "120-220字，输出客户需求判断、决策链判断、推进建议和风险提醒"
+        }
+
+        要求：
+        1. 使用中文。
+        2. aiStatusDetection 只能返回以下四个值之一：高意向、活跃状态、需跟进、休眠。
+        3. aiInsight 要具体、可执行，适合在客户详情中长期保存；列表中会展示其摘要。
+        4. 只返回 JSON，不要返回 Markdown、代码块或额外说明。
+
+        客户资料：
+        %s
+        """;
+
     private static final DateTimeFormatter AI_SEARCH_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Pattern DAYS_WITHOUT_CONTACT_PATTERN = Pattern.compile("(\\d{1,3})\\s*天(?:未跟进|未联系|未互动)");
     private static final Pattern RECENT_NEW_CUSTOMERS_PATTERN = Pattern.compile("(?:最近|近)(\\d{1,3})\\s*天新增");
     private static final Pattern LEVEL_PATTERN = Pattern.compile("([ABC])\\s*(?:类|级)?客户", Pattern.CASE_INSENSITIVE);
+    private static final String SEARCH_NUMBER_WITH_UNIT_PATTERN = "(\\d+(?:\\.\\d+)?)\\s*(万|w|W|千|k|K|亿)?\\s*(?:元|块|人民币)?";
+    private static final Pattern EXPLICIT_ZERO_PATTERN = Pattern.compile("(?<!\\d)0+(?:\\.0+)?(?!\\d)|零");
+    private static final Pattern QUOTATION_COMPARE_PATTERN = buildAmountComparePattern("报价(?:金额)?");
+    private static final Pattern QUOTATION_RANGE_PATTERN = buildAmountRangePattern("报价(?:金额)?");
+    private static final Pattern CONTRACT_AMOUNT_COMPARE_PATTERN = buildAmountComparePattern("合同(?:金额)?");
+    private static final Pattern CONTRACT_AMOUNT_RANGE_PATTERN = buildAmountRangePattern("合同(?:金额)?");
+    private static final Pattern REVENUE_COMPARE_PATTERN = buildAmountComparePattern("(?:回款|收入)(?:金额)?");
+    private static final Pattern REVENUE_RANGE_PATTERN = buildAmountRangePattern("(?:回款|收入)(?:金额)?");
     private static final List<String> COMMON_INDUSTRIES = List.of(
         "制造业", "互联网", "金融", "教育", "医疗", "零售", "物流", "房地产", "SaaS", "政府", "能源"
     );
@@ -155,12 +201,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "industry": "行业名称",
             "tag": "标签名称",
             "source": "客户来源",
-            "quotationMin": 0,
-            "quotationMax": 0,
-            "contractAmountMin": 0,
-            "contractAmountMax": 0,
-            "revenueMin": 0,
-            "revenueMax": 0,
+            "quotationMin": null,
+            "quotationMax": null,
+            "contractAmountMin": null,
+            "contractAmountMax": null,
+            "revenueMin": null,
+            "revenueMax": null,
             "lastContactStart": "yyyy-MM-dd HH:mm:ss",
             "lastContactEnd": "yyyy-MM-dd HH:mm:ss",
             "includeNoLastContact": true,
@@ -168,8 +214,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "nextFollowEnd": "yyyy-MM-dd HH:mm:ss",
             "createTimeStart": "yyyy-MM-dd HH:mm:ss",
             "createTimeEnd": "yyyy-MM-dd HH:mm:ss",
-            "contactCountMin": 0,
-            "contactCountMax": 0,
+            "contactCountMin": null,
+            "contactCountMax": null,
             "sortBy": "createTime/quotation/contractAmount/revenue/lastContactTime/nextFollowTime/contactCount",
             "sortOrder": "asc/desc"
           },
@@ -429,6 +475,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         vo.setLastContactTime(toDate(row.get("last_contact_time")));
         vo.setNextFollowTime(toDate(row.get("next_follow_time")));
         vo.setRemark(toStr(row.get("remark")));
+        vo.setAiStatusDetection(toStr(row.get("ai_status_detection")));
+        vo.setAiInsight(toStr(row.get("ai_insight")));
         vo.setOwnerId(toLong(row.get("owner_id")));
         vo.setOwnerName(toStr(row.get("owner_name")));
         vo.setCreateTime(toDate(row.get("create_time")));
@@ -543,6 +591,396 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         return detail;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CustomerAiReportVO generateAiReport(Long customerId) {
+        Customer customer = getById(customerId);
+        if (ObjectUtil.isNull(customer)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "瀹㈡埛涓嶅瓨鍦?");
+        }
+
+        CustomerDetailVO detail = getCustomerDetail(customerId);
+        List<FollowUpVO> recentFollowUps = followUpMapper.getRecentByCustomerId(customerId, 5);
+
+        CustomerAiReportVO report;
+        String prompt = String.format(AI_CUSTOMER_REPORT_PROMPT_V2, buildCustomerAiReportContext(detail, recentFollowUps));
+        try {
+            String response = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
+            report = parseCustomerAiReportResponse(response, detail, recentFollowUps);
+        } catch (Exception exception) {
+            log.error("generate customer ai report failed, customerId={}", customerId, exception);
+            report = buildFallbackCustomerAiReportV2(detail, recentFollowUps);
+        }
+
+        report.setCustomerId(customerId);
+
+        lambdaUpdate()
+                .eq(Customer::getCustomerId, customerId)
+                .set(Customer::getAiStatusDetection, StrUtil.nullToEmpty(report.getAiStatusDetection()))
+                .set(Customer::getAiInsight, StrUtil.nullToEmpty(report.getAiInsight()))
+                .update();
+
+        refreshCustomerSearchText(customerId);
+        globalSearchIndexService.refreshCustomerIndex(customerId);
+        return report;
+    }
+
+    private String buildCustomerAiReportContext(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("客户ID: ").append(detail.getCustomerId()).append('\n');
+        builder.append("公司名称: ").append(StrUtil.blankToDefault(detail.getCompanyName(), "未知")).append('\n');
+        builder.append("行业: ").append(StrUtil.blankToDefault(detail.getIndustry(), "未填写")).append('\n');
+        builder.append("阶段: ").append(getStageLabel(detail.getStage())).append('\n');
+        builder.append("客户级别: ").append(getLevelDisplayLabel(detail.getLevel())).append('\n');
+        builder.append("来源: ").append(StrUtil.blankToDefault(detail.getSource(), "未填写")).append('\n');
+        builder.append("负责人: ").append(StrUtil.blankToDefault(detail.getOwnerName(), "未分配")).append('\n');
+        builder.append("报价金额: ").append(formatNullableAmount(detail.getQuotation())).append('\n');
+        builder.append("合同金额: ").append(formatNullableAmount(detail.getContractAmount())).append('\n');
+        builder.append("回款金额: ").append(formatNullableAmount(detail.getRevenue())).append('\n');
+        builder.append("最后联系时间: ").append(formatNullableDateTime(detail.getLastContactTime())).append('\n');
+        builder.append("下次跟进时间: ").append(formatNullableDateTime(detail.getNextFollowTime())).append('\n');
+        builder.append("备注: ").append(StrUtil.blankToDefault(detail.getRemark(), "无")).append('\n');
+        builder.append("标签: ").append(formatTagNames(detail.getTags())).append('\n');
+        builder.append("联系人: ").append(formatContactSummary(detail.getContacts())).append('\n');
+        builder.append("相关任务: ").append(formatTaskSummary(detail.getTasks())).append('\n');
+        builder.append("最近跟进: ").append(formatFollowUpSummary(recentFollowUps)).append('\n');
+
+        if (detail.getCustomFields() != null && !detail.getCustomFields().isEmpty()) {
+            builder.append("自定义字段: ").append(formatCustomFieldSummary(detail.getCustomFields())).append('\n');
+        }
+        if (StrUtil.isNotBlank(detail.getAiStatusDetection())) {
+            builder.append("历史AI状态探测: ").append(detail.getAiStatusDetection()).append('\n');
+        }
+        if (StrUtil.isNotBlank(detail.getAiInsight())) {
+            builder.append("历史AI洞察: ").append(detail.getAiInsight()).append('\n');
+        }
+        return builder.toString();
+    }
+
+    private CustomerAiReportVO parseCustomerAiReportResponse(String response,
+                                                             CustomerDetailVO detail,
+                                                             List<FollowUpVO> recentFollowUps) {
+        try {
+            JsonNode root = objectMapper.readTree(extractJsonPayload(response));
+            CustomerAiReportVO report = new CustomerAiReportVO();
+            report.setAiStatusDetection(normalizeAiStatusDetection(getJsonText(root, "aiStatusDetection"), detail, recentFollowUps));
+            report.setAiInsight(normalizeAiReportText(getJsonText(root, "aiInsight")));
+            if (StrUtil.isAllBlank(report.getAiStatusDetection(), report.getAiInsight())) {
+                return buildFallbackCustomerAiReportV2(detail, recentFollowUps);
+            }
+            if (StrUtil.isBlank(report.getAiStatusDetection()) || StrUtil.isBlank(report.getAiInsight())) {
+                CustomerAiReportVO fallback = buildFallbackCustomerAiReportV2(detail, recentFollowUps);
+                if (StrUtil.isBlank(report.getAiStatusDetection())) {
+                    report.setAiStatusDetection(fallback.getAiStatusDetection());
+                }
+                if (StrUtil.isBlank(report.getAiInsight())) {
+                    report.setAiInsight(fallback.getAiInsight());
+                }
+            }
+            return report;
+        } catch (Exception exception) {
+            log.warn("parse customer ai report failed: {}", exception.getMessage());
+            return buildFallbackCustomerAiReportV2(detail, recentFollowUps);
+        }
+    }
+
+    private CustomerAiReportVO buildFallbackCustomerAiReport(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        CustomerAiReportVO report = new CustomerAiReportVO();
+        String stageLabel = getStageLabel(detail.getStage());
+        String levelLabel = getLevelDisplayLabel(detail.getLevel());
+        FollowUpVO latestFollowUp = recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0);
+
+        StringBuilder statusBuilder = new StringBuilder();
+        statusBuilder.append("当前处于").append(stageLabel).append("阶段");
+        if (StrUtil.isNotBlank(levelLabel)) {
+            statusBuilder.append("，客户等级").append(levelLabel);
+        }
+        if (latestFollowUp != null && latestFollowUp.getFollowTime() != null) {
+            statusBuilder.append("，最近跟进于").append(DateUtil.formatDateTime(latestFollowUp.getFollowTime()));
+        } else {
+            statusBuilder.append("，近期缺少有效跟进记录");
+        }
+        if (detail.getNextFollowTime() != null) {
+            statusBuilder.append("，已安排下次跟进");
+        } else {
+            statusBuilder.append("，下次跟进时间待明确");
+        }
+        report.setAiStatusDetection(statusBuilder.toString());
+
+        List<String> insightParts = new ArrayList<>();
+        insightParts.add("客户行业为" + StrUtil.blankToDefault(detail.getIndustry(), "未明确") + "，当前处于" + stageLabel + "阶段。");
+        if (detail.getContacts() != null && !detail.getContacts().isEmpty()) {
+            ContactVO primaryContact = detail.getContacts().stream()
+                    .filter(contact -> contact.getIsPrimary() != null && contact.getIsPrimary() == 1)
+                    .findFirst()
+                    .orElse(detail.getContacts().get(0));
+            insightParts.add("当前主要联系人为" + StrUtil.blankToDefault(primaryContact.getName(), "未明确")
+                    + "，建议围绕其职责进一步确认需求与决策节奏。");
+        } else {
+            insightParts.add("当前联系人信息较少，建议优先补齐关键决策人和业务使用方。");
+        }
+        if (latestFollowUp != null && StrUtil.isNotBlank(latestFollowUp.getContent())) {
+            insightParts.add("最近一次跟进显示：" + truncateText(latestFollowUp.getContent(), 70) + "。");
+        } else if (StrUtil.isNotBlank(detail.getRemark())) {
+            insightParts.add("现有备注显示：" + truncateText(detail.getRemark(), 70) + "。");
+        }
+        if (detail.getNextFollowTime() != null) {
+            insightParts.add("建议围绕已排定的下次跟进节点推进方案确认、预算校验和成交阻碍排查。");
+        } else {
+            insightParts.add("建议尽快明确下一次跟进动作和时间，避免推进节奏中断。");
+        }
+        report.setAiInsight(String.join("", insightParts));
+        return report;
+    }
+
+    private CustomerAiReportVO buildFallbackCustomerAiReportV2(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        CustomerAiReportVO report = new CustomerAiReportVO();
+        String stageLabel = getStageLabel(detail.getStage());
+        String aiStatus = inferAiStatusDetection(detail, recentFollowUps);
+        FollowUpVO latestFollowUp = recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0);
+
+        report.setAiStatusDetection(aiStatus);
+
+        List<String> insightParts = new ArrayList<>();
+        insightParts.add("客户行业为" + StrUtil.blankToDefault(detail.getIndustry(), "未明确") + "，当前处于" + stageLabel + "阶段，AI状态探测为" + aiStatus + "。");
+        if (detail.getContacts() != null && !detail.getContacts().isEmpty()) {
+            ContactVO primaryContact = detail.getContacts().stream()
+                    .filter(contact -> contact.getIsPrimary() != null && contact.getIsPrimary() == 1)
+                    .findFirst()
+                    .orElse(detail.getContacts().get(0));
+            insightParts.add("当前主要联系人为" + StrUtil.blankToDefault(primaryContact.getName(), "未明确")
+                    + "，建议围绕其职责进一步确认需求与决策节奏。");
+        } else {
+            insightParts.add("当前联系人信息较少，建议优先补齐关键决策人和业务使用方。");
+        }
+        if (latestFollowUp != null && StrUtil.isNotBlank(latestFollowUp.getContent())) {
+            insightParts.add("最近一次跟进显示：" + truncateText(latestFollowUp.getContent(), 70) + "。");
+        } else if (StrUtil.isNotBlank(detail.getRemark())) {
+            insightParts.add("现有备注显示：" + truncateText(detail.getRemark(), 70) + "。");
+        }
+        insightParts.add(buildAiInsightSuggestion(aiStatus));
+        report.setAiInsight(String.join("", insightParts));
+        return report;
+    }
+
+    private String normalizeAiStatusDetection(String value, CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        String normalized = StrUtil.trimToEmpty(value);
+        if (AI_STATUS_DETECTION_OPTIONS.contains(normalized)) {
+            return normalized;
+        }
+
+        String compact = normalized.replaceAll("\\s+", "");
+        if (StrUtil.isNotBlank(compact)) {
+            if (compact.contains("休眠") || compact.contains("沉睡") || compact.contains("长期未跟进")
+                    || compact.contains("长期未联系") || compact.contains("长期未互动")
+                    || compact.contains("超30天") || compact.contains("超过30天") || compact.contains("流失风险")) {
+                return "休眠";
+            }
+            if (compact.contains("高意向") || compact.contains("强意向") || compact.contains("高潜")
+                    || compact.contains("高潜力") || compact.contains("签约") || compact.contains("成交")) {
+                return "高意向";
+            }
+            if (compact.contains("活跃状态") || compact.contains("活跃") || compact.contains("持续沟通")
+                    || compact.contains("频繁互动") || compact.contains("跟进中") || compact.contains("推进中")) {
+                return "活跃状态";
+            }
+            if (compact.contains("需跟进") || compact.contains("待跟进") || compact.contains("需要跟进")
+                    || compact.contains("待联系") || compact.contains("待推进") || compact.contains("待回访")) {
+                return "需跟进";
+            }
+        }
+
+        return inferAiStatusDetection(detail, recentFollowUps);
+    }
+
+    private String inferAiStatusDetection(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        FollowUpVO latestFollowUp = recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0);
+        long daysSinceLastContact = getDaysSinceNow(detail.getLastContactTime());
+        long daysSinceCreate = getDaysSinceNow(detail.getCreateTime());
+        long daysSinceLatestFollowUp = latestFollowUp != null && latestFollowUp.getFollowTime() != null
+                ? getDaysSinceNow(latestFollowUp.getFollowTime())
+                : Long.MAX_VALUE;
+
+        Date now = new Date();
+        boolean hasUpcomingFollow = detail.getNextFollowTime() != null && !detail.getNextFollowTime().before(now);
+        boolean hasOverdueFollow = detail.getNextFollowTime() != null && detail.getNextFollowTime().before(now);
+        boolean hasRecentActivity = daysSinceLastContact <= 7 || daysSinceLatestFollowUp <= 7;
+        boolean hasCommercialSignal = detail.getQuotation() != null || detail.getContractAmount() != null || detail.getRevenue() != null;
+        boolean isHighValue = "A".equalsIgnoreCase(StrUtil.blankToDefault(detail.getLevel(), ""));
+        boolean isDormant = "lost".equals(detail.getStage())
+                || (!hasUpcomingFollow && daysSinceCreate >= 30 && daysSinceLastContact >= 30 && daysSinceLatestFollowUp >= 30);
+
+        if (isDormant) {
+            return "休眠";
+        }
+        if (("negotiation".equals(detail.getStage()) || "proposal".equals(detail.getStage()) || "closed".equals(detail.getStage()))
+                && (hasRecentActivity || hasUpcomingFollow || hasCommercialSignal || isHighValue)) {
+            return "高意向";
+        }
+        if (isHighValue && (hasRecentActivity || hasUpcomingFollow || hasCommercialSignal)) {
+            return "高意向";
+        }
+        if (hasRecentActivity || hasUpcomingFollow) {
+            return "活跃状态";
+        }
+        if (hasOverdueFollow || daysSinceLastContact >= 14 || daysSinceLatestFollowUp >= 14 || detail.getNextFollowTime() == null) {
+            return "需跟进";
+        }
+        return "活跃状态";
+    }
+
+    private String buildAiInsightSuggestion(String aiStatus) {
+        return switch (aiStatus) {
+            case "高意向" -> "建议优先围绕成交条件、预算确认和决策推进节奏展开深度跟进，尽快推动明确下一步商务动作。";
+            case "活跃状态" -> "建议保持当前互动频率，持续推进需求澄清、方案演示和关键角色沟通，避免热度回落。";
+            case "需跟进" -> "建议尽快安排一次明确触达，确认当前阻塞点、负责人反馈和下一次跟进时间，避免商机继续降温。";
+            case "休眠" -> "建议先评估客户沉默原因，再设计重新激活话术或活动触达策略，必要时重新识别需求窗口。";
+            default -> "建议结合当前阶段补齐信息、明确下一步动作，并持续更新跟进记录。";
+        };
+    }
+
+    private long getDaysSinceNow(Date value) {
+        if (value == null) {
+            return Long.MAX_VALUE;
+        }
+        long diff = System.currentTimeMillis() - value.getTime();
+        if (diff <= 0) {
+            return 0L;
+        }
+        return diff / (24L * 60L * 60L * 1000L);
+    }
+
+    private String extractJsonPayload(String response) {
+        String json = StrUtil.blankToDefault(response, "").trim();
+        if (json.startsWith("```")) {
+            json = json.replaceFirst("^```(?:json)?\\s*", "");
+            json = json.replaceFirst("\\s*```$", "");
+        }
+        int start = json.indexOf('{');
+        int end = json.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            json = json.substring(start, end + 1);
+        }
+        return json;
+    }
+
+    private String normalizeAiReportText(String value) {
+        if (StrUtil.isBlank(value)) {
+            return null;
+        }
+        return StrUtil.trim(value)
+                .replace("\r\n", "\n")
+                .replace('\r', '\n');
+    }
+
+    private String formatNullableDateTime(Date value) {
+        return value == null ? "无" : DateUtil.formatDateTime(value);
+    }
+
+    private String formatNullableAmount(BigDecimal value) {
+        return value == null ? "无" : value.stripTrailingZeros().toPlainString();
+    }
+
+    private String formatTagNames(List<CustomerTag> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return "无";
+        }
+        return tags.stream()
+                .map(CustomerTag::getTagName)
+                .filter(StrUtil::isNotBlank)
+                .collect(Collectors.joining("、"));
+    }
+
+    private String formatContactSummary(List<ContactVO> contacts) {
+        if (contacts == null || contacts.isEmpty()) {
+            return "无";
+        }
+        return contacts.stream()
+                .limit(5)
+                .map(contact -> {
+                    StringBuilder builder = new StringBuilder(StrUtil.blankToDefault(contact.getName(), "未命名联系人"));
+                    if (StrUtil.isNotBlank(contact.getPosition())) {
+                        builder.append('/').append(contact.getPosition());
+                    }
+                    if (StrUtil.isNotBlank(contact.getPhone())) {
+                        builder.append('/').append(contact.getPhone());
+                    }
+                    return builder.toString();
+                })
+                .collect(Collectors.joining("；"));
+    }
+
+    private String formatTaskSummary(List<Task> tasks) {
+        if (tasks == null || tasks.isEmpty()) {
+            return "无";
+        }
+        return tasks.stream()
+                .limit(5)
+                .map(task -> {
+                    StringBuilder builder = new StringBuilder(StrUtil.blankToDefault(task.getTitle(), "未命名任务"));
+                    if (StrUtil.isNotBlank(task.getStatus())) {
+                        builder.append(" [").append(task.getStatus()).append(']');
+                    }
+                    if (task.getDueDate() != null) {
+                        builder.append(" 截止").append(DateUtil.formatDateTime(task.getDueDate()));
+                    }
+                    return builder.toString();
+                })
+                .collect(Collectors.joining("；"));
+    }
+
+    private String formatFollowUpSummary(List<FollowUpVO> followUps) {
+        if (followUps == null || followUps.isEmpty()) {
+            return "无";
+        }
+        return followUps.stream()
+                .limit(5)
+                .map(followUp -> {
+                    StringBuilder builder = new StringBuilder();
+                    if (followUp.getFollowTime() != null) {
+                        builder.append(DateUtil.formatDateTime(followUp.getFollowTime())).append(' ');
+                    }
+                    if (StrUtil.isNotBlank(followUp.getType())) {
+                        builder.append('[').append(followUp.getType()).append("] ");
+                    }
+                    builder.append(truncateText(followUp.getContent(), 80));
+                    return builder.toString().trim();
+                })
+                .collect(Collectors.joining("；"));
+    }
+
+    private String formatCustomFieldSummary(Map<String, Object> customFields) {
+        return customFields.entrySet().stream()
+                .filter(entry -> entry.getValue() != null && StrUtil.isNotBlank(String.valueOf(entry.getValue())))
+                .limit(10)
+                .map(entry -> entry.getKey() + "=" + truncateText(String.valueOf(entry.getValue()), 40))
+                .collect(Collectors.joining("；"));
+    }
+
+    private String getLevelDisplayLabel(String level) {
+        return switch (StrUtil.blankToDefault(level, "")) {
+            case "A" -> "A级";
+            case "B" -> "B级";
+            case "C" -> "C级";
+            default -> StrUtil.blankToDefault(level, "未评级");
+        };
+    }
+
+    private String truncateText(String value, int maxLength) {
+        if (StrUtil.isBlank(value)) {
+            return "无";
+        }
+        String normalized = value.replace('\r', ' ').replace('\n', ' ').trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, maxLength) + "...";
     }
 
     @Override
@@ -1529,7 +1967,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         int refreshed = 0;
         for (Customer customer : customers) {
             Map<String, Object> customFields = customFieldMap.getOrDefault(customer.getCustomerId(), Collections.emptyMap());
-            String searchText = buildCustomerSearchText(searchableFields, customFields);
+            String searchText = buildCustomerSearchText(customer, searchableFields, customFields);
             lambdaUpdate()
                 .eq(Customer::getCustomerId, customer.getCustomerId())
                 .set(Customer::getSearchText, searchText)
@@ -1553,7 +1991,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Map<String, Object> customFields = searchableFields.isEmpty()
             ? Collections.emptyMap()
             : customFieldService.getCustomFieldValues("customer", customerId);
-        String searchText = buildCustomerSearchText(searchableFields, customFields);
+        String searchText = buildCustomerSearchText(customer, searchableFields, customFields);
 
         lambdaUpdate()
             .eq(Customer::getCustomerId, customerId)
@@ -1585,9 +2023,29 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         queryBO.setAuthorizedOwnerIds(new ArrayList<>(context.getUserIds()));
     }
 
-    private String buildCustomerSearchText(List<CustomFieldVO> searchableFields,
+    private String buildCustomerSearchText(Customer customer,
+                                           List<CustomFieldVO> searchableFields,
                                            Map<String, Object> customFields) {
         LinkedHashSet<String> fragments = new LinkedHashSet<>();
+
+        if (customer != null) {
+            appendSearchText(fragments, customer.getCompanyName());
+            appendSearchText(fragments, customer.getIndustry());
+            appendSearchText(fragments, customer.getStage());
+            appendSearchText(fragments, getStageLabel(customer.getStage()));
+            appendSearchText(fragments, customer.getLevel());
+            appendSearchText(fragments, getLevelDisplayLabel(customer.getLevel()));
+            appendSearchText(fragments, customer.getSource());
+            appendSearchText(fragments, customer.getAddress());
+            appendSearchText(fragments, customer.getWebsite());
+            appendSearchText(fragments, customer.getPrimaryContactName());
+            appendSearchText(fragments, customer.getPrimaryContactPhone());
+            appendSearchText(fragments, customer.getPrimaryContactPosition());
+            appendSearchText(fragments, customer.getTagNames());
+            appendSearchText(fragments, customer.getRemark());
+            appendSearchText(fragments, customer.getAiStatusDetection());
+            appendSearchText(fragments, customer.getAiInsight());
+        }
 
         if (searchableFields != null && !searchableFields.isEmpty() && customFields != null && !customFields.isEmpty()) {
             for (CustomFieldVO field : searchableFields) {
@@ -1854,15 +2312,11 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     private CustomerAiSearchParseVO parseCustomerAiSearchResponse(String response, String normalizedQuery) {
         try {
-            String json = response.trim();
-            if (json.startsWith("```")) {
-                json = json.replaceFirst("```(?:json)?\\s*", "");
-                json = json.replaceFirst("\\s*```$", "");
-            }
-
+            String json = extractJsonPayload(response);
             JsonNode root = objectMapper.readTree(json);
             JsonNode queryNode = root.has("parsedQuery") ? root.get("parsedQuery") : root;
             CustomerAiSearchQueryVO query = toCustomerAiSearchQuery(queryNode);
+            normalizeAiSearchQuery(query, normalizedQuery);
             enrichSearchQueryWithHeuristics(query, normalizedQuery);
 
             if (isSearchQueryEmpty(query)) {
@@ -1939,6 +2393,230 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return query;
     }
 
+    private void normalizeAiSearchQuery(CustomerAiSearchQueryVO query, String normalizedQuery) {
+        if (query == null) {
+            return;
+        }
+
+        applyAmountFilterFromQuery(query, normalizedQuery, QUOTATION_COMPARE_PATTERN, QUOTATION_RANGE_PATTERN, "quotation");
+        applyAmountFilterFromQuery(query, normalizedQuery, CONTRACT_AMOUNT_COMPARE_PATTERN, CONTRACT_AMOUNT_RANGE_PATTERN, "contractAmount");
+        applyAmountFilterFromQuery(query, normalizedQuery, REVENUE_COMPARE_PATTERN, REVENUE_RANGE_PATTERN, "revenue");
+
+        boolean keepZeroQuotation = shouldKeepZeroAmountFilter(normalizedQuery, "报价", "报价金额");
+        boolean keepZeroContract = shouldKeepZeroAmountFilter(normalizedQuery, "合同", "合同金额");
+        boolean keepZeroRevenue = shouldKeepZeroAmountFilter(normalizedQuery, "回款", "回款金额", "收入", "收入金额");
+        boolean keepZeroContactCount = shouldKeepZeroContactCountFilter(normalizedQuery);
+
+        if (!keepZeroQuotation) {
+            if (isZero(query.getQuotationMin())) {
+                query.setQuotationMin(null);
+            }
+            if (isZero(query.getQuotationMax())) {
+                query.setQuotationMax(null);
+            }
+        }
+        if (!keepZeroContract) {
+            if (isZero(query.getContractAmountMin())) {
+                query.setContractAmountMin(null);
+            }
+            if (isZero(query.getContractAmountMax())) {
+                query.setContractAmountMax(null);
+            }
+        }
+        if (!keepZeroRevenue) {
+            if (isZero(query.getRevenueMin())) {
+                query.setRevenueMin(null);
+            }
+            if (isZero(query.getRevenueMax())) {
+                query.setRevenueMax(null);
+            }
+        }
+        if (!keepZeroContactCount) {
+            if (Integer.valueOf(0).equals(query.getContactCountMin())) {
+                query.setContactCountMin(null);
+            }
+            if (Integer.valueOf(0).equals(query.getContactCountMax())) {
+                query.setContactCountMax(null);
+            }
+        }
+
+        normalizeAmountRange(query, "quotation", keepZeroQuotation);
+        normalizeAmountRange(query, "contractAmount", keepZeroContract);
+        normalizeAmountRange(query, "revenue", keepZeroRevenue);
+        normalizeContactCountRange(query, keepZeroContactCount);
+    }
+
+    private void applyAmountFilterFromQuery(CustomerAiSearchQueryVO query,
+                                            String normalizedQuery,
+                                            Pattern comparePattern,
+                                            Pattern rangePattern,
+                                            String fieldKey) {
+        if (query == null || StrUtil.isBlank(normalizedQuery)) {
+            return;
+        }
+
+        Matcher rangeMatcher = rangePattern.matcher(normalizedQuery);
+        if (rangeMatcher.find()) {
+            BigDecimal min = parseSearchAmount(rangeMatcher.group(2), rangeMatcher.group(3));
+            BigDecimal max = parseSearchAmount(rangeMatcher.group(4), rangeMatcher.group(5));
+            if (min != null && max != null) {
+                if (min.compareTo(max) > 0) {
+                    BigDecimal temp = min;
+                    min = max;
+                    max = temp;
+                }
+                setAmountRange(query, fieldKey, min, max);
+                return;
+            }
+        }
+
+        Matcher compareMatcher = comparePattern.matcher(normalizedQuery);
+        if (!compareMatcher.find()) {
+            return;
+        }
+
+        BigDecimal value = parseSearchAmount(compareMatcher.group(3), compareMatcher.group(4));
+        if (value == null) {
+            return;
+        }
+        applyAmountOperator(query, fieldKey, compareMatcher.group(2), value);
+    }
+
+    private void applyAmountOperator(CustomerAiSearchQueryVO query, String fieldKey, String operator, BigDecimal value) {
+        if (query == null || value == null) {
+            return;
+        }
+
+        String normalizedOperator = normalizeSearchOperator(operator);
+        if (isEqualityOperator(normalizedOperator)) {
+            setAmountRange(query, fieldKey, value, value);
+            return;
+        }
+        if (isUpperBoundOperator(normalizedOperator)) {
+            setAmountRange(query, fieldKey, null, value);
+            return;
+        }
+        setAmountRange(query, fieldKey, value, null);
+    }
+
+    private void setAmountRange(CustomerAiSearchQueryVO query, String fieldKey, BigDecimal min, BigDecimal max) {
+        if (query == null || StrUtil.isBlank(fieldKey)) {
+            return;
+        }
+        switch (fieldKey) {
+            case "quotation" -> {
+                query.setQuotationMin(min);
+                query.setQuotationMax(max);
+            }
+            case "contractAmount" -> {
+                query.setContractAmountMin(min);
+                query.setContractAmountMax(max);
+            }
+            case "revenue" -> {
+                query.setRevenueMin(min);
+                query.setRevenueMax(max);
+            }
+            default -> {
+                return;
+            }
+        }
+    }
+
+    private void normalizeAmountRange(CustomerAiSearchQueryVO query, String fieldKey, boolean keepZero) {
+        if (query == null || StrUtil.isBlank(fieldKey)) {
+            return;
+        }
+
+        BigDecimal min;
+        BigDecimal max;
+        switch (fieldKey) {
+            case "quotation" -> {
+                min = query.getQuotationMin();
+                max = query.getQuotationMax();
+            }
+            case "contractAmount" -> {
+                min = query.getContractAmountMin();
+                max = query.getContractAmountMax();
+            }
+            case "revenue" -> {
+                min = query.getRevenueMin();
+                max = query.getRevenueMax();
+            }
+            default -> {
+                return;
+            }
+        }
+
+        if (min == null || max == null || min.compareTo(max) <= 0) {
+            return;
+        }
+
+        if (!keepZero && isZero(max)) {
+            setAmountRange(query, fieldKey, min, null);
+            return;
+        }
+        if (!keepZero && isZero(min)) {
+            setAmountRange(query, fieldKey, null, max);
+            return;
+        }
+        setAmountRange(query, fieldKey, max, min);
+    }
+
+    private void normalizeContactCountRange(CustomerAiSearchQueryVO query, boolean keepZero) {
+        if (query == null) {
+            return;
+        }
+        Integer min = query.getContactCountMin();
+        Integer max = query.getContactCountMax();
+        if (min == null || max == null || min <= max) {
+            return;
+        }
+        if (!keepZero && max == 0) {
+            query.setContactCountMax(null);
+            return;
+        }
+        if (!keepZero && min == 0) {
+            query.setContactCountMin(null);
+            return;
+        }
+        query.setContactCountMin(max);
+        query.setContactCountMax(min);
+    }
+
+    private boolean shouldKeepZeroAmountFilter(String normalizedQuery, String... fieldKeywords) {
+        return mentionsExplicitZero(normalizedQuery) && containsAny(normalizedQuery, fieldKeywords);
+    }
+
+    private boolean shouldKeepZeroContactCountFilter(String normalizedQuery) {
+        if (StrUtil.isBlank(normalizedQuery)) {
+            return false;
+        }
+        if (containsAny(normalizedQuery, "无联系人", "没有联系人", "未添加联系人", "联系人为空")) {
+            return true;
+        }
+        return mentionsExplicitZero(normalizedQuery) && containsAny(normalizedQuery, "联系人", "联系人数", "联系人数量");
+    }
+
+    private boolean mentionsExplicitZero(String normalizedQuery) {
+        return StrUtil.isNotBlank(normalizedQuery) && EXPLICIT_ZERO_PATTERN.matcher(normalizedQuery).find();
+    }
+
+    private boolean containsAny(String value, String... candidates) {
+        if (StrUtil.isBlank(value) || candidates == null || candidates.length == 0) {
+            return false;
+        }
+        for (String candidate : candidates) {
+            if (StrUtil.isNotBlank(candidate) && value.contains(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isZero(BigDecimal value) {
+        return value != null && BigDecimal.ZERO.compareTo(value) == 0;
+    }
+
     private CustomerAiSearchParseVO buildSearchResult(String originalQuery,
                                                       CustomerAiSearchQueryVO query,
                                                       String explanation,
@@ -1970,6 +2648,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     private CustomerAiSearchQueryVO buildHeuristicSearchQuery(String normalizedQuery) {
         CustomerAiSearchQueryVO query = new CustomerAiSearchQueryVO();
+        normalizeAiSearchQuery(query, normalizedQuery);
         enrichSearchQueryWithHeuristics(query, normalizedQuery);
         return query;
     }
@@ -2276,6 +2955,32 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return amount.stripTrailingZeros().toPlainString();
     }
 
+    private static Pattern buildAmountComparePattern(String fieldRegex) {
+        return Pattern.compile("(" + fieldRegex + ")\\s*(?:在)?\\s*(大于等于|大于或等于|不少于|不低于|高于或等于|>=|＞=|≥|大于|高于|超过|多于|>|＞|小于等于|小于或等于|不超过|不高于|低于或等于|<=|＜=|≤|小于|低于|少于|以内|以下|<|＜|等于|为|=)\\s*" + SEARCH_NUMBER_WITH_UNIT_PATTERN);
+    }
+
+    private static Pattern buildAmountRangePattern(String fieldRegex) {
+        return Pattern.compile("(" + fieldRegex + ")\\s*" + SEARCH_NUMBER_WITH_UNIT_PATTERN + "\\s*(?:到|至|~|～|-|—)\\s*" + SEARCH_NUMBER_WITH_UNIT_PATTERN);
+    }
+
+    private BigDecimal parseSearchAmount(String numberText, String unitText) {
+        if (StrUtil.isBlank(numberText)) {
+            return null;
+        }
+        try {
+            BigDecimal amount = new BigDecimal(numberText.replace(",", ""));
+            String normalizedUnit = StrUtil.blankToDefault(unitText, "").trim().toLowerCase(Locale.ROOT);
+            return switch (normalizedUnit) {
+                case "万", "w" -> amount.multiply(BigDecimal.valueOf(10_000L));
+                case "千", "k" -> amount.multiply(BigDecimal.valueOf(1_000L));
+                case "亿" -> amount.multiply(BigDecimal.valueOf(100_000_000L));
+                default -> amount;
+            };
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private BigDecimal parseJsonBigDecimal(JsonNode node) {
         if (node == null || node.isNull()) {
             return null;
@@ -2392,6 +3097,27 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return "desc";
         }
         return null;
+    }
+
+    private String normalizeSearchOperator(String operator) {
+        if (operator == null) {
+            return "";
+        }
+        return operator.replaceAll("\\s+", "");
+    }
+
+    private boolean isUpperBoundOperator(String operator) {
+        return switch (operator) {
+            case "小于等于", "小于或等于", "不超过", "不高于", "低于或等于", "<=", "＜=", "≤", "小于", "低于", "少于", "以内", "以下", "<", "＜" -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isEqualityOperator(String operator) {
+        return switch (operator) {
+            case "等于", "为", "=" -> true;
+            default -> false;
+        };
     }
 
     private String normalizeOptionalText(String value) {

@@ -10,6 +10,7 @@ import type {
   CustomerImportPreview,
   CustomerImportRow,
   CustomerImportResult,
+  CustomerAiReportVO,
   CustomerAiSearchParseBO,
   CustomerAiSearchParseVO
 } from '@/types/customer'
@@ -143,6 +144,10 @@ export interface CustomerAiParseVO {
 
 export function aiParseCustomer(data: CustomerAiParseBO): Promise<CustomerAiParseVO> {
   return post('/customer/ai-parse', data)
+}
+
+export function generateCustomerAiReport(id: string): Promise<CustomerAiReportVO> {
+  return post(`/customer/${id}/ai-report`)
 }
 
 export function aiParseCustomerSearch(data: CustomerAiSearchParseBO): Promise<CustomerAiSearchParseVO> {

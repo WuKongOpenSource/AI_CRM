@@ -450,6 +450,7 @@ async function handleStartRecording() {
       } else if (event.error !== 'aborted') {
         ElMessage.warning('语音识别失败，请重试')
       }
+      console.error('Speech recognition error:', event)
     }
 
     speechRecognition.onend = () => {

@@ -134,9 +134,9 @@
                 <WkIcon name="ai" class="text-sm" />
                 AI 跟进
               </button>
-              <button class="h-8 px-4 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors" @click="handleGenerateReport">
+              <button v-if="canEditCustomer" class="h-8 px-4 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 flex items-center gap-1.5 hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" :disabled="generatingAiReport" @click="handleGenerateReport">
                 <WkIcon name="ai" class="text-sm" />
-                生成 AI 分析报告
+                <span class="text-sm leading-none">{{ generatingAiReport ? '生成中...' : '生成 AI 分析报告' }}</span>
               </button>
               <el-dropdown
                 v-if="canTransferCustomer || canDeleteCustomer"
@@ -367,6 +367,24 @@
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">备注</p>
                   <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2 whitespace-pre-wrap break-words">{{ customer.remark || '暂无备注' }}</p>
+                </div>
+                <div>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">AI 状态探测</p>
+                  <div class="px-2 py-1 -ml-2">
+                    <span
+                      v-if="getAiStatusMeta(customer.aiStatusDetection)"
+                      class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+                      :class="getAiStatusMeta(customer.aiStatusDetection)?.badgeClass"
+                    >
+                      <span class="size-2 rounded-full" :class="getAiStatusMeta(customer.aiStatusDetection)?.dotClass"></span>
+                      {{ getAiStatusMeta(customer.aiStatusDetection)?.label }}
+                    </span>
+                    <p v-else class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap break-words">{{ customer.aiStatusDetection || '暂无 AI 状态探测' }}</p>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">AI 洞察</p>
+                  <p class="text-sm text-slate-600 leading-relaxed px-2 py-1 -ml-2 whitespace-pre-wrap break-words">{{ customer.aiInsight || '暂无 AI 洞察' }}</p>
                 </div>
                 <div>
                   <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">负责人</p>
@@ -777,6 +795,34 @@
       @success="handleEditSuccess"
     />
 
+    <el-dialog
+      v-model="showAiReportDialog"
+      title="AI 分析报告"
+      width="680px"
+      destroy-on-close
+    >
+      <div class="space-y-4">
+        <section class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 状态探测</p>
+          <div class="mt-3">
+            <span
+              v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)"
+              class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+              :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.badgeClass"
+            >
+              <span class="size-2 rounded-full" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
+              {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.label }}
+            </span>
+            <p v-else class="text-sm leading-6 text-slate-700">{{ latestAiReport?.aiStatusDetection || customer?.aiStatusDetection || '暂无 AI 状态探测' }}</p>
+          </div>
+        </section>
+        <section class="rounded-xl border border-slate-200 bg-white px-4 py-4">
+          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 洞察</p>
+          <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{{ latestAiReport?.aiInsight || customer?.aiInsight || '暂无 AI 洞察' }}</p>
+        </section>
+      </div>
+    </el-dialog>
+
     <!-- AI Follow-up Drawer -->
     <AiFollowUpDrawer
       v-model="showAiFollowUpDrawer"
@@ -792,14 +838,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
-import { addCustomerTag, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { Contact, CustomerTag, FollowUp, FollowUpAddBO, FollowUpType, FollowUpUpdateBO } from '@/types/customer'
+import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpType, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
+import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
@@ -825,6 +872,7 @@ const editingFollowUpId = ref('')
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showAiFollowUpDrawer = ref(false)
+const showAiReportDialog = ref(false)
 const showTerminalStageMenu = ref(false)
 const showTransferPopover = ref(false)
 const headerMoreButtonRef = ref<HTMLElement | null>(null)
@@ -840,6 +888,8 @@ const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
 const customFields = ref<CustomField[]>([])
+const generatingAiReport = ref(false)
+const latestAiReport = ref<CustomerAiReportVO | null>(null)
 const ownerSearch = ref('')
 const ownerListLoading = ref(false)
 const userListLoaded = ref(false)
@@ -869,6 +919,10 @@ type SectionIconKey = keyof typeof sectionIconBgColors
 
 function getSectionIconStyle(key: SectionIconKey): { backgroundColor: string } {
   return { backgroundColor: sectionIconBgColors[key] }
+}
+
+function getAiStatusMeta(value: string | undefined | null) {
+  return getCustomerAiStatusMeta(value)
 }
 
 /** Vertical rail segment: line starts at first dot center, ends at last dot center; full height between. */
@@ -1284,8 +1338,22 @@ function handleEditFollowUp(followUp: FollowUp) {
   showAddFollowUpDialog.value = true
 }
 
-function handleGenerateReport() {
-  ElMessage.info('AI 分析报告功能开发中')
+async function handleGenerateReport() {
+  if (!canEditCustomer.value) return
+  if (!customer.value || generatingAiReport.value) return
+
+  generatingAiReport.value = true
+  try {
+    latestAiReport.value = await generateCustomerAiReport(customer.value.customerId)
+    await customerStore.fetchCustomerDetail(customer.value.customerId)
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    showAiReportDialog.value = true
+    ElMessage.success('AI 分析报告已生成并保存')
+  } catch {
+    // Error handled by interceptor
+  } finally {
+    generatingAiReport.value = false
+  }
 }
 
 function handleAddContact() {

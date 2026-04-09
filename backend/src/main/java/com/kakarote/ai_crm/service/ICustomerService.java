@@ -12,6 +12,7 @@ import com.kakarote.ai_crm.entity.BO.CustomerTransferBO;
 import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiReportVO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiSearchParseVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerImportPreviewVO;
@@ -59,6 +60,8 @@ public interface ICustomerService extends IService<Customer> {
     CustomerImportResultVO confirmImport(List<CustomerImportBO> rows);
 
     CustomerAiParseVO aiParseCustomer(CustomerAiParseBO parseBO);
+
+    CustomerAiReportVO generateAiReport(Long customerId);
 
     CustomerAiSearchParseVO aiParseSearch(CustomerAiSearchParseBO parseBO);
 }

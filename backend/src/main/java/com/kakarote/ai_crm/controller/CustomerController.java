@@ -12,6 +12,7 @@ import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.CustomerTransferBO;
 import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiReportVO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiSearchParseVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerImportPreviewVO;
@@ -171,5 +172,11 @@ public class CustomerController {
     @RequirePermission("customer:view")
     public Result<CustomerAiSearchParseVO> aiSearchParse(@Valid @RequestBody CustomerAiSearchParseBO parseBO) {
         return Result.ok(customerService.aiParseSearch(parseBO));
+    }
+    @PostMapping("/{id}/ai-report")
+    @Operation(summary = "生成客户 AI 分析报告")
+    @RequirePermission("customer:edit")
+    public Result<CustomerAiReportVO> generateAiReport(@PathVariable("id") Long id) {
+        return Result.ok(customerService.generateAiReport(id));
     }
 }
