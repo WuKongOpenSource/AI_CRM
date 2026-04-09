@@ -10,7 +10,7 @@
     >
       <button
         type="button"
-        class="absolute -right-3 top-10 z-10 size-6 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-primary"
+        class="absolute -right-3 top-10 z-0 size-6 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-primary"
         :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
         @click="sidebarCollapsed = !sidebarCollapsed"
       >

@@ -180,7 +180,7 @@
     </Teleport>
 
     <div class="flex flex-1 flex-col overflow-hidden" :class="{ 'pt-14': isMobile }">
-      <header class="z-10 flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8">
+      <header class="relative z-[200] flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8">
         <div class="flex flex-1 items-center gap-4">
           <div ref="searchPanelRef" class="relative w-full max-w-md">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-xl text-slate-400">search</span>
@@ -200,7 +200,7 @@
             <Transition name="dropdown">
               <div
                 v-if="showGlobalSearchDropdown"
-                class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10"
+                class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-[210] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10"
                 @mousedown.prevent
               >
                 <div v-if="globalSearchLoading" class="flex items-center gap-3 px-4 py-4 text-sm text-slate-500">
