@@ -6,6 +6,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -39,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -58,6 +61,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
 
+    @Autowired
+    private AiCustomerMatcher aiCustomerMatcher;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String AI_SCHEDULE_PARSE_PROMPT = """
@@ -66,6 +72,11 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
         用户输入:
         %s
+
+        额外规则：
+        1. 如果描述中出现“某公司某联系人开会/沟通/讨论”，`customerName` 只填写公司名，不要把客户联系人姓名并入公司名。
+        2. `participantNames` 只填写明确提到的内部参与同事/系统员工；客户联系人、外部人员、会议对象不要放进 `participantNames`。
+        3. 如果客户联系人是本次会议/沟通对象，标题里应尽量保留该联系人姓名，避免标题信息丢失。
 
         请严格按以下 JSON 格式返回，不要包含任何其他文字、代码块标记或解释：
         {
@@ -79,6 +90,18 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
           "description": "补充说明、会议主题或备注"
         }
         """;
+
+    private static final Pattern COMPANY_CONTACT_PATTERN = Pattern.compile(
+            "([\\u4E00-\\u9FA5A-Za-z0-9()（）·&._-]{2,80}?(?:有限责任公司|股份有限公司|集团有限公司|有限公司|集团公司|公司|集团|中心|事务所|工作室|工厂|厂))\\s*([\\u4E00-\\u9FA5]{2,4}(?:总|经理|主任|老师|先生|女士)?)\\s*(?=(?:开会|会面|见面|沟通|讨论|交流|拜访|对接|电话|聊|商量|洽谈|汇报|约见))"
+    );
+
+    private static final Pattern COMPANY_NAME_PATTERN = Pattern.compile(
+            "([\\u4E00-\\u9FA5A-Za-z0-9()（）·&._-]{2,80}?(?:有限责任公司|股份有限公司|集团有限公司|有限公司|集团公司|公司|集团|中心|事务所|工作室|工厂|厂))"
+    );
+
+    private static final Pattern EXPLICIT_PARTICIPANT_PATTERN = Pattern.compile(
+            "(?:参与人(?:员)?|参与者|参会人(?:员)?|出席人(?:员)?|同行(?:人员)?|与会人员)\\s*(?:有|为|是|包括|包含|[:：])\\s*([^。；;]+)"
+    );
 
     @Override
     public Long addSchedule(ScheduleAddBO scheduleAddBO) {
@@ -232,7 +255,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             vo.setParticipantNames(getTextOrDefault(root, "participantNames", ""));
             vo.setLocation(getTextOrDefault(root, "location", ""));
             vo.setDescription(getTextOrDefault(root, "description", ""));
-            applyParticipantMatches(vo);
+            applyCustomerMatch(vo, originalContent);
+            applyParticipantMatches(vo, originalContent);
+            refineTitleWithCompanyContact(vo, originalContent);
             if (!hasMeaningfulAiParseResult(vo)) {
                 log.warn("AI 日程解析响应缺少有效字段，使用兜底结果。response={}", response);
                 return buildFallbackScheduleResult(originalContent);
@@ -244,13 +269,77 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         }
     }
 
-    private void applyParticipantMatches(ScheduleAiParseVO vo) {
-        ParticipantMatchResult matchResult = resolveParticipantUsersByNames(vo.getParticipantNames());
+    private void applyCustomerMatch(ScheduleAiParseVO vo, String originalContent) {
+        LinkedHashSet<String> candidateNames = new LinkedHashSet<>();
+        extractCompanyContactMentions(originalContent).stream()
+                .map(CompanyContactMention::companyName)
+                .forEach(candidateNames::add);
+        extractStandaloneCompanyNames(originalContent).forEach(candidateNames::add);
+
+        String parsedCustomerName = normalizeCompanyCandidate(vo.getCustomerName());
+        if (StrUtil.isNotBlank(parsedCustomerName)) {
+            candidateNames.add(parsedCustomerName);
+        }
+
+        for (String candidateName : candidateNames) {
+            AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(candidateName);
+            if (matchResult.isMatched()) {
+                vo.setCustomerId(matchResult.getCustomer().getCustomerId());
+                vo.setCustomerName(matchResult.getCustomer().getCompanyName());
+                return;
+            }
+        }
+
+        if (StrUtil.isBlank(vo.getCustomerName()) && !candidateNames.isEmpty()) {
+            vo.setCustomerName(candidateNames.iterator().next());
+        } else {
+            vo.setCustomerName(parsedCustomerName);
+        }
+    }
+
+    private void applyParticipantMatches(ScheduleAiParseVO vo, String originalContent) {
+        List<String> participantNames = extractExplicitParticipantNames(originalContent);
+        if (participantNames.isEmpty()) {
+            participantNames = splitParticipantNames(vo.getParticipantNames()).stream()
+                    .filter(name -> !isExternalCompanyContactName(name, originalContent))
+                    .toList();
+        }
+
+        vo.setParticipantNames(String.join(", ", participantNames));
+
+        ParticipantMatchResult matchResult = resolveParticipantUsersByNames(participantNames);
         vo.setParticipantUserIds(matchResult.participantUsers().stream()
                 .map(ScheduleParticipantUserVO::getUserId)
                 .toList());
         vo.setParticipantUsers(matchResult.participantUsers());
         vo.setUnmatchedParticipantNames(String.join(", ", matchResult.unmatchedNames()));
+    }
+
+    private void refineTitleWithCompanyContact(ScheduleAiParseVO vo, String originalContent) {
+        if (StrUtil.isBlank(vo.getTitle())) {
+            return;
+        }
+
+        List<CompanyContactMention> mentions = extractCompanyContactMentions(originalContent);
+        if (mentions.size() != 1) {
+            return;
+        }
+
+        CompanyContactMention mention = mentions.get(0);
+        String contactName = mention.contactName();
+        if (StrUtil.isBlank(contactName) || StrUtil.contains(vo.getTitle(), contactName)) {
+            return;
+        }
+
+        String fullCompanyName = StrUtil.blankToDefault(vo.getCustomerName(), mention.companyName());
+        String shortCompanyName = shortenCompanyName(fullCompanyName);
+        if (StrUtil.isNotBlank(fullCompanyName) && StrUtil.contains(vo.getTitle(), fullCompanyName)) {
+            vo.setTitle(vo.getTitle().replaceFirst(Pattern.quote(fullCompanyName), Matcher.quoteReplacement(fullCompanyName + contactName)));
+            return;
+        }
+        if (StrUtil.isNotBlank(shortCompanyName) && StrUtil.contains(vo.getTitle(), shortCompanyName)) {
+            vo.setTitle(vo.getTitle().replaceFirst(Pattern.quote(shortCompanyName), Matcher.quoteReplacement(shortCompanyName + contactName)));
+        }
     }
 
     private boolean hasMeaningfulAiParseResult(ScheduleAiParseVO vo) {
@@ -265,8 +354,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
                 || StrUtil.isNotBlank(vo.getUnmatchedParticipantNames());
     }
 
-    private ParticipantMatchResult resolveParticipantUsersByNames(String participantNames) {
-        List<String> names = splitParticipantNames(participantNames);
+    private ParticipantMatchResult resolveParticipantUsersByNames(List<String> names) {
         if (names.isEmpty()) {
             return new ParticipantMatchResult(List.of(), List.of());
         }
@@ -341,9 +429,167 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             return List.of();
         }
         return Arrays.stream(participantNames.split("[,，]"))
-                .map(String::trim)
+                .map(this::normalizeParticipantName)
                 .filter(StrUtil::isNotBlank)
                 .toList();
+    }
+
+    private List<String> extractExplicitParticipantNames(String content) {
+        if (StrUtil.isBlank(content)) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        Matcher matcher = EXPLICIT_PARTICIPANT_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String segment = sanitizeParticipantSegment(matcher.group(1));
+            if (StrUtil.isBlank(segment)) {
+                continue;
+            }
+
+            String normalizedSegment = segment.replaceAll("\\s*(?:和|及|与)\\s*", "、");
+            for (String token : normalizedSegment.split("[、,，/]")) {
+                String name = normalizeParticipantName(token);
+                if (StrUtil.isNotBlank(name)) {
+                    names.add(name);
+                }
+            }
+        }
+        return new ArrayList<>(names);
+    }
+
+    private String sanitizeParticipantSegment(String segment) {
+        String cleaned = StrUtil.trim(segment);
+        if (StrUtil.isBlank(cleaned)) {
+            return "";
+        }
+
+        String[] tailKeywords = {"地点", "地址", "备注", "说明", "客户", "公司", "主题", "内容", "时间"};
+        int cutIndex = cleaned.length();
+        for (String keyword : tailKeywords) {
+            int index = cleaned.indexOf(keyword);
+            if (index > 0) {
+                cutIndex = Math.min(cutIndex, index);
+            }
+        }
+        return cleaned.substring(0, cutIndex).trim();
+    }
+
+    private boolean isExternalCompanyContactName(String name, String content) {
+        String normalizedName = normalizeParticipantName(name);
+        if (StrUtil.isBlank(normalizedName) || StrUtil.isBlank(content)) {
+            return false;
+        }
+        return extractCompanyContactMentions(content).stream()
+                .map(CompanyContactMention::contactName)
+                .anyMatch(contactName -> StrUtil.equals(normalizedName, normalizeParticipantName(contactName)));
+    }
+
+    private List<CompanyContactMention> extractCompanyContactMentions(String content) {
+        if (StrUtil.isBlank(content)) {
+            return List.of();
+        }
+
+        LinkedHashMap<String, CompanyContactMention> mentions = new LinkedHashMap<>();
+        Matcher matcher = COMPANY_CONTACT_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String companyName = normalizeCompanyCandidate(matcher.group(1));
+            String contactName = normalizeParticipantName(matcher.group(2));
+            if (StrUtil.isBlank(companyName) || StrUtil.isBlank(contactName)) {
+                continue;
+            }
+            mentions.putIfAbsent(companyName + "|" + contactName, new CompanyContactMention(companyName, contactName));
+        }
+        return new ArrayList<>(mentions.values());
+    }
+
+    private List<String> extractStandaloneCompanyNames(String content) {
+        if (StrUtil.isBlank(content)) {
+            return List.of();
+        }
+
+        LinkedHashSet<String> companies = new LinkedHashSet<>();
+        Matcher matcher = COMPANY_NAME_PATTERN.matcher(content);
+        while (matcher.find()) {
+            String companyName = normalizeCompanyCandidate(matcher.group(1));
+            if (StrUtil.isNotBlank(companyName)) {
+                companies.add(companyName);
+            }
+        }
+        return new ArrayList<>(companies);
+    }
+
+    private String normalizeParticipantName(String rawName) {
+        String result = StrUtil.trim(rawName);
+        if (StrUtil.isBlank(result)) {
+            return "";
+        }
+
+        String[] prefixes = {"我和", "我们和", "我们", "我司同事", "同事", "还有", "以及", "及", "与", "和"};
+        boolean changed = true;
+        while (changed && StrUtil.isNotBlank(result)) {
+            changed = false;
+            for (String prefix : prefixes) {
+                if (result.startsWith(prefix) && result.length() > prefix.length()) {
+                    result = StrUtil.trim(result.substring(prefix.length()));
+                    changed = true;
+                }
+            }
+        }
+
+        String strippedTitle = result.replaceFirst("(总监|经理|主任|老师|先生|女士|总)$", "");
+        if (strippedTitle.length() >= 2) {
+            result = strippedTitle;
+        }
+
+        if (result.length() > 20 || containsNonParticipantKeyword(result)) {
+            return "";
+        }
+        return result;
+    }
+
+    private boolean containsNonParticipantKeyword(String value) {
+        return StrUtil.containsAny(value, "地点", "地址", "会议", "公司", "方案", "讨论", "沟通", "开会");
+    }
+
+    private String normalizeCompanyCandidate(String rawCompanyName) {
+        String value = StrUtil.trim(rawCompanyName);
+        if (StrUtil.isBlank(value)) {
+            return "";
+        }
+
+        String[] prefixes = {"和", "与", "跟", "约", "找", "去", "到"};
+        boolean changed = true;
+        while (changed && StrUtil.isNotBlank(value)) {
+            changed = false;
+            for (String prefix : prefixes) {
+                if (value.startsWith(prefix) && value.length() > prefix.length() + 1) {
+                    value = StrUtil.trim(value.substring(prefix.length()));
+                    changed = true;
+                }
+            }
+        }
+
+        Matcher matcher = COMPANY_NAME_PATTERN.matcher(value);
+        if (matcher.find()) {
+            value = matcher.group(1);
+        }
+        return StrUtil.trim(value);
+    }
+
+    private String shortenCompanyName(String companyName) {
+        String result = StrUtil.trim(companyName);
+        if (StrUtil.isBlank(result)) {
+            return "";
+        }
+
+        String[] suffixes = {"有限责任公司", "股份有限公司", "集团有限公司", "有限公司", "集团公司", "公司", "集团"};
+        for (String suffix : suffixes) {
+            if (result.endsWith(suffix) && result.length() > suffix.length()) {
+                return StrUtil.removeSuffix(result, suffix);
+            }
+        }
+        return result;
     }
 
     private List<Long> parseParticipantUserIds(String participantUserIdsText) {
@@ -437,6 +683,12 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     private record ParticipantMatchResult(
             List<ScheduleParticipantUserVO> participantUsers,
             List<String> unmatchedNames
+    ) {
+    }
+
+    private record CompanyContactMention(
+            String companyName,
+            String contactName
     ) {
     }
 }

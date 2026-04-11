@@ -426,8 +426,9 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, useRouter, useRoute } from 'vue-router'
 import { useCustomerStore } from '@/stores/customer'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -455,6 +456,7 @@ import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/cus
 const router = useRouter()
 const route = useRoute()
 const customerStore = useCustomerStore()
+const { aiSearchState } = storeToRefs(customerStore)
 const { isMobile } = useResponsive()
 const pageRootRef = ref<HTMLElement | null>(null)
 const tableCardRef = ref<HTMLElement | null>(null)
@@ -511,7 +513,6 @@ const AI_SEARCH_EXAMPLES = [
 const showAiSearchPopover = ref(false)
 const aiSearchInput = ref('')
 const aiSearchLoading = ref(false)
-const aiSearchState = ref<CustomerAiSearchParseVO | null>(null)
 
 const hasAiSearchState = computed(() => {
   return Boolean(aiSearchState.value?.displayChips.length || aiSearchState.value?.explanation)
@@ -609,10 +610,14 @@ function syncAiKeywordChip(keyword: string) {
   }
 }
 
-async function clearAiSearch() {
+function resetAiSearchFilters() {
   aiSearchState.value = null
   aiSearchInput.value = ''
   customerStore.resetQueryParams()
+}
+
+async function clearAiSearch() {
+  resetAiSearchFilters()
   await customerStore.fetchCustomerList(true)
 }
 
@@ -964,6 +969,7 @@ async function loadListCustomFields() {
 }
 
 onMounted(async () => {
+  aiSearchInput.value = aiSearchState.value?.normalizedQuery || aiSearchState.value?.originalQuery || ''
   queueTableHeightUpdate()
   window.addEventListener('resize', queueTableHeightUpdate, { passive: true })
 
@@ -986,6 +992,12 @@ onMounted(async () => {
     showAddDialog.value = true
     router.replace({ path: route.path, query: {} })
   }
+})
+
+onBeforeRouteLeave((to) => {
+  if (to.path.startsWith('/customer')) return
+  if (!aiSearchState.value) return
+  resetAiSearchFilters()
 })
 
 onBeforeUnmount(() => {

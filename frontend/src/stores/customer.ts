@@ -8,7 +8,14 @@ import {
   deleteCustomer,
   getCustomerStatistics
 } from '@/api/customer'
-import type { CustomerListVO, CustomerDetailVO, CustomerQueryBO, CustomerAddBO, CustomerUpdateBO } from '@/types/customer'
+import type {
+  CustomerListVO,
+  CustomerDetailVO,
+  CustomerQueryBO,
+  CustomerAddBO,
+  CustomerUpdateBO,
+  CustomerAiSearchParseVO
+} from '@/types/customer'
 
 const DEFAULT_CUSTOMER_PAGE_SIZE = 10
 
@@ -50,6 +57,7 @@ export const useCustomerStore = defineStore('customer', () => {
   const totalCount = ref(0)
   const loading = ref(false)
   const statistics = ref<any>(null)
+  const aiSearchState = ref<CustomerAiSearchParseVO | null>(null)
 
   // Query params
   const queryParams = ref<CustomerQueryBO>(createDefaultCustomerQueryParams())
@@ -156,6 +164,7 @@ export const useCustomerStore = defineStore('customer', () => {
     totalCount,
     loading,
     statistics,
+    aiSearchState,
     queryParams,
     // Getters
     hasMore,

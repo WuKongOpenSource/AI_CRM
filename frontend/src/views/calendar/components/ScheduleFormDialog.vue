@@ -76,50 +76,26 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label class="mb-1.5 block text-xs font-bold text-slate-500">
-              开始日期
-              <span class="text-red-500">*</span>
-            </label>
-            <el-date-picker
-              v-model="scheduleForm.startDate"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="选择开始日期"
-              size="large"
-              class="w-full wk-crm-el-field-date"
-            />
-          </div>
-          <div>
-            <label class="mb-1.5 block text-xs font-bold text-slate-500">
               开始时间
               <span class="text-red-500">*</span>
             </label>
-            <el-time-picker
+            <el-date-picker
               v-model="scheduleForm.startTime"
-              value-format="HH:mm"
-              format="HH:mm"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              format="YYYY-MM-DD HH:mm"
               placeholder="选择开始时间"
               size="large"
               class="w-full wk-crm-el-field-date"
             />
           </div>
           <div>
-            <label class="mb-1.5 block text-xs font-bold text-slate-500">结束日期</label>
-            <el-date-picker
-              v-model="scheduleForm.endDate"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="选择结束日期"
-              clearable
-              size="large"
-              class="w-full wk-crm-el-field-date"
-            />
-          </div>
-          <div>
             <label class="mb-1.5 block text-xs font-bold text-slate-500">结束时间</label>
-            <el-time-picker
+            <el-date-picker
               v-model="scheduleForm.endTime"
-              value-format="HH:mm"
-              format="HH:mm"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              format="YYYY-MM-DD HH:mm"
               placeholder="选择结束时间"
               clearable
               size="large"
@@ -263,9 +239,7 @@ type Option = {
 
 type ScheduleFormState = {
   title: string
-  startDate: string
   startTime: string
-  endDate: string
   endTime: string
   type: string
   customerId: string
@@ -287,9 +261,7 @@ const { isMobile } = useResponsive()
 function createDefaultFormState(): ScheduleFormState {
   return {
     title: '',
-    startDate: '',
     startTime: '',
-    endDate: '',
     endTime: '',
     type: 'meeting',
     customerId: '',
@@ -315,7 +287,7 @@ const visible = computed({
 })
 
 const canSave = computed(() =>
-  !!scheduleForm.title.trim() && !!scheduleForm.startDate && !!scheduleForm.startTime && !saving.value
+  !!scheduleForm.title.trim() && !!scheduleForm.startTime && !saving.value
 )
 
 watch(
@@ -359,16 +331,17 @@ function formatDatePart(value: number): string {
   return value.toString().padStart(2, '0')
 }
 
+function formatDateTimeValue(date: Date): string {
+  return `${date.getFullYear()}-${formatDatePart(date.getMonth() + 1)}-${formatDatePart(date.getDate())} ${formatDatePart(date.getHours())}:${formatDatePart(date.getMinutes())}:${formatDatePart(date.getSeconds())}`
+}
+
 function parseAiDateTime(value?: string) {
   if (!value) return null
 
-  const directMatch = value.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/)
+  const directMatch = value.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/)
   if (directMatch) {
-    const [, year, month, day, hour, minute] = directMatch
-    return {
-      date: `${year}-${formatDatePart(Number(month))}-${formatDatePart(Number(day))}`,
-      time: `${formatDatePart(Number(hour))}:${minute}`
-    }
+    const [, year, month, day, hour, minute, second] = directMatch
+    return `${year}-${formatDatePart(Number(month))}-${formatDatePart(Number(day))} ${formatDatePart(Number(hour))}:${minute}:${second || '00'}`
   }
 
   const parsed = new Date(value)
@@ -376,10 +349,7 @@ function parseAiDateTime(value?: string) {
     return null
   }
 
-  return {
-    date: `${parsed.getFullYear()}-${formatDatePart(parsed.getMonth() + 1)}-${formatDatePart(parsed.getDate())}`,
-    time: `${formatDatePart(parsed.getHours())}:${formatDatePart(parsed.getMinutes())}`
-  }
+  return formatDateTimeValue(parsed)
 }
 
 function buildUserOption(user: ScheduleParticipantUser | Record<string, any>): Option {
@@ -399,6 +369,24 @@ function mergeUserOptions(options: Option[]) {
     optionMap.set(item.value, item)
   })
   userOptions.value = Array.from(optionMap.values())
+}
+
+function normalizeCompanyName(value?: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[\s()（）]/g, '')
+    .replace(/(?:有限责任公司|股份有限公司|集团有限公司|有限公司|集团公司|公司|集团)$/u, '')
+}
+
+function findExactCustomerMatch(customers: Array<{ customerId: string | number, companyName: string }>, customerName: string) {
+  const rawName = customerName.trim()
+  const normalizedName = normalizeCompanyName(rawName)
+  const matchedCustomers = customers.filter(customer =>
+    customer.companyName === rawName
+    || normalizeCompanyName(customer.companyName) === normalizedName
+  )
+
+  return matchedCustomers.length === 1 ? matchedCustomers[0] : null
 }
 
 async function searchCustomers(query: string) {
@@ -468,29 +456,33 @@ async function handleAiParse() {
 
     const parsedStart = parseAiDateTime(result.startTime)
     if (parsedStart) {
-      scheduleForm.startDate = parsedStart.date
-      scheduleForm.startTime = parsedStart.time
-      if (!scheduleForm.endDate) {
-        scheduleForm.endDate = parsedStart.date
-      }
+      scheduleForm.startTime = parsedStart
     }
 
     const parsedEnd = parseAiDateTime(result.endTime)
     if (parsedEnd) {
-      scheduleForm.endDate = parsedEnd.date
-      scheduleForm.endTime = parsedEnd.time
+      scheduleForm.endTime = parsedEnd
     }
 
-    if (result.customerName) {
+    if (result.customerId && result.customerName) {
+      customerOptions.value = [{
+        value: String(result.customerId),
+        label: result.customerName
+      }]
+      scheduleForm.customerId = String(result.customerId)
+    } else if (result.customerName) {
       const res = await queryCustomerList({ keyword: result.customerName, page: 1, limit: 5 })
       const customers = res.list || []
-      if (customers.length > 0) {
-        customerOptions.value = customers.map((customer: any) => ({
-          value: String(customer.customerId),
-          label: customer.companyName
-        }))
-        scheduleForm.customerId = String(customers[0].customerId)
-      }
+      customerOptions.value = customers.map((customer: any) => ({
+        value: String(customer.customerId),
+        label: customer.companyName
+      }))
+
+      const matchedCustomer = findExactCustomerMatch(customers, result.customerName)
+      scheduleForm.customerId = matchedCustomer ? String(matchedCustomer.customerId) : ''
+    } else {
+      scheduleForm.customerId = ''
+      customerOptions.value = []
     }
 
     if (result.participantUsers?.length) {
@@ -518,17 +510,10 @@ async function handleAiParse() {
 async function handleSaveSchedule() {
   if (!canSave.value) return
 
-  if ((scheduleForm.endDate && !scheduleForm.endTime) || (!scheduleForm.endDate && scheduleForm.endTime)) {
-    ElMessage.warning('结束日期和结束时间请同时填写')
-    return
-  }
+  const startTime = scheduleForm.startTime
+  const endTime = scheduleForm.endTime || undefined
 
-  const startTime = `${scheduleForm.startDate}T${scheduleForm.startTime}:00`
-  const endTime = scheduleForm.endDate && scheduleForm.endTime
-    ? `${scheduleForm.endDate}T${scheduleForm.endTime}:00`
-    : undefined
-
-  if (endTime && new Date(endTime).getTime() < new Date(startTime).getTime()) {
+  if (endTime && endTime < startTime) {
     ElMessage.warning('结束时间不能早于开始时间')
     return
   }

@@ -57,6 +57,7 @@ export interface ScheduleAiParseVO {
   endTime: string
   type: string
   customerName: string
+  customerId?: string
   participantNames: string
   participantUserIds?: string[]
   participantUsers?: ScheduleParticipantUser[]

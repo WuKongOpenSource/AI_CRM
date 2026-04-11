@@ -375,6 +375,38 @@ function formatDateForApi(date: Date = new Date()): string {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
+function parseApiDateTime(value?: string): Date | null {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return null
+
+  const parsed = new Date(trimmed.replace(' ', 'T'))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function normalizeParsedTimes(result: AiFollowUpParseVO) {
+  const now = new Date()
+  const normalizedNow = formatDateForApi(now)
+  let followTime = result.followTime || normalizedNow
+  let nextFollowTime = result.nextFollowTime || ''
+
+  const parsedFollowTime = parseApiDateTime(followTime)
+  const parsedNextFollowTime = parseApiDateTime(nextFollowTime)
+
+  if (
+    parsedFollowTime
+    && parsedFollowTime.getTime() > now.getTime() + 5 * 60 * 1000
+    && !parsedNextFollowTime
+  ) {
+    nextFollowTime = followTime
+    followTime = normalizedNow
+  }
+
+  return {
+    followTime,
+    nextFollowTime
+  }
+}
+
 function buildEditableContent(result: AiFollowUpParseVO, fallbackContent: string): string {
   const blocks: string[] = []
 
@@ -395,11 +427,12 @@ function buildEditableContent(result: AiFollowUpParseVO, fallbackContent: string
 }
 
 function applyParsedResult(result: AiFollowUpParseVO, originalContent: string) {
+  const normalizedTimes = normalizeParsedTimes(result)
   parsedData.value = result
   parsedForm.type = normalizeFollowUpType(result.type)
   parsedForm.content = buildEditableContent(result, originalContent)
-  parsedForm.followTime = result.followTime || formatDateForApi()
-  parsedForm.nextFollowTime = result.nextFollowTime || ''
+  parsedForm.followTime = normalizedTimes.followTime
+  parsedForm.nextFollowTime = normalizedTimes.nextFollowTime
   step.value = 2
 }
 

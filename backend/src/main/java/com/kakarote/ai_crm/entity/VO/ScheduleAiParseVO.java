@@ -26,6 +26,10 @@ public class ScheduleAiParseVO {
     @Schema(description = "关联客户名称")
     private String customerName;
 
+    @Schema(description = "已匹配的关联客户ID")
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long customerId;
+
     @Schema(description = "参与人名称（逗号分隔）")
     private String participantNames;
 

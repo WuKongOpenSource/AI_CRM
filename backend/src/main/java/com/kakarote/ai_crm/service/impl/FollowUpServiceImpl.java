@@ -77,6 +77,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         Attachment context:
         %s
 
+        Time rules:
+        1. `followTime` means the time this follow-up record is created or the actual completed follow-up time.
+        2. If the content is describing a future plan or scheduled contact such as "tomorrow at 10am call the customer", keep `followTime` as Current time.
+        3. Put planned future contact times into `nextFollowTime`.
+        4. Do not put a future planned time into `followTime` when the content has not happened yet.
+
         Keep summary, keyPoints, and todos in the same language as the user's content.
         Return strict JSON only with this exact shape:
         {
@@ -232,7 +238,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             }
             vo.setTodos(todos);
 
-            return vo;
+            return normalizeParsedTimes(vo, now);
         } catch (Exception e) {
             log.warn("AI response JSON parse failed: {}", e.getMessage());
             return buildFallbackResult(originalContent, now);
@@ -255,6 +261,25 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         vo.setNextFollowTime("");
         vo.setKeyPoints(List.of());
         vo.setTodos(List.of());
+        return vo;
+    }
+
+    private FollowUpAiParseVO normalizeParsedTimes(FollowUpAiParseVO vo, String now) {
+        LocalDateTime nowTime = parseDateTime(now, LocalTime.now());
+        if (nowTime == null) {
+            return vo;
+        }
+
+        LocalDateTime followTime = parseDateTime(vo.getFollowTime(), nowTime.toLocalTime());
+        LocalDateTime nextFollowTime = parseDateTime(vo.getNextFollowTime(), nowTime.toLocalTime());
+
+        if (followTime != null
+            && followTime.isAfter(nowTime.plusMinutes(5))
+            && nextFollowTime == null) {
+            vo.setNextFollowTime(AI_TIME_FORMATTER.format(followTime));
+            vo.setFollowTime(now);
+        }
+
         return vo;
     }
 
