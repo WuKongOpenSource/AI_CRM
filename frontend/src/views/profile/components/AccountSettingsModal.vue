@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="account-settings-overlay">
-      <div v-if="modelValue" class="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6">
+      <div v-if="modelValue" class="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-6">
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="handleClose" />
 
         <Transition name="account-settings-panel">
