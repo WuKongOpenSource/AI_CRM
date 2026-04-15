@@ -400,7 +400,7 @@
                     ref="fileInputRef"
                     type="file"
                     multiple
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml"
+                    :accept="CHAT_ATTACHMENT_ACCEPT"
                     class="hidden"
                     @change="handleFileSelect"
                   />
@@ -418,6 +418,7 @@
                     placeholder="输入指令，如：总结今天与张总的会议..."
                     :disabled="chatStore.isStreaming || isUploading"
                     @keydown.enter.exact.prevent="handleSend"
+                    @paste="handlePaste"
                   />
                   <div class="flex items-center gap-2 pr-1">
                     <button
@@ -573,6 +574,13 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
+import {
+  CHAT_ATTACHMENT_ACCEPT,
+  extractClipboardFiles,
+  MAX_CHAT_ATTACHMENT_COUNT,
+  MAX_CHAT_ATTACHMENT_SIZE,
+  mergeChatFiles
+} from '@/utils/chatAttachment'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
@@ -600,8 +608,8 @@ const apiKeySetupProviderOptions = ref<AiProviderPreset[]>([])
 const savingApiKey = ref(false)
 const resumeSendAfterApiKeySave = ref(false)
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
-const MAX_FILE_COUNT = 5
+const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
+const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
   provider: 'dashscope',
   apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode',
@@ -1001,6 +1009,16 @@ function handleUpload() {
   fileInputRef.value?.click()
 }
 
+function appendSelectedFiles(files: File[]) {
+  const result = mergeChatFiles(selectedFiles.value, files)
+  if (result.error) {
+    ElMessage.warning(result.error)
+    return
+  }
+
+  selectedFiles.value = result.files
+}
+
 function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files) return
@@ -1025,6 +1043,15 @@ function handleFileSelect(event: Event) {
 
   selectedFiles.value.push(...newFiles)
   input.value = '' // Reset input for re-selecting same file
+}
+
+function handlePaste(event: ClipboardEvent) {
+  const clipboardFiles = extractClipboardFiles(event)
+  if (clipboardFiles.length === 0) {
+    return
+  }
+
+  appendSelectedFiles(clipboardFiles)
 }
 
 function removeSelectedFile(index: number) {

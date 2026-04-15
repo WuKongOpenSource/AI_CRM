@@ -246,7 +246,7 @@
                 ref="fileInputRef"
                 type="file"
                 multiple
-                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml"
+                :accept="CHAT_ATTACHMENT_ACCEPT"
                 class="hidden"
                 @change="handleFileSelect"
               />
@@ -264,6 +264,7 @@
                 placeholder="输入您的问题..."
                 :disabled="chatStore.isStreaming || isUploading"
                 @keydown.enter.exact.prevent="handleSend"
+                @paste="handlePaste"
               />
               <button
                 type="button"
@@ -356,6 +357,13 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import {
+  CHAT_ATTACHMENT_ACCEPT,
+  extractClipboardFiles,
+  MAX_CHAT_ATTACHMENT_COUNT,
+  MAX_CHAT_ATTACHMENT_SIZE,
+  mergeChatFiles
+} from '@/utils/chatAttachment'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
@@ -375,8 +383,8 @@ const isUploading = ref(false)
 const currentTab = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024
-const MAX_FILE_COUNT = 5
+const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
+const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
@@ -525,6 +533,16 @@ function handleUpload() {
   fileInputRef.value?.click()
 }
 
+function appendSelectedFiles(files: File[]) {
+  const result = mergeChatFiles(selectedFiles.value, files)
+  if (result.error) {
+    ElMessage.warning(result.error)
+    return
+  }
+
+  selectedFiles.value = result.files
+}
+
 function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files) return
@@ -547,6 +565,15 @@ function handleFileSelect(event: Event) {
 
   selectedFiles.value.push(...newFiles)
   input.value = ''
+}
+
+function handlePaste(event: ClipboardEvent) {
+  const clipboardFiles = extractClipboardFiles(event)
+  if (clipboardFiles.length === 0) {
+    return
+  }
+
+  appendSelectedFiles(clipboardFiles)
 }
 
 function removeSelectedFile(index: number) {
