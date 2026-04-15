@@ -86,6 +86,35 @@ oidc:
   # Session Cookie 名称
   session-cookie: CRM_SESSION
 
+token-purchase:
+  enabled: ${TOKEN_PURCHASE_ENABLED:true}
+  order-expire-minutes: ${TOKEN_PURCHASE_ORDER_EXPIRE_MINUTES:30}
+  plans:
+    - id: starter-100w
+      name: 快速选购方案
+      description: 1,000,000 Token
+      token-amount: 1000000
+      price-fen: 6000
+      sort: 1
+      enabled: true
+  wechat:
+    enabled: ${TOKEN_PURCHASE_WECHAT_ENABLED:false}
+    gateway: ${TOKEN_PURCHASE_WECHAT_GATEWAY:https://api.mch.weixin.qq.com}
+    app-id: ${TOKEN_PURCHASE_WECHAT_APP_ID:}
+    merchant-id: ${TOKEN_PURCHASE_WECHAT_MERCHANT_ID:}
+    merchant-serial-no: ${TOKEN_PURCHASE_WECHAT_MERCHANT_SERIAL_NO:}
+    private-key: ${TOKEN_PURCHASE_WECHAT_PRIVATE_KEY:}
+    platform-certificate: ${TOKEN_PURCHASE_WECHAT_PLATFORM_CERTIFICATE:}
+    api-v3-key: ${TOKEN_PURCHASE_WECHAT_API_V3_KEY:}
+    notify-url: ${TOKEN_PURCHASE_WECHAT_NOTIFY_URL:}
+  alipay:
+    enabled: ${TOKEN_PURCHASE_ALIPAY_ENABLED:false}
+    gateway: ${TOKEN_PURCHASE_ALIPAY_GATEWAY:https://openapi.alipay.com/gateway.do}
+    app-id: ${TOKEN_PURCHASE_ALIPAY_APP_ID:}
+    private-key: ${TOKEN_PURCHASE_ALIPAY_PRIVATE_KEY:}
+    alipay-public-key: ${TOKEN_PURCHASE_ALIPAY_PUBLIC_KEY:}
+    notify-url: ${TOKEN_PURCHASE_ALIPAY_NOTIFY_URL:}
+
 # WeKnora 知识库服务配置
 weknora:
   # 是否启用 WeKnora 集成（设为 false 可禁用，仅使用本地存储）

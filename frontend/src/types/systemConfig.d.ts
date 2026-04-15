@@ -62,6 +62,13 @@ export interface AiConfig {
   giftTokenUsed?: number
   giftTokenRemaining?: number
   giftTokenAvailable?: boolean
+  purchasedTokenTotal?: number
+  purchasedTokenUsed?: number
+  purchasedTokenRemaining?: number
+  tokenTotal?: number
+  tokenUsed?: number
+  tokenRemaining?: number
+  tokenAvailable?: boolean
   updateTime?: string
 }
 

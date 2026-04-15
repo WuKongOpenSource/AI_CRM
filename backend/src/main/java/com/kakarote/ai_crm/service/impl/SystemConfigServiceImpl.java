@@ -411,6 +411,12 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         long giftTokenTotal = tenantService.getGiftTokenTotal(tenantId);
         long giftTokenUsed = tenantService.getGiftTokenUsed(tenantId);
         long giftTokenRemaining = tenantService.getGiftTokenRemaining(tenantId);
+        long purchasedTokenTotal = tenantService.getPurchasedTokenTotal(tenantId);
+        long purchasedTokenUsed = tenantService.getPurchasedTokenUsed(tenantId);
+        long purchasedTokenRemaining = tenantService.getPurchasedTokenRemaining(tenantId);
+        long tokenTotal = giftTokenTotal + purchasedTokenTotal;
+        long tokenUsed = giftTokenUsed + purchasedTokenUsed;
+        long tokenRemaining = giftTokenRemaining + purchasedTokenRemaining;
 
         AiConfigVO vo = new AiConfigVO();
         vo.setProvider(descriptor.getCode());
@@ -432,11 +438,18 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         ));
         vo.setMode(effectiveSnapshot.mode().getCode());
         vo.setCustomConfigSaved(customConfigSaved);
-        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), giftTokenRemaining));
+        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), tokenRemaining));
         vo.setGiftTokenTotal(giftTokenTotal);
         vo.setGiftTokenUsed(giftTokenUsed);
         vo.setGiftTokenRemaining(giftTokenRemaining);
         vo.setGiftTokenAvailable(giftTokenRemaining > 0);
+        vo.setPurchasedTokenTotal(purchasedTokenTotal);
+        vo.setPurchasedTokenUsed(purchasedTokenUsed);
+        vo.setPurchasedTokenRemaining(purchasedTokenRemaining);
+        vo.setTokenTotal(tokenTotal);
+        vo.setTokenUsed(tokenUsed);
+        vo.setTokenRemaining(tokenRemaining);
+        vo.setTokenAvailable(tokenRemaining > 0);
         vo.setUpdateTime(getLatestAiConfigUpdateTime());
         return vo;
     }
@@ -491,9 +504,9 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         return DisplayAiConfigSnapshot.fromEffective(effectiveSnapshot);
     }
 
-    private boolean isAiReady(AiMode mode, String apiKey, long giftTokenRemaining) {
+    private boolean isAiReady(AiMode mode, String apiKey, long tokenRemaining) {
         if (mode == AiMode.GIFT) {
-            return StrUtil.isNotBlank(apiKey) && giftTokenRemaining > 0;
+            return StrUtil.isNotBlank(apiKey) && tokenRemaining > 0;
         }
         return StrUtil.isNotBlank(apiKey);
     }

@@ -840,7 +840,7 @@ public class ChatServiceImpl implements IChatService {
         if (tenantId == null) {
             return "当前租户信息缺失，暂时无法使用赠送额度。";
         }
-        if (tenantService.hasAvailableGiftTokens(tenantId)) {
+        if (tenantService.hasAvailableTokens(tenantId)) {
             return null;
         }
         return "赠送 token 已用完，请配置 AI Key 或购买 AI 套餐后继续使用。";
@@ -850,7 +850,7 @@ public class ChatServiceImpl implements IChatService {
         if (!chatClientProvider.isUsingGiftMode() || tenantId == null || totalTokens == null || totalTokens <= 0) {
             return;
         }
-        tenantService.consumeGiftTokens(tenantId, totalTokens.longValue());
+        tenantService.consumeTokens(tenantId, totalTokens.longValue());
     }
 
     private TokenUsageSnapshot resolveTokenUsage(Integer promptTokens, Integer completionTokens, Integer totalTokens,

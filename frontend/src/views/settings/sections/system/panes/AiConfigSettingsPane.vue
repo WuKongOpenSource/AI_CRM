@@ -44,6 +44,9 @@
             >
               启用已保存自定义模型
             </el-button>
+            <el-button type="primary" @click="isTokenPurchaseDialogOpen = true">
+              购买 Token
+            </el-button>
           </div>
         </div>
       </div>
@@ -274,6 +277,11 @@
         <p>如果你要接入百度千帆等需要额外头信息的服务，可以在“额外请求头 (JSON)”中补充。</p>
       </div>
     </el-card>
+    <TokenPurchaseDialog
+      :model-value="isTokenPurchaseDialogOpen"
+      @update:model-value="(visible) => { isTokenPurchaseDialogOpen = visible }"
+      @paid="loadAiConfig"
+    />
   </div>
 </template>
 
@@ -281,6 +289,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Connection, Document, Hide, View } from '@element-plus/icons-vue'
+import TokenPurchaseDialog from '@/components/billing/TokenPurchaseDialog.vue'
 import {
   activateAiProvider,
   getAiConfigDetail,
@@ -318,6 +327,7 @@ const connectionTestResult = ref<AiConnectionTestResult | null>(null)
 const providerOptions = ref<AiProviderPreset[]>(AI_PROVIDER_PRESETS)
 const providerDrafts = ref<ProviderDraftMap>({})
 const loadedConfig = ref<AiConfig | null>(null)
+const isTokenPurchaseDialogOpen = ref(false)
 
 const aiConfigForm = reactive<AiConfigFormState>({
   provider: DEFAULT_PROVIDER,
@@ -338,8 +348,8 @@ const currentProviderPreset = computed(() => {
 
 const configuredProviders = computed(() => providerOptions.value.filter((item) => item.configured))
 const currentMode = computed(() => loadedConfig.value?.mode || 'gift')
-const giftTokenTotal = computed(() => loadedConfig.value?.giftTokenTotal ?? 0)
-const giftTokenRemaining = computed(() => loadedConfig.value?.giftTokenRemaining ?? 0)
+const giftTokenTotal = computed(() => loadedConfig.value?.tokenTotal ?? loadedConfig.value?.giftTokenTotal ?? 0)
+const giftTokenRemaining = computed(() => loadedConfig.value?.tokenRemaining ?? loadedConfig.value?.giftTokenRemaining ?? 0)
 const giftTokenRemainingWan = computed(() => (giftTokenRemaining.value / 10000).toFixed(1))
 const giftTokenTotalWan = computed(() => (giftTokenTotal.value / 10000).toFixed(1))
 const canUseGiftMode = computed(() => currentMode.value !== 'gift' && giftTokenRemaining.value > 0)
