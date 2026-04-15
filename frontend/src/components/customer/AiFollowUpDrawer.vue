@@ -3,7 +3,7 @@
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm"
+        class="fixed inset-0 z-[298] bg-slate-900/40 backdrop-blur-sm"
         @click="handleClose"
       />
     </Transition>
@@ -11,7 +11,7 @@
     <Transition name="slide-right">
       <div
         v-if="modelValue"
-        class="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl"
+        class="fixed inset-y-0 right-0 z-[299] flex w-full max-w-md flex-col bg-white shadow-2xl"
       >
         <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div class="min-w-0">
