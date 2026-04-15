@@ -27,8 +27,22 @@ public interface ICrmTenantService extends IService<CrmTenant> {
      */
     boolean hasAvailableGiftTokens(Long tenantId);
 
+    long getPurchasedTokenTotal(Long tenantId);
+
+    long getPurchasedTokenUsed(Long tenantId);
+
+    long getPurchasedTokenRemaining(Long tenantId);
+
+    long getTotalTokenRemaining(Long tenantId);
+
+    boolean hasAvailableTokens(Long tenantId);
+
     /**
      * 消耗赠送额度。额度不足时会自动扣到 0，不会出现负数。
      */
     void consumeGiftTokens(Long tenantId, long consumeTokens);
+
+    void consumeTokens(Long tenantId, long consumeTokens);
+
+    void addPurchasedTokens(Long tenantId, long tokenAmount);
 }

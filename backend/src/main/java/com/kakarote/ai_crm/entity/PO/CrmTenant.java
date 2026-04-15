@@ -55,6 +55,12 @@ public class CrmTenant implements Serializable {
     @Schema(description = "赠送 token 已使用量")
     private Long giftTokenUsed;
 
+    @TableField("purchased_token_total")
+    private Long purchasedTokenTotal;
+
+    @TableField("purchased_token_used")
+    private Long purchasedTokenUsed;
+
     @TableField("weknora_api_key")
     @Schema(description = "WeKnora 租户 API Key")
     private String weKnoraApiKey;

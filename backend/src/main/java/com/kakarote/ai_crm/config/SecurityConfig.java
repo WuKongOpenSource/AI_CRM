@@ -78,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers("/login", "/auth/login", "/auth/register", "/auth/reset-password").anonymous() // 允许匿名访问
                         .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
                         .requestMatchers("/index.html", "/doc.html", "/swagger-resources/**", "/webjars/**", "/v3/api-docs/**", "/instrument/callback").anonymous()
+                        .requestMatchers("/tokenPurchase/notify/**").permitAll()
                         .requestMatchers("/api/enum/**").permitAll() // 枚举值接口允许访问
                         .requestMatchers("/cloud/**").permitAll() // saas版本接口
                         // OIDC 端点允许访问（用于 MinIO SSO）

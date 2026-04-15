@@ -74,6 +74,20 @@ public class AiConfigVO implements Serializable {
     @Schema(description = "赠送 token 是否仍可用")
     private Boolean giftTokenAvailable;
 
+    private Long purchasedTokenTotal;
+
+    private Long purchasedTokenUsed;
+
+    private Long purchasedTokenRemaining;
+
+    private Long tokenTotal;
+
+    private Long tokenUsed;
+
+    private Long tokenRemaining;
+
+    private Boolean tokenAvailable;
+
     @Schema(description = "最后更新时间")
     private Date updateTime;
 

@@ -162,7 +162,7 @@
               <span class="text-xs font-medium text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
             </div>
             <p v-if="giftTokenRemaining <= 0" class="mb-3 text-xs text-slate-500">
-              赠送额度已用完，可配置 AI 服务后继续使用。
+              Token 已用完，可购买套餐或配置 AI 服务后继续使用。
             </p>
             <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
@@ -182,10 +182,10 @@
             </button>
             <button
               class="flex-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="!canManageAiConfig"
-              @click="openApiKeySetup"
+              :disabled="currentAiMode !== 'gift' && !canManageAiConfig"
+              @click="currentAiMode === 'gift' ? openTokenPurchaseDialog() : openApiKeySetup()"
             >
-              配置 AI 服务
+              {{ currentAiMode === 'gift' ? '购买 Token' : '配置 AI 服务' }}
             </button>
           </div>
           <p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
@@ -560,6 +560,11 @@
       @update:model-value="handleApiKeyModalVisibleChange"
       @save="handleSaveApiKey"
     />
+    <TokenPurchaseDialog
+      :model-value="isTokenPurchaseDialogOpen"
+      @update:model-value="handleTokenPurchaseDialogVisibleChange"
+      @paid="handleTokenPurchasePaid"
+    />
   </div>
 </template>
 
@@ -574,6 +579,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
+import TokenPurchaseDialog from '@/components/billing/TokenPurchaseDialog.vue'
 import {
   CHAT_ATTACHMENT_ACCEPT,
   extractClipboardFiles,
@@ -607,6 +613,8 @@ const apiKeySetupInitialConfig = ref<Partial<AiConfigUpdateBO> | null>(null)
 const apiKeySetupProviderOptions = ref<AiProviderPreset[]>([])
 const savingApiKey = ref(false)
 const resumeSendAfterApiKeySave = ref(false)
+const isTokenPurchaseDialogOpen = ref(false)
+const resumeSendAfterTokenPurchase = ref(false)
 
 const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
@@ -691,14 +699,18 @@ const currentAiMode = computed<AiMode>(() => aiConfig.value?.mode || 'gift')
 const aiReady = computed(() => Boolean(aiConfig.value?.ready))
 const hasAiApiKeyConfigured = computed(() => aiReady.value)
 const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
-const giftTokenTotal = computed(() => aiConfig.value?.giftTokenTotal ?? 0)
-const giftTokenRemaining = computed(() => aiConfig.value?.giftTokenRemaining ?? 0)
-const giftTokenProgressPercent = computed(() => {
-  if (giftTokenTotal.value <= 0) return 0
-  return Math.max(0, Math.min(100, Math.round((giftTokenRemaining.value / giftTokenTotal.value) * 100)))
+const tokenTotal = computed(() => aiConfig.value?.tokenTotal ?? aiConfig.value?.giftTokenTotal ?? 0)
+const tokenRemaining = computed(() => aiConfig.value?.tokenRemaining ?? aiConfig.value?.giftTokenRemaining ?? 0)
+const tokenProgressPercent = computed(() => {
+  if (tokenTotal.value <= 0) return 0
+  return Math.max(0, Math.min(100, Math.round((tokenRemaining.value / tokenTotal.value) * 100)))
 })
-const giftTokenRemainingWan = computed(() => formatWanToken(giftTokenRemaining.value))
-const giftTokenTotalWan = computed(() => formatWanToken(giftTokenTotal.value))
+const tokenRemainingWan = computed(() => formatWanToken(tokenRemaining.value))
+const tokenTotalWan = computed(() => formatWanToken(tokenTotal.value))
+const giftTokenRemaining = tokenRemaining
+const giftTokenProgressPercent = tokenProgressPercent
+const giftTokenRemainingWan = tokenRemainingWan
+const giftTokenTotalWan = tokenTotalWan
 const aiStatusBadgeText = computed(() => {
   if (currentAiMode.value === 'gift') {
     return giftTokenRemaining.value > 0 ? '赠送额度' : '已用完'
@@ -782,6 +794,19 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     giftTokenRemaining: (config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0,
     giftTokenAvailable: (config as Partial<AiConfig> | null)?.giftTokenAvailable
       ?? (((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0) > 0),
+    purchasedTokenTotal: (config as Partial<AiConfig> | null)?.purchasedTokenTotal ?? 0,
+    purchasedTokenUsed: (config as Partial<AiConfig> | null)?.purchasedTokenUsed ?? 0,
+    purchasedTokenRemaining: (config as Partial<AiConfig> | null)?.purchasedTokenRemaining ?? 0,
+    tokenTotal: (config as Partial<AiConfig> | null)?.tokenTotal
+      ?? ((config as Partial<AiConfig> | null)?.giftTokenTotal ?? 0),
+    tokenUsed: (config as Partial<AiConfig> | null)?.tokenUsed
+      ?? ((config as Partial<AiConfig> | null)?.giftTokenUsed ?? 0),
+    tokenRemaining: (config as Partial<AiConfig> | null)?.tokenRemaining
+      ?? ((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0),
+    tokenAvailable: (config as Partial<AiConfig> | null)?.tokenAvailable
+      ?? (((config as Partial<AiConfig> | null)?.tokenRemaining
+        ?? (config as Partial<AiConfig> | null)?.giftTokenRemaining
+        ?? 0) > 0),
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined
   }
 }
@@ -812,6 +837,12 @@ async function ensureAiAvailable(): Promise<boolean> {
 
   if (aiConfig.value?.ready) {
     return true
+  }
+
+  if (currentAiMode.value === 'gift' && tokenRemaining.value <= 0) {
+    resumeSendAfterTokenPurchase.value = true
+    isTokenPurchaseDialogOpen.value = true
+    return false
   }
 
   if (!canManageAiConfig.value) {
@@ -934,6 +965,28 @@ function openApiKeySetup() {
   prepareApiKeySetupModal().then(() => {
     isApiKeyModalOpen.value = true
   })
+}
+
+function openTokenPurchaseDialog() {
+  resumeSendAfterTokenPurchase.value = false
+  isTokenPurchaseDialogOpen.value = true
+}
+
+function handleTokenPurchaseDialogVisibleChange(visible: boolean) {
+  isTokenPurchaseDialogOpen.value = visible
+  if (!visible) {
+    resumeSendAfterTokenPurchase.value = false
+  }
+}
+
+async function handleTokenPurchasePaid() {
+  await loadAiConfig(true)
+  const shouldResumeSend = resumeSendAfterTokenPurchase.value
+  resumeSendAfterTokenPurchase.value = false
+  if (shouldResumeSend) {
+    await nextTick()
+    await handleSend()
+  }
 }
 
 async function handleSend() {
