@@ -76,6 +76,12 @@ public class Customer implements Serializable {
     private String website;
 
     /**
+     * 公司 Logo
+     */
+    @Schema(description = "公司 Logo")
+    private String logo;
+
+    /**
      * 报价金额
      */
     @Schema(description = "报价金额")

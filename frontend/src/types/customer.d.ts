@@ -10,6 +10,8 @@ export interface Customer {
   phone?: string
   email?: string
   website?: string
+  logo?: string
+  logoUrl?: string
   address?: string
   aiStatusDetection?: string
   aiInsight?: string

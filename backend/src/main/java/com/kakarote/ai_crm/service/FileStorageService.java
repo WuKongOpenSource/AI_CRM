@@ -20,6 +20,17 @@ public interface FileStorageService {
     String upload(MultipartFile file, String path);
 
     /**
+     * 上传输入流内容
+     *
+     * @param inputStream 文件输入流
+     * @param size 文件大小（字节）
+     * @param path 存储路径/key
+     * @param contentType 文件MIME类型
+     * @return 文件存储路径
+     */
+    String upload(InputStream inputStream, long size, String path, String contentType);
+
+    /**
      * 删除文件
      *
      * @param path 文件路径/key

@@ -207,8 +207,16 @@
                   </template>
                   <template v-else-if="field.fieldName === 'companyName'">
                     <div class="flex items-center gap-3 min-w-0">
-                      <div class="size-8 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs flex-shrink-0">
-                        {{ row.companyName?.charAt(0) || '?' }}
+                      <div class="size-8 rounded overflow-hidden border border-slate-200 bg-white flex items-center justify-center flex-shrink-0">
+                        <img
+                          v-if="row.logoUrl"
+                          :src="row.logoUrl"
+                          :alt="row.companyName || 'company logo'"
+                          class="size-full object-contain"
+                        />
+                        <span v-else class="bg-primary/10 text-primary flex size-full items-center justify-center font-bold text-xs">
+                          {{ row.companyName?.charAt(0) || '?' }}
+                        </span>
                       </div>
                       <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName || '-' }}</span>
                     </div>

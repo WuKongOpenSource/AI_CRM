@@ -108,6 +108,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private FileStorageService fileStorageService;
 
     @Autowired
+    private CustomerLogoService customerLogoService;
+
+    @Autowired
     private DataPermissionService dataPermissionService;
 
     @Autowired
@@ -266,6 +269,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Long currentTenantId = UserUtil.getTenantId();
         Customer customer = BeanUtil.copyProperties(customerAddBO, Customer.class);
         customer.setOwnerId(currentUserId);
+        customer.setWebsite(customerLogoService.normalizeWebsite(customer.getWebsite()));
+        customer.setLogo(null);
         customer.setStatus(1);
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);
@@ -317,10 +322,21 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (ObjectUtil.isNull(customer)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
+        String previousWebsite = customerLogoService.normalizeWebsite(customer.getWebsite());
+        String previousLogo = customer.getLogo();
         BeanUtil.copyProperties(customerUpdateBO, customer, "customerId", "createUserId", "createTime", "customFields");
+        String normalizedWebsite = customerLogoService.normalizeWebsite(customer.getWebsite());
+        boolean websiteChanged = !Objects.equals(previousWebsite, normalizedWebsite);
+        customer.setWebsite(normalizedWebsite);
+        if (websiteChanged) {
+            customer.setLogo(null);
+        }
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);
         updateById(customer);
+        if (websiteChanged) {
+            deleteCustomerLogoAfterCommit(previousLogo);
+        }
 
         // 更新自定义字段
         if (customerUpdateBO.getCustomFields() != null && !customerUpdateBO.getCustomFields().isEmpty()) {
@@ -344,6 +360,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
         removeById(customerId);
+        deleteCustomerLogoAfterCommit(customer.getLogo());
         // Delete related contacts
         contactMapper.delete(new LambdaQueryWrapper<Contact>().eq(Contact::getCustomerId, customerId));
         // Delete related tags
@@ -506,6 +523,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         vo.setLevel(toStr(row.get("level")));
         vo.setSource(toStr(row.get("source")));
         vo.setWebsite(toStr(row.get("website")));
+        vo.setLogo(toStr(row.get("logo")));
+        vo.setLogoUrl(customerLogoService.resolveLogoUrl(vo.getLogo()));
         vo.setAddress(toStr(row.get("address")));
         vo.setQuotation(toBigDecimal(row.get("quotation")));
         vo.setContractAmount(toBigDecimal(row.get("contract_amount")));
@@ -572,6 +591,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Override
     public CustomerDetailVO getCustomerDetail(Long customerId) {
         CustomerDetailVO detail = baseMapper.getCustomerById(customerId);
+        if (detail != null) {
+            detail.setLogoUrl(customerLogoService.resolveLogoUrl(detail.getLogo()));
+        }
         if (ObjectUtil.isNull(detail)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
@@ -652,6 +674,11 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private CustomerAiReportVO generateAiReportInternal(Long customerId,
                                                         Date expectedRequestedAt,
                                                         boolean persistCompletedStatus) {
+        try {
+            customerLogoService.populateCustomerLogo(customerId, expectedRequestedAt);
+        } catch (Exception exception) {
+            log.warn("populate customer logo failed, customerId={}", customerId, exception);
+        }
         CustomerDetailVO detail = getCustomerDetail(customerId);
         List<FollowUpVO> recentFollowUps = followUpMapper.getRecentByCustomerId(customerId, 5);
 
@@ -694,6 +721,26 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
         return report;
+    }
+
+    private void deleteCustomerLogoAfterCommit(String logo) {
+        String normalizedLogo = StrUtil.trimToNull(logo);
+        if (normalizedLogo == null) {
+            return;
+        }
+
+        Runnable deleteTask = () -> customerLogoService.deleteStoredLogoQuietly(normalizedLogo);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deleteTask.run();
+                }
+            });
+            return;
+        }
+
+        deleteTask.run();
     }
 
     private void scheduleCustomerAiAnalysis(Long customerId, Long userId, Long tenantId, Date analysisRequestedAt) {

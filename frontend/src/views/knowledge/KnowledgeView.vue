@@ -182,6 +182,14 @@
               <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
             </div>
             <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="hidden rounded-xl border border-primary/15 bg-primary/5 px-4 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 md:inline-flex"
+                :disabled="totalCount === 0"
+                @click="openScriptGenerator"
+              >
+                AI 话术 / SOP 生成
+              </button>
               <!-- View Mode Toggle -->
               <div class="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                 <button
@@ -261,7 +269,7 @@
               <button
                 type="button"
                 class="relative z-10 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white transition-all hover:bg-primary/90"
-                @click="queryParams.keyword = '销售话术'"
+                @click="openScriptGenerator"
               >
                 立即开始
               </button>
@@ -643,6 +651,7 @@
 
     <!-- Document Detail Modal -->
     <KnowledgeDetailModal v-model="showDetailModal" :knowledge-id="selectedKnowledgeId" />
+    <KnowledgeScriptGeneratorDialog v-model="showScriptDialog" />
   </div>
 </template>
 
@@ -662,6 +671,7 @@ import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'e
 import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeAiSearchVO } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 import KnowledgeSearchResultPanel from '@/components/knowledge/KnowledgeSearchResultPanel.vue'
+import KnowledgeScriptGeneratorDialog from '@/components/knowledge/KnowledgeScriptGeneratorDialog.vue'
 
 const { isMobile } = useResponsive()
 const route = useRoute()
@@ -676,6 +686,7 @@ const loading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
 const showDetailModal = ref(false)
+const showScriptDialog = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
 const totalCount = ref(0)
@@ -839,6 +850,14 @@ function openDetail(item: Knowledge) {
 function openDetailById(knowledgeId: string | number) {
   selectedKnowledgeId.value = String(knowledgeId)
   showDetailModal.value = true
+}
+
+function openScriptGenerator() {
+  if (totalCount.value === 0) {
+    ElMessage.warning('请先上传知识库文档')
+    return
+  }
+  showScriptDialog.value = true
 }
 
 async function openKnowledgeFromRouteQuery(knowledgeId: string) {

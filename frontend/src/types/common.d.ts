@@ -119,6 +119,21 @@ export interface KnowledgeAiSearchBO {
   limit?: number
 }
 
+export interface KnowledgeTargetedScriptBO {
+  knowledgeIds: string[]
+  customerId: string
+}
+
+export interface KnowledgeTargetedScriptVO {
+  title: string
+  subtitle: string
+  content: string
+  customerId: string
+  customerName: string
+  knowledgeIds: string[]
+  knowledgeNames: string[]
+}
+
 // AI Agent types
 export interface AiAgent {
   agentId: string

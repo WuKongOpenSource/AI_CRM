@@ -24,7 +24,13 @@
           <div class="flex justify-between">
             <div class="flex gap-4 min-w-0">
               <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
-                <span class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
+                <img
+                  v-if="customer.logoUrl"
+                  :src="customer.logoUrl"
+                  :alt="customer.companyName || 'company logo'"
+                  class="size-full object-contain bg-white"
+                />
+                <span v-else class="text-2xl font-bold text-slate-400">{{ customer.companyName?.charAt(0) || '?' }}</span>
               </div>
               <div class="min-w-0 space-y-2">
                 <div class="flex items-center gap-3 flex-wrap">
@@ -814,8 +820,14 @@
         <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5">
             <div class="flex items-center gap-4">
-              <div class="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-2xl font-black text-slate-400">
-                {{ customer.companyName?.charAt(0) || '?' }}
+              <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white text-2xl font-black text-slate-400">
+                <img
+                  v-if="customer.logoUrl"
+                  :src="customer.logoUrl"
+                  :alt="customer.companyName || 'company logo'"
+                  class="size-full object-contain"
+                />
+                <span v-else>{{ customer.companyName?.charAt(0) || '?' }}</span>
               </div>
               <div class="min-w-0">
                 <h4 class="truncate text-lg font-bold text-slate-900">{{ customer.companyName }}</h4>

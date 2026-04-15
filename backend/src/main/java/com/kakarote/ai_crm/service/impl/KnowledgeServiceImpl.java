@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ObjectUtil;
@@ -18,18 +19,25 @@ import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.entity.VO.ContactVO;
+import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
+import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeTargetedScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
+import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
@@ -75,6 +83,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private static final int DEFAULT_AI_SEARCH_LIMIT = 5;
     private static final int MAX_AI_SEARCH_LIMIT = 8;
     private static final int MAX_AI_SEARCH_CONTEXT_LENGTH = 1_200;
+    private static final int MAX_TARGETED_SCRIPT_DOC_COUNT = 4;
+    private static final int MAX_TARGETED_SCRIPT_DOC_CONTENT_LENGTH = 1_000;
+    private static final int MAX_TARGETED_SCRIPT_FOLLOWUP_COUNT = 3;
 
     @Value("${file.upload-path:./uploads}")
     private String uploadPath;
@@ -84,6 +95,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
     @Autowired
     private CustomerMapper customerMapper;
+
+    @Autowired
+    private FollowUpMapper followUpMapper;
 
     @Autowired
     private WeKnoraClient weKnoraClient;
@@ -101,6 +115,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Lazy
+    @Autowired
+    private ICustomerService customerService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -302,6 +320,74 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         return result;
     }
 
+    @Override
+    public KnowledgeTargetedScriptVO generateTargetedScript(KnowledgeTargetedScriptBO scriptBO) {
+        if (scriptBO == null || scriptBO.getCustomerId() == null
+            || scriptBO.getKnowledgeIds() == null || scriptBO.getKnowledgeIds().isEmpty()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "生成参数不完整");
+        }
+
+        List<Long> requestedIds = scriptBO.getKnowledgeIds().stream()
+            .filter(ObjectUtil::isNotNull)
+            .distinct()
+            .limit(MAX_TARGETED_SCRIPT_DOC_COUNT)
+            .toList();
+        if (requestedIds.isEmpty()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请至少选择一份参考文档");
+        }
+
+        List<Knowledge> fetchedKnowledges = lambdaQuery()
+            .in(Knowledge::getKnowledgeId, requestedIds)
+            .ne(Knowledge::getStatus, 2)
+            .list();
+        Map<Long, Knowledge> knowledgeMap = new LinkedHashMap<>();
+        for (Knowledge knowledge : fetchedKnowledges) {
+            knowledgeMap.put(knowledge.getKnowledgeId(), knowledge);
+        }
+
+        List<Knowledge> knowledges = new ArrayList<>();
+        for (Long knowledgeId : requestedIds) {
+            Knowledge knowledge = knowledgeMap.get(knowledgeId);
+            if (knowledge != null) {
+                knowledges.add(knowledge);
+            }
+        }
+        if (knowledges.size() != requestedIds.size()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "部分参考文档不存在或不可访问");
+        }
+
+        CustomerDetailVO customerDetail = customerService.getCustomerDetail(scriptBO.getCustomerId());
+        List<FollowUpVO> recentFollowUps = followUpMapper.getRecentByCustomerId(
+            scriptBO.getCustomerId(), MAX_TARGETED_SCRIPT_FOLLOWUP_COUNT
+        );
+
+        String fallback = buildTargetedScriptFallback(customerDetail, recentFollowUps, knowledges);
+        String content = fallback;
+        if (chatClientProvider.isApiKeyConfigured()) {
+            try {
+                String response = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(buildTargetedScriptPrompt(customerDetail, recentFollowUps, knowledges))
+                    .call()
+                    .content();
+                content = cleanGeneratedMarkdown(response, fallback);
+            } catch (Exception e) {
+                log.warn("生成定向销售话术失败，使用兜底内容: customerId={}, knowledgeIds={}, error={}",
+                    scriptBO.getCustomerId(), requestedIds, e.getMessage());
+            }
+        }
+
+        KnowledgeTargetedScriptVO result = new KnowledgeTargetedScriptVO();
+        result.setTitle("针对性销售话术已生成");
+        result.setSubtitle(buildTargetedScriptSubtitle(customerDetail.getCompanyName(), knowledges));
+        result.setContent(content);
+        result.setCustomerId(customerDetail.getCustomerId());
+        result.setCustomerName(customerDetail.getCompanyName());
+        result.setKnowledgeIds(knowledges.stream().map(Knowledge::getKnowledgeId).toList());
+        result.setKnowledgeNames(knowledges.stream().map(Knowledge::getName).toList());
+        return result;
+    }
+
     private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId, String tenantApiKey) {
         int maxAttempts = 60;
         long intervalMs = 20000; // 20秒
@@ -375,7 +461,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         globalSearchIndexService.refreshKnowledgeIndex(knowledgeId);
 
         // 重新异步上传（含轮询）
-self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName(), UserUtil.getTenantId());
+        self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), knowledge.getName(), UserUtil.getTenantId());
     }
 
     @Override
@@ -437,6 +523,34 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
         %s
 
         请用中文回答，回答要准确、简洁。如果文档中没有相关信息，请如实说明。
+        """;
+
+    private static final String TARGETED_SCRIPT_PROMPT_TEMPLATE = """
+        你是一位资深 B2B 销售总监兼售前顾问。请结合客户画像、最近跟进信息和参考文档，为一线销售生成一份“可直接拿来用”的针对性销售话术与 SOP。
+
+        输出要求：
+        1. 使用中文 Markdown。
+        2. 必须围绕客户当前场景输出，不要写成泛泛的产品介绍。
+        3. 不要编造参考资料中不存在的能力或承诺；若信息不足，请明确写“需进一步确认”。
+        4. 请严格使用以下结构：
+           ## 客户判断
+           ## 参考依据
+           ### 1. 开场白（建立连接与专业度）
+           ### 2. 需求探查（识别真实诉求）
+           ### 3. 价值呈现（把方案与客户场景绑定）
+           ### 4. 异议处理（提前化解顾虑）
+           ### 5. 收口推进（推动下一步）
+           ## SOP 建议
+           ## 风险提醒
+        5. 每个“话术”小节都输出 2-4 句可直接对客户说的话，必要时用引用块 `>` 包裹。
+        6. “SOP 建议”写成 4-6 条编号步骤，突出拜访/通话前准备、会中动作、会后跟进。
+        7. 语气专业、自然、克制，适合企业服务销售场景。
+
+        目标客户信息：
+        %s
+
+        参考文档信息：
+        %s
         """;
 
     @Override
@@ -765,6 +879,219 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
         return answer.toString().trim();
     }
 
+    private String buildTargetedScriptPrompt(CustomerDetailVO customerDetail,
+                                             List<FollowUpVO> recentFollowUps,
+                                             List<Knowledge> knowledges) {
+        return TARGETED_SCRIPT_PROMPT_TEMPLATE.formatted(
+            buildTargetedCustomerContext(customerDetail, recentFollowUps),
+            buildTargetedKnowledgeContext(knowledges)
+        );
+    }
+
+    private String buildTargetedCustomerContext(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("公司名称: ").append(StrUtil.blankToDefault(detail.getCompanyName(), "未提供")).append('\n');
+        builder.append("行业: ").append(StrUtil.blankToDefault(detail.getIndustry(), "未提供")).append('\n');
+        builder.append("商机阶段: ").append(StrUtil.blankToDefault(detail.getStageName(), detail.getStage())).append('\n');
+        builder.append("客户级别: ").append(StrUtil.blankToDefault(detail.getLevel(), "未提供")).append('\n');
+        builder.append("客户来源: ").append(StrUtil.blankToDefault(detail.getSource(), "未提供")).append('\n');
+        builder.append("最后联系时间: ").append(formatDateTime(detail.getLastContactTime())).append('\n');
+        builder.append("下次跟进时间: ").append(formatDateTime(detail.getNextFollowTime())).append('\n');
+        builder.append("AI 状态判断: ").append(StrUtil.blankToDefault(detail.getAiStatusDetection(), "未提供")).append('\n');
+        builder.append("AI 洞察: ").append(StrUtil.blankToDefault(detail.getAiInsight(), "未提供")).append('\n');
+        builder.append("备注: ").append(StrUtil.blankToDefault(detail.getRemark(), "未提供")).append('\n');
+        builder.append("主联系人: ").append(resolvePrimaryContactSummary(detail.getContacts())).append('\n');
+        builder.append("最近跟进记录: ").append(formatFollowUpSummary(recentFollowUps)).append('\n');
+        builder.append("近期任务: ").append(formatTaskSummary(detail)).append('\n');
+        return builder.toString().trim();
+    }
+
+    private String buildTargetedKnowledgeContext(List<Knowledge> knowledges) {
+        StringBuilder builder = new StringBuilder();
+        Map<Long, String> customerNameMap = loadCustomerNameMap(knowledges);
+        for (int i = 0; i < knowledges.size(); i++) {
+            Knowledge knowledge = knowledges.get(i);
+            builder.append("资料").append(i + 1).append('\n');
+            builder.append("名称: ").append(StrUtil.blankToDefault(knowledge.getName(), "未命名文档")).append('\n');
+            builder.append("类型: ").append(StrUtil.blankToDefault(knowledge.getType(), "document")).append('\n');
+            builder.append("关联客户: ")
+                .append(StrUtil.blankToDefault(customerNameMap.get(knowledge.getCustomerId()), "未关联"))
+                .append('\n');
+            builder.append("摘要: ").append(StrUtil.blankToDefault(knowledge.getSummary(), "未提供")).append('\n');
+            builder.append("核心片段: ").append(extractTargetedScriptSnippet(knowledge)).append("\n\n");
+        }
+        return builder.toString().trim();
+    }
+
+    private String extractTargetedScriptSnippet(Knowledge knowledge) {
+        String content = normalizeSearchableContent(knowledge.getContentText());
+        if (StrUtil.isBlank(content)) {
+            return StrUtil.blankToDefault(knowledge.getSummary(), "暂无可用正文片段");
+        }
+        return content.length() > MAX_TARGETED_SCRIPT_DOC_CONTENT_LENGTH
+            ? content.substring(0, MAX_TARGETED_SCRIPT_DOC_CONTENT_LENGTH) + "..."
+            : content;
+    }
+
+    private String cleanGeneratedMarkdown(String content, String fallback) {
+        if (StrUtil.isBlank(content)) {
+            return fallback;
+        }
+        String normalized = content.trim();
+        if (normalized.startsWith("```")) {
+            normalized = normalized.replaceFirst("```(?:markdown|md)?\\s*", "");
+            normalized = normalized.replaceFirst("\\s*```$", "");
+        }
+        return StrUtil.isBlank(normalized) ? fallback : normalized.trim();
+    }
+
+    private String buildTargetedScriptFallback(CustomerDetailVO detail,
+                                               List<FollowUpVO> recentFollowUps,
+                                               List<Knowledge> knowledges) {
+        String customerName = StrUtil.blankToDefault(detail.getCompanyName(), "该客户");
+        String industry = StrUtil.blankToDefault(detail.getIndustry(), "所在行业");
+        String stage = StrUtil.blankToDefault(detail.getStageName(), StrUtil.blankToDefault(detail.getStage(), "当前阶段"));
+        String openingHook = firstNonBlank(
+            detail.getAiInsight(),
+            detail.getRemark(),
+            recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.getFirst().getContent()
+        );
+        List<String> evidenceLines = new ArrayList<>();
+        for (Knowledge knowledge : knowledges) {
+            evidenceLines.add("- **%s**：%s".formatted(
+                StrUtil.blankToDefault(knowledge.getName(), "未命名文档"),
+                StrUtil.blankToDefault(firstNonBlank(knowledge.getSummary(), extractTargetedScriptSnippet(knowledge)), "暂无摘要")
+            ));
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("## 客户判断\n\n");
+        builder.append(customerName).append("当前处于**").append(stage).append("**阶段，所属行业为**").append(industry)
+            .append("**。建议围绕客户业务目标、当前推进节点和文档中的关键价值点展开沟通，避免直接堆砌产品能力。\n\n");
+
+        builder.append("## 参考依据\n\n");
+        evidenceLines.forEach(line -> builder.append(line).append('\n'));
+        builder.append('\n');
+
+        builder.append("### 1. 开场白（建立连接与专业度）\n\n");
+        builder.append("> 您好，我这边结合贵司目前的业务推进情况和我们整理的参考资料，特别关注到")
+            .append(StrUtil.blankToDefault(openingHook, "当前项目推进效率与服务协同的提升空间"))
+            .append("。今天想先和您确认一下，现阶段最希望优先解决的是流程效率、协同响应，还是业务增长相关的问题？\n\n");
+
+        builder.append("### 2. 需求探查（识别真实诉求）\n\n");
+        builder.append("> 从目前信息看，贵司已经进入").append(stage)
+            .append("阶段。为了让后续方案更贴合实际，我想先确认三个点：第一，当前内部最需要优化的业务环节是什么；第二，项目推进时最担心的风险点是什么；第三，决策时更看重上线速度、落地效果还是整体投入产出？\n\n");
+
+        builder.append("### 3. 价值呈现（把方案与客户场景绑定）\n\n");
+        builder.append("> 我们这次不是单纯介绍产品功能，而是希望结合您当前的业务目标，把文档里提到的关键策略和落地经验，转成更适合贵司现阶段的推进方案。这样既能缩短内部沟通成本，也能让后续决策更聚焦在实际收益上。\n\n");
+
+        builder.append("### 4. 异议处理（提前化解顾虑）\n\n");
+        builder.append("> 如果您担心实施复杂度、投入产出或内部协同成本，我们建议先从最核心、最容易验证价值的环节切入，先跑通一个小范围场景，再逐步扩展。这样既能控制风险，也更方便内部形成共识。\n\n");
+
+        builder.append("### 5. 收口推进（推动下一步）\n\n");
+        builder.append("> 如果方向上您认可，我们可以下一步一起把关键需求、当前流程痛点和预期目标梳理清楚，再输出一版更贴合贵司实际情况的推进建议，帮助您内部更快评估和决策。\n\n");
+
+        builder.append("## SOP 建议\n\n");
+        builder.append("1. 通话或拜访前先统一内部口径，明确本次沟通要验证的 2-3 个核心问题。\n");
+        builder.append("2. 结合参考文档中的重点信息，准备与客户场景直接相关的案例、政策或产品价值表达。\n");
+        builder.append("3. 会中优先确认客户当前阶段、推进阻力、关键决策人和时间节点，再展开方案说明。\n");
+        builder.append("4. 若客户表达顾虑，先复述问题并给出可落地的分阶段方案，不急于一次性覆盖全部诉求。\n");
+        builder.append("5. 会后 24 小时内发送本次沟通纪要，明确下一步动作、责任人和时间安排。\n\n");
+
+        builder.append("## 风险提醒\n\n");
+        builder.append("- 若客户内部目标和决策链尚不清晰，建议先补齐关键信息，再推进正式方案。\n");
+        builder.append("- 当前参考资料更多提供方向性支撑，具体预算、周期和交付边界仍需进一步确认。\n");
+        builder.append("- 如果最近跟进已中断较久，建议先用低压沟通方式重新建立互动，再推进深入交流。\n");
+
+        return builder.toString().trim();
+    }
+
+    private String buildTargetedScriptSubtitle(String customerName, List<Knowledge> knowledges) {
+        List<String> knowledgeNames = knowledges.stream()
+            .map(Knowledge::getName)
+            .filter(StrUtil::isNotBlank)
+            .limit(2)
+            .toList();
+        String docLabel = knowledgeNames.isEmpty() ? "所选参考资料" : String.join("、", knowledgeNames);
+        if (knowledges.size() > knowledgeNames.size()) {
+            docLabel += " 等 " + knowledges.size() + " 份资料";
+        }
+        return "基于 %s & %s".formatted(docLabel, StrUtil.blankToDefault(customerName, "目标客户"));
+    }
+
+    private String resolvePrimaryContactSummary(List<ContactVO> contacts) {
+        if (contacts == null || contacts.isEmpty()) {
+            return "未提供";
+        }
+        ContactVO primary = contacts.stream()
+            .filter(contact -> contact != null && Integer.valueOf(1).equals(contact.getIsPrimary()))
+            .findFirst()
+            .orElse(contacts.getFirst());
+        if (primary == null) {
+            return "未提供";
+        }
+        StringBuilder builder = new StringBuilder(StrUtil.blankToDefault(primary.getName(), "未命名联系人"));
+        if (StrUtil.isNotBlank(primary.getPosition())) {
+            builder.append(" / ").append(primary.getPosition());
+        }
+        if (StrUtil.isNotBlank(primary.getPhone())) {
+            builder.append(" / ").append(primary.getPhone());
+        }
+        return builder.toString();
+    }
+
+    private String formatFollowUpSummary(List<FollowUpVO> recentFollowUps) {
+        if (recentFollowUps == null || recentFollowUps.isEmpty()) {
+            return "近期暂无有效跟进记录";
+        }
+        List<String> summaries = new ArrayList<>();
+        for (FollowUpVO followUp : recentFollowUps) {
+            if (followUp == null) {
+                continue;
+            }
+            StringBuilder builder = new StringBuilder();
+            builder.append(formatDateTime(followUp.getFollowTime())).append(" ");
+            builder.append(StrUtil.blankToDefault(followUp.getTypeName(), StrUtil.blankToDefault(followUp.getType(), "跟进")));
+            builder.append("：");
+            builder.append(StrUtil.blankToDefault(firstNonBlank(followUp.getSummary(), followUp.getContent()), "暂无内容"));
+            summaries.add(builder.toString());
+        }
+        return String.join("；", summaries);
+    }
+
+    private String formatTaskSummary(CustomerDetailVO detail) {
+        if (detail.getTasks() == null || detail.getTasks().isEmpty()) {
+            return "暂无待跟进任务";
+        }
+        return detail.getTasks().stream()
+            .limit(3)
+            .map(task -> {
+                StringBuilder builder = new StringBuilder(StrUtil.blankToDefault(task.getTitle(), "未命名任务"));
+                if (StrUtil.isNotBlank(task.getStatus())) {
+                    builder.append("（").append(task.getStatus()).append("）");
+                }
+                return builder.toString();
+            })
+            .reduce((left, right) -> left + "；" + right)
+            .orElse("暂无待跟进任务");
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
+    private String formatDateTime(java.util.Date date) {
+        return date == null ? "未提供" : DateUtil.formatDateTime(date);
+    }
+
     private Map<Long, String> loadCustomerNameMap(List<Knowledge> knowledges) {
         Set<Long> customerIds = new LinkedHashSet<>();
         for (Knowledge knowledge : knowledges) {
@@ -773,7 +1100,7 @@ self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), knowledge.getFilePath(), k
             }
         }
         if (customerIds.isEmpty()) {
-            return Map.of();
+            return new LinkedHashMap<>();
         }
 
         List<Customer> customers = customerMapper.selectBatchIds(customerIds);

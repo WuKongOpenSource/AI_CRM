@@ -8,8 +8,10 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeTargetedScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
@@ -17,6 +19,7 @@ import com.kakarote.ai_crm.utils.DocToHtmlConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -84,6 +87,14 @@ public class KnowledgeController {
     @RequirePermission("knowledge:view")
     public Result<KnowledgeAiSearchVO> aiSearch(@RequestBody KnowledgeAiSearchBO searchBO) {
         return Result.ok(knowledgeService.aiSearch(searchBO));
+    }
+
+    @PostMapping("/targeted-script")
+    @Operation(summary = "Generate targeted sales script and SOP")
+    @RequirePermission("knowledge:view")
+    public Result<KnowledgeTargetedScriptVO> generateTargetedScript(
+            @Valid @RequestBody KnowledgeTargetedScriptBO scriptBO) {
+        return Result.ok(knowledgeService.generateTargetedScript(scriptBO));
     }
 
     @GetMapping("/detail/{id}")

@@ -5,7 +5,9 @@ import type {
   KnowledgeQueryBO,
   KnowledgeAiAnalyzeVO,
   KnowledgeAiSearchBO,
-  KnowledgeAiSearchVO
+  KnowledgeAiSearchVO,
+  KnowledgeTargetedScriptBO,
+  KnowledgeTargetedScriptVO
 } from '@/types/common'
 
 /**
@@ -93,6 +95,15 @@ export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {
  */
 export function aiSearchKnowledge(query: KnowledgeAiSearchBO): Promise<KnowledgeAiSearchVO> {
   return post('/knowledge/ai-search', query)
+}
+
+/**
+ * Generate targeted sales script and SOP from selected knowledge documents
+ */
+export function generateKnowledgeTargetedScript(
+  data: KnowledgeTargetedScriptBO
+): Promise<KnowledgeTargetedScriptVO> {
+  return post('/knowledge/targeted-script', data)
 }
 
 /**

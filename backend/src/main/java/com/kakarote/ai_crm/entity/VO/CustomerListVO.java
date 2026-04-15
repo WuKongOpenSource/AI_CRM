@@ -39,6 +39,10 @@ public class CustomerListVO {
 
     private String website;
 
+    private String logo;
+
+    private String logoUrl;
+
     private String address;
 
     @Schema(description = "报价金额")

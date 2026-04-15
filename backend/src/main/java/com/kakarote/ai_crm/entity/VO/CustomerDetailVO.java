@@ -44,6 +44,12 @@ public class CustomerDetailVO {
     @Schema(description = "网站")
     private String website;
 
+    @Schema(description = "公司 Logo")
+    private String logo;
+
+    @Schema(description = "公司 Logo URL")
+    private String logoUrl;
+
     @Schema(description = "报价金额")
     private BigDecimal quotation;
 

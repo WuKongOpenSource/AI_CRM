@@ -17,7 +17,6 @@ import java.io.InputStream;
 
 /**
  * 本地文件存储服务实现
- * 当 minio.enabled=false 时使用本地存储
  */
 @Slf4j
 @Service
@@ -33,16 +32,30 @@ public class LocalFileStorageService implements FileStorageService {
             File baseDir = new File(uploadPath).getAbsoluteFile();
             File targetFile = new File(baseDir, path);
 
-            // 创建目录
             FileUtil.mkdir(targetFile.getParentFile());
-
-            // 保存文件
             file.transferTo(targetFile);
 
-            log.info("文件上传成功: path={}", path);
+            log.info("file upload success: path={}", path);
             return path;
         } catch (Exception e) {
-            log.error("文件上传失败: path={}, error={}", path, e.getMessage(), e);
+            log.error("file upload failed: path={}, error={}", path, e.getMessage(), e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文件上传失败");
+        }
+    }
+
+    @Override
+    public String upload(InputStream inputStream, long size, String path, String contentType) {
+        try (InputStream stream = inputStream) {
+            File baseDir = new File(uploadPath).getAbsoluteFile();
+            File targetFile = new File(baseDir, path);
+
+            FileUtil.mkdir(targetFile.getParentFile());
+            FileUtil.writeFromStream(stream, targetFile);
+
+            log.info("stream upload success: path={}", path);
+            return path;
+        } catch (Exception e) {
+            log.error("stream upload failed: path={}, error={}", path, e.getMessage(), e);
             throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文件上传失败");
         }
     }
@@ -54,16 +67,15 @@ public class LocalFileStorageService implements FileStorageService {
             File targetFile = new File(baseDir, path);
             if (targetFile.exists()) {
                 FileUtil.del(targetFile);
-                log.info("文件删除成功: path={}", path);
+                log.info("file delete success: path={}", path);
             }
         } catch (Exception e) {
-            log.error("文件删除失败: path={}, error={}", path, e.getMessage(), e);
+            log.error("file delete failed: path={}, error={}", path, e.getMessage(), e);
         }
     }
 
     @Override
     public String getUrl(String path) {
-        // 本地存储返回相对路径，需要通过 Controller 下载接口访问
         return "/knowledge/download/" + path;
     }
 
@@ -77,7 +89,7 @@ public class LocalFileStorageService implements FileStorageService {
             }
             return new FileInputStream(targetFile);
         } catch (FileNotFoundException e) {
-            log.error("文件不存在: path={}", path);
+            log.error("file not found: path={}", path);
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件不存在");
         }
     }
@@ -96,6 +108,6 @@ public class LocalFileStorageService implements FileStorageService {
 
     @Override
     public PresignedUploadInfo getPresignedUploadUrl(String path, String contentType, int expiry) {
-        throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "本地存储不支持预签名上传，请启用MinIO存储");
+        throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "本地存储不支持预签名上传，请启用 MinIO 存储");
     }
 }
