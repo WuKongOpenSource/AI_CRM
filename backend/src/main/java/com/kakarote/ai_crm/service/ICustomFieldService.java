@@ -72,6 +72,13 @@ public interface ICustomFieldService extends IService<CustomField> {
     List<CustomFieldVO> getFormFieldsByEntity(String entityType);
 
     /**
+     * Ensure system field metadata exists for the current tenant.
+     *
+     * @param entityType entity type
+     */
+    void initializeSystemFields(String entityType);
+
+    /**
      * 调整字段排序
      *
      * @param sortList 排序列表

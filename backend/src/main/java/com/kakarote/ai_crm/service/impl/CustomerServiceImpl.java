@@ -381,7 +381,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return emptyPage;
         }
         // 1. 获取启用的自定义字段，构建动态列列表
-        List<CustomFieldVO> enabledFields = customFieldService.getEnabledFieldsByEntity("customer");
+        List<CustomFieldVO> enabledFields = getEnabledCustomOnlyFields("customer");
         List<String> cfColumns = enabledFields.stream()
                 .map(CustomFieldVO::getColumnName)
                 .filter(col -> dynamicSchemaService.columnExists("crm_customer", col))
@@ -1508,7 +1508,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 .collect(Collectors.groupingBy(Contact::getCustomerId));
 
         // 3. 查自定义字段定义
-        List<CustomFieldVO> customFields = customFieldService.getEnabledFieldsByEntity("customer");
+        List<CustomFieldVO> customFields = getEnabledCustomOnlyFields("customer");
 
         // 4. 构建Excel
         ExcelWriter writer = ExcelUtil.getWriter(true);
@@ -1776,7 +1776,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Override
     public void downloadImportTemplate(HttpServletResponse response) {
-        List<CustomFieldVO> customFields = customFieldService.getEnabledFieldsByEntity("customer");
+        List<CustomFieldVO> customFields = getEnabledCustomOnlyFields("customer");
 
         ExcelWriter writer = ExcelUtil.getWriter(true);
         Sheet sheet = writer.getSheet();
@@ -1912,7 +1912,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         List<CustomerImportBO> rows = new ArrayList<>();
 
         // 查自定义字段定义
-        List<CustomFieldVO> customFields = customFieldService.getEnabledFieldsByEntity("customer");
+        List<CustomFieldVO> customFields = getEnabledCustomOnlyFields("customer");
         Map<String, CustomFieldVO> cfLabelMap = customFields.stream()
                 .collect(Collectors.toMap(CustomFieldVO::getFieldLabel, f -> f, (a, b) -> a));
 
@@ -2390,9 +2390,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     private List<CustomFieldVO> getSearchableCustomerTextFields() {
-        return customFieldService.getEnabledFieldsByEntity("customer").stream()
+        return getEnabledCustomOnlyFields("customer").stream()
             .filter(field -> Boolean.TRUE.equals(field.getIsSearchable()))
             .filter(field -> SEARCHABLE_CUSTOM_FIELD_TYPES.contains(field.getFieldType()))
+            .toList();
+    }
+
+    private List<CustomFieldVO> getEnabledCustomOnlyFields(String entityType) {
+        return customFieldService.getEnabledFieldsByEntity(entityType).stream()
+            .filter(field -> !"system".equalsIgnoreCase(field.getFieldSource()))
             .toList();
     }
 

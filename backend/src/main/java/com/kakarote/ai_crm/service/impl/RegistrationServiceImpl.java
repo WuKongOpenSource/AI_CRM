@@ -17,6 +17,7 @@ import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.ManagerUserRole;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
 import com.kakarote.ai_crm.service.ICrmTenantService;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.IManagerRoleService;
 import com.kakarote.ai_crm.service.IManagerUserRoleService;
 import com.kakarote.ai_crm.service.ManageUserService;
@@ -61,6 +62,9 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Autowired
     private IManagerUserRoleService userRoleService;
 
+    @Autowired
+    private ICustomFieldService customFieldService;
+
     @Lazy
     @Autowired
     private WeKnoraClient weKnoraClient;
@@ -98,6 +102,9 @@ public class RegistrationServiceImpl implements RegistrationService {
         TenantContextHolder.setTenantId(newTenantId);
 
         try {
+            customFieldService.initializeSystemFields("customer");
+            customFieldService.initializeSystemFields("contact");
+
             ManagerDept dept = new ManagerDept();
             dept.setDeptName(companyName);
             dept.setParentId(0L);

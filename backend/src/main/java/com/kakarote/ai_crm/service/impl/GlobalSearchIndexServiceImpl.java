@@ -500,6 +500,7 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         }
 
         Set<String> searchableFieldNames = customFieldService.getEnabledFieldsByEntity(entityType).stream()
+                .filter(field -> !"system".equalsIgnoreCase(field.getFieldSource()))
                 .filter(field -> Boolean.TRUE.equals(field.getIsSearchable()))
                 .filter(field -> SEARCHABLE_CUSTOM_FIELD_TYPES.contains(StrUtil.blankToDefault(field.getFieldType(), "").toLowerCase(Locale.ROOT)))
                 .map(CustomFieldVO::getFieldName)
