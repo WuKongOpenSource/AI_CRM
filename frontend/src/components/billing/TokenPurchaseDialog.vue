@@ -4,60 +4,62 @@
     width="640px"
     :show-close="false"
     append-to-body
-    class="token-purchase-dialog"
+    class="token-purchase-dialog wk-dialog--flush"
     @close="handleClose"
   >
-    <div class="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl shadow-slate-200/70">
-      <div class="flex items-start justify-between border-b border-slate-200 bg-slate-50 px-8 py-6">
-        <div class="flex items-start gap-4">
-          <div class="flex size-14 items-center justify-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/20">
-            <span class="material-symbols-outlined text-2xl">bolt</span>
+    <div class="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl shadow-slate-200/70">
+      <button
+        type="button"
+        class="absolute right-3 top-3 z-10 flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200/80 hover:text-slate-700"
+        aria-label="关闭"
+        @click="handleClose"
+      >
+        <span class="material-symbols-outlined text-[20px] leading-none">close</span>
+      </button>
+
+      <div class="border-b border-slate-200 bg-slate-50 px-6 pb-5 pt-5 pr-12">
+        <div class="flex items-start gap-3">
+          <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-md shadow-primary/20">
+            <span class="material-symbols-outlined text-xl">bolt</span>
           </div>
-          <div>
-            <h3 class="text-[30px] font-black tracking-tight text-slate-900">Token 余额不足</h3>
-            <p class="mt-1 text-sm text-slate-500">请购买更多 Token 以继续使用 AI 功能。</p>
+          <div class="min-w-0">
+            <h3 class="text-lg font-bold tracking-tight text-slate-900">Token 余额不足</h3>
+            <p class="mt-0.5 text-xs leading-relaxed text-slate-500">请购买更多 Token 以继续使用 AI 功能。</p>
           </div>
         </div>
-        <button
-          type="button"
-          class="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-slate-700"
-          @click="handleClose"
-        >
-          <span class="material-symbols-outlined">close</span>
-        </button>
       </div>
 
-      <div class="space-y-6 px-8 py-7">
-        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+      <div class="space-y-5 px-6 py-5">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
           <div class="flex items-center justify-between gap-4">
-            <span class="text-sm font-semibold text-slate-500">当前剩余 Token</span>
-            <span class="text-3xl font-black tracking-tight text-rose-500">{{ formatToken(options?.tokenRemaining ?? 0) }}</span>
+            <span class="text-xs font-semibold text-slate-500">当前剩余 Token</span>
+            <span class="text-xl font-bold tabular-nums tracking-tight text-rose-500">{{ formatToken(options?.tokenRemaining ?? 0) }}</span>
           </div>
-          <p class="mt-2 text-xs text-slate-400">
+          <p class="mt-1.5 text-[11px] leading-relaxed text-slate-400">
             赠送额度 {{ formatToken(options?.giftTokenRemaining ?? 0) }}，已购额度 {{ formatToken(options?.purchasedTokenRemaining ?? 0) }}
           </p>
         </div>
 
         <template v-if="isPaying && currentOrder">
-          <div class="rounded-3xl border border-primary/20 bg-primary/[0.03] px-6 py-6">
-            <div class="flex flex-col gap-6 md:flex-row md:items-center">
-              <div class="mx-auto flex size-[220px] items-center justify-center rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div class="rounded-2xl border border-primary/20 bg-primary/[0.03] px-4 py-4">
+            <div class="flex flex-col gap-5 md:flex-row md:items-center">
+              <div class="mx-auto flex size-[200px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                 <img v-if="currentOrder.qrCodeImage" :src="currentOrder.qrCodeImage" alt="payment qr code" class="size-full object-contain" />
-                <div v-else class="text-sm text-slate-400">二维码生成中</div>
+                <div v-else class="text-xs text-slate-400">二维码生成中</div>
               </div>
-              <div class="flex-1">
-                <p class="text-xs font-bold uppercase tracking-[0.22em] text-primary/70">{{ currentOrder.paymentChannelLabel }}</p>
-                <h4 class="mt-2 text-2xl font-black text-slate-900">{{ currentOrder.planName }}</h4>
-                <p class="mt-2 text-sm text-slate-500">{{ formatToken(currentOrder.tokenAmount) }} Token，支付 {{ currentOrder.amountDisplay }}</p>
-                <div class="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+              <div class="min-w-0 flex-1">
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/70">{{ currentOrder.paymentChannelLabel }}</p>
+                <h4 class="mt-1.5 text-base font-bold text-slate-900">{{ currentOrder.planName }}</h4>
+                <p class="mt-1.5 text-xs text-slate-500">{{ formatToken(currentOrder.tokenAmount) }} Token，支付 {{ currentOrder.amountDisplay }}</p>
+                <div class="mt-3 rounded-xl bg-white px-3 py-2.5 text-xs text-slate-600 shadow-sm">
                   <p>订单号：{{ currentOrder.orderNo }}</p>
                   <p class="mt-1">请使用{{ currentOrder.paymentChannelLabel }}扫码完成支付。</p>
                   <p v-if="currentOrder.expireTime" class="mt-1 text-amber-600">过期时间：{{ formatTime(currentOrder.expireTime) }}</p>
                 </div>
-                <div class="mt-5 flex flex-wrap gap-3">
-                  <el-button type="primary" :loading="refreshingOrder" @click="refreshCurrentOrder">刷新状态</el-button>
-                  <el-button @click="backToSelection">更换支付方式</el-button>
-                  <el-button text @click="openOrdersDrawer">管理账单</el-button>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <el-button type="primary" size="small" :loading="refreshingOrder" @click="refreshCurrentOrder">刷新状态</el-button>
+                  <el-button size="small" @click="backToSelection">更换支付方式</el-button>
+                  <el-button text size="small" @click="openOrdersDrawer">管理账单</el-button>
                 </div>
               </div>
             </div>
@@ -65,59 +67,59 @@
         </template>
 
         <template v-else>
-          <div class="space-y-3">
-            <p class="text-center text-sm font-bold tracking-[0.2em] text-slate-400">选择套餐</p>
+          <div class="space-y-2.5">
+            <p class="text-center text-xs font-semibold tracking-[0.16em] text-slate-400">选择套餐</p>
             <button
               v-for="plan in options?.plans || []"
               :key="plan.id"
               type="button"
-              class="w-full rounded-3xl border px-6 py-5 text-left transition-all"
+              class="w-full rounded-2xl border px-4 py-3.5 text-left transition-all"
               :class="selectedPlanId === plan.id
                 ? 'border-primary bg-primary/[0.04] shadow-lg shadow-primary/10'
                 : 'border-slate-200 bg-white hover:border-primary/30 hover:bg-slate-50'"
               @click="selectedPlanId = plan.id"
             >
-              <div class="flex items-center justify-between gap-4">
-                <div class="flex items-center gap-4">
-                  <div class="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <span class="material-symbols-outlined">auto_awesome</span>
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-3">
+                  <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span class="material-symbols-outlined text-[22px]">auto_awesome</span>
                   </div>
-                  <div>
-                    <div class="text-3xl font-black tracking-tight text-slate-900">{{ formatToken(plan.tokenAmount) }} Token</div>
-                    <div class="mt-1 text-sm font-medium text-slate-500">{{ plan.description || '标准充值方案' }}</div>
+                  <div class="min-w-0">
+                    <div class="text-base font-bold tracking-tight text-slate-900">{{ formatToken(plan.tokenAmount) }} Token</div>
+                    <div class="mt-0.5 text-xs font-medium text-slate-500">{{ plan.description || '标准充值方案' }}</div>
                   </div>
                 </div>
-                <div class="text-right">
-                  <div class="text-[42px] font-black tracking-tight text-primary">¥{{ formatPrice(plan.priceFen) }}</div>
-                  <div class="text-sm text-slate-400">一次性付费</div>
+                <div class="shrink-0 text-right">
+                  <div class="text-2xl font-bold tabular-nums tracking-tight text-primary">¥{{ formatPrice(plan.priceFen) }}</div>
+                  <div class="text-xs text-slate-400">一次性付费</div>
                 </div>
               </div>
             </button>
           </div>
 
-          <div class="space-y-3">
-            <p class="text-center text-sm font-bold tracking-[0.2em] text-slate-400">选择支付方式</p>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div class="space-y-2.5">
+            <p class="text-center text-xs font-semibold tracking-[0.16em] text-slate-400">选择支付方式</p>
+            <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
               <button
                 v-for="channel in options?.channels || []"
                 :key="channel.code"
                 type="button"
-                class="rounded-2xl border px-5 py-4 text-left transition-all"
+                class="rounded-xl border px-4 py-3 text-left transition-all"
                 :class="selectedChannel === channel.code && channel.enabled
                   ? 'border-primary bg-primary/[0.04] shadow-lg shadow-primary/10'
                   : 'border-slate-200 bg-white hover:border-primary/30'"
                 :disabled="!channel.enabled"
                 @click="channel.enabled && (selectedChannel = channel.code)"
               >
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2.5">
                   <div
-                    class="flex size-11 items-center justify-center rounded-2xl text-lg font-black"
+                    class="flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold"
                     :class="channel.code === 'wechat' ? 'bg-emerald-50 text-emerald-600' : 'bg-sky-50 text-sky-600'"
                   >
                     {{ channel.code === 'wechat' ? '微' : '支' }}
                   </div>
-                  <div>
-                    <div class="text-lg font-bold text-slate-900">{{ channel.label }}</div>
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-slate-900">{{ channel.label }}</div>
                     <div class="mt-1 text-xs text-slate-400">
                       {{ channel.enabled ? '扫码完成支付' : (channel.unavailableReason || '当前不可用') }}
                     </div>
@@ -129,12 +131,11 @@
         </template>
       </div>
 
-      <div class="flex items-center justify-between border-t border-slate-200 px-8 py-6">
-        <el-button text @click="openOrdersDrawer">管理账单</el-button>
+      <div class="flex items-center justify-between border-t border-slate-200 px-6 py-4">
+        <el-button text size="small" @click="openOrdersDrawer">管理账单</el-button>
         <el-button
           v-if="!isPaying"
           type="primary"
-          size="large"
           :loading="creatingOrder"
           :disabled="!canCreateOrder"
           @click="submitOrder"
