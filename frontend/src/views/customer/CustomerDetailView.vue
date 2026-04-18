@@ -142,10 +142,10 @@
               </button>
               <button
                 type="button"
-                class="h-8 px-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90"
                 @click="showBasicInfoDrawer = true"
               >
-                <span class="material-symbols-outlined text-[18px] leading-none">info</span>
+                <span class="material-symbols-outlined text-[18px] leading-none">description</span>
                 <span>{{ viewBasicInfoButtonText }}</span>
               </button>
               <el-dropdown

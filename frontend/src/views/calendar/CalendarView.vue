@@ -293,7 +293,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { getMySchedules, queryScheduleList } from '@/api/schedule'
 import { getMyTasks, updateTaskStatus, aiParseTask, updateTask } from '@/api/task'
