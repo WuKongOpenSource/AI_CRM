@@ -242,6 +242,7 @@
         </div>
 
         <div class="flex items-center gap-3">
+          <AiQuotaHeaderPopover />
           <button class="flex size-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100">
             <span class="material-symbols-outlined">notifications</span>
           </button>
@@ -268,6 +269,7 @@
     <AccountSettingsModal v-model="showAccountSettingsModal" />
     <FloatingActionButton v-if="route.path !== '/chat' && !chatDrawerOpen" />
     <AiChatDrawer />
+    <AiQuotaModals />
   </div>
 </template>
 
@@ -278,6 +280,8 @@ import { ElMessageBox } from 'element-plus'
 import defaultLogoImg from '@/assets/images/logo.png'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
+import AiQuotaHeaderPopover from '@/components/layout/AiQuotaHeaderPopover.vue'
+import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
