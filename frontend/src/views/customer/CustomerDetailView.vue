@@ -48,43 +48,47 @@
                     }"
                   >{{ customer.level }}级客户</span>
                 </div>
-                <div class="flex items-center gap-4 text-sm flex-wrap">
-                  <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-1">
+                <div class="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+                  <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+                    <div class="flex items-center gap-1 shrink-0">
                       <span class="text-slate-400">联系人:</span>
                       <span class="text-slate-600 font-medium">{{ primaryContact?.name || '-' }}</span>
                     </div>
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-1 shrink-0">
                       <span class="text-slate-400">手机:</span>
                       <span class="text-slate-600 font-mono font-medium">{{ primaryContact?.phone || '-' }}</span>
                     </div>
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-1 shrink-0">
                       <span class="text-slate-400">状态:</span>
                       <span class="text-primary font-bold">{{ getStageLabel(customer.stage) }}</span>
                     </div>
                   </div>
-                </div>
-                <div v-if="customer.tags?.length || canEditCustomerTags" class="flex flex-wrap items-center gap-2">
-                  <span
-                    v-for="tag in customer.tags"
-                    :key="tag.tagId"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                  <div
+                    v-if="customer.tags?.length || canEditCustomerTags"
+                    class="ml-2 flex min-w-0 flex-wrap items-center justify-end gap-2"
                   >
-                    {{ tag.tagName }}
                     <span
+                      v-for="tag in customer.tags"
+                      :key="tag.tagId"
+                      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 group"
+                    >
+                      {{ tag.tagName }}
+                      <span
+                        v-if="canEditCustomerTags"
+                        class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                        @click="handleRemoveTag(tag)"
+                      >close</span>
+                    </span>
+                    <button
                       v-if="canEditCustomerTags"
-                      class="material-symbols-outlined text-xs text-slate-400 hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                      @click="handleRemoveTag(tag)"
-                    >close</span>
-                  </span>
-                  <button
-                    v-if="canEditCustomerTags"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
-                    @click="showAddTagDialog = true"
-                  >
-                    <span class="wk-plus-button-mark" aria-hidden="true">+</span>
-                    <span>添加标签</span>
-                  </button>
+                      type="button"
+                      class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-primary border border-dashed border-primary/30 hover:bg-primary/5 transition-colors"
+                      @click="showAddTagDialog = true"
+                    >
+                      <span class="wk-plus-button-mark" aria-hidden="true">+</span>
+                      <span>添加标签</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -239,7 +243,7 @@
                     </div>
                     <template #reference>
                       <div
-                        class="relative h-9 flex-none w-[180px] group"
+                        class="relative h-8 flex-none w-[180px] group"
                         :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
                         :title="getStepperLabel(stage)"
                         :style="{ zIndex: getStepperZIndex(stage, idx) }"
@@ -277,7 +281,7 @@
 
                   <div
                     v-else
-                    class="relative h-9 flex-none w-[180px] group"
+                    class="relative h-8 flex-none w-[180px] group"
                     :class="canChangeStage ? 'cursor-pointer' : 'cursor-default'"
                     @click="handleStageChange(stage)"
                     :title="getStepperLabel(stage)"
@@ -1736,6 +1740,13 @@ async function handleAiFollowUpSaved() {
   await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
 }
 
+function handleOpenFollowUpDialog() {
+  if (!canCreateFollowUps.value) return
+  if (!customer.value) return
+  resetFollowUpForm(customer.value.customerId)
+  showAddFollowUpDialog.value = true
+}
+
 function handleEditFollowUp(followUp: FollowUp) {
   if (!canEditFollowUps.value) return
   editingFollowUpId.value = String(followUp.followUpId)
@@ -2166,7 +2177,7 @@ const stageOptions = [
   { value: 'lost', label: '已流失' }
 ]
 const STEPPER_SEGMENT_WIDTH = 180
-const STEPPER_SEGMENT_HEIGHT = 36
+const STEPPER_SEGMENT_HEIGHT = 32
 const STEPPER_CHEVRON_SIZE = 12
 const STEPPER_END_RADIUS = STEPPER_SEGMENT_HEIGHT / 2
 
@@ -2330,8 +2341,6 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
   }
 }
 
-void formatCustomFieldValue
-void handleOpenFollowUpDialog
 </script>
 
 <style>

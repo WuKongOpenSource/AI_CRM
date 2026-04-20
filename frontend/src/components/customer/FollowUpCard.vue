@@ -2,15 +2,26 @@
   <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-3">
-          <div class="size-10 rounded-xl flex items-center justify-center text-white shadow-sm bg-primary">
+        <div class="flex items-start gap-3">
+          <div class="size-10 shrink-0 rounded-xl flex items-center justify-center text-white shadow-sm bg-primary">
             <span class="material-symbols-outlined text-base">{{ getFollowUpIcon(item.type) }}</span>
           </div>
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 flex flex-col gap-1.5">
+            <h4 class="font-bold text-slate-900 text-base leading-tight">
+              {{ item.summary || getFollowUpTypeLabel(item.type) }}
+            </h4>
             <div class="flex flex-wrap items-center gap-2">
-              <h4 class="font-bold text-slate-900 text-base leading-tight">
-                {{ item.summary || getFollowUpTypeLabel(item.type) }}
-              </h4>
+              <span
+                v-if="item.createUserName"
+                class="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600"
+              >
+                <span
+                  class="material-symbols-outlined text-[13px] leading-none text-slate-400"
+                  style="font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20"
+                  aria-hidden="true"
+                >person</span>
+                {{ item.createUserName }}
+              </span>
               <span
                 v-if="item.aiGenerated"
                 class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary"
@@ -25,12 +36,6 @@
               </span>
               <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                 {{ getFollowUpTypeLabel(item.type) }}
-              </span>
-              <span
-                v-if="item.createUserName"
-                class="inline-flex items-center rounded-full border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-500"
-              >
-                {{ item.createUserName }}
               </span>
             </div>
           </div>
