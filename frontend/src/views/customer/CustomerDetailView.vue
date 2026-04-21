@@ -423,10 +423,10 @@
                 <div class="mt-3">
                   <span
                     v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)"
-                    class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
                     :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.badgeClass"
                   >
-                    <span class="size-2 rounded-full" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.dotClass"></span>
+                    <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.dotClass"></span>
                     {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.label }}
                   </span>
                   <p
@@ -983,10 +983,10 @@
           <div class="mt-3">
             <span
               v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)"
-              class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
               :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.badgeClass"
             >
-              <span class="size-2 rounded-full" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
+              <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
               {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.label }}
             </span>
             <p v-else class="text-sm leading-6 text-slate-700">{{ latestAiReport?.aiStatusDetection || customer?.aiStatusDetection || '暂无 AI 状态探测' }}</p>
