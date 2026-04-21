@@ -21,7 +21,7 @@
 
         <!-- Customer Info Card -->
         <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <div class="flex flex-col gap-3 md:flex-row md:justify-between md:gap-0">
+          <div class="flex flex-col gap-3 md:flex-row md:justify-between md:gap-0 justify-between">
             <div class="flex min-w-0 gap-4">
               <div class="size-14 bg-slate-100 rounded-lg flex items-center justify-center border border-slate-200 overflow-hidden shrink-0">
                 <img
@@ -193,7 +193,7 @@
               </span>
               <h3 class="text-sm font-bold text-slate-900">客户阶段</h3>
             </div> -->
-            <div class="relative overflow-x-auto overflow-y-visible md:overflow-visible">
+            <div class="relative overflow-visible overflow-x-auto overflow-y-visible md:overflow-visible">
               <!-- Chevron segments (mobile: no wrap + horizontal scroll; desktop: wrap) -->
               <div class="relative flex flex-nowrap md:flex-wrap items-stretch gap-x-2 md:gap-x-0 gap-y-2 min-w-max">
                 <template v-for="(stage, idx) in stageFlow" :key="stage">
@@ -423,10 +423,10 @@
                 <div class="mt-3">
                   <span
                     v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)"
-                    class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+                    class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
                     :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.badgeClass"
                   >
-                    <span class="size-2 rounded-full" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.dotClass"></span>
+                    <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.dotClass"></span>
                     {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.label }}
                   </span>
                   <p
@@ -983,10 +983,10 @@
           <div class="mt-3">
             <span
               v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)"
-              class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
+              class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
               :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.badgeClass"
             >
-              <span class="size-2 rounded-full" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
+              <span class="size-2 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
               {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.label }}
             </span>
             <p v-else class="text-sm leading-6 text-slate-700">{{ latestAiReport?.aiStatusDetection || customer?.aiStatusDetection || '暂无 AI 状态探测' }}</p>

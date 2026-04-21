@@ -6,7 +6,7 @@
         <h2 class="text-2xl font-bold text-slate-900">客户列表</h2>
         <p class="text-sm text-slate-500">管理您的客户关系并查看 AI 驱动的业务洞察。</p>
       </div>
-      <div class="flex flex-nowrap sm:flex-wrap items-center gap-3">
+      <div class="flex flex-nowrap sm:flex-wrap items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative group flex items-center">
           <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">search</span>
@@ -28,7 +28,7 @@
         >
           <template #reference>
             <button
-              class="h-10 shrink-0 px-4 bg-white border border-primary/30 text-primary rounded-xl text-sm font-bold whitespace-nowrap hover:bg-primary/5 transition-all shadow-sm flex items-center gap-2"
+              class="h-10 px-4 bg-white border border-primary/30 text-primary rounded-xl text-sm font-bold whitespace-nowrap hover:bg-primary/5 transition-all shadow-sm flex items-center gap-2"
               type="button"
             >
               <WkIcon name="ai" class="text-sm" />
@@ -148,7 +148,7 @@
     </div>
 
     <!-- Main Content: Table + AI Sidebar -->
-    <div class="flex flex-col xl:flex-row gap-6 items-stretch xl:items-start relative overflow-x-hidden">
+    <div class="flex flex-col xl:flex-row gap-6 xl:items-start relative overflow-x-hidden">
       <!-- Table Area -->
       <div class="w-full min-w-0 flex-1 space-y-6">
         <div
@@ -225,10 +225,10 @@
                     <div class="flex items-center justify-center py-1">
                       <span
                         v-if="getAiStatusMeta(row.aiStatusDetection)"
-                        class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold whitespace-nowrap shadow-sm"
+                        class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
                         :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
                       >
-                        <span class="size-2 rounded-full" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
+                        <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
                         {{ getAiStatusMeta(row.aiStatusDetection)?.label }}
                       </span>
                       <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>

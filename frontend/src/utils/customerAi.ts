@@ -9,22 +9,22 @@ type CustomerAiStatusMeta = {
 const CUSTOMER_AI_STATUS_META: Record<CustomerAiStatus, CustomerAiStatusMeta> = {
   高意向: {
     label: '高意向',
-    badgeClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/90',
+    badgeClass: 'bg-emerald-100 text-emerald-800',
     dotClass: 'bg-emerald-500'
   },
   活跃状态: {
     label: '活跃状态',
-    badgeClass: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/90',
+    badgeClass: 'bg-blue-100 text-blue-800',
     dotClass: 'bg-blue-500'
   },
   需跟进: {
     label: '需跟进',
-    badgeClass: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200/90',
+    badgeClass: 'bg-amber-100 text-amber-800',
     dotClass: 'bg-amber-500'
   },
   休眠: {
     label: '休眠',
-    badgeClass: 'bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200',
+    badgeClass: 'bg-slate-100 text-slate-800',
     dotClass: 'bg-slate-400'
   }
 }
