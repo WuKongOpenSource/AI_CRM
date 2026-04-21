@@ -58,22 +58,22 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-start gap-1 self-start">
         <button
           v-if="canEdit"
           type="button"
-          class="rounded-lg p-2 text-slate-300 transition hover:bg-slate-50 hover:text-primary"
+          class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-primary"
           @click="$emit('edit', item)"
         >
-          <span class="material-symbols-outlined text-base">edit</span>
+          <span class="material-symbols-outlined text-[20px] leading-none">edit</span>
         </button>
         <button
           v-if="canDelete"
           type="button"
-          class="rounded-lg p-2 text-slate-300 transition hover:bg-slate-50 hover:text-red-500"
+          class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-red-500"
           @click="$emit('delete', item.followUpId)"
         >
-          <span class="material-symbols-outlined text-base">delete</span>
+          <span class="material-symbols-outlined text-[20px] leading-none">delete</span>
         </button>
       </div>
     </div>
@@ -94,10 +94,10 @@
           </div>
           <button
             type="button"
-            class="rounded-lg p-2 text-slate-300 transition hover:bg-slate-50 hover:text-primary"
+            class="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-50 hover:text-primary"
             @click="handleDownload(attachment)"
           >
-            <span class="material-symbols-outlined text-base">download</span>
+            <span class="material-symbols-outlined text-[20px] leading-none">download</span>
           </button>
         </div>
 

@@ -793,46 +793,13 @@
       </template>
     </el-dialog>
 
-    <!-- Add Follow-up Dialog -->
-    <el-dialog 
-      v-model="showAddFollowUpDialog" 
-      :title="isEditingFollowUp ? '编辑跟进记录' : '添加跟进记录'" 
-      :width="isMobile ? '95%' : '500px'" 
-      :fullscreen="isMobile"
-      class="wk-dialog--flush"
-      >
-      <el-form :model="followUpForm" label-width="80px">
-        <el-form-item label="跟进类型">
-          <el-select v-model="followUpForm.type" class="w-full">
-            <el-option label="电话" value="call" />
-            <el-option label="会议" value="meeting" />
-            <el-option label="邮件" value="email" />
-            <el-option label="拜访" value="visit" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="跟进时间">
-          <el-date-picker v-model="followUpForm.followTime" type="datetime" class="w-full" placeholder="选择跟进时间" value-format="YYYY-MM-DD HH:mm:ss" />
-        </el-form-item>
-        <el-form-item label="跟进内容">
-          <el-input v-model="followUpForm.content" type="textarea" :rows="4" placeholder="请输入跟进内容" />
-        </el-form-item>
-        <el-form-item label="下次联系">
-          <el-date-picker
-            v-model="followUpForm.nextFollowTime"
-            type="datetime"
-            class="w-full"
-            placeholder="选择下次联系时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            clearable
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddFollowUpDialog = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmitFollowUp">{{ isEditingFollowUp ? '保存' : '添加' }}</el-button>
-      </template>
-    </el-dialog>
+    <FollowUpUpsertDialog
+      v-model="showAddFollowUpDialog"
+      :customer-id="customer?.customerId || ''"
+      :editing-follow-up="editingFollowUpForDialog"
+      :submitting="submitting"
+      @submit="handleFollowUpDialogSubmit"
+    />
 
     <ContactUpsertDialog
       v-model="showAddContactDialog"
@@ -1085,11 +1052,13 @@ import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimar
 import { getEnabledFieldsByEntity } from '@/api/customField'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Task, TaskAddBO, TaskStatus } from '@/types/common'
-import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpType, FollowUpUpdateBO } from '@/types/customer'
+import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
+import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
+import type { FollowUpUpsertSubmitPayload } from '@/components/customer/FollowUpUpsertDialog.vue'
 import AiParseInsightSidebar from '@/components/crm/AiParseInsightSidebar.vue'
 import FollowUpCard from '@/components/customer/FollowUpCard.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
@@ -1114,7 +1083,7 @@ const showAddContactDialog = ref(false)
 const showContactDetail = ref(false)
 const currentContact = ref<Contact | null>(null)
 const editingContact = ref<Contact | null>(null)
-const editingFollowUpId = ref('')
+const editingFollowUpForDialog = ref<FollowUp | null>(null)
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showBasicInfoDrawer = ref(false)
@@ -1416,56 +1385,6 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
 }
 
 
-function formatDateForApi(date: Date = new Date()): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
-
-interface FollowUpFormState {
-  customerId: string
-  type: FollowUpType
-  content: string
-  followTime: string
-  nextFollowTime: string
-}
-
-const FOLLOW_UP_TYPES = new Set<FollowUpType>(['call', 'meeting', 'email', 'visit', 'other'])
-
-function normalizeFollowUpType(type?: string): FollowUpType {
-  return type && FOLLOW_UP_TYPES.has(type as FollowUpType) ? type as FollowUpType : 'call'
-}
-
-function normalizeDateTimeValue(value?: string): string {
-  if (!value) return ''
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-    return value
-  }
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? value : formatDateForApi(parsed)
-}
-
-const followUpForm = reactive<FollowUpFormState>({
-  customerId: '',
-  type: 'call',
-  content: '',
-  followTime: formatDateForApi(),
-  nextFollowTime: ''
-})
-
-function resetFollowUpForm(customerId = customer.value?.customerId || '') {
-  editingFollowUpId.value = ''
-  followUpForm.customerId = customerId
-  followUpForm.type = 'call'
-  followUpForm.content = ''
-  followUpForm.followTime = formatDateForApi()
-  followUpForm.nextFollowTime = ''
-}
-
 const customer = computed(() => customerStore.currentCustomer)
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const canTransferCustomer = computed(() => userStore.hasPermission('customer:transfer'))
@@ -1484,7 +1403,6 @@ const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:dele
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
-const isEditingFollowUp = computed(() => !!editingFollowUpId.value)
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -1497,7 +1415,7 @@ const filteredTransferUserList = computed(() => {
 
 watch(showAddFollowUpDialog, (visible) => {
   if (!visible) {
-    resetFollowUpForm(route.params.id as string || customer.value?.customerId || '')
+    editingFollowUpForDialog.value = null
   }
 })
 
@@ -1505,7 +1423,6 @@ onMounted(async () => {
   const customerId = route.params.id as string
   if (customerId) {
     loading.value = true
-    resetFollowUpForm(customerId)
 
     const fetchTasks: Promise<any>[] = [
       customerStore.fetchCustomerDetail(customerId).catch(err => {
@@ -1741,14 +1658,15 @@ async function handleAiFollowUpSaved() {
   await refreshFollowUpContext(customer.value.customerId, { resetFollowUps: true })
 }
 
+function handleOpenFollowUpDialog() {
+  if (!canCreateFollowUps.value) return
+  editingFollowUpForDialog.value = null
+  showAddFollowUpDialog.value = true
+}
+
 function handleEditFollowUp(followUp: FollowUp) {
   if (!canEditFollowUps.value) return
-  editingFollowUpId.value = String(followUp.followUpId)
-  followUpForm.customerId = String(followUp.customerId)
-  followUpForm.type = normalizeFollowUpType(followUp.type)
-  followUpForm.content = followUp.content || ''
-  followUpForm.followTime = normalizeDateTimeValue(followUp.followTime)
-  followUpForm.nextFollowTime = normalizeDateTimeValue(followUp.nextFollowTime)
+  editingFollowUpForDialog.value = followUp
   showAddFollowUpDialog.value = true
 }
 
@@ -2064,37 +1982,30 @@ async function handleRemoveTag(tag: CustomerTag) {
   } catch { /* Error handled */ }
 }
 
-async function handleSubmitFollowUp() {
-  if (isEditingFollowUp.value ? !canEditFollowUps.value : !canCreateFollowUps.value) return
-  if (!followUpForm.content.trim()) {
-    ElMessage.warning('请输入跟进内容')
-    return
-  }
-  if (!followUpForm.followTime) {
-    ElMessage.warning('请选择跟进时间')
-    return
-  }
+async function handleFollowUpDialogSubmit(payload: FollowUpUpsertSubmitPayload) {
+  const isEdit = payload.mode === 'edit'
+  if (isEdit ? !canEditFollowUps.value : !canCreateFollowUps.value) return
   submitting.value = true
   try {
-    const payload = {
-      type: followUpForm.type,
-      content: followUpForm.content.trim(),
-      followTime: followUpForm.followTime,
-      nextFollowTime: followUpForm.nextFollowTime || undefined
+    const body = {
+      type: payload.type,
+      content: payload.content,
+      followTime: payload.followTime,
+      nextFollowTime: payload.nextFollowTime
     }
-    if (isEditingFollowUp.value) {
+    if (isEdit) {
       await updateFollowUp({
-        followUpId: editingFollowUpId.value,
-        ...payload
+        followUpId: payload.followUpId!,
+        ...body
       } as FollowUpUpdateBO)
     } else {
       await addFollowUp({
-        customerId: followUpForm.customerId,
-        ...payload
+        customerId: payload.customerId,
+        ...body
       } as FollowUpAddBO)
     }
-    const successMessage = isEditingFollowUp.value ? '跟进记录已更新' : '跟进记录添加成功'
-    await refreshFollowUpContext(followUpForm.customerId, { resetFollowUps: !isEditingFollowUp.value })
+    const successMessage = isEdit ? '跟进记录已更新' : '跟进记录添加成功'
+    await refreshFollowUpContext(payload.customerId, { resetFollowUps: !isEdit })
     showAddFollowUpDialog.value = false
     ElMessage.success(successMessage)
   } catch { /* Error handled */ } finally {
