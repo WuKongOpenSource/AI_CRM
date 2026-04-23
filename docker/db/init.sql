@@ -535,7 +535,11 @@ CREATE TABLE "public"."crm_task" (
   "create_user_id" int8,
   "update_user_id" int8,
   "create_time" timestamp(6),
-  "update_time" timestamp(6)
+  "update_time" timestamp(6),
+  "value_priority_score" int4,
+  "value_priority_tier" varchar(20) COLLATE "pg_catalog"."default",
+  "value_priority_reason" text COLLATE "pg_catalog"."default",
+  "high_value" bool DEFAULT false
 )
 ;
 COMMENT ON COLUMN "public"."crm_task"."task_id" IS '任务ID';
@@ -553,6 +557,10 @@ COMMENT ON COLUMN "public"."crm_task"."create_user_id" IS '创建人ID';
 COMMENT ON COLUMN "public"."crm_task"."update_user_id" IS '修改人ID';
 COMMENT ON COLUMN "public"."crm_task"."create_time" IS '创建时间';
 COMMENT ON COLUMN "public"."crm_task"."update_time" IS '修改时间';
+COMMENT ON COLUMN "public"."crm_task"."value_priority_score" IS 'High-value priority score';
+COMMENT ON COLUMN "public"."crm_task"."value_priority_tier" IS 'High-value priority tier: HIGH/MEDIUM/LOW';
+COMMENT ON COLUMN "public"."crm_task"."value_priority_reason" IS 'Reason for the high-value priority score';
+COMMENT ON COLUMN "public"."crm_task"."high_value" IS 'Whether the task is in the high-value bucket';
 COMMENT ON TABLE "public"."crm_task" IS '任务表';
 
 -- ----------------------------

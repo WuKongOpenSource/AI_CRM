@@ -30,6 +30,7 @@ import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.ServletOutputStream;
@@ -112,6 +113,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Autowired
+    private ITaskService taskService;
 
     @Autowired
     @Qualifier("customerAiAnalysisExecutor")
@@ -330,6 +334,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         refreshCustomerSearchText(customer.getCustomerId());
         globalSearchIndexService.refreshCustomerIndex(customer.getCustomerId());
         globalSearchIndexService.refreshCustomerRelatedIndexes(customer.getCustomerId());
+        taskService.refreshValuePriorityByCustomerId(customer.getCustomerId());
         scheduleCustomerAiAnalysis(customer.getCustomerId(),
                 currentUserId,
                 ObjectUtil.defaultIfNull(customer.getTenantId(), currentTenantId),
@@ -351,6 +356,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         globalSearchIndexService.deleteByEntity("customer", customerId);
         globalSearchIndexService.deleteContactIndexesByCustomerId(customerId);
         globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
     }
 
     @Override
@@ -693,6 +699,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
         return report;
     }
 
@@ -1335,6 +1342,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         customer.setStage(stage);
         updateById(customer);
         globalSearchIndexService.refreshCustomerIndex(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
     }
 
     @Override
@@ -2268,6 +2276,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             .update();
         refreshCustomerSearchText(customerId);
         globalSearchIndexService.refreshCustomerIndex(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
     }
 
     /**

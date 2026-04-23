@@ -44,4 +44,10 @@ public class TaskQueryBO extends PageEntity {
 
     @Schema(description = "绛涢€夋潯浠? today, thisWeek, overdue, all")
     private String filter;
+
+    @Schema(description = "Sort mode: default/value")
+    private String sortMode;
+
+    @Schema(description = "Only return high-value tasks when value sorting is enabled")
+    private Boolean highValueOnly;
 }

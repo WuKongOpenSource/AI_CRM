@@ -51,4 +51,8 @@ public interface ITaskService extends IService<Task> {
      * AI智能解析任务
      */
     TaskAiParseVO aiParseTask(TaskAiParseBO parseBO);
+
+    void refreshValuePriority(Long taskId);
+
+    void refreshValuePriorityByCustomerId(Long customerId);
 }

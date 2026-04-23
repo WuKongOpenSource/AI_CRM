@@ -256,6 +256,10 @@ CREATE TABLE crm_task (
     update_user_id BIGINT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    value_priority_score INTEGER,
+    value_priority_tier VARCHAR(20),
+    value_priority_reason TEXT,
+    high_value BOOLEAN DEFAULT FALSE,
     PRIMARY KEY (task_id)
 );
 
@@ -263,6 +267,11 @@ CREATE INDEX idx_task_assigned_to ON crm_task (assigned_to);
 CREATE INDEX idx_task_customer_id ON crm_task (customer_id);
 CREATE INDEX idx_task_status ON crm_task (status);
 CREATE INDEX idx_task_due_date ON crm_task (due_date);
+
+COMMENT ON COLUMN crm_task.value_priority_score IS '高价值优先分数';
+COMMENT ON COLUMN crm_task.value_priority_tier IS '高价值优先分层: HIGH/MEDIUM/LOW';
+COMMENT ON COLUMN crm_task.value_priority_reason IS '高价值优先原因说明';
+COMMENT ON COLUMN crm_task.high_value IS '是否高价值优先任务';
 
 CREATE TRIGGER trg_task_update_time
     BEFORE UPDATE ON crm_task

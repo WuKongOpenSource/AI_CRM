@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.entity.VO.TaskVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.Date;
 import java.util.List;
@@ -23,6 +24,8 @@ public interface TaskMapper extends BaseMapper<Task> {
      * 分页查询任务
      */
     IPage<TaskVO> queryPageList(IPage<TaskVO> page, @Param("query") TaskQueryBO query);
+
+    List<TaskVO> queryList(@Param("query") TaskQueryBO query);
 
     /**
      * 查询用户待办任务
@@ -49,4 +52,19 @@ public interface TaskMapper extends BaseMapper<Task> {
     @InterceptorIgnore(dataPermission = "true")
     @Select("SELECT * FROM crm_task WHERE customer_id = #{customerId}")
     List<Task> selectByCustomerIdIgnoreDataPermission(@Param("customerId") Long customerId);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Update("""
+        UPDATE crm_task
+        SET value_priority_score = #{score},
+            value_priority_tier = #{tier},
+            value_priority_reason = #{reason},
+            high_value = #{highValue}
+        WHERE task_id = #{taskId}
+        """)
+    int updateValuePriorityById(@Param("taskId") Long taskId,
+                                @Param("score") Integer score,
+                                @Param("tier") String tier,
+                                @Param("reason") String reason,
+                                @Param("highValue") Boolean highValue);
 }

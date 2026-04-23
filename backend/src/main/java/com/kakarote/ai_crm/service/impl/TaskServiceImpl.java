@@ -16,9 +16,11 @@ import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
+import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.TaskMapper;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.ITaskService;
@@ -29,8 +31,18 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 任务服务实现
@@ -46,7 +58,13 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
 
+    @Autowired
+    private CustomerMapper customerMapper;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final int HIGH_VALUE_THRESHOLD = 72;
+    private static final int MEDIUM_VALUE_THRESHOLD = 58;
 
     private static final String AI_TASK_PARSE_PROMPT = """
         你是一个专业的 CRM 助手。请分析以下自然语言任务描述，提取结构化信息并以 JSON 格式返回。
@@ -85,6 +103,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             task.setGeneratedByAi(0);
         }
         save(task);
+        refreshValuePriority(task.getTaskId());
         globalSearchIndexService.refreshTaskIndex(task.getTaskId());
         return task.getTaskId();
     }
@@ -97,6 +116,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         }
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
         updateById(task);
+        refreshValuePriority(task.getTaskId());
         globalSearchIndexService.refreshTaskIndex(task.getTaskId());
     }
 
@@ -112,9 +132,13 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
 
     @Override
     public BasePage<TaskVO> queryPageList(TaskQueryBO queryBO) {
+        if (useValuePriorityMode(queryBO)) {
+            return queryValuePriorityPageList(queryBO);
+        }
         BasePage<TaskVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
         fillTaskNames(page.getList());
+        hydrateValuePriority(page.getList(), true);
         return page;
     }
 
@@ -129,6 +153,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             task.setCompletedTime(new Date());
         }
         updateById(task);
+        refreshValuePriority(taskId);
         globalSearchIndexService.refreshTaskIndex(taskId);
     }
 
@@ -141,7 +166,34 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         // 使用 mapper 查询以获取关联的负责人姓名
         List<TaskVO> tasks = baseMapper.getMyTasksFiltered(userId, filter, today, weekEnd);
         fillTaskNames(tasks);
+        hydrateValuePriority(tasks, true);
         return tasks;
+    }
+
+    @Override
+    public void refreshValuePriority(Long taskId) {
+        if (taskId == null) {
+            return;
+        }
+        Task task = baseMapper.selectByIdIgnoreDataPermission(taskId);
+        if (task == null) {
+            return;
+        }
+        Customer customer = task.getCustomerId() == null ? null : customerMapper.selectByIdIgnoreDataPermission(task.getCustomerId());
+        persistValuePriority(task, customer);
+    }
+
+    @Override
+    public void refreshValuePriorityByCustomerId(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(customerId);
+        List<Task> tasks = baseMapper.selectByCustomerIdIgnoreDataPermission(customerId);
+        if (tasks == null || tasks.isEmpty()) {
+            return;
+        }
+        tasks.forEach(task -> persistValuePriority(task, customer));
     }
 
     /**
@@ -192,6 +244,530 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (tasks != null) {
             tasks.forEach(this::fillTaskNames);
         }
+    }
+
+    private boolean useValuePriorityMode(TaskQueryBO queryBO) {
+        return Boolean.TRUE.equals(queryBO.getHighValueOnly())
+            || "value".equalsIgnoreCase(StrUtil.blankToDefault(queryBO.getSortMode(), ""));
+    }
+
+    private BasePage<TaskVO> queryValuePriorityPageList(TaskQueryBO queryBO) {
+        List<TaskVO> tasks = baseMapper.queryList(queryBO);
+        fillTaskNames(tasks);
+        hydrateValuePriority(tasks, true);
+
+        List<TaskVO> rankedTasks = tasks.stream()
+            .filter(task -> !Boolean.TRUE.equals(queryBO.getHighValueOnly()) || Boolean.TRUE.equals(task.getHighValue()))
+            .sorted(buildValuePriorityComparator())
+            .collect(Collectors.toList());
+
+        return paginateTasks(rankedTasks, queryBO);
+    }
+
+    private BasePage<TaskVO> paginateTasks(List<TaskVO> tasks, TaskQueryBO queryBO) {
+        long pageNumber = Math.max(1, queryBO.getPage());
+        long pageSize = Math.max(1, queryBO.getLimit());
+        int fromIndex = (int) Math.min((pageNumber - 1) * pageSize, tasks.size());
+        int toIndex = (int) Math.min(fromIndex + pageSize, tasks.size());
+
+        BasePage<TaskVO> page = new BasePage<>(pageNumber, pageSize, tasks.size());
+        page.setRecords(tasks.subList(fromIndex, toIndex));
+        return page;
+    }
+
+    private Comparator<TaskVO> buildValuePriorityComparator() {
+        return Comparator
+            .comparingInt((TaskVO task) -> switch (StrUtil.blankToDefault(task.getStatus(), "")) {
+                case "PENDING" -> 0;
+                case "IN_PROGRESS" -> 1;
+                default -> 2;
+            })
+            .thenComparing(TaskVO::getValuePriorityScore, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(task -> task.getDueDate() == null ? Long.MAX_VALUE : task.getDueDate().getTime())
+            .thenComparing(task -> task.getCreateTime() == null ? Long.MAX_VALUE : task.getCreateTime().getTime());
+    }
+
+    private void hydrateValuePriority(List<TaskVO> tasks, boolean persistMissing) {
+        if (tasks == null || tasks.isEmpty()) {
+            return;
+        }
+
+        Map<Long, Customer> customerMap = loadCustomerMap(tasks.stream()
+            .map(TaskVO::getCustomerId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet()));
+
+        for (TaskVO task : tasks) {
+            if (hasPersistedValuePriority(task)) {
+                continue;
+            }
+
+            TaskValuePriorityResult result = evaluateValuePriority(toTaskPriorityInput(task), customerMap.get(task.getCustomerId()));
+            applyValuePriority(task, result);
+
+            if (persistMissing && task.getTaskId() != null) {
+                baseMapper.updateValuePriorityById(task.getTaskId(), result.score(), result.tier(), result.reason(), result.highValue());
+            }
+        }
+    }
+
+    private void persistValuePriority(Task task, Customer customer) {
+        if (task == null || task.getTaskId() == null) {
+            return;
+        }
+        TaskValuePriorityResult result = evaluateValuePriority(toTaskPriorityInput(task), customer);
+        baseMapper.updateValuePriorityById(task.getTaskId(), result.score(), result.tier(), result.reason(), result.highValue());
+        task.setValuePriorityScore(result.score());
+        task.setValuePriorityTier(result.tier());
+        task.setValuePriorityReason(result.reason());
+        task.setHighValue(result.highValue());
+    }
+
+    private Map<Long, Customer> loadCustomerMap(Set<Long> customerIds) {
+        if (customerIds == null || customerIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return customerMapper.selectBatchIds(customerIds).stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toMap(Customer::getCustomerId, Function.identity(), (left, right) -> left));
+    }
+
+    private boolean hasPersistedValuePriority(TaskVO task) {
+        return task.getValuePriorityScore() != null
+            && StrUtil.isNotBlank(task.getValuePriorityTier())
+            && StrUtil.isNotBlank(task.getValuePriorityReason())
+            && task.getHighValue() != null;
+    }
+
+    private void applyValuePriority(TaskVO task, TaskValuePriorityResult result) {
+        task.setValuePriorityScore(result.score());
+        task.setValuePriorityTier(result.tier());
+        task.setValuePriorityReason(result.reason());
+        task.setHighValue(result.highValue());
+    }
+
+    private TaskValuePriorityResult evaluateValuePriority(TaskPriorityInput task, Customer customer) {
+        int customerValue = computeCustomerValue(customer);
+        int winProbability = computeWinProbability(customer);
+        int urgency = computeUrgency(task, customer);
+        int actionFit = computeActionFit(task, customer);
+        int manualBonus = computeManualPriorityBonus(task);
+        int riskPenalty = computeRiskPenalty(task, customer);
+
+        int score = Math.round(
+            customerValue * 0.35f
+                + winProbability * 0.30f
+                + urgency * 0.20f
+                + actionFit * 0.15f
+                + manualBonus
+                - riskPenalty
+        );
+
+        if ("COMPLETED".equalsIgnoreCase(task.status())) {
+            score = Math.min(score, 35);
+        }
+
+        score = clamp(score, 1, 99);
+        String tier = score >= HIGH_VALUE_THRESHOLD ? "HIGH" : score >= MEDIUM_VALUE_THRESHOLD ? "MEDIUM" : "LOW";
+        boolean highValue = !"COMPLETED".equalsIgnoreCase(task.status()) && score >= HIGH_VALUE_THRESHOLD;
+
+        return new TaskValuePriorityResult(
+            score,
+            tier,
+            buildValuePriorityReason(task, customer, score, customerValue, winProbability, urgency, actionFit),
+            highValue
+        );
+    }
+
+    private int computeCustomerValue(Customer customer) {
+        if (customer == null) {
+            return 28;
+        }
+
+        int score = 30;
+        String level = StrUtil.blankToDefault(customer.getLevel(), "");
+        if ("A".equalsIgnoreCase(level)) {
+            score += 28;
+        } else if ("B".equalsIgnoreCase(level)) {
+            score += 18;
+        } else if ("C".equalsIgnoreCase(level)) {
+            score += 8;
+        }
+
+        score += scoreAmount(customer.getQuotation(), 8, 12, 16);
+        score += scoreAmount(customer.getContractAmount(), 5, 8, 12);
+        score += scoreAmount(customer.getRevenue(), 3, 5, 8);
+
+        if (customer.getContactCount() != null) {
+            score += Math.min(10, Math.max(0, customer.getContactCount()) * 2);
+        }
+
+        Integer snapshotScore = extractSnapshotScore(customer);
+        if (snapshotScore != null) {
+            score = Math.round(score * 0.75f + snapshotScore * 0.25f);
+        }
+
+        return clamp(score, 10, 98);
+    }
+
+    private int computeWinProbability(Customer customer) {
+        if (customer == null) {
+            return 24;
+        }
+
+        int score = switch (StrUtil.blankToDefault(customer.getStage(), "").toLowerCase()) {
+            case "lead" -> 25;
+            case "qualified" -> 45;
+            case "proposal" -> 65;
+            case "negotiation" -> 82;
+            case "closed" -> 90;
+            case "lost" -> 5;
+            default -> 30;
+        };
+
+        switch (normalizeAiStatus(customer.getAiStatusDetection())) {
+            case "HIGH_INTENT" -> score += 12;
+            case "ACTIVE" -> score += 6;
+            case "DORMANT" -> score -= 18;
+            case "FOLLOW_UP" -> score += 1;
+            default -> {
+            }
+        }
+
+        long daysSinceLastContact = daysSince(customer.getLastContactTime());
+        if (daysSinceLastContact >= 0) {
+            if (daysSinceLastContact <= 3) {
+                score += 8;
+            } else if (daysSinceLastContact <= 7) {
+                score += 4;
+            } else if (daysSinceLastContact > 21) {
+                score -= 12;
+            } else if (daysSinceLastContact > 14) {
+                score -= 6;
+            }
+        }
+
+        score += scoreNextFollowMomentum(customer.getNextFollowTime());
+        return clamp(score, 5, 98);
+    }
+
+    private TaskPriorityInput toTaskPriorityInput(TaskVO task) {
+        return new TaskPriorityInput(
+            task.getTaskId(),
+            task.getTitle(),
+            task.getDescription(),
+            task.getStatus(),
+            task.getPriority(),
+            task.getDueDate(),
+            task.getCreateTime(),
+            task.getCustomerId(),
+            task.getGeneratedByAi(),
+            task.getTaskType()
+        );
+    }
+
+    private TaskPriorityInput toTaskPriorityInput(Task task) {
+        return new TaskPriorityInput(
+            task.getTaskId(),
+            task.getTitle(),
+            task.getDescription(),
+            task.getStatus(),
+            task.getPriority(),
+            task.getDueDate(),
+            task.getCreateTime(),
+            task.getCustomerId(),
+            task.getGeneratedByAi(),
+            task.getTaskType()
+        );
+    }
+
+    private int computeUrgency(TaskPriorityInput task, Customer customer) {
+        if ("COMPLETED".equalsIgnoreCase(task.status())) {
+            return 0;
+        }
+
+        int score = scoreDeadline(task.dueDate(), 20, 100, 90, 75, 60, 40, 25);
+        if (customer != null) {
+            score = Math.max(score, scoreDeadline(customer.getNextFollowTime(), 15, 88, 82, 68, 52, 34, 20));
+        }
+        if ("IN_PROGRESS".equalsIgnoreCase(task.status())) {
+            score = Math.min(100, score + 6);
+        }
+        return clamp(score, 0, 100);
+    }
+
+    private int computeActionFit(TaskPriorityInput task, Customer customer) {
+        int score = customer != null ? 55 : 35;
+        String stage = customer == null ? "" : StrUtil.blankToDefault(customer.getStage(), "").toLowerCase();
+        String taskType = StrUtil.blankToDefault(task.taskType(), "");
+        String taskText = (StrUtil.blankToDefault(task.title(), "") + " " + StrUtil.blankToDefault(task.description(), "")).toLowerCase();
+
+        if (containsAny(taskType, "跟进", "follow") || containsAny(taskText, "跟进", "回访", "follow")) {
+            score += isStage(stage, "lead", "qualified", "proposal", "negotiation") ? 18 : 10;
+        }
+        if (containsAny(taskType, "电话", "call") || containsAny(taskText, "电话", "沟通", "call")) {
+            score += isStage(stage, "lead", "qualified", "proposal") ? 15 : 8;
+        }
+        if (containsAny(taskType, "会议", "meeting", "visit") || containsAny(taskText, "会议", "拜访", "演示", "meeting")) {
+            score += isStage(stage, "proposal", "negotiation") ? 18 : 10;
+        }
+        if (containsAny(taskType, "文档", "document") || containsAny(taskText, "方案", "报价", "合同", "proposal", "quote", "contract")) {
+            score += isStage(stage, "proposal", "negotiation") ? 18 : 8;
+        }
+        if (task.generatedByAi() != null && task.generatedByAi() == 1) {
+            score += 5;
+        }
+        if (task.customerId() == null) {
+            score -= 8;
+        }
+        return clamp(score, 20, 95);
+    }
+
+    private int computeManualPriorityBonus(TaskPriorityInput task) {
+        return switch (StrUtil.blankToDefault(task.priority(), "")) {
+            case "HIGH" -> 6;
+            case "MEDIUM" -> 2;
+            default -> 0;
+        };
+    }
+
+    private int computeRiskPenalty(TaskPriorityInput task, Customer customer) {
+        int penalty = 0;
+        if (task.customerId() == null) {
+            penalty += 10;
+        } else if (customer == null) {
+            penalty += 6;
+        }
+
+        if (customer != null) {
+            if ("lost".equalsIgnoreCase(customer.getStage())) {
+                penalty += 20;
+            }
+            if ("DORMANT".equals(normalizeAiStatus(customer.getAiStatusDetection()))) {
+                penalty += 8;
+            }
+            if (customer.getNextFollowTime() == null) {
+                penalty += 4;
+            }
+        }
+
+        if (StrUtil.isBlank(task.description())) {
+            penalty += 2;
+        }
+        return penalty;
+    }
+
+    private String buildValuePriorityReason(TaskPriorityInput task,
+                                            Customer customer,
+                                            int score,
+                                            int customerValue,
+                                            int winProbability,
+                                            int urgency,
+                                            int actionFit) {
+        List<String> reasons = new ArrayList<>();
+        String stage = customer == null ? "" : StrUtil.blankToDefault(customer.getStage(), "");
+        String aiStatus = customer == null ? "" : normalizeAiStatus(customer.getAiStatusDetection());
+
+        if (StrUtil.isNotBlank(stage)) {
+            reasons.add("客户处于" + getStageLabel(stage) + "阶段");
+        }
+        if ("HIGH_INTENT".equals(aiStatus)) {
+            reasons.add("AI 判断为高意向");
+        } else if ("ACTIVE".equals(aiStatus)) {
+            reasons.add("客户近期仍保持活跃");
+        }
+
+        if (urgency >= 85) {
+            reasons.add("当前处理窗口已经非常接近");
+        } else if (urgency >= 65) {
+            reasons.add("任务时效性较强");
+        }
+
+        if (hasCommercialSignal(customer) && customerValue >= 70) {
+            reasons.add("已有明确商业金额信号");
+        }
+        if (actionFit >= 75) {
+            reasons.add("当前任务与客户阶段高度匹配");
+        }
+        if (customer == null && task.customerId() == null) {
+            reasons.add("未绑定客户，价值判断偏保守");
+        }
+
+        if (reasons.isEmpty()) {
+            if (winProbability >= 75) {
+                reasons.add("成交推进概率较高");
+            } else if (customerValue >= 70) {
+                reasons.add("客户价值较高");
+            } else {
+                reasons.add("建议按常规节奏跟进");
+            }
+        }
+
+        String summary = reasons.stream().limit(3).collect(Collectors.joining("，"));
+        if ("COMPLETED".equalsIgnoreCase(task.status())) {
+            return summary + "，当前任务已完成，排序仅供回看参考。";
+        }
+        if (score >= HIGH_VALUE_THRESHOLD) {
+            return summary + "，建议优先推进。";
+        }
+        if (score >= MEDIUM_VALUE_THRESHOLD) {
+            return summary + "，建议本周持续跟进。";
+        }
+        return summary + "，可按计划处理。";
+    }
+
+    private Integer extractSnapshotScore(Customer customer) {
+        if (customer == null || StrUtil.isBlank(customer.getAiParseSnapshot())) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(customer.getAiParseSnapshot());
+            if (root.has("score") && !root.get("score").isNull()) {
+                return root.get("score").asInt();
+            }
+        } catch (Exception e) {
+            log.debug("Failed to parse customer ai snapshot score: customerId={}", customer.getCustomerId(), e);
+        }
+        return null;
+    }
+
+    private int scoreAmount(BigDecimal amount, int lowScore, int mediumScore, int highScore) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+        if (amount.compareTo(new BigDecimal("500000")) >= 0) {
+            return highScore;
+        }
+        if (amount.compareTo(new BigDecimal("100000")) >= 0) {
+            return mediumScore;
+        }
+        return lowScore;
+    }
+
+    private int scoreNextFollowMomentum(Date nextFollowTime) {
+        if (nextFollowTime == null) {
+            return -6;
+        }
+        long hours = hoursUntil(nextFollowTime);
+        if (hours < 0) {
+            return -10;
+        }
+        if (hours <= 24) {
+            return 8;
+        }
+        if (hours <= 72) {
+            return 6;
+        }
+        return 3;
+    }
+
+    private int scoreDeadline(Date deadline,
+                              int emptyScore,
+                              int overdueScore,
+                              int sameDayScore,
+                              int nextDayScore,
+                              int threeDayScore,
+                              int sevenDayScore,
+                              int relaxedScore) {
+        if (deadline == null) {
+            return emptyScore;
+        }
+        long hours = hoursUntil(deadline);
+        if (hours < 0) {
+            return overdueScore;
+        }
+        if (hours <= 24) {
+            return sameDayScore;
+        }
+        if (hours <= 48) {
+            return nextDayScore;
+        }
+        if (hours <= 24 * 3L) {
+            return threeDayScore;
+        }
+        if (hours <= 24 * 7L) {
+            return sevenDayScore;
+        }
+        return relaxedScore;
+    }
+
+    private long daysSince(Date value) {
+        if (value == null) {
+            return -1;
+        }
+        return TimeUnit.MILLISECONDS.toDays(Math.max(0, System.currentTimeMillis() - value.getTime()));
+    }
+
+    private long hoursUntil(Date value) {
+        if (value == null) {
+            return Long.MAX_VALUE;
+        }
+        return TimeUnit.MILLISECONDS.toHours(value.getTime() - System.currentTimeMillis());
+    }
+
+    private boolean hasCommercialSignal(Customer customer) {
+        return customer != null
+            && (scoreAmount(customer.getQuotation(), 1, 1, 1) > 0
+            || scoreAmount(customer.getContractAmount(), 1, 1, 1) > 0
+            || scoreAmount(customer.getRevenue(), 1, 1, 1) > 0);
+    }
+
+    private boolean isStage(String actualStage, String... stages) {
+        if (StrUtil.isBlank(actualStage)) {
+            return false;
+        }
+        for (String stage : stages) {
+            if (actualStage.equalsIgnoreCase(stage)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        if (StrUtil.isBlank(text) || keywords == null) {
+            return false;
+        }
+        String normalized = text.toLowerCase();
+        for (String keyword : keywords) {
+            if (StrUtil.isNotBlank(keyword) && normalized.contains(keyword.toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalizeAiStatus(String aiStatus) {
+        String normalized = StrUtil.blankToDefault(aiStatus, "").replace(" ", "");
+        if (normalized.contains("高意向")) {
+            return "HIGH_INTENT";
+        }
+        if (normalized.contains("活跃")) {
+            return "ACTIVE";
+        }
+        if (normalized.contains("休眠")) {
+            return "DORMANT";
+        }
+        if (normalized.contains("需跟进") || normalized.contains("待跟进")) {
+            return "FOLLOW_UP";
+        }
+        return normalized;
+    }
+
+    private String getStageLabel(String stage) {
+        return switch (stage.toLowerCase()) {
+            case "lead" -> "线索初期";
+            case "qualified" -> "需求确认";
+            case "proposal" -> "方案评估";
+            case "negotiation" -> "商务谈判";
+            case "closed" -> "成交";
+            case "lost" -> "流失";
+            default -> "推进中";
+        };
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Override
@@ -258,5 +834,27 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         vo.setAssignedToName("");
         vo.setDescription(content);
         return vo;
+    }
+
+    private record TaskPriorityInput(
+        Long taskId,
+        String title,
+        String description,
+        String status,
+        String priority,
+        Date dueDate,
+        Date createTime,
+        Long customerId,
+        Integer generatedByAi,
+        String taskType
+    ) {
+    }
+
+    private record TaskValuePriorityResult(
+        int score,
+        String tier,
+        String reason,
+        boolean highValue
+    ) {
     }
 }

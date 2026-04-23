@@ -24,7 +24,9 @@ export const useTaskStore = defineStore('task', () => {
     keyword: '',
     status: undefined,
     priority: undefined,
-    filter: 'all'
+    filter: 'all',
+    sortMode: 'default',
+    highValueOnly: false
   })
 
   // Getters

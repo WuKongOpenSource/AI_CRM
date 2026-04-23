@@ -985,5 +985,6 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             .set(Customer::getLastContactTime, latestFollowUp != null ? latestFollowUp.getFollowTime() : null)
             .set(Customer::getNextFollowTime, latestFollowUp != null ? latestFollowUp.getNextFollowTime() : null);
         customerMapper.update(null, updateWrapper);
+        taskService.refreshValuePriorityByCustomerId(customerId);
     }
 }

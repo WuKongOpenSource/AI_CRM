@@ -98,6 +98,18 @@ public class Task implements Serializable {
     @Schema(description = "参与人名称（逗号分隔）")
     private String participantNames;
 
+    @Schema(description = "High-value priority score")
+    private Integer valuePriorityScore;
+
+    @Schema(description = "High-value priority tier: HIGH/MEDIUM/LOW")
+    private String valuePriorityTier;
+
+    @Schema(description = "Human-readable reason for the high-value priority score")
+    private String valuePriorityReason;
+
+    @Schema(description = "Whether this task belongs to the high-value priority bucket")
+    private Boolean highValue;
+
     /**
      * 完成时间
      */
