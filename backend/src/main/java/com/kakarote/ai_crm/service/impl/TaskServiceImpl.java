@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +66,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
 
     private static final int HIGH_VALUE_THRESHOLD = 72;
     private static final int MEDIUM_VALUE_THRESHOLD = 58;
+    private static final int HIGH_VALUE_FALLBACK_LIMIT = 5;
 
     private static final String AI_TASK_PARSE_PROMPT = """
         你是一个专业的 CRM 助手。请分析以下自然语言任务描述，提取结构化信息并以 JSON 格式返回。
@@ -139,6 +141,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         baseMapper.queryPageList(page, queryBO);
         fillTaskNames(page.getList());
         hydrateValuePriority(page.getList(), true);
+        attachStatusCounts(page, queryBO);
         return page;
     }
 
@@ -256,12 +259,24 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         fillTaskNames(tasks);
         hydrateValuePriority(tasks, true);
 
-        List<TaskVO> rankedTasks = tasks.stream()
-            .filter(task -> !Boolean.TRUE.equals(queryBO.getHighValueOnly()) || Boolean.TRUE.equals(task.getHighValue()))
+        List<TaskVO> sortedTasks = tasks.stream()
             .sorted(buildValuePriorityComparator())
             .collect(Collectors.toList());
 
-        return paginateTasks(rankedTasks, queryBO);
+        List<TaskVO> rankedTasks = sortedTasks.stream()
+            .filter(task -> !Boolean.TRUE.equals(queryBO.getHighValueOnly()) || Boolean.TRUE.equals(task.getHighValue()))
+            .collect(Collectors.toList());
+
+        if (Boolean.TRUE.equals(queryBO.getHighValueOnly()) && rankedTasks.isEmpty()) {
+            int fallbackLimit = resolveHighValueFallbackLimit(queryBO);
+            rankedTasks = sortedTasks.stream()
+                .limit(fallbackLimit)
+                .collect(Collectors.toList());
+        }
+
+        BasePage<TaskVO> page = paginateTasks(rankedTasks, queryBO);
+        attachStatusCounts(page, queryBO);
+        return page;
     }
 
     private BasePage<TaskVO> paginateTasks(List<TaskVO> tasks, TaskQueryBO queryBO) {
@@ -285,6 +300,67 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             .thenComparing(TaskVO::getValuePriorityScore, Comparator.nullsLast(Comparator.reverseOrder()))
             .thenComparing(task -> task.getDueDate() == null ? Long.MAX_VALUE : task.getDueDate().getTime())
             .thenComparing(task -> task.getCreateTime() == null ? Long.MAX_VALUE : task.getCreateTime().getTime());
+    }
+
+    private void attachStatusCounts(BasePage<TaskVO> page, TaskQueryBO queryBO) {
+        Map<String, Object> extraData = new LinkedHashMap<>();
+        extraData.put("statusCounts", buildStatusCounts(queryBO));
+        page.setExtraData(extraData);
+    }
+
+    private Map<String, Long> buildStatusCounts(TaskQueryBO queryBO) {
+        TaskQueryBO summaryQuery = BeanUtil.copyProperties(queryBO, TaskQueryBO.class);
+        summaryQuery.setStatus(null);
+
+        List<TaskVO> tasks = baseMapper.queryList(summaryQuery);
+        if (tasks == null || tasks.isEmpty()) {
+            return buildStatusCountMap(Collections.emptyList());
+        }
+
+        if (useValuePriorityMode(summaryQuery)) {
+            hydrateValuePriority(tasks, true);
+            List<TaskVO> sortedTasks = tasks.stream()
+                .sorted(buildValuePriorityComparator())
+                .collect(Collectors.toList());
+
+            if (Boolean.TRUE.equals(summaryQuery.getHighValueOnly())) {
+                List<TaskVO> highValueTasks = sortedTasks.stream()
+                    .filter(task -> Boolean.TRUE.equals(task.getHighValue()))
+                    .collect(Collectors.toList());
+
+                if (!highValueTasks.isEmpty()) {
+                    return buildStatusCountMap(highValueTasks);
+                }
+
+                return buildStatusCountMap(sortedTasks.stream()
+                    .limit(resolveHighValueFallbackLimit(summaryQuery))
+                    .collect(Collectors.toList()));
+            }
+
+            return buildStatusCountMap(sortedTasks);
+        }
+
+        return buildStatusCountMap(tasks);
+    }
+
+    private Map<String, Long> buildStatusCountMap(List<TaskVO> tasks) {
+        long pendingCount = tasks.stream().filter(task -> "PENDING".equalsIgnoreCase(task.getStatus())).count();
+        long inProgressCount = tasks.stream().filter(task -> "IN_PROGRESS".equalsIgnoreCase(task.getStatus())).count();
+        long completedCount = tasks.stream().filter(task -> "COMPLETED".equalsIgnoreCase(task.getStatus())).count();
+
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        statusCounts.put("all", (long) tasks.size());
+        statusCounts.put("PENDING", pendingCount);
+        statusCounts.put("IN_PROGRESS", inProgressCount);
+        statusCounts.put("COMPLETED", completedCount);
+        return statusCounts;
+    }
+
+    private int resolveHighValueFallbackLimit(TaskQueryBO queryBO) {
+        return (int) Math.min(
+            Math.max(1, ObjectUtil.defaultIfNull(queryBO.getLimit(), HIGH_VALUE_FALLBACK_LIMIT)),
+            HIGH_VALUE_FALLBACK_LIMIT
+        );
     }
 
     private void hydrateValuePriority(List<TaskVO> tasks, boolean persistMissing) {

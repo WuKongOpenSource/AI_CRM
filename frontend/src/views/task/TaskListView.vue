@@ -59,6 +59,16 @@
           </button>
         </div>
 
+        <div
+          v-if="taskStore.highValueFallbackActive"
+          class="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          <span class="material-symbols-outlined text-base leading-none mt-0.5">info</span>
+          <p>
+            当前没有达到高价值阈值的任务，已按 AI 评分为您展示前 {{ taskStore.highValueFallbackCount }} 条高分任务，方便优先处理。
+          </p>
+        </div>
+
         <!-- Loading -->
         <div v-if="taskStore.loading" class="text-center py-16">
           <span class="material-symbols-outlined text-4xl text-slate-300 animate-spin">progress_activity</span>
@@ -381,6 +391,13 @@ const formData = reactive<TaskAddBO & { status?: TaskStatus; assignedToName?: st
 // Computed properties
 const statusTabs = computed(() => {
   const tasks = taskStore.taskList
+  const counts = taskStore.statusCounts
+  return [
+    { value: 'all', label: '全部', count: counts.all },
+    { value: 'PENDING', label: '待处理', count: counts.PENDING },
+    { value: 'IN_PROGRESS', label: '进行中', count: counts.IN_PROGRESS },
+    { value: 'COMPLETED', label: '已完成', count: counts.COMPLETED }
+  ]
   return [
     { value: 'all', label: '全部', count: taskStore.totalCount },
     { value: 'PENDING', label: '待处理', count: tasks.filter(t => t.status === 'PENDING').length },

@@ -10,6 +10,7 @@ export interface PageResult<T> {
   totalRow: number
   pageSize: number
   pageNumber: number
+  extraData?: any
 }
 
 export interface PageQuery {

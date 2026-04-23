@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -61,6 +62,8 @@ public class BasePage<T> implements IPage<T>, Serializable {
     /**
      * 额外数据
      */
+    @Getter
+    @Setter
     private Object extraData;
 
 
