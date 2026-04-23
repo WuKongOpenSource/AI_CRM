@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.RandomUtil;
@@ -90,6 +91,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         String realname = normalizeText(registerBO.getRealname());
         String companyName = StrUtil.trim(registerBO.getCompanyName());
         verifyEmailCode(email, registerBO.getVerificationCode());
+        ensureEmailNotRegistered(email);
 
         CrmTenant tenant = new CrmTenant();
         tenant.setTenantName(companyName);
@@ -234,10 +236,11 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     private void validateSendScene(String email, Integer type) {
-        boolean hasExistingUser = CollUtil.isNotEmpty(manageUserService.queryUsersByUsername(email));
         if (Objects.equals(type, REGISTER_EMAIL_TYPE)) {
+            ensureEmailNotRegistered(email);
             return;
         }
+        boolean hasExistingUser = CollUtil.isNotEmpty(manageUserService.queryUsersByUsername(email));
         if (Objects.equals(type, RESET_PASSWORD_EMAIL_TYPE)) {
             if (!hasExistingUser) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST, "该邮箱尚未注册");
@@ -254,6 +257,15 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
         if (!StrUtil.equals(StrUtil.trim(verificationCode), cachedCode)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_VERIFICATION_CODE_ERROR);
+        }
+    }
+
+    private void ensureEmailNotRegistered(String email) {
+        long registeredEnterpriseCount = tenantService.count(
+                Wrappers.<CrmTenant>lambdaQuery().eq(CrmTenant::getContactEmail, email)
+        );
+        if (registeredEnterpriseCount > 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_EMAIL_ALREADY_REGISTERED);
         }
     }
 
