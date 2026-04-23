@@ -166,140 +166,140 @@
               empty-text="暂无客户数据"
               @row-click="handleCustomerRowClick"
             >
-              <el-table-column
-                v-for="field in listFields"
-                :key="field.fieldId"
-                :label="field.fieldLabel"
-                :fixed="getFieldFixed(field)"
-                :min-width="getFieldMinWidth(field)"
-                :align="getFieldAlign(field)"
-              >
-                <template #header>
-                  <span class="normal-case tracking-normal">{{ getListFieldLabel(field) }}</span>
-                </template>
-                <template #default="{ row }">
-                  <template v-if="field.fieldSource === 'custom'">
-                    <template v-if="field.fieldType === 'checkbox'">
-                      <span
-                        v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
-                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
-                        :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-slate-100 text-slate-600'"
-                      >
+              <template v-for="field in listFields" :key="field.fieldId">
+                <el-table-column
+                  :label="field.fieldLabel"
+                  :fixed="getFieldFixed(field)"
+                  :min-width="getFieldMinWidth(field)"
+                  :align="getFieldAlign(field)"
+                >
+                  <template #header>
+                    <span class="normal-case tracking-normal">{{ getListFieldLabel(field) }}</span>
+                  </template>
+                  <template #default="{ row }">
+                    <template v-if="field.fieldSource === 'custom'">
+                      <template v-if="field.fieldType === 'checkbox'">
                         <span
-                          class="size-1.5 rounded-full"
+                          v-if="getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) !== null"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap"
                           :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
-                            ? 'bg-emerald-500'
-                            : 'bg-slate-400'"
-                        ></span>
-                        {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-slate-100 text-slate-600'"
+                        >
+                          <span
+                            class="size-1.5 rounded-full"
+                            :class="getCustomFieldCheckboxState(row.customFields?.[field.fieldName])
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-400'"
+                          ></span>
+                          {{ getCustomFieldCheckboxState(row.customFields?.[field.fieldName]) ? '开启' : '关闭' }}
+                        </span>
+                        <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                      </template>
+                      <span
+                        v-else
+                        class="block text-sm text-slate-600 truncate"
+                        :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
+                      >
+                        {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
                       </span>
+                    </template>
+                    <template v-else-if="field.fieldName === 'companyName'">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="size-8 rounded overflow-hidden border border-slate-200 bg-white flex items-center justify-center flex-shrink-0">
+                          <img
+                            v-if="row.logoUrl"
+                            :src="row.logoUrl"
+                            :alt="row.companyName || 'company logo'"
+                            class="size-full object-contain"
+                          />
+                          <span v-else class="bg-primary/10 text-primary flex size-full items-center justify-center font-bold text-xs">
+                            {{ row.companyName?.charAt(0) || '?' }}
+                          </span>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName || '-' }}</span>
+                      </div>
+                    </template>
+                    <template v-else-if="field.fieldName === 'aiStatusDetection'">
+                      <div class="flex items-center justify-center py-1">
+                        <span
+                          v-if="getAiStatusMeta(row.aiStatusDetection)"
+                          class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
+                          :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
+                        >
+                          <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
+                          {{ getAiStatusMeta(row.aiStatusDetection)?.label }}
+                        </span>
+                        <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                      </div>
+                    </template>
+                    <template v-else-if="field.fieldName === 'aiInsight'">
+                      <div v-if="row.aiInsight" class="py-1">
+                        <el-tooltip
+                          placement="top"
+                          effect="light"
+                          :show-after="150"
+                          popper-class="wk-ai-insight-tooltip"
+                        >
+                          <template #content>
+                            <div class="wk-ai-insight-tooltip__content">
+                              {{ row.aiInsight }}
+                            </div>
+                          </template>
+                          <p class="wk-ai-insight-text text-sm text-slate-600">
+                            {{ getAiInsightPreview(row.aiInsight) }}
+                          </p>
+                        </el-tooltip>
+                      </div>
                       <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
+                    </template>
+                    <template v-else-if="field.fieldName === 'level'">
+                      <span
+                        v-if="row.level"
+                        class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                        :class="getLevelBadgeClass(row.level)"
+                      >
+                        {{ getLevelLabel(field, row.level) }}
+                      </span>
+                      <span v-else class="text-slate-300">-</span>
+                    </template>
+                    <template v-else-if="field.fieldName === 'stage'">
+                      <span
+                        v-if="row.stage"
+                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                        :class="getStageBadgeClass(row.stage)"
+                      >
+                        <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
+                        {{ getConfiguredStageLabel(field, row.stage) }}
+                      </span>
+                      <span v-else class="text-slate-300">-</span>
                     </template>
                     <span
                       v-else
-                      class="block text-sm text-slate-600 truncate"
-                      :title="formatCustomFieldValue(field, row.customFields?.[field.fieldName])"
+                      class="block text-sm text-slate-600 truncate whitespace-nowrap"
+                      :title="getListFieldDisplayValue(field, row)"
                     >
-                      {{ formatCustomFieldValue(field, row.customFields?.[field.fieldName]) }}
+                      {{ getListFieldDisplayValue(field, row) }}
                     </span>
                   </template>
-                  <template v-else-if="field.fieldName === 'companyName'">
-                    <div class="flex items-center gap-3 min-w-0">
-                      <div class="size-8 rounded overflow-hidden border border-slate-200 bg-white flex items-center justify-center flex-shrink-0">
-                        <img
-                          v-if="row.logoUrl"
-                          :src="row.logoUrl"
-                          :alt="row.companyName || 'company logo'"
-                          class="size-full object-contain"
-                        />
-                        <span v-else class="bg-primary/10 text-primary flex size-full items-center justify-center font-bold text-xs">
-                          {{ row.companyName?.charAt(0) || '?' }}
-                        </span>
-                      </div>
-                      <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName || '-' }}</span>
-                    </div>
-                  </template>
-                  <template v-else-if="field.fieldName === 'aiStatusDetection'">
-                    <div class="flex items-center justify-center py-1">
-                      <span
-                        v-if="getAiStatusMeta(row.aiStatusDetection)"
-                        class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
-                        :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
-                      >
-                        <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
-                        {{ getAiStatusMeta(row.aiStatusDetection)?.label }}
-                      </span>
-                      <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
-                    </div>
-                  </template>
-                  <template v-else-if="field.fieldName === 'aiInsight'">
-                    <div v-if="row.aiInsight" class="py-1">
-                      <el-tooltip
-                        placement="top"
-                        effect="light"
-                        :show-after="150"
-                        popper-class="wk-ai-insight-tooltip"
-                      >
-                        <template #content>
-                          <div class="wk-ai-insight-tooltip__content">
-                            {{ row.aiInsight }}
-                          </div>
-                        </template>
-                        <p class="wk-ai-insight-text text-sm text-slate-600">
-                          {{ getAiInsightPreview(row.aiInsight) }}
-                        </p>
-                      </el-tooltip>
-                    </div>
-                    <span v-else class="text-sm text-slate-300 whitespace-nowrap">-</span>
-                  </template>
-                  <template v-else-if="field.fieldName === 'level'">
-                    <span
-                      v-if="row.level"
-                      class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
-                      :class="getLevelBadgeClass(row.level)"
-                    >
-                      {{ getLevelLabel(field, row.level) }}
-                    </span>
-                    <span v-else class="text-slate-300">-</span>
-                  </template>
-                  <template v-else-if="field.fieldName === 'stage'">
-                    <span
-                      v-if="row.stage"
-                      class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
-                      :class="getStageBadgeClass(row.stage)"
-                    >
-                      <span class="size-1.5 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
-                      {{ getConfiguredStageLabel(field, row.stage) }}
-                    </span>
-                    <span v-else class="text-slate-300">-</span>
-                  </template>
-                  <span
-                    v-else
-                    class="block text-sm text-slate-600 truncate whitespace-nowrap"
-                    :title="getListFieldDisplayValue(field, row)"
-                  >
-                    {{ getListFieldDisplayValue(field, row) }}
-                  </span>
-                </template>
-              </el-table-column>
+                </el-table-column>
 
-              <el-table-column label="联系人" min-width="140">
-                <template #default="{ row }">
-                  <div v-if="row.primaryContactName" class="text-sm text-slate-600 whitespace-nowrap">
-                    <div>{{ row.primaryContactName }}</div>
-                    <div v-if="row.primaryContactPosition" class="text-xs text-slate-400">{{ row.primaryContactPosition }}</div>
-                  </div>
-                  <span v-else class="text-sm text-slate-300">-</span>
-                </template>
-              </el-table-column>
+                <el-table-column v-if="field.fieldName === 'companyName'" :key="`${field.fieldId}-contact`" label="联系人" min-width="140">
+                  <template #default="{ row }">
+                    <div v-if="row.primaryContactName" class="text-sm text-slate-600 whitespace-nowrap">
+                      <div>{{ row.primaryContactName }}</div>
+                      <div v-if="row.primaryContactPosition" class="text-xs text-slate-400">{{ row.primaryContactPosition }}</div>
+                    </div>
+                    <span v-else class="text-sm text-slate-300">-</span>
+                  </template>
+                </el-table-column>
 
-              <el-table-column label="电话" min-width="140">
-                <template #default="{ row }">
-                  <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
-                </template>
-              </el-table-column>
+                <el-table-column v-if="field.fieldName === 'companyName'" :key="`${field.fieldId}-phone`" label="电话" min-width="140">
+                  <template #default="{ row }">
+                    <span class="text-sm text-slate-600 font-mono whitespace-nowrap">{{ row.primaryContactPhone || '-' }}</span>
+                  </template>
+                </el-table-column>
+              </template>
 
               <el-table-column label="负责人" min-width="140">
                 <template #default="{ row }">
