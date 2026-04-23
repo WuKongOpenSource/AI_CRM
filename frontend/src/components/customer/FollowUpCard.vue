@@ -7,7 +7,7 @@
             <span class="material-symbols-outlined text-base">{{ getFollowUpIcon(item.type) }}</span>
           </div>
           <div class="min-w-0 flex-1 flex flex-col gap-1.5">
-            <h4 class="font-bold text-slate-900 text-base leading-tight">
+            <h4 class="truncate font-bold text-slate-900 text-base leading-tight">
               {{ item.summary || getFollowUpTypeLabel(item.type) }}
             </h4>
             <div class="flex flex-wrap items-center gap-2">
@@ -41,7 +41,9 @@
           </div>
         </div>
 
-        <p class="mt-3 text-sm leading-5 text-slate-700 whitespace-pre-line">{{ item.content }}</p>
+        <div v-if="displayContent" class="mt-3 rounded-2xl bg-slate-50/80 px-4 py-3">
+          <p class="text-sm leading-6 text-slate-700 whitespace-pre-line">{{ displayContent }}</p>
+        </div>
 
         <div class="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
           <span class="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1.5 text-slate-500">
@@ -240,6 +242,7 @@ const previewAttachment = ref<FollowUpAttachment | null>(null)
 
 const tasks = computed(() => props.item.tasks || [])
 const pendingTaskCount = computed(() => tasks.value.filter(task => !isTaskCompleted(task)).length)
+const displayContent = computed(() => normalizeContentText(props.item.content))
 
 watch(
   () => props.item.attachments,
@@ -294,6 +297,13 @@ function handlePreview(attachment: FollowUpAttachment) {
 
 function isImageAttachment(attachment: FollowUpAttachment): boolean {
   return String(attachment.mimeType || '').startsWith('image/')
+}
+
+function normalizeContentText(value?: string): string {
+  return String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function getFollowUpTypeLabel(type?: string): string {

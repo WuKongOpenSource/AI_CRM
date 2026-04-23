@@ -17,7 +17,7 @@
 
       <div v-if="result && !loading" class="flex items-center gap-6 text-xs text-slate-400">
         <span>检索耗时: {{ formatElapsed(result.tookMs) }}</span>
-        <span class="font-bold text-primary">匹配度: {{ result.matchPercent }}%</span>
+        <span class="font-bold text-primary">匹配度 {{ result.matchPercent }}%</span>
       </div>
     </div>
 
@@ -104,6 +104,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { KnowledgeAiSearchVO } from '@/types/common'
+import { normalizeAssistantMessageContent } from '@/utils/chatMessage'
 import { renderMarkdown } from '@/utils/markdown'
 
 const props = defineProps<{
@@ -117,21 +118,17 @@ defineEmits<{
   open: [knowledgeId: string | number]
 }>()
 
-const normalizedAnswer = computed(() => {
-  const answer = props.result?.answer || ''
-  return answer.replace(/(?:\.\.\.|…)+\s*$/, '').trimEnd()
-})
+const normalizedAnswer = computed(() => normalizeAssistantMessageContent(props.result?.answer || ''))
 
 const renderedAnswer = computed(() => renderMarkdown(normalizedAnswer.value))
 
 function formatElapsed(ms?: number): string {
   if (!ms || ms <= 0) return '0.1s'
-  if (ms < 1000) return `${(ms / 1000).toFixed(1)}s`
   return `${(ms / 1000).toFixed(1)}s`
 }
 
 function formatReferenceName(name?: string): string {
-  return String(name || '').replace(/^\d+[_-]+/, '').trim() || '未命名文件'
+  return String(name || '').replace(/^\d+[_-]+/, '').trim() || '未命名文档'
 }
 </script>
 

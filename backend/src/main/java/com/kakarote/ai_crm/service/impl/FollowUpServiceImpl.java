@@ -86,6 +86,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     );
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final int MAX_ATTACHMENT_ANALYSIS_LENGTH = 4000;
+    private static final int MAX_FOLLOW_UP_SUMMARY_LENGTH = 22;
 
     private static final String AI_PARSE_PROMPT_TEMPLATE = """
         You are a professional CRM assistant.
@@ -109,9 +110,12 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         6. Example: if Current time is "2026-04-13 15:00:00" and the content says "明天上午10点电话沟通", then `followTime` must be "2026-04-13 15:00:00" and `nextFollowTime` must be "2026-04-14 10:00:00".
 
         Keep summary, sceneType, keyPoints, and todos in the same language as the user's content.
+        The `summary` must be very concise and title-like, suitable for a card heading.
+        Prefer 8-18 Chinese characters or within 30 characters in other languages.
+        Do not write a paragraph, explanation, or multiple sentences.
         Return strict JSON only with this exact shape:
         {
-          "summary": "short summary in 1-2 sentences",
+          "summary": "very short heading-style summary",
           "sceneType": "brief scene label in the same language, or empty string",
           "type": "one of: call, meeting, email, visit, other",
           "followTime": "yyyy-MM-dd HH:mm:ss",
@@ -158,6 +162,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         if (followUp.getAiGenerated() == null) {
             followUp.setAiGenerated(0);
         }
+        followUp.setSummary(normalizeStoredSummary(followUp.getSummary()));
         save(followUp);
         saveAttachments(followUp.getFollowUpId(), followUpAddBO.getAttachments());
         createSuggestedTasks(followUp, followUpAddBO.getSuggestedTasks());
@@ -307,11 +312,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
             JsonNode root = objectMapper.readTree(json);
             FollowUpAiParseVO vo = new FollowUpAiParseVO();
-            vo.setSummary(getTextOrDefault(
-                root,
-                "summary",
-                originalContent.length() > 100 ? originalContent.substring(0, 100) + "..." : originalContent
-            ));
+            vo.setSummary(normalizeGeneratedSummary(getTextOrDefault(root, "summary", ""), originalContent));
             vo.setSceneType(getTextOrDefault(root, "sceneType", ""));
             vo.setType(getTextOrDefault(root, "type", "other"));
             vo.setFollowTime(normalizeRequiredDateTime(getTextOrDefault(root, "followTime", now), now));
@@ -346,7 +347,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
 
     private FollowUpAiParseVO buildFallbackResult(String content, String now) {
         FollowUpAiParseVO vo = new FollowUpAiParseVO();
-        vo.setSummary(content.length() > 100 ? content.substring(0, 100) + "..." : content);
+        vo.setSummary(normalizeGeneratedSummary("", content));
         vo.setSceneType("");
         vo.setType("other");
         vo.setFollowTime(now);
@@ -388,6 +389,59 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         }
 
         return vo;
+    }
+
+    private String normalizeGeneratedSummary(String summary, String fallbackContent) {
+        String candidate = StrUtil.isNotBlank(summary) ? summary : fallbackContent;
+        return compactSummary(candidate);
+    }
+
+    private String normalizeStoredSummary(String summary) {
+        if (StrUtil.isBlank(summary)) {
+            return null;
+        }
+        return compactSummary(summary);
+    }
+
+    private String compactSummary(String text) {
+        String normalized = normalizeSingleLineText(text);
+        if (StrUtil.isBlank(normalized)) {
+            return "";
+        }
+
+        String sentence = firstSegment(normalized, "[。！？!?；;\\r\\n]+");
+        String clause = firstSegment(sentence, "[，,:：]+");
+        String candidate = StrUtil.isNotBlank(clause) ? clause : sentence;
+        candidate = candidate.replaceFirst("^[\\s\\-•·*#\\d.、）)]+", "");
+        candidate = candidate.replaceFirst("[\\s,，.。!！?？;；:：]+$", "");
+        candidate = normalizeSingleLineText(candidate);
+        if (StrUtil.isBlank(candidate)) {
+            candidate = normalized;
+        }
+
+        if (candidate.length() > MAX_FOLLOW_UP_SUMMARY_LENGTH) {
+            candidate = candidate.substring(0, MAX_FOLLOW_UP_SUMMARY_LENGTH).trim();
+            candidate = candidate.replaceFirst("[\\s,，.。!！?？;；:：]+$", "");
+        }
+
+        return candidate;
+    }
+
+    private String firstSegment(String text, String regex) {
+        if (StrUtil.isBlank(text)) {
+            return "";
+        }
+        String[] parts = text.split(regex);
+        for (String part : parts) {
+            if (StrUtil.isNotBlank(part)) {
+                return part.trim();
+            }
+        }
+        return text.trim();
+    }
+
+    private String normalizeSingleLineText(String text) {
+        return StrUtil.blankToDefault(text, "").replaceAll("\\s+", " ").trim();
     }
 
     private LocalDateTime chooseFutureNextFollowTime(
@@ -684,6 +738,7 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             ));
 
         for (FollowUpVO followUp : followUps) {
+            followUp.setSummary(normalizeStoredSummary(followUp.getSummary()));
             followUp.setAttachments(attachmentMap.getOrDefault(followUp.getFollowUpId(), List.of()));
             followUp.setTasks(taskMap.getOrDefault(followUp.getFollowUpId(), List.of()));
         }

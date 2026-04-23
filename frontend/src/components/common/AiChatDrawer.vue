@@ -140,7 +140,7 @@
                       <div
                         class="wk-markdown"
                         :class="{ 'streaming-cursor': message.isStreaming }"
-                        v-html="renderAssistantMessage(message.content || '...')"
+                        v-html="renderAssistantMessage(message.content, message.isStreaming)"
                       />
                     </div>
                     <!-- Attachments -->
@@ -167,7 +167,12 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-xs text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
+                    <div
+                      class="text-xs font-medium"
+                      :class="message.isStreaming ? 'text-primary/70' : 'text-slate-400'"
+                    >
+                      {{ getAssistantMessageStatus(message) }} · {{ formatTime(message.timestamp) }}
+                    </div>
                   </div>
                 </div>
 
@@ -364,6 +369,11 @@ import {
   MAX_CHAT_ATTACHMENT_SIZE,
   mergeChatFiles
 } from '@/utils/chatAttachment'
+import {
+  getAssistantMessagePlaceholder,
+  getAssistantMessageStatusLabel,
+  normalizeAssistantMessageContent
+} from '@/utils/chatMessage'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
@@ -525,8 +535,13 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
-function renderAssistantMessage(content: string): string {
-  return renderMarkdown(content)
+function renderAssistantMessage(content: string, isStreaming = false): string {
+  const normalized = normalizeAssistantMessageContent(content, isStreaming)
+  return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming))
+}
+
+function getAssistantMessageStatus(message: { isStreaming?: boolean }): string {
+  return getAssistantMessageStatusLabel(Boolean(message.isStreaming))
 }
 
 function handleUpload() {
