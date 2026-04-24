@@ -224,7 +224,7 @@
                             {{ row.companyName?.charAt(0) || '?' }}
                           </span>
                         </div>
-                        <span class="text-sm font-semibold text-slate-900 truncate block transition-colors">{{ row.companyName || '-' }}</span>
+                        <span class="text-sm font-semibold text-slate-900 truncate block cursor-pointer transition-colors hover:text-primary hover:underline hover:decoration-primary underline-offset-2">{{ row.companyName || '-' }}</span>
                       </div>
                     </template>
                     <template v-else-if="field.fieldName === 'aiStatusDetection'">
