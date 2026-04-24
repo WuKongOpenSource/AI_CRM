@@ -423,7 +423,7 @@
                 <div class="mt-3">
                   <span
                     v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)"
-                    class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
+                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
                     :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.badgeClass"
                   >
                     <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer.aiStatusDetection)?.dotClass"></span>
@@ -1168,7 +1168,7 @@
           <div class="mt-3">
             <span
               v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)"
-              class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
+              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
               :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.badgeClass"
             >
               <span class="size-2 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>

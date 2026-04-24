@@ -224,7 +224,7 @@
                       <div class="flex items-center justify-center py-1">
                         <span
                           v-if="getAiStatusMeta(row.aiStatusDetection)"
-                          class="inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
+                          class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
                           :class="getAiStatusMeta(row.aiStatusDetection)?.badgeClass"
                         >
                           <span class="size-1.5 rounded-full mr-1.5" :class="getAiStatusMeta(row.aiStatusDetection)?.dotClass"></span>
