@@ -221,7 +221,7 @@
                       </div>
                     </template>
                     <template v-else-if="field.fieldName === 'aiStatusDetection'">
-                      <div class="flex items-center justify-center py-1">
+                      <div class="flex items-center justify-start py-1">
                         <span
                           v-if="getAiStatusMeta(row.aiStatusDetection)"
                           class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap"
@@ -256,7 +256,7 @@
                     <template v-else-if="field.fieldName === 'level'">
                       <span
                         v-if="row.level"
-                        class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                        class="inline-flex items-center justify-start h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
                         :class="getLevelBadgeClass(row.level)"
                       >
                         {{ getLevelLabel(field, row.level) }}
@@ -337,9 +337,9 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="操作" fixed="right" width="132" align="right">
+              <el-table-column label="操作" fixed="right" width="132" align="left">
                 <template #default="{ row }">
-                  <div class="flex justify-end" data-row-action="true" @click.stop>
+                  <div class="flex" data-row-action="true" @click.stop>
                     <button
                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                       @click="handleAiFollowUp(row)"
@@ -417,7 +417,7 @@
                         <div class="mt-0.5">
                           <span
                             v-if="row.level"
-                            class="inline-flex items-center justify-center h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
+                            class="inline-flex items-center justify-start h-6 min-w-[2.5rem] px-2 rounded-lg font-bold text-xs"
                             :class="getLevelBadgeClass(row.level)"
                           >
                             {{ getMobileLevelText(row) }}
@@ -928,9 +928,7 @@ function getFieldFixed(field: CustomField): 'left' | undefined {
   return field.fieldName === 'companyName' ? 'left' : undefined
 }
 
-function getFieldAlign(field: CustomField): 'left' | 'center' | 'right' {
-  if (field.fieldName === 'aiStatusDetection') return 'center'
-  if (field.fieldName === 'level') return 'center'
+function getFieldAlign(field: CustomField): 'left' | 'right' {
   if (field.fieldType === 'number' || field.fieldName === 'quotation') return 'right'
   return 'left'
 }
