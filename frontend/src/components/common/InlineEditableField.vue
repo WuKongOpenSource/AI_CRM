@@ -2,11 +2,14 @@
   <div
     class="inline-editable-field"
     :class="{ 'is-editing': editing, 'is-disabled': !editable }"
-    data-row-action="true"
-    @click.stop
   >
     <template v-if="editing">
-      <div class="inline-editable-field__editor" :class="{ 'is-block': resolvedFieldType === 'textarea' }">
+      <div
+        class="inline-editable-field__editor"
+        :class="{ 'is-block': resolvedFieldType === 'textarea' }"
+        data-row-action="true"
+        @click.stop
+      >
         <el-select
           v-if="resolvedFieldType === 'select'"
           ref="editorRef"
@@ -145,7 +148,8 @@
           type="button"
           class="inline-editable-field__edit"
           :title="`编辑${resolvedFieldLabel}`"
-          @click="startEdit"
+          data-row-action="true"
+          @click.stop="startEdit"
         >
           <span class="material-symbols-outlined">edit</span>
         </button>
