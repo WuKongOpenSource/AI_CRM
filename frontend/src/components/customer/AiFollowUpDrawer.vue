@@ -66,8 +66,8 @@
               />
 
               <div class="flex items-center justify-between gap-3">
-                <label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
-                  <span class="material-symbols-outlined text-base">attach_file</span>
+                <label class="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary">
+                  <span class="material-symbols-outlined shrink-0 text-base">attach_file</span>
                   <span>上传附件</span>
                   <input
                     type="file"

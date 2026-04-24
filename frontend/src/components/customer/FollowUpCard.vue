@@ -40,24 +40,6 @@
             </div>
           </div>
         </div>
-
-        <div v-if="displayContent" class="mt-3 rounded-2xl bg-slate-50/80 px-4 py-3">
-          <p class="text-sm leading-6 text-slate-700 whitespace-pre-line">{{ displayContent }}</p>
-        </div>
-
-        <div class="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
-          <span class="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1.5 text-slate-500">
-            <span class="material-symbols-outlined text-sm">schedule</span>
-            跟进时间 {{ formatDateTime(item.followTime || item.createTime) }}
-          </span>
-          <span
-            v-if="item.nextFollowTime"
-            class="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-2.5 py-1.5 text-amber-700"
-          >
-            <span class="material-symbols-outlined text-sm">event_repeat</span>
-            下次联系 {{ formatDateTime(item.nextFollowTime) }}
-          </span>
-        </div>
       </div>
 
       <div class="flex shrink-0 items-start gap-1 self-start">
@@ -78,6 +60,31 @@
           <span class="material-symbols-outlined text-[20px] leading-none">delete</span>
         </button>
       </div>
+    </div>
+
+    <div v-if="displayContent" class="mt-3 w-full min-w-0">
+      <p class="text-sm leading-6 text-slate-700 whitespace-pre-line break-words [word-break:break-word]">{{ displayContent }}</p>
+    </div>
+
+    <div class="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+      <span class="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1.5 text-slate-500">
+        <span class="material-symbols-outlined text-sm">schedule</span>
+        跟进时间 {{ formatDateTime(item.followTime || item.createTime) }}
+      </span>
+      <span
+        v-if="item.nextFollowTime"
+        class="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-2.5 py-1.5 text-amber-700"
+      >
+        <span class="material-symbols-outlined text-sm">event_repeat</span>
+        下次联系 {{ formatDateTime(item.nextFollowTime) }}
+      </span>
+      <span
+        v-if="item.createTime"
+        class="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1.5 text-slate-500"
+      >
+        <span class="material-symbols-outlined text-sm">edit_calendar</span>
+        创建时间 {{ formatDateTime(item.createTime) }}
+      </span>
     </div>
 
     <div v-if="attachments.length > 0" class="mt-3 rounded-2xl border border-slate-200 overflow-hidden">
