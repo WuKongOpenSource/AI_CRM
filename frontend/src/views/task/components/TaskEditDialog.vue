@@ -5,7 +5,6 @@
     :show-close="false"
     destroy-on-close
     top="10vh"
-    :fullscreen="isMobile"
     class="!rounded-2xl !p-0 overflow-hidden task-dialog wk-crm-el-field-scope"
   >
     <template #header>

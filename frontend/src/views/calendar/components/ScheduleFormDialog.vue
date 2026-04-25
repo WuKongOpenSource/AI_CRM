@@ -2,7 +2,6 @@
   <el-dialog
     v-model="visible"
     :width="isMobile ? '96%' : '720px'"
-    :fullscreen="isMobile"
     :show-close="false"
     destroy-on-close
     top="6vh"

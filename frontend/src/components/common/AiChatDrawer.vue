@@ -4,7 +4,7 @@
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[299]"
         @click="closeChatDrawer"
       />
     </Transition>
@@ -13,7 +13,7 @@
     <Transition name="slide-right">
       <div
         v-if="isOpen"
-        class="fixed inset-y-0 right-0 z-50 flex flex-col bg-white shadow-2xl"
+        class="fixed inset-y-0 right-0 z-[300] flex flex-col bg-white shadow-2xl"
         :class="isMobile ? 'w-full' : 'w-full max-w-lg'"
       >
         <!-- Header -->

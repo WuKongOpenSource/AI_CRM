@@ -15,7 +15,7 @@
         <!-- Modal Container -->
         <div :class="[
           'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
-          isMobile ? 'max-w-full max-h-full rounded-none inset-0 rounded-[1rem]' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
+          isMobile ? 'max-w-full max-h-full inset-0 rounded-[1rem]' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
         ]">
           <!-- Header -->
           <div class="bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
