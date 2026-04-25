@@ -36,7 +36,7 @@ public class ScheduleTools {
 
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
-    @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。直接传入客户名称和联系人姓名即可，无需先查询ID。")
+    @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。直接传入客户名称和联系人姓名即可，无需先查询ID。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
     @AiToolPermission(value = "schedule:create", action = "创建日程")
     public String createSchedule(
             @ToolParam(description = "日程标题，必填") String title,
@@ -52,13 +52,13 @@ public class ScheduleTools {
             title, startTime, endTime, type, customerName, contactName);
 
         try {
-            if (StrUtil.isBlank(startTime) || "null".equalsIgnoreCase(startTime)) {
+            if (!hasTextValue(startTime)) {
                 return "创建日程失败: 缺少开始时间参数";
             }
 
             ScheduleAddBO bo = new ScheduleAddBO();
             bo.setTitle(title);
-            bo.setType(StrUtil.isNotBlank(type) && !"null".equalsIgnoreCase(type) ? type : "meeting");
+            bo.setType(hasTextValue(type) ? type : "meeting");
             bo.setDescription(description);
             bo.setLocation(location);
 
@@ -68,7 +68,7 @@ public class ScheduleTools {
                 return "创建日程失败: 开始时间格式无效，请使用 yyyy-MM-dd HH:mm 格式";
             }
 
-            if (StrUtil.isNotBlank(endTime) && !"null".equalsIgnoreCase(endTime)) {
+            if (hasTextValue(endTime)) {
                 try {
                     bo.setEndTime(dateTimeFormat.parse(endTime));
                 } catch (Exception e) {
@@ -78,7 +78,7 @@ public class ScheduleTools {
 
             String matchedCompanyName = null;
             Long customerId = null;
-            if (StrUtil.isNotBlank(customerName) && !"null".equalsIgnoreCase(customerName)) {
+            if (hasTextValue(customerName)) {
                 AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
                 if (customerMatch.isAmbiguous()) {
                     return "创建日程失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
@@ -88,11 +88,12 @@ public class ScheduleTools {
                     matchedCompanyName = customerMatch.getCustomer().getCompanyName();
                     bo.setCustomerId(customerId);
                 } else {
-                    log.info("未找到客户「{}」，将不关联客户", customerName);
+                    log.info("未找到客户「{}」，中止创建日程并提示先创建客户", customerName);
+                    return "创建日程失败: 系统中未找到名为「" + customerName + "」的客户。请先创建该客户后再创建日程，或确认客户名称是否正确。";
                 }
             }
 
-            if (StrUtil.isNotBlank(contactName) && !"null".equalsIgnoreCase(contactName)) {
+            if (hasTextValue(contactName)) {
                 Long contactId = findContactIdByName(contactName, customerId);
                 if (contactId == null) {
                     log.info("未找到联系人「{}」，将不关联联系人", contactName);
@@ -106,13 +107,13 @@ public class ScheduleTools {
             result.append(String.format("日程「%s」创建成功！日程ID: %d。", title, scheduleId));
             result.append(String.format("\n- 类型: %s", getTypeName(bo.getType())));
             result.append(String.format("\n- 开始时间: %s", startTime));
-            if (StrUtil.isNotBlank(endTime) && !"null".equalsIgnoreCase(endTime)) {
+            if (hasTextValue(endTime)) {
                 result.append(String.format("\n- 结束时间: %s", endTime));
             }
             if (matchedCompanyName != null) {
                 result.append(String.format("\n- 公司名称: %s", matchedCompanyName));
             }
-            if (StrUtil.isNotBlank(location) && !"null".equalsIgnoreCase(location)) {
+            if (hasTextValue(location)) {
                 result.append(String.format("\n- 地点: %s", location));
             }
 
@@ -196,6 +197,10 @@ public class ScheduleTools {
         }
 
         return null;
+    }
+
+    private boolean hasTextValue(String value) {
+        return StrUtil.isNotBlank(value) && !"null".equalsIgnoreCase(StrUtil.trim(value));
     }
 
     private String getTypeName(String type) {

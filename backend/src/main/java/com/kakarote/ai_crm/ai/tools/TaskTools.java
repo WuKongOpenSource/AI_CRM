@@ -81,7 +81,7 @@ public class TaskTools {
         }
     }
 
-    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期也用此工具。直接传入客户名称即可，无需先查询ID。")
+    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期也用此工具。直接传入客户名称即可，无需先查询ID。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
     @AiToolPermission(value = "task:create", action = "创建任务")
     public String createTask(
             @ToolParam(description = "任务标题，必填") String title,
@@ -96,7 +96,7 @@ public class TaskTools {
         try {
             Long customerId = null;
             String matchedCompanyName = null;
-            if (StrUtil.isNotBlank(customerName) && !"null".equalsIgnoreCase(customerName)) {
+            if (hasTextValue(customerName)) {
                 AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
                 if (customerMatch.isAmbiguous()) {
                     return "创建任务失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
@@ -105,7 +105,8 @@ public class TaskTools {
                     customerId = customerMatch.getCustomer().getCustomerId();
                     matchedCompanyName = customerMatch.getCustomer().getCompanyName();
                 } else {
-                    log.info("未找到客户「{}」，将不关联客户", customerName);
+                    log.info("未找到客户「{}」，中止创建任务并提示先创建客户", customerName);
+                    return "创建任务失败: 系统中未找到名为「" + customerName + "」的客户。请先创建该客户后再创建任务，或确认客户名称是否正确。";
                 }
             }
 
@@ -115,7 +116,7 @@ public class TaskTools {
             bo.setCustomerId(customerId);
             bo.setPriority(priority != null ? priority : "medium");
 
-            if (StrUtil.isNotBlank(dueDate) && !"null".equalsIgnoreCase(dueDate)) {
+            if (hasTextValue(dueDate)) {
                 bo.setDueDate(dateFormat.parse(dueDate));
             }
 
@@ -129,7 +130,7 @@ public class TaskTools {
             if (matchedCompanyName != null) {
                 result.append("\n- 公司名称: ").append(matchedCompanyName);
             }
-            if (StrUtil.isNotBlank(dueDate) && !"null".equalsIgnoreCase(dueDate)) {
+            if (hasTextValue(dueDate)) {
                 result.append("\n- 截止日期: ").append(dueDate);
             }
             return result.toString();
@@ -247,6 +248,10 @@ public class TaskTools {
             case "completed" -> "已完成";
             default -> status;
         };
+    }
+
+    private boolean hasTextValue(String value) {
+        return StrUtil.isNotBlank(value) && !"null".equalsIgnoreCase(StrUtil.trim(value));
     }
 
     private String getPriorityLabel(String priority) {

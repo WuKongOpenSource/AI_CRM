@@ -205,7 +205,7 @@
                     <WkIcon name="ai" class="text-lg" />
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
-                    <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
+                    <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left text-sm leading-relaxed border border-slate-100">
                       <div
                         class="wk-markdown"
                         :class="{ 'streaming-cursor': message.isStreaming }"

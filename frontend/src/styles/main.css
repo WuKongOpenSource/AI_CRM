@@ -461,6 +461,7 @@ html, body {
 .wk-markdown {
   color: inherit;
   line-height: 1.75;
+  text-align: left;
   word-break: break-word;
 }
 
