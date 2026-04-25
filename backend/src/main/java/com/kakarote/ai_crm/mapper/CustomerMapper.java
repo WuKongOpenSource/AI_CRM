@@ -42,6 +42,28 @@ public interface CustomerMapper extends BaseMapper<Customer> {
     @Select("SELECT * FROM crm_customer WHERE customer_id = #{customerId}")
     Customer selectByIdIgnoreDataPermission(@Param("customerId") Long customerId);
 
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("""
+            SELECT *
+            FROM crm_customer
+            WHERE company_name = #{companyName}
+              AND status = 1
+            ORDER BY create_time DESC
+            """)
+    List<Customer> selectByExactCompanyNameIgnoreDataPermission(@Param("companyName") String companyName);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("""
+            SELECT *
+            FROM crm_customer
+            WHERE company_name LIKE CONCAT('%', #{keyword}, '%')
+              AND status = 1
+            ORDER BY create_time DESC
+            LIMIT #{limit}
+            """)
+    List<Customer> selectByCompanyNameLikeIgnoreDataPermission(@Param("keyword") String keyword,
+                                                               @Param("limit") Integer limit);
+
     /**
      * 查询客户详情
      */

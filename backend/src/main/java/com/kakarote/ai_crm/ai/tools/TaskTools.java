@@ -98,6 +98,9 @@ public class TaskTools {
             String matchedCompanyName = null;
             if (hasTextValue(customerName)) {
                 AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
+                if (customerMatch.isExistsNoAccess()) {
+                    return "客户已存在：「" + customerName + "」。";
+                }
                 if (customerMatch.isAmbiguous()) {
                     return "创建任务失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
                 }

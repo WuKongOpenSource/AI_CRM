@@ -77,6 +77,9 @@ public class FollowupTools {
             }
 
             AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
+            if (customerMatch.isExistsNoAccess()) {
+                return "客户已存在：「" + customerName + "」。";
+            }
             if (customerMatch.isAmbiguous()) {
                 return "创建跟进失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
             }
@@ -138,6 +141,9 @@ public class FollowupTools {
             }
 
             AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
+            if (customerMatch.isExistsNoAccess()) {
+                return "客户已存在：「" + customerName + "」。";
+            }
             if (customerMatch.isAmbiguous()) {
                 return "查询跟进记录失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
             }

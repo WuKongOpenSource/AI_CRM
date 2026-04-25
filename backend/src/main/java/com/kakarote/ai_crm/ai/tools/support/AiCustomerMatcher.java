@@ -48,6 +48,10 @@ public class AiCustomerMatcher {
         }
 
         if (candidateMap.isEmpty()) {
+            ScoredCustomer noAccessMatch = findBestIgnoringDataPermission(input, searchKeywords, List.of());
+            if (isUsableNoAccessMatch(noAccessMatch)) {
+                return CustomerMatchResult.existsNoAccess(input);
+            }
             return CustomerMatchResult.notFound(input, List.of());
         }
 
@@ -64,8 +68,16 @@ public class AiCustomerMatcher {
             .toList();
 
         ScoredCustomer best = scoredCustomers.get(0);
+        ScoredCustomer noAccessMatch = findBestIgnoringDataPermission(input, searchKeywords, candidateMap.keySet());
         if (best.getScore() < MIN_MATCH_SCORE) {
+            if (isUsableNoAccessMatch(noAccessMatch)) {
+                return CustomerMatchResult.existsNoAccess(input);
+            }
             return CustomerMatchResult.notFound(input, topCandidates);
+        }
+
+        if (isHighConfidenceNoAccessMatch(noAccessMatch) && noAccessMatch.getScore() > best.getScore()) {
+            return CustomerMatchResult.existsNoAccess(input);
         }
 
         if (scoredCustomers.size() > 1) {
@@ -76,6 +88,37 @@ public class AiCustomerMatcher {
         }
 
         return CustomerMatchResult.matched(input, best.getCustomer(), topCandidates);
+    }
+
+    private ScoredCustomer findBestIgnoringDataPermission(String input,
+                                                          List<String> searchKeywords,
+                                                          Iterable<Long> accessibleCustomerIds) {
+        LinkedHashSet<Long> accessibleIds = new LinkedHashSet<>();
+        accessibleCustomerIds.forEach(accessibleIds::add);
+
+        Map<Long, Customer> candidateMap = new LinkedHashMap<>();
+        for (String keyword : searchKeywords) {
+            collectExactMatchesIgnoringDataPermission(keyword, candidateMap);
+            collectLikeMatchesIgnoringDataPermission(keyword, candidateMap);
+        }
+        accessibleIds.forEach(candidateMap::remove);
+
+        if (candidateMap.isEmpty()) {
+            return null;
+        }
+
+        return candidateMap.values().stream()
+            .map(customer -> new ScoredCustomer(customer, calculateBestScore(customer, input, searchKeywords)))
+            .max(Comparator.comparingInt(ScoredCustomer::getScore))
+            .orElse(null);
+    }
+
+    private boolean isUsableNoAccessMatch(ScoredCustomer scoredCustomer) {
+        return scoredCustomer != null && scoredCustomer.getScore() >= MIN_MATCH_SCORE;
+    }
+
+    private boolean isHighConfidenceNoAccessMatch(ScoredCustomer scoredCustomer) {
+        return scoredCustomer != null && scoredCustomer.getScore() >= 930;
     }
 
     private void collectExactMatches(String keyword, Map<Long, Customer> candidateMap) {
@@ -104,6 +147,24 @@ public class AiCustomerMatcher {
                 .orderByDesc(Customer::getCreateTime)
                 .last("LIMIT " + MAX_CANDIDATES)
         );
+        likeMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
+    }
+
+    private void collectExactMatchesIgnoringDataPermission(String keyword, Map<Long, Customer> candidateMap) {
+        if (StrUtil.isBlank(keyword)) {
+            return;
+        }
+
+        List<Customer> exactMatches = customerService.findCustomersByExactCompanyNameIgnoreDataPermission(keyword);
+        exactMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
+    }
+
+    private void collectLikeMatchesIgnoringDataPermission(String keyword, Map<Long, Customer> candidateMap) {
+        if (StrUtil.isBlank(keyword) || keyword.length() < 2) {
+            return;
+        }
+
+        List<Customer> likeMatches = customerService.findCustomersByCompanyNameLikeIgnoreDataPermission(keyword, MAX_CANDIDATES);
         likeMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
     }
 
@@ -291,12 +352,20 @@ public class AiCustomerMatcher {
             return new CustomerMatchResult(rawName, null, candidateCustomers, MatchStatus.AMBIGUOUS);
         }
 
+        public static CustomerMatchResult existsNoAccess(String rawName) {
+            return new CustomerMatchResult(rawName, null, List.of(), MatchStatus.EXISTS_NO_ACCESS);
+        }
+
         public boolean isMatched() {
             return status == MatchStatus.MATCHED && customer != null;
         }
 
         public boolean isAmbiguous() {
             return status == MatchStatus.AMBIGUOUS;
+        }
+
+        public boolean isExistsNoAccess() {
+            return status == MatchStatus.EXISTS_NO_ACCESS;
         }
 
         public String formatCandidateNames() {
@@ -310,7 +379,8 @@ public class AiCustomerMatcher {
     public enum MatchStatus {
         MATCHED,
         NOT_FOUND,
-        AMBIGUOUS
+        AMBIGUOUS,
+        EXISTS_NO_ACCESS
     }
 
     @Getter

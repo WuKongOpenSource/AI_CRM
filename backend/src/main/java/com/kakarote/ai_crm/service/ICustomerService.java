@@ -42,6 +42,10 @@ public interface ICustomerService extends IService<Customer> {
 
     List<Customer> findCustomersByExactCompanyName(String companyName);
 
+    List<Customer> findCustomersByExactCompanyNameIgnoreDataPermission(String companyName);
+
+    List<Customer> findCustomersByCompanyNameLikeIgnoreDataPermission(String keyword, int limit);
+
     CustomerDetailVO getCustomerDetail(Long customerId);
 
     void updateStage(Long customerId, String stage);

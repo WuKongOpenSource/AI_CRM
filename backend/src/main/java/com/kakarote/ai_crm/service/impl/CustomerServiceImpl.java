@@ -824,6 +824,25 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     @Override
+    public List<Customer> findCustomersByExactCompanyNameIgnoreDataPermission(String companyName) {
+        String normalizedCompanyName = StrUtil.trim(companyName);
+        if (StrUtil.isBlank(normalizedCompanyName)) {
+            return Collections.emptyList();
+        }
+        return baseMapper.selectByExactCompanyNameIgnoreDataPermission(normalizedCompanyName);
+    }
+
+    @Override
+    public List<Customer> findCustomersByCompanyNameLikeIgnoreDataPermission(String keyword, int limit) {
+        String normalizedKeyword = StrUtil.trim(keyword);
+        if (StrUtil.isBlank(normalizedKeyword) || normalizedKeyword.length() < 2) {
+            return Collections.emptyList();
+        }
+        int actualLimit = Math.max(1, Math.min(limit, 50));
+        return baseMapper.selectByCompanyNameLikeIgnoreDataPermission(normalizedKeyword, actualLimit);
+    }
+
+    @Override
     public CustomerDetailVO getCustomerDetail(Long customerId) {
         CustomerDetailVO detail = baseMapper.getCustomerById(customerId);
         if (detail != null) {
