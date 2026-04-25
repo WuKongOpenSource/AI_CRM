@@ -26,11 +26,13 @@ export interface CustomField {
   fieldType: FieldType
   fieldSource: FieldSource
   columnName: string
+  columnType?: string
   defaultValue?: string
   placeholder?: string
   isRequired: boolean
   isSearchable: boolean
   isShowInList: boolean
+  isUnique: boolean
   options?: FieldOption[]
   validation?: FieldValidation
   sortOrder: number
@@ -60,6 +62,7 @@ export interface CustomFieldAddBO {
   isRequired?: boolean
   isSearchable?: boolean
   isShowInList?: boolean
+  isUnique?: boolean
   options?: FieldOption[]
   validation?: FieldValidation
   sortOrder?: number
@@ -73,9 +76,17 @@ export interface CustomFieldUpdateBO {
   isRequired?: boolean
   isSearchable?: boolean
   isShowInList?: boolean
+  isUnique?: boolean
   options?: FieldOption[]
   validation?: FieldValidation
   sortOrder?: number
+}
+
+export interface CustomFieldUniqueCheckBO {
+  entityType: EntityType
+  entityId?: string | number | null
+  fieldName: string
+  value: any
 }
 
 export interface FieldSortBO {

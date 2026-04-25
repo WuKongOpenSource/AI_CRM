@@ -88,6 +88,7 @@
                     entity-type="customer"
                     mode="form"
                     v-model="customerFieldValues"
+                    :entity-id="isEdit ? (props.customer as any)?.customerId : null"
                     :full-span-field-names="['companyName', 'address', 'remark']"
                     class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4"
                   />
@@ -426,6 +427,7 @@ function getPrimaryContactFromCustomer(c: CustomerLike): { name?: string; phone?
 }
 
 function hydrateFromCustomer() {
+  dynamicFieldFormRef.value?.clearUniqueFieldErrors()
   const c = props.customer ?? null
   Object.assign(formData, {
     companyName: c?.companyName || '',
@@ -455,6 +457,7 @@ function applyCreateInitialStage() {
 }
 
 function resetAll() {
+  dynamicFieldFormRef.value?.clearUniqueFieldErrors()
   Object.assign(formData, {
     companyName: '',
     industry: '',
@@ -620,6 +623,10 @@ async function handleSubmit() {
     const missingFields = dynamicFieldFormRef.value.getRequiredFieldLabels()
     if (missingFields.length > 0) {
       ElMessage.warning(`请填写必填字段: ${missingFields.join(', ')}`)
+      return
+    }
+    const uniqueValid = await dynamicFieldFormRef.value.validateUniqueFields()
+    if (!uniqueValid) {
       return
     }
   }

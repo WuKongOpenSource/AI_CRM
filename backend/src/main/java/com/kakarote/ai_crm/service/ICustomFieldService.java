@@ -104,6 +104,25 @@ public interface ICustomFieldService extends IService<CustomField> {
     void updateCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
 
     /**
+     * Validate unique field values before saving a record.
+     *
+     * @param entityType entity type
+     * @param entityId   current entity ID, excluded from duplicate checks when not null
+     * @param values     system and custom field values
+     */
+    void validateUniqueCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
+
+    /**
+     * Validate a single unique field value.
+     *
+     * @param entityType entity type
+     * @param entityId   current entity ID, excluded from duplicate checks when not null
+     * @param fieldName  field name
+     * @param value      field value
+     */
+    void validateUniqueFieldValue(String entityType, Long entityId, String fieldName, Object value);
+
+    /**
      * Update one custom field value. Unlike batch update, this method supports clearing a value.
      *
      * @param entityType entity type

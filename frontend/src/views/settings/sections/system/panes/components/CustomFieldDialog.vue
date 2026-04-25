@@ -105,6 +105,9 @@
       <el-form-item label="列表显示">
         <el-switch v-model="fieldForm.isShowInList" />
       </el-form-item>
+      <el-form-item label="唯一">
+        <el-switch v-model="fieldForm.isUnique" />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
@@ -130,6 +133,7 @@ const props = defineProps<{
     isRequired: boolean
     isSearchable: boolean
     isShowInList: boolean
+    isUnique: boolean
     options: FieldOption[]
   }
   submitting: boolean

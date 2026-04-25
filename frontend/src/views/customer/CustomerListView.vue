@@ -668,6 +668,7 @@ const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
     isRequired: false,
     isSearchable: true,
     isShowInList: true,
+    isUnique: false,
     sortOrder: 900,
     status: 1
   },
@@ -682,6 +683,7 @@ const AI_CUSTOMER_LIST_FIELDS: CustomField[] = [
     isRequired: false,
     isSearchable: true,
     isShowInList: true,
+    isUnique: false,
     sortOrder: 910,
     status: 1
   }

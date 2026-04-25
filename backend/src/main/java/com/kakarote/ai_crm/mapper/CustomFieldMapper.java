@@ -45,6 +45,14 @@ public interface CustomFieldMapper extends BaseMapper<CustomField> {
             @Param("values") Map<String, Object> values
     );
 
+    Long countByCustomFieldValue(
+            @Param("tableName") String tableName,
+            @Param("idColumn") String idColumn,
+            @Param("entityId") Long entityId,
+            @Param("columnName") String columnName,
+            @Param("value") Object value
+    );
+
     /**
      * 批量查询实体的自定义字段值
      *

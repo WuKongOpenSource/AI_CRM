@@ -3,6 +3,7 @@ import type {
   CustomField,
   CustomFieldAddBO,
   CustomFieldUpdateBO,
+  CustomFieldUniqueCheckBO,
   FieldSortBO,
   FieldSortUpdateBO,
   EntityType
@@ -69,6 +70,13 @@ export function getListFieldsByEntity(entityType: EntityType): Promise<CustomFie
  */
 export function getFormFieldsByEntity(entityType: EntityType): Promise<CustomField[]> {
   return get(`/custom-field/form/${entityType}`)
+}
+
+/**
+ * Validate unique field value
+ */
+export function validateUniqueFieldValue(data: CustomFieldUniqueCheckBO): Promise<void> {
+  return post('/custom-field/validate-unique', data)
 }
 
 /**

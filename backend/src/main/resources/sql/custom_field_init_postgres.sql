@@ -20,6 +20,7 @@ CREATE TABLE crm_custom_field (
     is_required SMALLINT DEFAULT 0,
     is_searchable SMALLINT DEFAULT 0,
     is_show_in_list SMALLINT DEFAULT 1,
+    is_unique SMALLINT DEFAULT 0,
     options TEXT DEFAULT NULL,
     validation_rules TEXT DEFAULT NULL,
     sort_order INT DEFAULT 0,
@@ -50,6 +51,7 @@ COMMENT ON COLUMN crm_custom_field.column_type IS '数据库列类型';
 COMMENT ON COLUMN crm_custom_field.is_required IS '是否必填: 0否 1是';
 COMMENT ON COLUMN crm_custom_field.is_searchable IS '是否可搜索: 0否 1是';
 COMMENT ON COLUMN crm_custom_field.is_show_in_list IS '是否在列表显示: 0否 1是';
+COMMENT ON COLUMN crm_custom_field.is_unique IS '是否唯一: 0否 1是';
 COMMENT ON COLUMN crm_custom_field.options IS '选项列表(JSON数组): [{"value":"v1","label":"选项1"}]';
 COMMENT ON COLUMN crm_custom_field.validation_rules IS '验证规则(JSON): {"min":0,"max":100,"pattern":""}';
 COMMENT ON COLUMN crm_custom_field.status IS '状态: 0禁用 1启用';

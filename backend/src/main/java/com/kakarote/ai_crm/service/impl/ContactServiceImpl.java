@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +56,8 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         if (contact.getIsPrimary() == null) {
             contact.setIsPrimary(0);
         }
+        customFieldService.validateUniqueCustomFieldValues("contact", null,
+                buildContactUniqueFieldValues(contact, contactAddBO.getCustomFields()));
         save(contact);
         // 若设为主联系人，重置该客户下其他联系人的主联系人标记
         if (contact.getIsPrimary() != null && contact.getIsPrimary() == 1) {
@@ -83,6 +86,8 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         }
         Long oldCustomerId = contact.getCustomerId();
         BeanUtil.copyProperties(contactUpdateBO, contact, "contactId", "createUserId", "createTime", "customFields");
+        customFieldService.validateUniqueCustomFieldValues("contact", contact.getContactId(),
+                buildContactUniqueFieldValues(contact, contactUpdateBO.getCustomFields()));
         updateById(contact);
 
         // 若设为主联系人，重置该客户下其他联系人的主联系人标记
@@ -104,6 +109,23 @@ public class ContactServiceImpl extends ServiceImpl<ContactMapper, Contact> impl
         }
         customerService.syncContactCache(contact.getCustomerId());
         globalSearchIndexService.refreshContactIndex(contact.getContactId());
+    }
+
+    private Map<String, Object> buildContactUniqueFieldValues(Contact contact, Map<String, Object> customFields) {
+        Map<String, Object> values = new HashMap<>();
+        if (contact != null) {
+            values.put("name", contact.getName());
+            values.put("position", contact.getPosition());
+            values.put("phone", contact.getPhone());
+            values.put("email", contact.getEmail());
+            values.put("wechat", contact.getWechat());
+            values.put("isPrimary", contact.getIsPrimary());
+            values.put("notes", contact.getNotes());
+        }
+        if (customFields != null && !customFields.isEmpty()) {
+            values.putAll(customFields);
+        }
+        return values;
     }
 
     @Override

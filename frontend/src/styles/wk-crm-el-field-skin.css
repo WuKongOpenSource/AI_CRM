@@ -126,3 +126,34 @@
     0 0 0 1px var(--el-color-primary) inset,
     0 0 0 2px var(--wk-field-focus-ring) !important;
 }
+
+.wk-crm-el-field-scope {
+  --wk-field-error: rgb(239 68 68);
+  --wk-field-error-ring: rgb(254 226 226);
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-error:not(.el-input--textarea) .el-input__wrapper,
+.wk-crm-el-field-scope .wk-crm-el-field-error:not(.el-input--textarea) .el-input__wrapper.is-focus,
+.wk-crm-el-field-scope .wk-crm-el-field-error.el-textarea .el-textarea__inner,
+.wk-crm-el-field-scope .wk-crm-el-field-error.el-textarea .el-textarea__inner:focus,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-date .el-input__wrapper,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-date .el-input__wrapper.is-focus,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-select .el-select__wrapper,
+.wk-crm-el-field-scope .wk-crm-el-field-error.wk-crm-el-field-select .el-select__wrapper.is-focused {
+  background-color: #fff !important;
+  box-shadow:
+    0 0 0 1px var(--wk-field-error) inset,
+    0 0 0 2px var(--wk-field-error-ring) !important;
+}
+
+.wk-crm-el-field-scope .wk-crm-el-field-error.el-switch .el-switch__core {
+  border-color: var(--wk-field-error) !important;
+  box-shadow: 0 0 0 2px var(--wk-field-error-ring);
+}
+
+.wk-crm-el-field-error-message {
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--wk-field-error, rgb(239 68 68));
+}

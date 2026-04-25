@@ -35,6 +35,9 @@ public class CustomFieldUpdateBO {
     @Schema(description = "是否在列表显示")
     private Boolean isShowInList;
 
+    @Schema(description = "是否唯一")
+    private Boolean isUnique;
+
     @Schema(description = "选项列表(下拉类型时使用)")
     private List<FieldOption> options;
 

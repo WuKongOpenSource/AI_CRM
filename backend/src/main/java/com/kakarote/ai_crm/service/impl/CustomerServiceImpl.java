@@ -305,6 +305,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StrUtil.isBlank(customer.getLevel())) {
             customer.setLevel(null);
         }
+        customFieldService.validateUniqueCustomFieldValues("customer", null,
+                buildCustomerUniqueFieldValues(customer, customerAddBO.getCustomFields()));
         save(customer);
 
         // Create primary contact if provided
@@ -317,6 +319,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             contact.setPosition(customerAddBO.getContactPosition());
             contact.setIsPrimary(1);
             contact.setStatus(1);
+            customFieldService.validateUniqueCustomFieldValues("contact", null,
+                    buildContactUniqueFieldValues(contact, null));
             contactMapper.insert(contact);
             // 同步冗余字段
             syncContactCache(customer.getCustomerId());
@@ -357,6 +361,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
         customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
         customer.setAiAnalysisRequestedAt(analysisRequestedAt);
+        customFieldService.validateUniqueCustomFieldValues("customer", customer.getCustomerId(),
+                buildCustomerUniqueFieldValues(customer, customerUpdateBO.getCustomFields()));
         updateById(customer);
         if (websiteChanged) {
             deleteCustomerLogoAfterCommit(previousLogo);
@@ -679,6 +685,43 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
     }
 
+    private Map<String, Object> buildCustomerUniqueFieldValues(Customer customer, Map<String, Object> customFields) {
+        Map<String, Object> values = new HashMap<>();
+        if (customer != null) {
+            values.put("companyName", customer.getCompanyName());
+            values.put("industry", customer.getIndustry());
+            values.put("stage", customer.getStage());
+            values.put("level", customer.getLevel());
+            values.put("source", customer.getSource());
+            values.put("website", customer.getWebsite());
+            values.put("quotation", customer.getQuotation());
+            values.put("address", customer.getAddress());
+            values.put("nextFollowTime", customer.getNextFollowTime());
+            values.put("remark", customer.getRemark());
+        }
+        if (customFields != null && !customFields.isEmpty()) {
+            values.putAll(customFields);
+        }
+        return values;
+    }
+
+    private Map<String, Object> buildContactUniqueFieldValues(Contact contact, Map<String, Object> customFields) {
+        Map<String, Object> values = new HashMap<>();
+        if (contact != null) {
+            values.put("name", contact.getName());
+            values.put("position", contact.getPosition());
+            values.put("phone", contact.getPhone());
+            values.put("email", contact.getEmail());
+            values.put("wechat", contact.getWechat());
+            values.put("isPrimary", contact.getIsPrimary());
+            values.put("notes", contact.getNotes());
+        }
+        if (customFields != null && !customFields.isEmpty()) {
+            values.putAll(customFields);
+        }
+        return values;
+    }
+
     private boolean isEnabledCustomCustomerField(String fieldName) {
         return customFieldService.getEnabledFieldsByEntity("customer").stream()
                 .anyMatch(field -> "custom".equalsIgnoreCase(field.getFieldSource())
@@ -703,27 +746,56 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         boolean websiteChanged = false;
         String previousLogo = customer.getLogo();
+        Object uniqueValue;
 
         switch (fieldName) {
-            case "companyName" -> wrapper.set(Customer::getCompanyName, normalizeStringValue(value));
-            case "industry" -> wrapper.set(Customer::getIndustry, normalizeStringValue(value));
-            case "level" -> wrapper.set(Customer::getLevel, normalizeStringValue(value));
-            case "source" -> wrapper.set(Customer::getSource, normalizeStringValue(value));
-            case "address" -> wrapper.set(Customer::getAddress, normalizeStringValue(value));
+            case "companyName" -> {
+                uniqueValue = normalizeStringValue(value);
+                wrapper.set(Customer::getCompanyName, uniqueValue);
+            }
+            case "industry" -> {
+                uniqueValue = normalizeStringValue(value);
+                wrapper.set(Customer::getIndustry, uniqueValue);
+            }
+            case "level" -> {
+                uniqueValue = normalizeStringValue(value);
+                wrapper.set(Customer::getLevel, uniqueValue);
+            }
+            case "source" -> {
+                uniqueValue = normalizeStringValue(value);
+                wrapper.set(Customer::getSource, uniqueValue);
+            }
+            case "address" -> {
+                uniqueValue = normalizeStringValue(value);
+                wrapper.set(Customer::getAddress, uniqueValue);
+            }
             case "website" -> {
                 String normalizedWebsite = customerLogoService.normalizeWebsite(normalizeStringValue(value));
+                uniqueValue = normalizedWebsite;
                 websiteChanged = !Objects.equals(normalizedWebsite, customer.getWebsite());
                 wrapper.set(Customer::getWebsite, normalizedWebsite);
                 if (websiteChanged) {
                     wrapper.set(Customer::getLogo, "");
                 }
             }
-            case "quotation" -> wrapper.set(Customer::getQuotation, parseFieldBigDecimal(value));
-            case "nextFollowTime" -> wrapper.set(Customer::getNextFollowTime, parseFieldDate(value));
-            case "remark" -> wrapper.set(Customer::getRemark, normalizeStringValue(value));
+            case "quotation" -> {
+                uniqueValue = parseFieldBigDecimal(value);
+                wrapper.set(Customer::getQuotation, uniqueValue);
+            }
+            case "nextFollowTime" -> {
+                uniqueValue = parseFieldDate(value);
+                wrapper.set(Customer::getNextFollowTime, uniqueValue);
+            }
+            case "remark" -> {
+                uniqueValue = normalizeStringValue(value);
+                wrapper.set(Customer::getRemark, uniqueValue);
+            }
             default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Field is not editable");
         }
 
+        Map<String, Object> uniqueValues = new HashMap<>();
+        uniqueValues.put(fieldName, uniqueValue);
+        customFieldService.validateUniqueCustomFieldValues("customer", customerId, uniqueValues);
         update(wrapper);
         if (websiteChanged) {
             deleteCustomerLogoAfterCommit(previousLogo);
@@ -748,6 +820,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             contact.setIsPrimary(1);
             contact.setStatus(1);
             applyPrimaryContactValue(contact, normalizedFieldName, textValue);
+            Map<String, Object> uniqueValues = new HashMap<>();
+            uniqueValues.put(normalizedFieldName, textValue);
+            customFieldService.validateUniqueCustomFieldValues("contact", null, uniqueValues);
             contactMapper.insert(contact);
         } else {
             LambdaUpdateWrapper<Contact> wrapper = Wrappers.lambdaUpdate(Contact.class)
@@ -761,6 +836,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 case "position" -> wrapper.set(Contact::getPosition, textValue);
                 default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Contact field is not editable");
             }
+            Map<String, Object> uniqueValues = new HashMap<>();
+            uniqueValues.put(normalizedFieldName, textValue);
+            customFieldService.validateUniqueCustomFieldValues("contact", contact.getContactId(), uniqueValues);
             contactMapper.update(null, wrapper);
         }
 
@@ -2474,6 +2552,25 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return val.isEmpty() ? null : val;
     }
 
+    private Map<String, Object> buildCustomerImportUniqueFieldValues(CustomerImportBO row) {
+        Map<String, Object> values = new HashMap<>();
+        if (row != null) {
+            values.put("companyName", row.getCompanyName());
+            values.put("industry", row.getIndustry());
+            values.put("stage", row.getStage());
+            values.put("level", row.getLevel());
+            values.put("source", row.getSource());
+            values.put("website", row.getWebsite());
+            values.put("quotation", row.getQuotation());
+            values.put("address", row.getAddress());
+            values.put("remark", row.getRemark());
+            if (row.getCustomFields() != null && !row.getCustomFields().isEmpty()) {
+                values.putAll(row.getCustomFields());
+            }
+        }
+        return values;
+    }
+
     // ==================== 确认导入 ====================
 
     @Override
@@ -2514,6 +2611,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                         // 更新现有客户
                         Customer existing = getById(first.getExistingCustomerId());
                         if (existing != null) {
+                            customFieldService.validateUniqueCustomFieldValues("customer", existing.getCustomerId(),
+                                    buildCustomerImportUniqueFieldValues(first));
                             if (StrUtil.isNotEmpty(first.getIndustry())) existing.setIndustry(first.getIndustry());
                             if (StrUtil.isNotEmpty(first.getStage())) existing.setStage(first.getStage());
                             if (StrUtil.isNotEmpty(first.getLevel())) existing.setLevel(first.getLevel());
@@ -2556,6 +2655,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 customer.setRemark(first.getRemark());
                 customer.setOwnerId(UserUtil.getUserId());
                 customer.setStatus(1);
+                customFieldService.validateUniqueCustomFieldValues("customer", null,
+                        buildCustomerUniqueFieldValues(customer, first.getCustomFields()));
                 save(customer);
 
                 // 保存自定义字段
@@ -2576,6 +2677,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                         contact.setWechat(r.getContactWechat());
                         contact.setIsPrimary(firstContact ? 1 : 0);
                         contact.setStatus(1);
+                        customFieldService.validateUniqueCustomFieldValues("contact", null,
+                                buildContactUniqueFieldValues(contact, null));
                         contactMapper.insert(contact);
                         firstContact = false;
                     }
@@ -2617,6 +2720,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         contact.setWechat(row.getContactWechat());
         contact.setIsPrimary(0);
         contact.setStatus(1);
+        customFieldService.validateUniqueCustomFieldValues("contact", null,
+                buildContactUniqueFieldValues(contact, null));
         contactMapper.insert(contact);
     }
 

@@ -16,8 +16,9 @@
         v-model="localValues[field.fieldName]"
         :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
         size="large"
-        class="w-full wk-crm-el-field-input"
-        @input="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-input')"
+        @input="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-input
         v-else-if="field.fieldType === 'textarea'"
@@ -26,8 +27,9 @@
         :rows="3"
         resize="none"
         :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
-        class="w-full wk-crm-el-field-input"
-        @input="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-input')"
+        @input="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-input
         v-else-if="field.fieldType === 'number'"
@@ -35,8 +37,9 @@
         type="number"
         :placeholder="field.placeholder || `请输入${field.fieldLabel}`"
         size="large"
-        class="w-full wk-crm-el-field-input"
-        @input="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-input')"
+        @input="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-date-picker
         v-else-if="field.fieldType === 'date'"
@@ -45,8 +48,9 @@
         value-format="YYYY-MM-DD"
         :placeholder="field.placeholder || '选择日期'"
         size="large"
-        class="w-full wk-crm-el-field-date"
-        @change="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-date')"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-date-picker
         v-else-if="field.fieldType === 'datetime'"
@@ -55,17 +59,19 @@
         value-format="YYYY-MM-DD HH:mm:ss"
         :placeholder="field.placeholder || '选择日期时间'"
         size="large"
-        class="w-full wk-crm-el-field-date"
-        @change="emitChange"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-date')"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       />
       <el-select
         v-else-if="field.fieldType === 'select'"
         v-model="localValues[field.fieldName]"
         :placeholder="field.placeholder || '请选择'"
         size="large"
-        class="w-full wk-crm-el-field-select"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-select')"
         clearable
-        @change="emitChange"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       >
         <el-option
           v-for="opt in field.options"
@@ -79,10 +85,11 @@
         v-model="localValues[field.fieldName]"
         :placeholder="field.placeholder || '请选择'"
         size="large"
-        class="w-full wk-crm-el-field-select"
+        :class="getFieldControlClass(field, 'w-full wk-crm-el-field-select')"
         multiple
         clearable
-        @change="emitChange"
+        @change="handleFieldChange(field)"
+        @blur="handleFieldBlur(field)"
       >
         <el-option
           v-for="opt in field.options"
@@ -92,8 +99,15 @@
         />
       </el-select>
       <div v-else-if="field.fieldType === 'checkbox'" class="pt-1">
-        <el-switch v-model="localValues[field.fieldName]" @change="emitChange" />
+        <el-switch
+          v-model="localValues[field.fieldName]"
+          :class="getFieldControlClass(field, '')"
+          @change="handleFieldChange(field, true)"
+        />
       </div>
+      <p v-if="uniqueFieldErrors[field.fieldName]" class="wk-crm-el-field-error-message">
+        {{ uniqueFieldErrors[field.fieldName] }}
+      </p>
     </div>
   </div>
 </template>
@@ -101,7 +115,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import type { CustomField, EntityType } from '@/types/customField'
-import { getEnabledFieldsByEntity, getFormFieldsByEntity } from '@/api/customField'
+import { getEnabledFieldsByEntity, getFormFieldsByEntity, validateUniqueFieldValue } from '@/api/customField'
 
 // 与新建任务一致：父级需带 wk-crm-el-field-scope 才应用 wk-crm-el-field-skin.css
 
@@ -111,11 +125,13 @@ const props = withDefaults(defineProps<{
   fields?: CustomField[] | null
   mode?: 'custom' | 'form'
   fullSpanFieldNames?: string[]
+  entityId?: string | number | null
 }>(), {
   modelValue: () => ({}),
   fields: null,
   mode: 'custom',
-  fullSpanFieldNames: () => []
+  fullSpanFieldNames: () => [],
+  entityId: null
 })
 
 const emit = defineEmits<{
@@ -125,6 +141,7 @@ const emit = defineEmits<{
 
 const fields = ref<CustomField[]>([])
 const localValues = ref<Record<string, any>>({})
+const uniqueFieldErrors = ref<Record<string, string>>({})
 
 function filterFieldsByMode(nextFields: CustomField[]): CustomField[] {
   if (props.mode !== 'custom') {
@@ -139,6 +156,14 @@ function getFieldWrapperClass(field: CustomField): string {
     return 'md:col-span-2'
   }
   return ''
+}
+
+function hasUniqueFieldError(field: CustomField): boolean {
+  return Boolean(uniqueFieldErrors.value[field.fieldName])
+}
+
+function getFieldControlClass(field: CustomField, baseClass: string) {
+  return [baseClass, { 'wk-crm-el-field-error': hasUniqueFieldError(field) }]
 }
 
 function normalizeMultiselectValue(value: unknown): string[] {
@@ -288,6 +313,76 @@ function emitChange() {
   emit('update:modelValue', { ...localValues.value })
 }
 
+function getUniqueErrorMessage(error: unknown, field: CustomField): string {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+  return `字段「${field.fieldLabel}」的值已存在`
+}
+
+function setUniqueFieldError(field: CustomField, message: string) {
+  uniqueFieldErrors.value = {
+    ...uniqueFieldErrors.value,
+    [field.fieldName]: message
+  }
+}
+
+function clearUniqueFieldError(field: CustomField) {
+  if (!uniqueFieldErrors.value[field.fieldName]) {
+    return
+  }
+  const nextErrors = { ...uniqueFieldErrors.value }
+  delete nextErrors[field.fieldName]
+  uniqueFieldErrors.value = nextErrors
+}
+
+function clearUniqueFieldErrors() {
+  uniqueFieldErrors.value = {}
+}
+
+function shouldSkipUniqueValue(value: unknown): boolean {
+  return value === null || value === undefined || value === '' ||
+    (Array.isArray(value) && value.length === 0)
+}
+
+async function validateUniqueField(field: CustomField): Promise<boolean> {
+  if (!field.isUnique) {
+    return true
+  }
+
+  const value = localValues.value[field.fieldName]
+  if (shouldSkipUniqueValue(value)) {
+    clearUniqueFieldError(field)
+    return true
+  }
+
+  try {
+    await validateUniqueFieldValue({
+      entityType: props.entityType,
+      entityId: props.entityId,
+      fieldName: field.fieldName,
+      value
+    })
+    clearUniqueFieldError(field)
+    return true
+  } catch (error) {
+    setUniqueFieldError(field, getUniqueErrorMessage(error, field))
+    return false
+  }
+}
+
+function handleFieldBlur(field: CustomField) {
+  void validateUniqueField(field)
+}
+
+function handleFieldChange(field: CustomField, validateUnique = false) {
+  clearUniqueFieldError(field)
+  emitChange()
+  if (validateUnique) {
+    void validateUniqueField(field)
+  }
+}
+
 // Watch for external value changes
 watch(() => props.modelValue, (newVal) => {
   applyModelValue(newVal)
@@ -335,5 +430,23 @@ function getRequiredFieldLabels(): string[] {
   return missing
 }
 
-defineExpose({ validate, getRequiredFieldLabels, fields, localValues })
+async function validateUniqueFields(): Promise<boolean> {
+  for (const field of fields.value) {
+    const valid = await validateUniqueField(field)
+    if (!valid) {
+      return false
+    }
+  }
+  return true
+}
+
+defineExpose({
+  validate,
+  getRequiredFieldLabels,
+  validateUniqueFields,
+  clearUniqueFieldErrors,
+  fields,
+  localValues,
+  uniqueFieldErrors
+})
 </script>

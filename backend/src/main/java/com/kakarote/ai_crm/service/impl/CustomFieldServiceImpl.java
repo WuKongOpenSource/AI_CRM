@@ -131,6 +131,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setIsRequired(Boolean.TRUE.equals(bo.getIsRequired()) ? 1 : 0);
         field.setIsSearchable(Boolean.TRUE.equals(bo.getIsSearchable()) ? 1 : 0);
         field.setIsShowInList(bo.getIsShowInList() == null || bo.getIsShowInList() ? 1 : 0);
+        field.setIsUnique(Boolean.TRUE.equals(bo.getIsUnique()) ? 1 : 0);
         field.setOptions(bo.getOptions() != null ? JSON.toJSONString(bo.getOptions()) : null);
         field.setValidationRules(bo.getValidation() != null ? JSON.toJSONString(bo.getValidation()) : null);
         field.setSortOrder(bo.getSortOrder() != null ? bo.getSortOrder() : getNextSortOrder(bo.getEntityType()));
@@ -166,6 +167,9 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         }
         if (bo.getIsShowInList() != null) {
             field.setIsShowInList(bo.getIsShowInList() ? 1 : 0);
+        }
+        if (bo.getIsUnique() != null) {
+            field.setIsUnique(bo.getIsUnique() ? 1 : 0);
         }
         if (bo.getOptions() != null && !isSystemField(field)) {
             field.setOptions(JSON.toJSONString(bo.getOptions()));
@@ -356,38 +360,33 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             return;
         }
 
-        // 构建fieldName -> columnName的映射
-        Map<String, String> fieldToColumn = fields.stream()
-                .collect(Collectors.toMap(CustomFieldVO::getFieldName, CustomFieldVO::getColumnName));
+        Map<String, CustomFieldVO> fieldMap = fields.stream()
+                .collect(Collectors.toMap(CustomFieldVO::getFieldName, field -> field));
 
-        // 构建fieldName -> fieldType的映射，用于值类型转换
-        Map<String, String> fieldToType = fields.stream()
-                .collect(Collectors.toMap(CustomFieldVO::getFieldName, CustomFieldVO::getFieldType));
+        String tableName = dynamicSchemaService.getTableName(entityType);
+        String idColumn = dynamicSchemaService.getIdColumnName(entityType);
 
         // 将字段名转换为列名，过滤空值，按字段类型做 Java 类型转换
         Map<String, Object> columnValues = new HashMap<>();
         for (Map.Entry<String, Object> entry : values.entrySet()) {
-            String columnName = fieldToColumn.get(entry.getKey());
-            if (columnName == null) {
+            CustomFieldVO field = fieldMap.get(entry.getKey());
+            if (field == null) {
                 continue;
             }
             Object val = entry.getValue();
             if (val == null || "".equals(val)) {
                 continue;
             }
-            String fieldType = fieldToType.get(entry.getKey());
-            val = convertValueForJdbc(fieldType, val, entry.getKey());
+            val = convertValueForJdbc(field, val, entry.getKey());
             if (val != null) {
-                columnValues.put(columnName, val);
+                validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, val);
+                columnValues.put(field.getColumnName(), val);
             }
         }
 
         if (columnValues.isEmpty()) {
             return;
         }
-
-        String tableName = dynamicSchemaService.getTableName(entityType);
-        String idColumn = dynamicSchemaService.getIdColumnName(entityType);
 
         baseMapper.updateCustomFieldValues(tableName, idColumn, entityId, columnValues);
     }
@@ -410,10 +409,51 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Custom field column not found");
         }
 
-        Object jdbcValue = "".equals(value) ? null : convertValueForJdbc(field.getFieldType(), value, fieldName);
+        Object jdbcValue = "".equals(value) ? null : convertValueForJdbc(field, value, fieldName);
+        validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, jdbcValue);
         Map<String, Object> columnValues = new HashMap<>();
         columnValues.put(field.getColumnName(), jdbcValue);
         baseMapper.updateCustomFieldValues(tableName, idColumn, entityId, columnValues);
+    }
+
+    @Override
+    public void validateUniqueCustomFieldValues(String entityType, Long entityId, Map<String, Object> values) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+
+        List<CustomFieldVO> fields = getEnabledFieldsByEntity(entityType);
+        if (fields.isEmpty()) {
+            return;
+        }
+
+        Map<String, CustomFieldVO> fieldMap = fields.stream()
+                .collect(Collectors.toMap(CustomFieldVO::getFieldName, field -> field));
+        String tableName = dynamicSchemaService.getTableName(entityType);
+        String idColumn = dynamicSchemaService.getIdColumnName(entityType);
+
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            CustomFieldVO field = fieldMap.get(entry.getKey());
+            if (field == null || !Boolean.TRUE.equals(field.getIsUnique())) {
+                continue;
+            }
+            Object val = entry.getValue();
+            if (val == null || "".equals(val)) {
+                continue;
+            }
+            val = convertValueForJdbc(field, val, entry.getKey());
+            validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, val);
+        }
+    }
+
+    @Override
+    public void validateUniqueFieldValue(String entityType, Long entityId, String fieldName, Object value) {
+        if (StrUtil.isBlank(fieldName)) {
+            return;
+        }
+        Map<String, Object> values = new HashMap<>();
+        values.put(fieldName, value);
+        validateUniqueCustomFieldValues(entityType, entityId, values);
     }
 
     @Override
@@ -476,6 +516,20 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
      * checkbox → Boolean
      * multiselect (List) → JSON String
      */
+    private Object convertValueForJdbc(CustomFieldVO field, Object val, String fieldName) {
+        if (field == null) {
+            return val;
+        }
+        Object converted = convertValueForJdbc(field.getFieldType(), val, fieldName);
+        if (converted instanceof Boolean bool
+                && "checkbox".equals(field.getFieldType())
+                && field.getColumnType() != null
+                && field.getColumnType().toUpperCase(Locale.ROOT).contains("SMALLINT")) {
+            return bool ? 1 : 0;
+        }
+        return converted;
+    }
+
     private Object convertValueForJdbc(String fieldType, Object val, String fieldName) {
         if (val == null || fieldType == null) {
             return val;
@@ -512,6 +566,34 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         } catch (Exception e) {
             log.warn("自定义字段值转换失败: field={}, type={}, value={}, error={}", fieldName, fieldType, val, e.getMessage());
             return null;
+        }
+    }
+
+    private void validateUniqueCustomFieldValue(String tableName,
+                                                String idColumn,
+                                                Long entityId,
+                                                CustomFieldVO field,
+                                                Object value) {
+        if (field == null || !Boolean.TRUE.equals(field.getIsUnique()) || value == null) {
+            return;
+        }
+        if (value instanceof String strValue && StrUtil.isBlank(strValue)) {
+            return;
+        }
+        if (StrUtil.isBlank(field.getColumnName()) || !dynamicSchemaService.columnExists(tableName, field.getColumnName())) {
+            return;
+        }
+
+        Long count = baseMapper.countByCustomFieldValue(
+                tableName,
+                idColumn,
+                entityId,
+                field.getColumnName(),
+                value
+        );
+        if (count != null && count > 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    "字段「" + field.getFieldLabel() + "」的值已存在");
         }
     }
 
@@ -604,6 +686,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setIsRequired(definition.required() ? 1 : 0);
         field.setIsSearchable(definition.searchable() ? 1 : 0);
         field.setIsShowInList(definition.showInList() ? 1 : 0);
+        field.setIsUnique(0);
         field.setOptions(definition.options() == null ? null : JSON.toJSONString(definition.options()));
         field.setValidationRules(null);
         field.setSortOrder(definition.sortOrder());
@@ -684,6 +767,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             vo.setIsRequired(field.getIsRequired() != null && field.getIsRequired() == 1);
             vo.setIsSearchable(field.getIsSearchable() != null && field.getIsSearchable() == 1);
             vo.setIsShowInList(field.getIsShowInList() != null && field.getIsShowInList() == 1);
+            vo.setIsUnique(field.getIsUnique() != null && field.getIsUnique() == 1);
 
             // 解析options JSON
             if (StrUtil.isNotEmpty(field.getOptions())) {

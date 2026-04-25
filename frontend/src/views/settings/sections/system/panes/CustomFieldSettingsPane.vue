@@ -48,6 +48,7 @@
             <div class="font-medium">
               {{ field.fieldLabel }}
               <el-tag v-if="field.isRequired" size="small" type="danger" class="ml-2">必填</el-tag>
+              <el-tag v-if="field.isUnique" size="small" type="warning" class="ml-2">唯一</el-tag>
             </div>
             <div class="text-sm text-slate-500 mt-1">
               <el-tag size="small">{{ getFieldTypeLabel(field.fieldType) }}</el-tag>
@@ -129,6 +130,7 @@ const fieldForm = reactive({
   isRequired: false,
   isSearchable: false,
   isShowInList: true,
+  isUnique: false,
   options: [] as FieldOption[]
 })
 
@@ -212,6 +214,7 @@ function resetFieldForm() {
     isRequired: false,
     isSearchable: false,
     isShowInList: true,
+    isUnique: false,
     options: []
   })
 }
@@ -232,6 +235,7 @@ function handleEditField(field: CustomField) {
     isRequired: field.isRequired,
     isSearchable: field.isSearchable,
     isShowInList: field.isShowInList,
+    isUnique: field.isUnique ?? false,
     options: field.options ? [...field.options] : []
   })
   showFieldDialog.value = true
@@ -278,6 +282,7 @@ async function handleSaveField() {
         isRequired: fieldForm.isRequired,
         isSearchable: fieldForm.isSearchable,
         isShowInList: fieldForm.isShowInList,
+        isUnique: fieldForm.isUnique,
         options: isEditingSystemField ? undefined : (fieldForm.options.length > 0 ? fieldForm.options : undefined)
       })
       ElMessage.success('字段更新成功')
@@ -291,6 +296,7 @@ async function handleSaveField() {
         isRequired: fieldForm.isRequired,
         isSearchable: fieldForm.isSearchable,
         isShowInList: fieldForm.isShowInList,
+        isUnique: fieldForm.isUnique,
         options: fieldForm.options.length > 0 ? fieldForm.options : undefined
       })
       ElMessage.success('字段添加成功')

@@ -213,6 +213,7 @@ CREATE TABLE "public"."crm_custom_field" (
   "is_required" int2 DEFAULT 0,
   "is_searchable" int2 DEFAULT 0,
   "is_show_in_list" int2 DEFAULT 1,
+  "is_unique" int2 DEFAULT 0,
   "options" text COLLATE "pg_catalog"."default",
   "validation_rules" text COLLATE "pg_catalog"."default",
   "sort_order" int4 DEFAULT 0,
@@ -234,6 +235,7 @@ COMMENT ON COLUMN "public"."crm_custom_field"."placeholder" IS '输入框占位�
 COMMENT ON COLUMN "public"."crm_custom_field"."is_required" IS '是否必填: 0否 1是';
 COMMENT ON COLUMN "public"."crm_custom_field"."is_searchable" IS '是否可搜索: 0否 1是';
 COMMENT ON COLUMN "public"."crm_custom_field"."is_show_in_list" IS '是否在列表显示: 0否 1是';
+COMMENT ON COLUMN "public"."crm_custom_field"."is_unique" IS '是否唯一: 0否 1是';
 COMMENT ON COLUMN "public"."crm_custom_field"."options" IS '选项列表(JSON数组): [{"value":"v1","label":"选项1"}]';
 COMMENT ON COLUMN "public"."crm_custom_field"."validation_rules" IS '验证规则(JSON): {"min":0,"max":100,"pattern":""}';
 COMMENT ON COLUMN "public"."crm_custom_field"."sort_order" IS '排序序号';
