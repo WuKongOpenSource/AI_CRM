@@ -16,6 +16,67 @@ html, body, #app {
   overflow: hidden;
 }
 
+/*
+ * Native mobile (Capacitor) safe-area.
+ * `capacitor-plugin-safe-area` injects: --safe-area-inset-top/right/bottom/left
+ * We scope padding to native mobile only to avoid impacting PC layout.
+ */
+:root {
+  --wk-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --wk-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --wk-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --wk-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
+
+/* Apply safe-area to app root so inner scroll containers can reach bottom */
+html.wk-native-mobile body {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+html.wk-native-mobile,
+html.wk-native-mobile body,
+html.wk-native-mobile #app {
+  height: 100dvh;
+}
+
+html.wk-native-mobile #app {
+  box-sizing: border-box;
+  padding-top: var(--wk-safe-top);
+  padding-right: var(--wk-safe-right);
+  padding-left: var(--wk-safe-left);
+}
+
+/* Utilities for native mobile layouts */
+.wk-screen {
+  height: 100vh;
+}
+
+html.wk-native-mobile .wk-screen {
+  height: 100dvh;
+}
+
+html.wk-native-mobile .wk-safe-bottom {
+  box-sizing: border-box;
+  padding-bottom: var(--wk-safe-bottom);
+}
+
+/* Mobile: prevent double-tap zoom; avoid iOS focus zoom on inputs */
+html, body {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select,
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: 16px;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

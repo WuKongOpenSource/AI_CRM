@@ -1,6 +1,6 @@
 <template>
-  <div class="flex h-screen bg-background-light">
-    <aside v-if="!isMobile" class="relative flex h-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white">
+  <div class="flex wk-screen bg-background-light">
+    <aside v-if="!isMobile" class="relative flex wk-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white">
       <div class="flex items-center gap-3 p-6">
         <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
           <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
@@ -256,7 +256,7 @@
         </div>
       </header>
 
-      <main class="flex-1 overflow-y-auto">
+      <main class="flex-1 overflow-y-auto wk-safe-bottom">
         <router-view v-slot="{ Component }">
           <Transition name="page-fade" mode="out-in">
             <component :is="Component" />

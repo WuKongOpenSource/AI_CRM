@@ -22,6 +22,26 @@ import './styles/iconfont.css'
 import './styles/main.css'
 import './styles/wk-crm-el-field-skin.css'
 
+// Capacitor iOS safe-area: only enable for native mobile shell
+if (typeof window !== 'undefined') {
+  const isMobile =
+    window.innerWidth < 768 ||
+    (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches)
+
+  const cap = (window as any).Capacitor
+  const isNativePlatform =
+    !!cap &&
+    (typeof cap.isNativePlatform === 'function'
+      ? cap.isNativePlatform()
+      : typeof cap.getPlatform === 'function'
+        ? cap.getPlatform() !== 'web'
+        : false)
+
+  if (isMobile && isNativePlatform) {
+    document.documentElement.classList.add('wk-native-mobile')
+  }
+}
+
 const app = createApp(App)
 
 app.use(createPinia())
