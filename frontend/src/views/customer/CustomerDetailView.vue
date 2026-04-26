@@ -766,7 +766,7 @@
                   v-if="canUploadKnowledge"
                   type="button"
                   class="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20"
-                  @click="openKnowledgeUploadDialog"
+                  @click="openCustomerKnowledgeUpload"
                 >
                   <span class="material-symbols-outlined text-sm">upload</span>
                   上传文档
@@ -827,132 +827,18 @@
       </template>
     </el-dialog>
 
-    <el-dialog
+    <KnowledgeUploadDialog
+      ref="knowledgeUploadDialogRef"
       v-model="showKnowledgeUploadDialog"
-      :width="isMobile ? '95%' : '560px'"
-      :fullscreen="isMobile"
-      align-center
-      title="上传客户文档"
+      :customer-id="customer?.customerId"
+      headline="上传客户文档"
+      subline="支持 PDF、Word、PPT、Excel。上传后将关联当前客户，AI 将自动解析并建立索引。"
+      step1-label="1. 选择文档类型"
+      success-message="文档上传成功"
+      summary-placeholder="例如：客户关切点、关键结论、下一步计划…"
       destroy-on-close
-    >
-      <div class="space-y-6">
-        <section class="space-y-3">
-          <p class="text-xs font-bold uppercase tracking-widest text-slate-400">1. 选择文档类型</p>
-          <div class="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <button
-              v-for="cat in [
-                { id: 'document', label: '产品文档', icon: 'description' },
-                { id: 'proposal', label: '方案资料', icon: 'lightbulb' },
-                { id: 'meeting', label: '会议纪要', icon: 'event_note' },
-                { id: 'contract', label: '合同文件', icon: 'assignment' },
-                { id: 'email', label: 'Email', icon: 'mail' },
-                { id: 'recording', label: '录音文件', icon: 'mic' }
-              ]"
-              :key="cat.id"
-              type="button"
-              :disabled="knowledgeUploading"
-              @click="knowledgeUploadForm.type = cat.id"
-              :class="[
-                'flex flex-col items-center gap-2 rounded-2xl border bg-white py-4 transition-all',
-                knowledgeUploadForm.type === cat.id
-                  ? 'border-primary bg-primary/5 text-primary ring-2 ring-primary/20'
-                  : 'border-slate-100 text-slate-600 hover:border-slate-200 hover:bg-slate-50',
-                knowledgeUploading ? 'cursor-not-allowed opacity-60' : ''
-              ]"
-            >
-              <span class="material-symbols-outlined text-xl">{{ cat.icon }}</span>
-              <span class="text-xs font-bold">{{ cat.label }}</span>
-            </button>
-          </div>
-        </section>
-
-        <section class="space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">2. 上传文件</p>
-            <span v-if="knowledgeUploading" class="inline-flex items-center gap-2 text-xs text-slate-500">
-              <span class="inline-block size-3 rounded-full border-2 border-slate-300 border-t-transparent animate-spin"></span>
-              正在上传...
-            </span>
-          </div>
-
-          <el-upload
-            class="w-full"
-            :show-file-list="false"
-            :before-upload="handleKnowledgeBeforeUpload"
-            :http-request="handleKnowledgeUpload"
-            :disabled="knowledgeUploading"
-            drag
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
-          >
-            <div class="rounded-[2rem] border-2 border-dashed border-slate-200 bg-white p-8 text-center transition-all hover:border-primary hover:bg-primary/5 md:p-10">
-              <template v-if="uploadingKnowledgeFile">
-                <div class="mx-auto flex max-w-xl items-center gap-4 rounded-2xl bg-slate-900 p-4 text-left">
-                  <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
-                    <span class="material-symbols-outlined text-lg">
-                      {{
-                        uploadingKnowledgeFile?.name?.toLowerCase().endsWith('.pdf')
-                          ? 'picture_as_pdf'
-                          : uploadingKnowledgeFile?.name?.toLowerCase().endsWith('.ppt') || uploadingKnowledgeFile?.name?.toLowerCase().endsWith('.pptx')
-                            ? 'slideshow'
-                            : 'description'
-                      }}
-                    </span>
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-bold text-white">{{ uploadingKnowledgeFile.name }}</p>
-                    <p class="mt-0.5 text-xs text-slate-300">
-                      {{ `${(uploadingKnowledgeFile.size / 1024 / 1024).toFixed(2)} MB` }}
-                    </p>
-                    <p class="mt-2 text-xs text-slate-400">点击更换文件，或拖拽新文件到此处</p>
-                  </div>
-                </div>
-              </template>
-              <template v-else>
-                <span class="material-symbols-outlined mb-3 text-4xl text-slate-300">upload_file</span>
-                <p class="text-xs font-bold text-slate-500">拖拽文件到此处，或点击浏览</p>
-                <p class="mt-1 text-xs text-slate-300">支持 PDF、Word、PPT、Excel，最大 50MB</p>
-              </template>
-            </div>
-          </el-upload>
-        </section>
-
-        <section class="space-y-3">
-          <p class="text-xs font-bold uppercase tracking-widest text-slate-400">3. 填写摘要（可选）</p>
-          <el-input
-            v-model="knowledgeUploadForm.summary"
-            type="textarea"
-            :rows="3"
-            :disabled="knowledgeUploading"
-            resize="none"
-            placeholder="Example: customer concerns, key conclusions, next steps"
-          />
-        </section>
-      </div>
-
-      <template #footer>
-        <div class="flex gap-3">
-          <button
-            type="button"
-            class="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="knowledgeUploading"
-            @click="showKnowledgeUploadDialog = false"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            class="flex-1 rounded-2xl bg-primary py-3 text-sm font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-            :disabled="knowledgeUploading || !uploadingKnowledgeFile"
-            @click="handleConfirmKnowledgeUpload"
-          >
-            <span class="inline-flex items-center justify-center gap-2">
-              <span v-if="knowledgeUploading" class="inline-block size-4 rounded-full border-2 border-white/60 border-t-transparent animate-spin"></span>
-              {{ knowledgeUploading ? 'Uploading...' : 'Start upload' }}
-            </span>
-          </button>
-        </div>
-      </template>
-    </el-dialog>
+      @success="onCustomerKnowledgeUploadSuccess"
+    />
 
     <KnowledgeDetailModal
       v-model="showKnowledgeDetailModal"
@@ -1337,8 +1223,8 @@ import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
-import { downloadKnowledge, queryKnowledgeList, uploadKnowledge } from '@/api/knowledge'
-import { ElMessage, ElMessageBox, UploadRequestOptions } from 'element-plus'
+import { downloadKnowledge, queryKnowledgeList } from '@/api/knowledge'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskAddBO, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
@@ -1356,6 +1242,7 @@ import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.
 import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
 import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
+import KnowledgeUploadDialog from '@/components/knowledge/KnowledgeUploadDialog.vue'
 import InlineEditableField from '@/components/common/InlineEditableField.vue'
 import { appEvents, APP_EVENT } from '@/utils/events'
 
@@ -1398,8 +1285,7 @@ const contactLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
 const customerKnowledgeLoading = ref(false)
 const showKnowledgeUploadDialog = ref(false)
-const knowledgeUploading = ref(false)
-const uploadingKnowledgeFile = ref<File | null>(null)
+const knowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
 const selectedKnowledgeId = ref('')
 const showKnowledgeDetailModal = ref(false)
 const customFields = ref<CustomField[]>([])
@@ -1422,11 +1308,6 @@ const latestAiReport = ref<CustomerAiReportVO | null>(null)
 const ownerSearch = ref('')
 const ownerListLoading = ref(false)
 const userListLoaded = ref(false)
-const knowledgeUploadForm = reactive({
-  type: 'document',
-  summary: ''
-})
-
 const selectedCustomerTask = ref<Task | null>(null)
 const showCustomerTaskDetail = computed({
   get: () => !!selectedCustomerTask.value,
@@ -1797,12 +1678,6 @@ watch(showAddFollowUpDialog, (visible) => {
   }
 })
 
-watch(showKnowledgeUploadDialog, (visible) => {
-  if (!visible && !knowledgeUploading.value) {
-    resetKnowledgeUploadForm()
-  }
-})
-
 onMounted(async () => {
   const customerId = route.params.id as string
   if (customerId) {
@@ -1961,44 +1836,14 @@ async function fetchCustomerKnowledge(customerId: string) {
   }
 }
 
-function resetKnowledgeUploadForm() {
-  uploadingKnowledgeFile.value = null
-  knowledgeUploadForm.type = 'document'
-  knowledgeUploadForm.summary = ''
-}
-
-function openKnowledgeUploadDialog() {
+function openCustomerKnowledgeUpload() {
   if (!canUploadKnowledge.value) return
-  resetKnowledgeUploadForm()
-  showKnowledgeUploadDialog.value = true
+  knowledgeUploadDialogRef.value?.openEmpty()
 }
 
-function handleKnowledgeBeforeUpload(file: File) {
-  uploadingKnowledgeFile.value = file
-  return false
-}
-
-function handleKnowledgeUpload(_options: UploadRequestOptions) {
-  // Handled by handleConfirmKnowledgeUpload
-}
-
-async function handleConfirmKnowledgeUpload() {
-  if (!customer.value || !uploadingKnowledgeFile.value) return
-
-  knowledgeUploading.value = true
-  try {
-    await uploadKnowledge(
-      uploadingKnowledgeFile.value,
-      knowledgeUploadForm.type,
-      customer.value.customerId,
-      knowledgeUploadForm.summary
-    )
-    ElMessage.success('文档上传成功')
-    showKnowledgeUploadDialog.value = false
-    resetKnowledgeUploadForm()
-    await fetchCustomerKnowledge(customer.value.customerId)
-  } finally {
-    knowledgeUploading.value = false
+function onCustomerKnowledgeUploadSuccess() {
+  if (customer.value) {
+    void fetchCustomerKnowledge(customer.value.customerId)
   }
 }
 
