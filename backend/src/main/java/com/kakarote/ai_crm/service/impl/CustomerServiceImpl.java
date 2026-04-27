@@ -1002,6 +1002,17 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     /**
+     * 查找客户按ID忽略数据权限。
+     */
+    @Override
+    public Customer findCustomerByIdIgnoreDataPermission(Long customerId) {
+        if (customerId == null) {
+            return null;
+        }
+        return baseMapper.selectByIdIgnoreDataPermission(customerId);
+    }
+
+    /**
      * 获取客户详情。
      */
     @Override

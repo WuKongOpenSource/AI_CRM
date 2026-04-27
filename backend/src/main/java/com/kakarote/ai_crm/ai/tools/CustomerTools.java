@@ -100,12 +100,12 @@ public class CustomerTools {
             List<Customer> existingCustomersIgnoringDataPermission =
                 customerService.findCustomersByExactCompanyNameIgnoreDataPermission(normalizedCompanyName);
             if (!existingCustomersIgnoringDataPermission.isEmpty()) {
-                return buildExistingNoAccessMessage(normalizedCompanyName);
+                return buildExistingNoAccessMessage(normalizedCompanyName, existingCustomersIgnoringDataPermission.get(0), "创建客户");
             }
 
             AiCustomerMatcher.CustomerMatchResult existingNoAccess = aiCustomerMatcher.match(normalizedCompanyName);
             if (existingNoAccess.isExistsNoAccess()) {
-                return buildExistingNoAccessMessage(normalizedCompanyName);
+                return existingNoAccess.formatNoAccessMessage("创建客户");
             }
 
             Long customerId = customerService.addCustomer(bo);
@@ -184,6 +184,13 @@ public class CustomerTools {
 
             BasePage<CustomerListVO> page = customerService.queryPageList(queryBO);
             if (page.getList().isEmpty()) {
+                String normalizedKeyword = normalizeOptionalText(keyword);
+                if (normalizedKeyword != null) {
+                    AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(normalizedKeyword);
+                    if (matchResult.isExistsNoAccess()) {
+                        return matchResult.formatNoAccessMessage("查看客户信息");
+                    }
+                }
                 return "没有找到符合条件的客户。";
             }
 
@@ -247,10 +254,14 @@ public class CustomerTools {
             String matchedCompanyName = null;
             try {
                 customerId = Long.parseLong(customerIdentifier);
+                String noAccessMessage = buildNoAccessMessageIfHidden(customerId, customerIdentifier, "更新客户信息");
+                if (noAccessMessage != null) {
+                    return noAccessMessage;
+                }
             } catch (NumberFormatException e) {
                 AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(customerIdentifier);
                 if (matchResult.isExistsNoAccess()) {
-                    return buildExistingNoAccessMessage(customerIdentifier);
+                    return matchResult.formatNoAccessMessage("更新客户信息");
                 }
                 if (matchResult.isAmbiguous()) {
                     return "更新客户失败: 客户名称「" + customerIdentifier + "」无法唯一匹配，可能是：" + matchResult.formatCandidateNames() + "。请提供更完整的客户名称或直接提供客户ID。";
@@ -360,10 +371,14 @@ public class CustomerTools {
             String matchedCompanyName = normalizedIdentifier;
             try {
                 customerId = Long.parseLong(normalizedIdentifier);
+                String noAccessMessage = buildNoAccessMessageIfHidden(customerId, normalizedIdentifier, "查看客户信息");
+                if (noAccessMessage != null) {
+                    return noAccessMessage;
+                }
             } catch (NumberFormatException e) {
                 AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(normalizedIdentifier);
                 if (matchResult.isExistsNoAccess()) {
-                    return buildExistingNoAccessMessage(normalizedIdentifier);
+                    return matchResult.formatNoAccessMessage("查看客户信息");
                 }
                 if (matchResult.isAmbiguous()) {
                     return "获取客户详情失败: 客户名称「" + normalizedIdentifier + "」无法唯一匹配，可能是：" + matchResult.formatCandidateNames() + "。请提供更完整的客户名称。";
@@ -498,8 +513,38 @@ public class CustomerTools {
     /**
      * 构建Existing编号Access消息。
      */
-    private String buildExistingNoAccessMessage(String companyName) {
-        return "客户已存在：「" + companyName + "」。";
+    private String buildExistingNoAccessMessage(String requestedName, Customer customer, String actionLabel) {
+        return AiCustomerMatcher.CustomerMatchResult
+            .existsNoAccess(requestedName, customer)
+            .formatNoAccessMessage(actionLabel);
+    }
+
+    private String buildNoAccessMessageIfHidden(Long customerId, String requestedName, String actionLabel) {
+        Customer visibleCustomer = customerService.getById(customerId);
+        if (visibleCustomer != null && !Integer.valueOf(0).equals(visibleCustomer.getStatus())) {
+            return null;
+        }
+
+        Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customerId);
+        if (existingCustomer == null || Integer.valueOf(0).equals(existingCustomer.getStatus())) {
+            return null;
+        }
+
+        return buildExistingNoAccessMessage(requestedName, existingCustomer, actionLabel);
+    }
+
+    private String resolveOwnerName(Customer customer) {
+        if (customer == null) {
+            return "未知";
+        }
+        if (StrUtil.isNotBlank(customer.getOwnerName())) {
+            return customer.getOwnerName();
+        }
+        Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customer.getCustomerId());
+        if (existingCustomer != null && StrUtil.isNotBlank(existingCustomer.getOwnerName())) {
+            return existingCustomer.getOwnerName();
+        }
+        return "未知";
     }
 
     /**
@@ -508,6 +553,7 @@ public class CustomerTools {
     private String formatExistingCustomer(Customer customer) {
         StringBuilder sb = new StringBuilder();
         sb.append("客户ID=").append(customer.getCustomerId());
+        sb.append("，负责人=").append(resolveOwnerName(customer));
         if (StrUtil.isNotBlank(customer.getLevel())) {
             sb.append("，等级=").append(customer.getLevel());
         }

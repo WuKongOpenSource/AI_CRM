@@ -188,8 +188,16 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         Long userId = UserUtil.getUserId();
         Date today = DateUtil.beginOfDay(new Date());
         Date weekEnd = DateUtil.endOfWeek(new Date());
+        DataPermissionContext context = dataPermissionService.createContextByPermission("schedule:view");
 
-        List<ScheduleVO> schedules = baseMapper.getMySchedules(userId, filter, today, weekEnd);
+        List<ScheduleVO> schedules = baseMapper.getMySchedules(
+                userId,
+                filter,
+                today,
+                weekEnd,
+                context.isAllData(),
+                context.getUserIds()
+        );
         enrichSchedules(schedules);
         return schedules;
     }

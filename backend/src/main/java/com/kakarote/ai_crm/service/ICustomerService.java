@@ -71,6 +71,11 @@ public interface ICustomerService extends IService<Customer> {
     List<Customer> findCustomersByCompanyNameLikeIgnoreDataPermission(String keyword, int limit);
 
     /**
+     * 按ID查找客户，忽略数据权限。
+     */
+    Customer findCustomerByIdIgnoreDataPermission(Long customerId);
+
+    /**
      * 获取客户详情。
      */
     CustomerDetailVO getCustomerDetail(Long customerId);

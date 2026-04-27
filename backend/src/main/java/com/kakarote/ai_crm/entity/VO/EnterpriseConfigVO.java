@@ -13,16 +13,16 @@ import java.util.Date;
 @Schema(name = "EnterpriseConfigVO", description = "企业信息配置")
 public class EnterpriseConfigVO implements Serializable {
 
-    @Schema(description = "企业名称")
+    @Schema(description = "公司名称")
     private String name;
 
-    @Schema(description = "企业Logo（MinIO objectKey）")
+    @Schema(description = "公司Logo（MinIO objectKey）")
     private String logo;
 
-    @Schema(description = "企业Logo访问URL")
+    @Schema(description = "公司Logo访问URL")
     private String logoUrl;
 
-    @Schema(description = "企业说明")
+    @Schema(description = "公司说明")
     private String description;
 
     @Schema(description = "最后更新时间")

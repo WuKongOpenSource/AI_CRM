@@ -45,7 +45,12 @@ public interface CustomerMapper extends BaseMapper<Customer> {
      * 查询按ID忽略数据权限。
      */
     @InterceptorIgnore(dataPermission = "true")
-    @Select("SELECT * FROM crm_customer WHERE customer_id = #{customerId}")
+    @Select("""
+            SELECT c.*, u.realname AS owner_name
+            FROM crm_customer c
+            LEFT JOIN manager_user u ON c.owner_id = u.user_id
+            WHERE c.customer_id = #{customerId}
+            """)
     Customer selectByIdIgnoreDataPermission(@Param("customerId") Long customerId);
 
     /**
@@ -53,11 +58,12 @@ public interface CustomerMapper extends BaseMapper<Customer> {
      */
     @InterceptorIgnore(dataPermission = "true")
     @Select("""
-            SELECT *
-            FROM crm_customer
-            WHERE company_name = #{companyName}
-              AND status = 1
-            ORDER BY create_time DESC
+            SELECT c.*, u.realname AS owner_name
+            FROM crm_customer c
+            LEFT JOIN manager_user u ON c.owner_id = u.user_id
+            WHERE c.company_name = #{companyName}
+              AND c.status = 1
+            ORDER BY c.create_time DESC
             """)
     List<Customer> selectByExactCompanyNameIgnoreDataPermission(@Param("companyName") String companyName);
 
@@ -66,11 +72,12 @@ public interface CustomerMapper extends BaseMapper<Customer> {
      */
     @InterceptorIgnore(dataPermission = "true")
     @Select("""
-            SELECT *
-            FROM crm_customer
-            WHERE company_name LIKE CONCAT('%', #{keyword}, '%')
-              AND status = 1
-            ORDER BY create_time DESC
+            SELECT c.*, u.realname AS owner_name
+            FROM crm_customer c
+            LEFT JOIN manager_user u ON c.owner_id = u.user_id
+            WHERE c.company_name LIKE CONCAT('%', #{keyword}, '%')
+              AND c.status = 1
+            ORDER BY c.create_time DESC
             LIMIT #{limit}
             """)
     List<Customer> selectByCompanyNameLikeIgnoreDataPermission(@Param("keyword") String keyword,

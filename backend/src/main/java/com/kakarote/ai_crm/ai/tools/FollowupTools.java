@@ -81,7 +81,7 @@ public class FollowupTools {
 
             AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
             if (customerMatch.isExistsNoAccess()) {
-                return "客户已存在：「" + customerName + "」。";
+                return customerMatch.formatNoAccessMessage("创建跟进记录");
             }
             if (customerMatch.isAmbiguous()) {
                 return "创建跟进失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
@@ -148,7 +148,7 @@ public class FollowupTools {
 
             AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
             if (customerMatch.isExistsNoAccess()) {
-                return "客户已存在：「" + customerName + "」。";
+                return customerMatch.formatNoAccessMessage("查看跟进记录");
             }
             if (customerMatch.isAmbiguous()) {
                 return "查询跟进记录失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
@@ -269,11 +269,18 @@ public class FollowupTools {
             Long customerId = Long.parseLong(normalizedCustomerId);
             Customer customer = customerService.getById(customerId);
             if (customer == null || Integer.valueOf(0).equals(customer.getStatus())) {
-                return new CustomerResolveResult(null, actionName + " failed: customerId " + customerId + " was not found or is inactive.");
+                Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customerId);
+                if (existingCustomer != null && !Integer.valueOf(0).equals(existingCustomer.getStatus())) {
+                    String message = AiCustomerMatcher.CustomerMatchResult
+                        .existsNoAccess(normalizedCustomerId, existingCustomer)
+                        .formatNoAccessMessage("创建跟进记录");
+                    return new CustomerResolveResult(null, message);
+                }
+                return new CustomerResolveResult(null, "操作未执行：客户不存在或已停用，无法创建跟进记录。");
             }
             return new CustomerResolveResult(customer, null);
         } catch (NumberFormatException e) {
-            return new CustomerResolveResult(null, actionName + " failed: customerId must be a number.");
+            return new CustomerResolveResult(null, "操作未执行：客户ID必须是数字。");
         }
     }
 

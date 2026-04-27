@@ -144,7 +144,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     }
 
     /**
-     * 解析企业名称MAP。
+     * 解析公司名称MAP。
      */
     private Map<Long, String> resolveEnterpriseNameMap(Collection<Long> tenantIds, Map<Long, String> tenantNameMap) {
         if (CollUtil.isEmpty(tenantIds)) {

@@ -30,7 +30,9 @@ public interface ScheduleMapper extends BaseMapper<Schedule> {
     List<ScheduleVO> getMySchedules(@Param("userId") Long userId,
                                      @Param("filter") String filter,
                                      @Param("today") Date today,
-                                     @Param("weekEnd") Date weekEnd);
+                                     @Param("weekEnd") Date weekEnd,
+                                     @Param("allData") Boolean allData,
+                                     @Param("userIds") List<Long> userIds);
 
     /**
      * 查询按ID忽略数据权限。
