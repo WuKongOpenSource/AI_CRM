@@ -28,7 +28,6 @@ import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
-import com.kakarote.ai_crm.entity.VO.KnowledgeTargetedScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
@@ -73,6 +72,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 知识库服务实现
@@ -357,10 +357,10 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     }
 
     /**
-     * 生成TargetedScript。
+     * Stream targeted sales script content.
      */
     @Override
-    public KnowledgeTargetedScriptVO generateTargetedScript(KnowledgeTargetedScriptBO scriptBO) {
+    public Flux<String> streamTargetedScript(KnowledgeTargetedScriptBO scriptBO) {
         if (scriptBO == null || scriptBO.getCustomerId() == null
             || scriptBO.getKnowledgeIds() == null || scriptBO.getKnowledgeIds().isEmpty()) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "生成参数不完整");
@@ -399,46 +399,72 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         List<FollowUpVO> recentFollowUps = followUpMapper.getRecentByCustomerId(
             scriptBO.getCustomerId(), MAX_TARGETED_SCRIPT_FOLLOWUP_COUNT
         );
-
         String fallback = buildTargetedScriptFallback(customerDetail, recentFollowUps, knowledges);
-        String content = fallback;
-        if (chatClientProvider.isApiKeyConfigured()) {
-            try {
-                String prompt = buildTargetedScriptPrompt(customerDetail, recentFollowUps, knowledges);
-                aiQuotaService.ensureQuotaAvailable("knowledge_targeted_script", null, null, prompt);
-                var chatResponse = chatClientProvider.getChatClient()
-                    .prompt()
-                    .user(prompt)
-                    .call()
-                    .chatResponse();
-                String response = chatResponse.getResult().getOutput().getText();
-                aiQuotaService.consumeResolvedTokens(
-                    "knowledge_targeted_script",
-                    aiQuotaService.resolveTokenUsage(chatResponse, null, null, prompt, response)
-                );
-                content = cleanGeneratedMarkdown(response, fallback);
-            } catch (BusinessException e) {
-                throw e;
-            } catch (Exception e) {
-                log.warn("生成定向销售话术失败，使用兜底内容: customerId={}, knowledgeIds={}, error={}",
-                    scriptBO.getCustomerId(), requestedIds, e.getMessage());
-            }
+
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            return Flux.just(fallback);
         }
 
-        KnowledgeTargetedScriptVO result = new KnowledgeTargetedScriptVO();
-        result.setTitle("针对性销售话术已生成");
-        result.setSubtitle(buildTargetedScriptSubtitle(customerDetail.getCompanyName(), knowledges));
-        result.setContent(content);
-        result.setCustomerId(customerDetail.getCustomerId());
-        result.setCustomerName(customerDetail.getCompanyName());
-        result.setKnowledgeIds(knowledges.stream().map(Knowledge::getKnowledgeId).toList());
-        result.setKnowledgeNames(knowledges.stream().map(Knowledge::getName).toList());
-        return result;
+        Long currentTenantId = UserUtil.getTenantId();
+        String prompt = buildTargetedScriptPrompt(customerDetail, recentFollowUps, knowledges);
+        String quotaTip = aiQuotaService.resolveQuotaFailureMessage(
+            currentTenantId, "knowledge_targeted_script", null, null, prompt
+        );
+        if (quotaTip != null) {
+            return Flux.just(quotaTip);
+        }
+
+        StringBuilder fullResponse = new StringBuilder();
+        AtomicReference<Integer> promptTokensRef = new AtomicReference<>(0);
+        AtomicReference<Integer> completionTokensRef = new AtomicReference<>(0);
+        AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
+
+        return chatClientProvider.getChatClient()
+            .prompt()
+            .user(prompt)
+            .stream()
+            .chatResponse()
+            .doOnNext(chatResponse -> {
+                if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
+                    String text = chatResponse.getResult().getOutput().getText();
+                    if (text != null) {
+                        fullResponse.append(text);
+                    }
+                }
+                if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
+                    var usage = chatResponse.getMetadata().getUsage();
+                    if (usage.getPromptTokens() > 0 || usage.getCompletionTokens() > 0) {
+                        promptTokensRef.set(usage.getPromptTokens());
+                        completionTokensRef.set(usage.getCompletionTokens());
+                        totalTokensRef.set(usage.getTotalTokens());
+                    }
+                }
+            })
+            .mapNotNull(chatResponse -> {
+                if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
+                    return chatResponse.getResult().getOutput().getText();
+                }
+                return null;
+            })
+            .doOnComplete(() -> aiQuotaService.consumeResolvedTokens(
+                currentTenantId,
+                "knowledge_targeted_script",
+                aiQuotaService.resolveTokenUsage(
+                    promptTokensRef.get(),
+                    completionTokensRef.get(),
+                    totalTokensRef.get(),
+                    null,
+                    null,
+                    prompt,
+                    fullResponse.toString()
+                )
+            ))
+            .doOnError(error -> log.warn(
+                "流式生成定向销售话术失败: customerId={}, knowledgeIds={}, error={}",
+                scriptBO.getCustomerId(), requestedIds, error.getMessage()
+            ));
     }
 
-    /**
-     * 处理pollWeKnoraParseStatus方法逻辑。
-     */
     private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId, String tenantApiKey) {
         int maxAttempts = 60;
         long intervalMs = 20000; // 20秒
@@ -1346,21 +1372,6 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     }
 
     /**
-     * 处理cleanGeneratedMarkdown方法逻辑。
-     */
-    private String cleanGeneratedMarkdown(String content, String fallback) {
-        if (StrUtil.isBlank(content)) {
-            return fallback;
-        }
-        String normalized = content.trim();
-        if (normalized.startsWith("```")) {
-            normalized = normalized.replaceFirst("```(?:markdown|md)?\\s*", "");
-            normalized = normalized.replaceFirst("\\s*```$", "");
-        }
-        return StrUtil.isBlank(normalized) ? fallback : normalized.trim();
-    }
-
-    /**
      * 构建TargetedScript兜底。
      */
     private String buildTargetedScriptFallback(CustomerDetailVO detail,
@@ -1422,22 +1433,6 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         builder.append("- 如果最近跟进已中断较久，建议先用低压沟通方式重新建立互动，再推进深入交流。\n");
 
         return builder.toString().trim();
-    }
-
-    /**
-     * 构建TargetedScriptSubtitle。
-     */
-    private String buildTargetedScriptSubtitle(String customerName, List<Knowledge> knowledges) {
-        List<String> knowledgeNames = knowledges.stream()
-            .map(Knowledge::getName)
-            .filter(StrUtil::isNotBlank)
-            .limit(2)
-            .toList();
-        String docLabel = knowledgeNames.isEmpty() ? "所选参考资料" : String.join("、", knowledgeNames);
-        if (knowledges.size() > knowledgeNames.size()) {
-            docLabel += " 等 " + knowledges.size() + " 份资料";
-        }
-        return "基于 %s & %s".formatted(docLabel, StrUtil.blankToDefault(customerName, "目标客户"));
     }
 
     /**

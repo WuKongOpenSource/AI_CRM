@@ -264,16 +264,23 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import {
-  generateKnowledgeTargetedScript,
-  queryKnowledgeList
+  queryKnowledgeList,
+  streamKnowledgeTargetedScript
 } from '@/api/knowledge'
 import { queryCustomerList } from '@/api/customer'
-import type {
-  Knowledge,
-  KnowledgeTargetedScriptVO
-} from '@/types/common'
+import type { Knowledge } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
 import { renderMarkdown } from '@/utils/markdown'
+
+interface TargetedScriptResult {
+  title: string
+  subtitle: string
+  content: string
+  customerId: string
+  customerName: string
+  knowledgeIds: string[]
+  knowledgeNames: string[]
+}
 
 const props = defineProps<{
   modelValue: boolean
@@ -296,7 +303,7 @@ const customerOptions = ref<CustomerListVO[]>([])
 const customerLoading = ref(false)
 
 const generating = ref(false)
-const result = ref<KnowledgeTargetedScriptVO | null>(null)
+const result = ref<TargetedScriptResult | null>(null)
 
 let documentSearchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -428,13 +435,54 @@ async function handleGenerate() {
 
   generating.value = true
   try {
-    result.value = await generateKnowledgeTargetedScript({
+    result.value = buildStreamingResult()
+    await streamKnowledgeTargetedScript({
       knowledgeIds: selectedDocumentIds.value,
       customerId: selectedCustomerId.value
+    }, (chunk) => {
+      if (result.value) {
+        result.value.content += chunk
+      }
+    }, () => {
+      if (result.value) {
+        result.value.title = '针对性销售话术已生成'
+      }
+    }, () => {
+      ElMessage.error('生成失败，请稍后重试')
     })
+  } catch {
+    if (result.value && !result.value.content.trim()) {
+      result.value = null
+    } else if (result.value) {
+      result.value.title = '生成中断，请重试'
+    }
   } finally {
     generating.value = false
   }
+}
+
+function buildStreamingResult(): TargetedScriptResult {
+  const customer = customerOptions.value.find(item => item.customerId === selectedCustomerId.value)
+  const docs = selectedDocuments.value
+  const customerName = customer?.companyName || '目标客户'
+  return {
+    title: 'AI 正在生成话术...',
+    subtitle: buildClientSubtitle(customerName, docs),
+    content: '',
+    customerId: selectedCustomerId.value,
+    customerName,
+    knowledgeIds: selectedDocumentIds.value,
+    knowledgeNames: docs.map(item => item.name)
+  }
+}
+
+function buildClientSubtitle(customerName: string, docs: Knowledge[]): string {
+  const docNames = docs.map(item => item.name).filter(Boolean).slice(0, 2)
+  let docLabel = docNames.length > 0 ? docNames.join('、') : '所选参考资料'
+  if (docs.length > docNames.length) {
+    docLabel += ` 等 ${docs.length} 份资料`
+  }
+  return `${customerName} · 基于 ${docLabel}`
 }
 
 async function handleCopyResult() {

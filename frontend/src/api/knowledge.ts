@@ -6,8 +6,7 @@ import type {
   KnowledgeAiAnalyzeVO,
   KnowledgeAiSearchBO,
   KnowledgeAiSearchVO,
-  KnowledgeTargetedScriptBO,
-  KnowledgeTargetedScriptVO
+  KnowledgeTargetedScriptBO
 } from '@/types/common'
 
 /**
@@ -110,12 +109,74 @@ export function aiSearchKnowledge(query: KnowledgeAiSearchBO): Promise<Knowledge
 }
 
 /**
- * Generate targeted sales script and SOP from selected knowledge documents
+ * Stream targeted sales script content as it is generated
  */
-export function generateKnowledgeTargetedScript(
-  data: KnowledgeTargetedScriptBO
-): Promise<KnowledgeTargetedScriptVO> {
-  return post('/knowledge/targeted-script', data)
+export async function streamKnowledgeTargetedScript(
+  data: KnowledgeTargetedScriptBO,
+  onChunk: (text: string) => void,
+  onComplete?: () => void,
+  onError?: (error: Error) => void
+): Promise<void> {
+  const token = getToken()
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+
+  const cleanup = () => {
+    if (reader) {
+      try { reader.releaseLock() } catch { /* ignore */ }
+      reader = null
+    }
+  }
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/knowledge/targeted-script/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        ...(token ? { 'Manager-Token': token } : {})
+      },
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    reader = response.body?.getReader() ?? null
+    if (!reader) {
+      throw new Error('Response body is not readable')
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        if (buffer.trim()) {
+          const parsedContent = parseSSEEvent(buffer)
+          if (parsedContent) onChunk(parsedContent)
+        }
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() || ''
+
+      for (const event of events) {
+        const parsedContent = parseSSEEvent(event)
+        if (parsedContent) onChunk(parsedContent)
+      }
+    }
+
+    onComplete?.()
+  } catch (error) {
+    onError?.(error as Error)
+    throw error
+  } finally {
+    cleanup()
+  }
 }
 
 /**

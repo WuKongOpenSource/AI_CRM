@@ -11,7 +11,6 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
-import com.kakarote.ai_crm.entity.VO.KnowledgeTargetedScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
@@ -102,14 +101,16 @@ public class KnowledgeController {
     }
 
     /**
-     * 生成TargetedScript。
+     * Stream targeted sales script content.
      */
-    @PostMapping("/targeted-script")
-    @Operation(summary = "Generate targeted sales script and SOP")
+    @PostMapping(value = "/targeted-script/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Stream targeted sales script and SOP")
     @RequirePermission("knowledge:view")
-    public Result<KnowledgeTargetedScriptVO> generateTargetedScript(
+    public Flux<ServerSentEvent<String>> streamTargetedScript(
             @Valid @RequestBody KnowledgeTargetedScriptBO scriptBO) {
-        return Result.ok(knowledgeService.generateTargetedScript(scriptBO));
+        return knowledgeService.streamTargetedScript(scriptBO)
+                .filter(chunk -> chunk != null && !chunk.isEmpty())
+                .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build());
     }
 
     /**

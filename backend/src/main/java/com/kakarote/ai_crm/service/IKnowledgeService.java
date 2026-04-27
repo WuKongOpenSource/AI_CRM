@@ -9,7 +9,6 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
-import com.kakarote.ai_crm.entity.VO.KnowledgeTargetedScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
@@ -70,7 +69,7 @@ public interface IKnowledgeService extends IService<Knowledge> {
     KnowledgeAiSearchVO aiSearch(KnowledgeAiSearchBO searchBO);
 
     /**
-     * Generate targeted sales script and SOP from selected knowledge documents and customer
+     * Stream targeted sales script content as it is generated.
      */
-    KnowledgeTargetedScriptVO generateTargetedScript(KnowledgeTargetedScriptBO scriptBO);
+    Flux<String> streamTargetedScript(KnowledgeTargetedScriptBO scriptBO);
 }
