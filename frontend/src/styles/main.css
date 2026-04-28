@@ -22,6 +22,13 @@ html, body, #app {
  * We scope padding to native mobile only to avoid impacting PC layout.
  */
 :root {
+  --el-color-primary: #137fec;
+  --el-color-primary-dark-2: #0f66bd;
+  --el-color-primary-light-3: #5ba5f2;
+  --el-color-primary-light-5: #89bff6;
+  --el-color-primary-light-7: #b8d9fa;
+  --el-color-primary-light-8: #d0e5fc;
+  --el-color-primary-light-9: #e8f3fe;
   --wk-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --wk-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --wk-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));

@@ -154,7 +154,11 @@
           <span class="material-symbols-outlined wk-plus-button-icon">person_add</span>
           <span>新增客户</span>
         </button>
-        <el-dropdown v-if="!isMobile" trigger="click">
+        <el-dropdown
+          v-if="!isMobile"
+          trigger="click"
+          popper-class="wk-customer-import-export-dropdown"
+        >
           <button
             type="button"
             class="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-primary/30 hover:bg-slate-50 hover:text-primary"
@@ -1701,6 +1705,33 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   border: 1px solid #dbeafe;
   box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
   padding: 16px;
+}
+
+:global(.wk-customer-import-export-dropdown.el-popper) {
+  border-color: #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+}
+
+:global(.wk-customer-import-export-dropdown .el-popper__arrow) {
+  display: none;
+}
+
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu) {
+  padding: 4px 0;
+}
+
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu__item) {
+  height: 40px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu__item:not(.is-disabled):hover),
+:global(.wk-customer-import-export-dropdown .el-dropdown-menu__item:not(.is-disabled):focus) {
+  background-color: rgba(19, 127, 236, 0.1);
+  color: #137fec;
 }
 
 .wk-customer-card {
