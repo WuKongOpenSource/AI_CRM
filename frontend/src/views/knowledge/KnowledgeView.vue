@@ -180,10 +180,23 @@
               <h3 class="text-lg font-bold text-slate-900">{{ getCategoryLabel() }}</h3>
               <span class="ml-1 text-sm text-slate-400">{{ totalCount }} 项结果</span>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex w-full items-center justify-end gap-2 md:w-auto">
+              <!-- Mobile Upload Button -->
+              <el-upload
+                v-if="isMobile"
+                :show-file-list="false"
+                :before-upload="onUploadTriggerBeforeUpload"
+                :http-request="noopHttpRequest"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
+              >
+                <button class="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
+                  <span class="material-symbols-outlined text-sm">upload</span>
+                  上传
+                </button>
+              </el-upload>
               <button
                 type="button"
-                class="hidden rounded-xl border border-primary/15 bg-primary/5 px-4 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 md:inline-flex"
+                class="inline-flex rounded-xl border border-primary/15 bg-primary/5 px-4 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 md:text-sm"
                 :disabled="totalCount === 0"
                 @click="openScriptGenerator"
               >
@@ -214,19 +227,7 @@
                   <span class="material-symbols-outlined block text-sm">list</span>
                 </button>
               </div>
-              <!-- Mobile Upload Button -->
-              <el-upload
-                v-if="isMobile"
-                :show-file-list="false"
-                :before-upload="onUploadTriggerBeforeUpload"
-                :http-request="noopHttpRequest"
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
-              >
-                <button class="flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">
-                  <span class="material-symbols-outlined text-sm">upload</span>
-                  上传
-                </button>
-              </el-upload>
+              
             </div>
           </div>
 
@@ -252,7 +253,7 @@
             <!-- AI 话术生成器（首位） -->
             <div
               v-if="knowledgeList.length > 0"
-              class="relative flex min-h-[240px] flex-col overflow-hidden rounded-2xl bg-[#1e293b] p-6 text-white"
+              class="relative hidden min-h-[240px] flex-col overflow-hidden rounded-2xl bg-[#1e293b] p-6 text-white md:flex"
             >
               <div class="relative z-10 flex flex-1 flex-col">
                 <div

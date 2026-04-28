@@ -1,5 +1,5 @@
 <template>
-  <div ref="pageRootRef" data-customer-page-root class="flex flex-col gap-6 px-6 py-6">
+  <div ref="pageRootRef" data-customer-page-root class="flex flex-col gap-6 px-4 py-6 md:px-6">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-start justify-between gap-3">

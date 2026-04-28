@@ -71,12 +71,12 @@
               class="flex flex-col bg-white"
             >
               <div class="p-3 sm:p-5 flex items-center justify-between border-b border-slate-100">
-                <div class="hidden sm:flex sm:flex-col">
+                <div class=" sm:flex sm:flex-col">
                   <span class="text-sm font-medium" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
-                    {{ day.label }}
+                    {{ isMobile ? day.label.replace('周', '') : day.label }}
                   </span>
                   <span class="text-xs text-slate-400">
-                    {{ getLunarText(day.fullDate) }}
+                    {{ isMobile ? getLunarDayText(day.fullDate) : getLunarText(day.fullDate) }}
                   </span>
                 </div>
                 <span
@@ -86,7 +86,7 @@
               </div>
               <div
                 class="flex-1 p-3 space-y-3"
-                :class="isMobile && getEventsForDate(day.fullDate).length ? 'cursor-pointer' : ''"
+                :class="isMobile && (getEventsForDate(day.fullDate).length || getTasksForDate(day.fullDate).length) ? 'cursor-pointer' : ''"
                 @click="openMobileEventsDialog(day.fullDate)"
               >
                 <div v-if="isMobile" class="flex h-full items-center justify-center">
@@ -169,7 +169,7 @@
                 <div
                   v-if="cell.fullDate"
                   class="space-y-1"
-                  :class="isMobile && getEventsForDate(cell.fullDate).length ? 'cursor-pointer' : ''"
+                  :class="isMobile && (getEventsForDate(cell.fullDate).length || getTasksForDate(cell.fullDate).length) ? 'cursor-pointer' : ''"
                   @click="handleMobileMonthCellClick(cell.fullDate)"
                 >
                   <div
@@ -332,25 +332,54 @@
       </template>
 
       <div class="max-h-[60vh] overflow-auto pb-[env(safe-area-inset-bottom)]">
-        <div v-if="mobileMonthEvents.length === 0" class="py-10 text-center text-sm text-slate-400">
-          当天暂无日程
+        <div
+          v-if="mobileMonthEvents.length === 0 && mobileMonthTasks.length === 0"
+          class="py-10 text-center text-sm text-slate-400"
+        >
+          当天暂无日程与任务
         </div>
-        <div v-else class="space-y-2">
-          <button
-            v-for="event in mobileMonthEvents"
-            :key="event.scheduleId"
-            type="button"
-            class="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors"
-            @click="handleSelectEventFromMobileDialog(event)"
-          >
-            <p class="text-sm font-bold text-slate-900 truncate">{{ event.title }}</p>
-            <p class="mt-0.5 text-xs text-slate-500 truncate">
-              {{ formatTime(event.startTime) }}
-              <template v-if="event.customerName || event.participantNames">
-                • {{ event.customerName || event.participantNames }}
-              </template>
-            </p>
-          </button>
+        <div v-else class="space-y-5">
+          <section v-if="mobileMonthEvents.length" class="space-y-2">
+            <div class="flex items-center justify-between px-1">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">日程</p>
+              <p class="text-xs font-bold text-slate-300">{{ mobileMonthEvents.length }}</p>
+            </div>
+            <button
+              v-for="event in mobileMonthEvents"
+              :key="event.scheduleId"
+              type="button"
+              class="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors"
+              @click="handleSelectEventFromMobileDialog(event)"
+            >
+              <p class="text-sm font-bold text-slate-900 truncate">{{ event.title }}</p>
+              <p class="mt-0.5 text-xs text-slate-500 truncate">
+                {{ formatTime(event.startTime) }}
+                <template v-if="event.customerName || event.participantNames">
+                  • {{ event.customerName || event.participantNames }}
+                </template>
+              </p>
+            </button>
+          </section>
+
+          <section v-if="mobileMonthTasks.length" class="space-y-2">
+            <div class="flex items-center justify-between px-1">
+              <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">任务</p>
+              <p class="text-xs font-bold text-slate-300">{{ mobileMonthTasks.length }}</p>
+            </div>
+            <button
+              v-for="task in mobileMonthTasks"
+              :key="task.taskId"
+              type="button"
+              class="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2.5 hover:bg-slate-50 transition-colors"
+              @click="handleSelectTaskFromMobileDialog(task)"
+            >
+              <p class="text-sm font-bold text-slate-900 truncate">{{ task.title }}</p>
+              <p class="mt-0.5 text-xs text-slate-500 truncate">
+                <template v-if="task.customerName">{{ task.customerName }}</template>
+                <template v-else>—</template>
+              </p>
+            </button>
+          </section>
         </div>
       </div>
     </el-dialog>
@@ -428,10 +457,17 @@ function getLunarText(dateStr: string): string {
   }
 }
 
+function getLunarDayText(dateStr: string): string {
+  const text = getLunarText(dateStr)
+  if (!text) return ''
+  return text.replace(/^(闰)?[一二三四五六七八九十冬腊\d]+月/, '')
+}
+
 function openMobileEventsDialog(dateStr: string) {
   if (!isMobile.value) return
   const events = getEventsForDate(dateStr)
-  if (!events.length) return
+  const dayTasks = getTasksForDate(dateStr)
+  if (!events.length && !dayTasks.length) return
   mobileMonthEventsDialogDate.value = dateStr
   showMobileMonthEventsDialog.value = true
 }
@@ -443,7 +479,11 @@ function handleMobileMonthCellClick(dateStr: string) {
 function handleSelectEventFromMobileDialog(event: ScheduleVO) {
   selectedEvent.value = event
   selectedTask.value = null
-  showMobileMonthEventsDialog.value = false
+}
+
+function handleSelectTaskFromMobileDialog(task: Task) {
+  selectedTask.value = task
+  selectedEvent.value = null
 }
 
 const showScheduleDetailDrawer = computed({
@@ -480,6 +520,11 @@ const viewModes = [
 const mobileMonthEvents = computed(() => {
   if (!mobileMonthEventsDialogDate.value) return []
   return getEventsForDate(mobileMonthEventsDialogDate.value)
+})
+
+const mobileMonthTasks = computed(() => {
+  if (!mobileMonthEventsDialogDate.value) return []
+  return getTasksForDate(mobileMonthEventsDialogDate.value)
 })
 
 const calendarAnchorDate = ref<Date>(new Date())
