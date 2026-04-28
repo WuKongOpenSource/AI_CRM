@@ -2,15 +2,15 @@
   <div class="flex h-full min-h-0 bg-background-light">
     <!-- Calendar Main -->
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-8" :class="{ 'border-r border-slate-100': selectedEvent || selectedTask }">
-      <div class="flex min-h-0 w-full flex-1 flex-col gap-6">
+      <div class="flex min-h-0 w-full flex-1 flex-col gap-4 md:gap-6">
         <!-- Header -->
-        <div class="shrink-0 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6 min-w-0">
+        <div class="shrink-0 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
+          <div class="flex min-w-0 flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:gap-6">
             <div class="min-w-0">
-              <h2 class="text-2xl font-bold text-slate-900">智能日程安排</h2>
-              <p class="text-sm text-slate-500 mt-1">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
+              <h2 class="text-xl font-bold text-slate-900 sm:text-2xl">智能日程安排</h2>
+              <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
             </div>
-            <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-1 shrink-0">
+            <div class="flex w-full shrink-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-1 sm:w-auto sm:justify-start">
               <button
                 type="button"
                 class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
@@ -36,14 +36,14 @@
               </button>
             </div>
           </div>
-          <div class="flex items-center gap-4 flex-wrap">
-            <div class="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-200">
+          <div class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:w-auto sm:flex-wrap sm:gap-4">
+            <div class="flex min-w-0 items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
               <button
                 v-for="mode in viewModes"
                 :key="mode.value"
                 type="button"
                 @click="viewMode = mode.value"
-                class="px-5 py-1.5 text-sm font-medium rounded-md transition-colors"
+                class="min-w-0 flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:px-5"
                 :class="viewMode === mode.value
                   ? 'bg-white text-primary'
                   : 'text-slate-600 hover:text-slate-900'"
@@ -52,7 +52,7 @@
             <button
               type="button"
               @click="openCreateScheduleDialog"
-              class="px-6 py-2.5 bg-primary text-white text-sm font-bold rounded-xl hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
+              class="flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 sm:gap-2 sm:px-6 sm:py-2.5"
             >
               <span class="material-symbols-outlined wk-plus-button-icon">add</span>
               新增日程
@@ -67,28 +67,28 @@
         >
           <Transition name="wk-cal-view" mode="out-in">
           <!-- Week View -->
-          <div v-if="viewMode === 'grid'" key="grid" class="grid min-h-[400px] flex-1 grid-cols-7 divide-x divide-slate-200">
+          <div v-if="viewMode === 'grid'" key="grid" class="grid min-h-[320px] flex-1 grid-cols-7 divide-x divide-slate-200 sm:min-h-[400px]">
             <div
               v-for="day in weekDays"
               :key="day.label"
               class="flex flex-col bg-white"
             >
-              <div class="p-3 sm:p-5 flex items-center justify-between border-b border-slate-100">
-                <div class="hidden sm:flex sm:flex-col">
-                  <span class="text-sm font-medium" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
+              <div class="flex flex-col items-center justify-center gap-1 border-b border-slate-100 p-1.5 sm:flex-row sm:justify-between sm:p-5">
+                <div class="flex flex-col items-center sm:items-start">
+                  <span class="text-[10px] font-medium sm:text-sm" :class="day.isToday ? 'text-primary' : 'text-slate-400'">
                     {{ day.label }}
                   </span>
-                  <span class="text-xs text-slate-400">
+                  <span class="text-[8px] leading-none text-slate-400 sm:text-[10px]">
                     {{ getLunarText(day.fullDate) }}
                   </span>
                 </div>
                 <span
-                  class="size-7 shrink-0 flex items-center justify-center rounded-full text-sm font-bold"
+                  class="flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold sm:size-7 sm:text-sm"
                   :class="day.isToday ? 'bg-primary text-white' : 'text-slate-900'"
                 >{{ day.date }}</span>
               </div>
               <div
-                class="flex-1 p-3 space-y-4"
+                class="flex-1 space-y-4 p-1.5 sm:p-3"
                 :class="isMobile && getEventsForDate(day.fullDate).length ? 'cursor-pointer' : ''"
                 @click="openMobileEventsDialog(day.fullDate)"
               >
@@ -156,12 +156,12 @@
           </div>
 
           <!-- Month View -->
-          <div v-else-if="viewMode === 'month'" key="month" class="min-h-[560px] flex flex-1 flex-col">
+          <div v-else-if="viewMode === 'month'" key="month" class="min-h-[420px] flex flex-1 flex-col sm:min-h-[560px]">
             <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
               <div
                 v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
                 :key="dayLabel"
-                class="py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider"
+                class="py-2.5 text-center text-[11px] font-bold uppercase text-slate-500 sm:py-3 sm:text-xs"
               >
                 {{ dayLabel }}
               </div>
@@ -170,15 +170,15 @@
               <div
                 v-for="(cell, i) in monthCells"
                 :key="i"
-                class="min-h-[120px] p-2"
+                class="min-h-[74px] p-1.5 sm:min-h-[120px] sm:p-2"
                 :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
               >
                 <div class="flex justify-between items-start mb-1">
-                  <span v-if="cell.fullDate && !isMobile" class="text-[10px] text-slate-400 leading-6">
+                  <span v-if="cell.fullDate" class="truncate text-[9px] leading-5 text-slate-400 sm:text-[10px] sm:leading-6">
                     {{ getLunarText(cell.fullDate) }}
                   </span>
                   <span
-                    class="size-6 flex items-center justify-center rounded-full text-xs font-medium"
+                    class="flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-medium sm:size-6 sm:text-xs"
                     :class="cell.isToday
                       ? 'bg-primary text-white font-bold'
                       : !cell.isCurrentMonth ? 'text-slate-300' : 'text-slate-700'"
