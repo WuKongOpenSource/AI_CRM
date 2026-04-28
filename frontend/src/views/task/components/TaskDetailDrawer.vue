@@ -21,22 +21,22 @@
         <div class="flex items-center gap-2">
           <button
             v-if="canEdit"
-            class="size-9 rounded-full text-slate-400 transition-colors hover:bg-primary/10 hover:text-primary"
+            class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-primary/10 hover:text-primary"
             type="button"
             aria-label="编辑任务"
             title="编辑任务"
             @click="$emit('edit', task)"
           >
-            <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+            <span class="material-symbols-outlined flex size-[18px] items-center justify-center text-[18px] leading-none">edit</span>
           </button>
           <button
-            class="size-9 rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             type="button"
             aria-label="关闭任务详情"
             title="关闭"
             @click="open = false"
           >
-            <span class="material-symbols-outlined text-xl leading-none">close</span>
+            <span class="material-symbols-outlined flex size-[18px] items-center justify-center text-[18px] leading-none">close</span>
           </button>
         </div>
       </div>
