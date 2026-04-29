@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full min-h-0 bg-background-light">
+  <div class="flex h-full min-h-0 overflow-y-auto bg-background-light md:overflow-hidden">
     <!-- Calendar Main -->
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-8" :class="{ 'border-r border-slate-100': selectedEvent || selectedTask }">
       <div class="flex min-h-0 w-full flex-1 flex-col gap-4 md:gap-6">
@@ -351,7 +351,7 @@
         <!-- Mobile Day Detail List (append below calendar views) -->
         <div
           v-if="showMobileInlineDayList"
-          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm max-h-[60vh] overflow-y-auto"
+          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:max-h-[60vh] sm:overflow-y-auto"
         >
           <div class="max-w-3xl mx-auto space-y-8">
             <!-- <div class="flex items-center justify-between gap-3">
