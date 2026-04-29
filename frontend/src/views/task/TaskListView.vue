@@ -9,7 +9,7 @@
             <h2 class="text-xl md:text-2xl font-bold text-slate-900">AI 优先行动中心</h2>
             <p class="text-sm text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
-          <div class="flex items-center justify-end gap-3">
+          <div class="flex items-center justify-between gap-3">
             <!-- Segmented filter -->
             <div class="wk-x-scroll-hidden flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm overflow-x-auto max-w-[70vw] md:max-w-none">
               <button
@@ -272,7 +272,7 @@
 
     <TaskDetailDrawer
       v-model="showTaskDetail"
-      :task="selectedTask"
+      :task="detailTask"
       :is-mobile="isMobile"
       @edit="handleEditFromDetail"
       @mutated="handleTaskDetailMutated"
@@ -306,6 +306,8 @@ const currentStatus = ref('all')
 const valueFilter = ref<'all' | 'high-impact'>('all')
 const showAddDialog = ref(false)
 const editingTask = ref<Task | null>(null)
+const showTaskDetail = ref(false)
+const detailTask = ref<Task | null>(null)
 const selectedTask = ref<Task | null>(null)
 
 // Computed properties
@@ -341,10 +343,11 @@ const visiblePages = computed(() => {
   return pages
 })
 
-const showTaskDetail = computed({
-  get: () => !!selectedTask.value,
-  set: (val: boolean) => {
-    if (!val) selectedTask.value = null
+watch(showTaskDetail, open => {
+  if (open) return
+  detailTask.value = null
+  if (!isMobile.value) {
+    selectedTask.value = null
   }
 })
 
@@ -387,7 +390,11 @@ async function openTaskFromRouteQuery(taskId: string) {
 
   const matchedTask = taskStore.taskList.find(task => task.taskId === taskId) || null
   if (matchedTask) {
-    selectedTask.value = matchedTask
+    detailTask.value = matchedTask
+    showTaskDetail.value = true
+    if (!isMobile.value) {
+      selectedTask.value = matchedTask
+    }
   }
 
   const nextQuery = { ...route.query }
@@ -401,7 +408,11 @@ async function openTaskFromRouteQuery(taskId: string) {
   await taskStore.fetchTaskList(false)
 
   if (matchedTask) {
-    selectedTask.value = taskStore.taskList.find(task => task.taskId === taskId) || matchedTask
+    const refreshed = taskStore.taskList.find(task => task.taskId === taskId) || matchedTask
+    detailTask.value = refreshed
+    if (!isMobile.value) {
+      selectedTask.value = refreshed
+    }
   }
 }
 
@@ -446,19 +457,32 @@ async function handleStartTask(task: Task) {
 }
 
 function handleViewDetail(task: Task) {
+  detailTask.value = task
+  showTaskDetail.value = true
+  if (isMobile.value) {
+    // 手机端点击详情时不走 selectedTask 选中逻辑，改用侧滑抽屉展示详情
+    // selectedTask.value = task
+    return
+  }
   selectedTask.value = task
 }
 
 function handleEditFromDetail(task: Task) {
   handleEdit(task)
-  if (isMobile.value) selectedTask.value = null
+  if (isMobile.value) {
+    showTaskDetail.value = false
+  }
 }
 
 async function handleTaskDetailMutated() {
   await taskStore.fetchTaskList(false)
-  const id = selectedTask.value?.taskId
+  const id = detailTask.value?.taskId
   if (id) {
-    selectedTask.value = taskStore.taskList.find(t => t.taskId === id) ?? null
+    const refreshed = taskStore.taskList.find(t => t.taskId === id) ?? null
+    detailTask.value = refreshed
+    if (!isMobile.value) {
+      selectedTask.value = refreshed
+    }
   }
 }
 
@@ -474,9 +498,13 @@ function handleEdit(task: Task) {
 
 function handleTaskSaved() {
   editingTask.value = null
-  const selectedTaskId = selectedTask.value?.taskId
+  const selectedTaskId = detailTask.value?.taskId
   if (selectedTaskId) {
-    selectedTask.value = taskStore.taskList.find(task => task.taskId === selectedTaskId) || selectedTask.value
+    const refreshed = taskStore.taskList.find(task => task.taskId === selectedTaskId) || detailTask.value
+    detailTask.value = refreshed
+    if (!isMobile.value) {
+      selectedTask.value = refreshed
+    }
   }
 }
 

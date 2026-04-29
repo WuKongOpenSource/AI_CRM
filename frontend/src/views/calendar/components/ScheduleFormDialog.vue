@@ -1,11 +1,14 @@
 <template>
   <el-dialog
     v-model="visible"
-    :width="isMobile ? '96%' : '720px'"
+    :width="isMobile ? 'calc(100% - 32px)' : '720px'"
     :show-close="false"
     destroy-on-close
-    top="6vh"
-    class="schedule-dialog !rounded-2xl !p-0 overflow-hidden wk-crm-el-field-scope"
+    :top="isMobile ? '16px' : '10vh'"
+    :class="[
+      'schedule-dialog !rounded-2xl !p-0 overflow-hidden wk-crm-el-field-scope',
+      isMobile ? 'schedule-dialog--mobile' : 'schedule-dialog--desktop'
+    ]"
   >
     <template #header>
       <div class="flex items-center justify-between">
@@ -615,13 +618,31 @@ async function handleSaveSchedule() {
 }
 
 .schedule-dialog .el-dialog__body {
-  max-height: 72vh;
-  overflow-y: auto;
   padding: 0 !important;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .schedule-dialog .el-dialog__footer {
   padding: 14px 24px 22px !important;
+}
+
+.schedule-dialog.el-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.schedule-dialog--desktop.el-dialog {
+  max-height: 90vh;
+}
+
+.schedule-dialog--mobile.el-dialog {
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  margin: 16px auto !important;
+  border-radius: 1rem !important;
 }
 
 .el-overlay:has(.schedule-dialog) {

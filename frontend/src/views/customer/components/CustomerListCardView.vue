@@ -1,8 +1,9 @@
 <template>
-  <div class="min-h-0 min-w-0 flex-1 overflow-hidden">
+  <div class="min-h-0 min-w-0 flex-1" :class="isMobile ? 'overflow-visible' : 'overflow-hidden'">
     <div
-      class="wk-card-view-scroll min-h-0 overflow-y-auto overflow-x-hidden"
-      :style="{ maxHeight: `${scrollMaxHeight}px` }"
+      class="wk-card-view-scroll min-h-0 overflow-x-hidden"
+      :class="isMobile ? 'overflow-y-visible' : 'overflow-y-auto'"
+      :style="isMobile ? undefined : { maxHeight: `${scrollMaxHeight}px` }"
     >
       <div
         v-if="customers.length === 0"
@@ -99,8 +100,11 @@
 
 <script setup lang="ts">
 import type { CustomerListVO } from '@/types/customer'
+import { useResponsive } from '@/composables/useResponsive'
 import { getCustomerAiStatusMeta } from '@/utils/customerAi'
 import { formatCardQuotation, formatLastContactDate, lastFollowUpHighlightClass } from '@/utils/customerListViewUi'
+
+const { isMobile } = useResponsive()
 
 defineProps<{
   customers: CustomerListVO[]

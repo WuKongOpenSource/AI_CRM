@@ -62,12 +62,20 @@
 
         <!-- Calendar Views -->
         <div
-          class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative"
-          :class="viewMode === 'grid' || viewMode === 'month' ? 'min-h-0 flex flex-1 flex-col' : 'shrink-0'"
+          class="shrink-0 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative"
+          :class="viewMode === 'grid'
+            ? 'min-h-0 flex flex-col sm:flex-1'
+            : viewMode === 'month'
+              ? 'min-h-0 flex flex-col sm:flex-1'
+              : 'shrink-0'"
         >
           <Transition name="wk-cal-view" mode="out-in">
           <!-- Week View -->
-          <div v-if="viewMode === 'grid'" key="grid" class="grid min-h-[320px] flex-1 grid-cols-7 divide-x divide-slate-200 sm:min-h-[400px]">
+          <div
+            v-if="viewMode === 'grid'"
+            key="grid"
+            class="grid h-[124px] grid-cols-7 divide-x divide-slate-200 sm:h-auto sm:min-h-[400px] sm:flex-1"
+          >
             <div
               v-for="day in weekDays"
               :key="day.label"
@@ -88,11 +96,14 @@
                 >{{ day.date }}</span>
               </div>
               <div
-                class="flex-1 space-y-4 p-1.5 sm:p-3"
-                :class="isMobile && getEventsForDate(day.fullDate).length ? 'cursor-pointer' : ''"
+                class="space-y-4 p-1.5 sm:p-3"
+                :class="[
+                  isMobile ? 'h-[60px]' : 'flex-1',
+                  isMobile && getEventsForDate(day.fullDate).length ? 'cursor-pointer' : ''
+                ]"
                 @click="openMobileEventsDialog(day.fullDate)"
               >
-                <div v-if="isMobile" class="flex h-full items-center justify-center">
+                <div v-if="isMobile" class="flex h-[40px] items-center justify-center">
                   <span
                     v-if="getEventsForDate(day.fullDate).length || getTasksForDate(day.fullDate).length"
                     class="size-2 rounded-full bg-primary/70"
@@ -156,7 +167,7 @@
           </div>
 
           <!-- Month View -->
-          <div v-else-if="viewMode === 'month'" key="month" class="min-h-[420px] flex flex-1 flex-col sm:min-h-[560px]">
+          <div v-else-if="viewMode === 'month'" key="month" class="flex flex-col sm:min-h-[560px] sm:flex-1">
             <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
               <div
                 v-for="dayLabel in ['周一','周二','周三','周四','周五','周六','周日']"
@@ -166,11 +177,11 @@
                 {{ dayLabel }}
               </div>
             </div>
-            <div class="grid flex-1 grid-cols-7 grid-rows-5 divide-x divide-y divide-slate-100">
+            <div class="grid grid-cols-7 grid-rows-5 divide-x divide-y divide-slate-100 h-[400px] sm:flex-1 sm:h-auto">
               <div
                 v-for="(cell, i) in monthCells"
                 :key="i"
-                class="min-h-[74px] p-1.5 sm:min-h-[120px] sm:p-2"
+                class="h-full p-1.5 sm:h-auto sm:min-h-[120px] sm:p-2"
                 :class="{ 'bg-slate-50/50': !cell.isCurrentMonth }"
               >
                 <div class="flex justify-between items-start mb-1">
@@ -188,7 +199,7 @@
                 </div>
                 <div
                   v-if="cell.fullDate"
-                  class="space-y-1"
+                  class="space-y-1 py-2"
                   :class="isMobile && (getEventsForDate(cell.fullDate).length || getTasksForDate(cell.fullDate).length) ? 'cursor-pointer' : ''"
                   @click="handleMobileMonthCellClick(cell.fullDate)"
                 >
@@ -335,6 +346,112 @@
             </div>
           </div>
           </Transition>
+        </div>
+
+        <!-- Mobile Day Detail List (append below calendar views) -->
+        <div
+          v-if="showMobileInlineDayList"
+          class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm max-h-[60vh] overflow-y-auto"
+        >
+          <div class="max-w-3xl mx-auto space-y-8">
+            <!-- <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-bold text-slate-900">
+                {{ mobileInlineDayListHeader }}
+              </h3>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                @click="closeMobileInlineDayList"
+              >
+                <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+                返回日历
+              </button>
+            </div> -->
+
+            <div v-if="mobileInlineDayGroups.length === 0" class="text-center py-20 text-slate-400">
+              <span class="material-symbols-outlined text-4xl mb-2">calendar_today</span>
+              <p class="text-sm">当日暂无日程安排和待办任务</p>
+            </div>
+
+            <div v-for="group in mobileInlineDayGroups" :key="group.dateStr" class="space-y-4">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span class="size-2 rounded-full bg-primary"></span>
+                {{ group.header }}
+                <span class="text-xs font-normal text-slate-400 ml-2">农历 {{ group.lunar }}</span>
+              </h3>
+
+              <div class="space-y-4 ml-4 border-l-2 border-slate-100 pl-6">
+                <div
+                  v-for="item in group.items"
+                  :key="item.key"
+                  class="relative bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-all group"
+                  :class="item.kind === 'schedule' ? 'cursor-pointer' : ''"
+                  @click="item.kind === 'schedule' ? (selectedEvent = item.payload, selectedTask = null) : selectTask(item.payload)"
+                >
+                  <div
+                    class="absolute -left-[32px] top-5 size-3 bg-white border-2 rounded-full"
+                    :class="item.kind === 'schedule' ? 'border-primary' : 'border-slate-300'"
+                  ></div>
+
+                  <div v-if="item.kind === 'schedule'" class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <h4 class="text-sm font-bold text-slate-900 mb-1 group-hover:text-primary transition-colors truncate">
+                        {{ item.payload.title }}
+                      </h4>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span v-if="item.payload.customerName" class="text-xs text-slate-500 font-medium">{{ item.payload.customerName }}</span>
+                        <span v-if="item.payload.typeName" class="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-bold">{{ item.payload.typeName }}</span>
+                        <span v-if="item.payload.location" class="text-xs px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full font-bold">{{ item.payload.location }}</span>
+                      </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <span class="inline-block px-2 py-1 bg-slate-50 text-slate-600 text-xs font-bold rounded-lg">
+                        {{ item.timeLabel }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div v-else class="flex items-start gap-3">
+                    <button
+                      @click.stop="handleToggleTask(item.payload)"
+                      class="mt-0.5 shrink-0 size-5 rounded border flex items-center justify-center transition-colors"
+                      :class="item.payload.status === 'COMPLETED'
+                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                        : 'border-slate-300 hover:border-primary text-transparent hover:text-primary/20'"
+                      aria-label="切换任务完成状态"
+                      :title="item.payload.status === 'COMPLETED' ? '标记为未完成' : '标记为已完成'"
+                    >
+                      <span class="material-symbols-outlined text-[14px] font-bold">check</span>
+                    </button>
+
+                    <div class="min-w-0 flex-1" @click="selectTask(item.payload)">
+                      <h4
+                        class="text-sm font-bold mb-1 truncate"
+                        :class="item.payload.status === 'COMPLETED' ? 'text-slate-400 line-through' : 'text-slate-900'"
+                      >
+                        {{ item.payload.title }}
+                      </h4>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span v-if="item.payload.customerName" class="text-xs text-slate-500">{{ item.payload.customerName }}</span>
+                        <span v-if="item.payload.dueDate" class="text-xs px-2 py-0.5 bg-slate-50 text-slate-600 rounded-full font-bold">
+                          截止 {{ formatDueDate(item.payload.dueDate) }}
+                        </span>
+                        <span
+                          v-if="item.payload.priority"
+                          class="text-xs px-2 py-0.5 rounded-full font-bold"
+                          :class="{
+                            'bg-red-50 text-red-500': normalizeTaskPriority(item.payload.priority) === 'HIGH',
+                            'bg-amber-50 text-amber-500': normalizeTaskPriority(item.payload.priority) === 'MEDIUM',
+                            'bg-slate-100 text-slate-500': normalizeTaskPriority(item.payload.priority) === 'LOW',
+                          }"
+                        >{{ getTaskPriorityLabel(item.payload.priority) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -520,17 +637,17 @@ function getLunarText(dateStr: string): string {
   }
 }
 
-function getLunarDayText(dateStr: string): string {
-  const text = getLunarText(dateStr)
-  if (!text) return ''
-  return text.replace(/^(闰)?[一二三四五六七八九十冬腊\d]+月/, '')
-}
-
 function openMobileEventsDialog(dateStr: string) {
   if (!isMobile.value) return
   const events = getEventsForDate(dateStr)
   const dayTasks = getTasksForDate(dateStr)
   if (!events.length && !dayTasks.length) return
+  if (mobileDayDetailDisplayMode.value === 'list') {
+    showMobileMonthEventsDialog.value = false
+    mobileInlineDayListDate.value = dateStr
+    return
+  }
+  mobileInlineDayListDate.value = null
   mobileMonthEventsDialogDate.value = dateStr
   showMobileMonthEventsDialog.value = true
 }
@@ -573,6 +690,9 @@ const showTaskEditDialog = ref(false)
 const editingTask = ref<Task | null>(null)
 const showMobileMonthEventsDialog = ref(false)
 const mobileMonthEventsDialogDate = ref<string | null>(null)
+/** Mobile date click detail mode: 'dialog' keeps current behavior, 'list' shows inline list block */
+const mobileDayDetailDisplayMode = ref<'dialog' | 'list'>('list')
+const mobileInlineDayListDate = ref<string | null>(null)
 
 const viewModes = [
   { value: 'grid' as const, label: '周' },
@@ -588,6 +708,20 @@ const mobileMonthEvents = computed(() => {
 const mobileMonthTasks = computed(() => {
   if (!mobileMonthEventsDialogDate.value) return []
   return getTasksForDate(mobileMonthEventsDialogDate.value)
+})
+
+const showMobileInlineDayList = computed(() => {
+  return isMobile.value && mobileDayDetailDisplayMode.value === 'list' && !!mobileInlineDayListDate.value
+})
+
+const mobileInlineDayGroups = computed(() => {
+  if (!mobileInlineDayListDate.value) return []
+  return listGroups.value.filter(group => group.dateStr === mobileInlineDayListDate.value)
+})
+
+const mobileInlineDayListHeader = computed(() => {
+  if (!mobileInlineDayListDate.value) return '当天日程'
+  return getDayHeader(mobileInlineDayListDate.value)
 })
 
 const calendarAnchorDate = ref<Date>(new Date())
@@ -607,6 +741,10 @@ function shiftCalendarAnchor(direction: number) {
 
 function goCalendarToday() {
   calendarAnchorDate.value = new Date()
+}
+
+function closeMobileInlineDayList() {
+  mobileInlineDayListDate.value = null
 }
 
 const weekDays = computed(() => {
@@ -724,6 +862,16 @@ watch(
     }
   }
 )
+
+watch(viewMode, () => {
+  mobileInlineDayListDate.value = null
+})
+
+watch(isMobile, (mobile) => {
+  if (!mobile) {
+    mobileInlineDayListDate.value = null
+  }
+})
 
 async function openScheduleFromRouteQuery(scheduleId: string) {
   try {

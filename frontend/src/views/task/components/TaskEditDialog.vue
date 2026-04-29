@@ -1,11 +1,14 @@
 <template>
   <el-dialog
     v-model="open"
-    :width="isMobile ? '95%' : '720px'"
+    :width="isMobile ? 'calc(100% - 32px)' : '720px'"
     :show-close="false"
     destroy-on-close
-    top="10vh"
-    class="!rounded-2xl !p-0 overflow-hidden task-dialog wk-crm-el-field-scope"
+    :top="isMobile ? '16px' : '10vh'"
+    :class="[
+      '!rounded-2xl !p-0 overflow-hidden task-dialog wk-crm-el-field-scope',
+      isMobile ? 'task-dialog--mobile' : 'task-dialog--desktop'
+    ]"
   >
     <template #header>
       <div class="flex items-center justify-between">
@@ -495,11 +498,26 @@ function formatDateTimeLocal(dateStr: string): string {
 }
 .task-dialog .el-dialog__body {
   padding: 0 !important;
-  max-height: 65vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 .task-dialog .el-dialog__footer {
   padding: 14px 24px 22px !important;
+}
+.task-dialog.el-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.task-dialog--desktop.el-dialog {
+  max-height: 90vh;
+}
+.task-dialog--mobile.el-dialog {
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  margin: 16px auto !important;
+  border-radius: 1rem !important;
 }
 /* Prevent overlay from scrolling — dialog body scrolls internally */
 .el-overlay:has(.task-dialog) {

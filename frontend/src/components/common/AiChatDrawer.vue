@@ -246,7 +246,7 @@
             </div>
 
             <!-- Input Box -->
-            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:border-primary transition-all">
+            <div class="flex flex-wrap items-center bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:border-primary transition-all">
               <input
                 ref="fileInputRef"
                 type="file"
@@ -271,9 +271,10 @@
                 @keydown.enter.exact.prevent="handleSend"
                 @paste="handlePaste"
               />
+              <div class="order-3 basis-full sm:hidden"></div>
               <button
                 type="button"
-                class="h-9 rounded-full border px-3 text-xs font-semibold shadow-sm transition-all"
+                class="order-4 mt-1 h-9 w-fit rounded-full border px-3 text-xs font-semibold shadow-sm transition-all sm:order-none sm:mt-0"
                 :class="chatStore.ragEnabled
                   ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
                   : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
@@ -289,7 +290,7 @@
                 </span>
               </button>
               <button
-                class="size-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all disabled:opacity-50"
+                class="order-5 mt-1 ml-auto size-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all disabled:opacity-50 sm:order-none sm:mt-0 sm:ml-0"
                 :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
                 @click="handleSend"
               >
