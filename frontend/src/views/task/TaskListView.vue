@@ -469,9 +469,6 @@ function handleViewDetail(task: Task) {
 
 function handleEditFromDetail(task: Task) {
   handleEdit(task)
-  if (isMobile.value) {
-    showTaskDetail.value = false
-  }
 }
 
 async function handleTaskDetailMutated() {

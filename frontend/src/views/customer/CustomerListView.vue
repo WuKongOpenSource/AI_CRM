@@ -32,8 +32,8 @@
         <el-popover
           v-model:visible="showAiSearchPopover"
           trigger="click"
-          placement="bottom-end"
-          :width="420"
+          :placement="isMobile ? 'bottom' : 'bottom-end'"
+          :width="isMobile ? 'calc(100vw - 2rem)' : 420"
           popper-class="wk-ai-search-popover"
         >
           <template #reference>
@@ -74,16 +74,16 @@
               <p class="text-xs text-slate-500 leading-5">{{ aiSearchStatusText }}</p>
             </div>
 
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 v-if="hasAiSearchState"
-                class="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors"
+                class="text-left text-xs font-medium text-slate-500 hover:text-red-500 transition-colors"
                 type="button"
                 @click="clearAiSearch"
               >
                 清空 AI 条件
               </button>
-              <div class="flex items-center gap-2 ml-auto">
+              <div class="flex w-full items-center justify-end gap-2 sm:w-auto sm:ml-auto">
                 <button
                   class="px-3 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
                   type="button"

@@ -719,11 +719,6 @@ const mobileInlineDayGroups = computed(() => {
   return listGroups.value.filter(group => group.dateStr === mobileInlineDayListDate.value)
 })
 
-const mobileInlineDayListHeader = computed(() => {
-  if (!mobileInlineDayListDate.value) return '当天日程'
-  return getDayHeader(mobileInlineDayListDate.value)
-})
-
 const calendarAnchorDate = ref<Date>(new Date())
 const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
@@ -741,10 +736,6 @@ function shiftCalendarAnchor(direction: number) {
 
 function goCalendarToday() {
   calendarAnchorDate.value = new Date()
-}
-
-function closeMobileInlineDayList() {
-  mobileInlineDayListDate.value = null
 }
 
 const weekDays = computed(() => {
