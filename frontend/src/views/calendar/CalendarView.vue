@@ -10,7 +10,9 @@
               <h2 class="text-xl font-bold text-slate-900 sm:text-2xl">智能日程安排</h2>
               <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
             </div>
-            <div class="flex w-full shrink-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-1 sm:w-auto sm:justify-start">
+          </div>
+          <div class="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:w-auto sm:flex-wrap sm:gap-4">
+            <div class="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-1 sm:w-auto sm:justify-start">
               <button
                 type="button"
                 class="size-8 flex items-center justify-center rounded-lg hover:bg-slate-50 text-slate-600 transition-colors"
@@ -35,8 +37,6 @@
                 <span class="material-symbols-outlined text-[20px]">chevron_right</span>
               </button>
             </div>
-          </div>
-          <div class="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:w-auto sm:flex-wrap sm:gap-4">
             <div class="flex min-w-0 items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
               <button
                 v-for="mode in viewModes"
@@ -52,7 +52,7 @@
             <button
               type="button"
               @click="openCreateScheduleDialog"
-              class="flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 sm:gap-2 sm:px-6 sm:py-2.5"
+              class="col-span-2 flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 sm:col-auto sm:gap-2 sm:px-6 sm:py-2.5"
             >
               <span class="material-symbols-outlined wk-plus-button-icon">add</span>
               新增日程
@@ -711,7 +711,10 @@ const mobileMonthTasks = computed(() => {
 })
 
 const showMobileInlineDayList = computed(() => {
-  return isMobile.value && mobileDayDetailDisplayMode.value === 'list' && !!mobileInlineDayListDate.value
+  return isMobile.value
+    && viewMode.value !== 'list'
+    && mobileDayDetailDisplayMode.value === 'list'
+    && !!mobileInlineDayListDate.value
 })
 
 const mobileInlineDayGroups = computed(() => {
@@ -721,6 +724,12 @@ const mobileInlineDayGroups = computed(() => {
 
 const calendarAnchorDate = ref<Date>(new Date())
 const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+function syncMobileInlineDayListDefaultDate() {
+  if (!isMobile.value || mobileDayDetailDisplayMode.value !== 'list') return
+  if (mobileInlineDayListDate.value) return
+  mobileInlineDayListDate.value = toDateStr(new Date())
+}
 
 function shiftCalendarAnchor(direction: number) {
   const d = new Date(calendarAnchorDate.value)
@@ -839,6 +848,7 @@ async function loadTasks() {
 
 onMounted(async () => {
   await Promise.all([loadSchedules(), loadTasks()])
+  syncMobileInlineDayListDefaultDate()
 
   if (typeof route.query.openScheduleId === 'string') {
     await openScheduleFromRouteQuery(route.query.openScheduleId)
@@ -855,13 +865,17 @@ watch(
 )
 
 watch(viewMode, () => {
-  mobileInlineDayListDate.value = null
+  if (!isMobile.value) {
+    mobileInlineDayListDate.value = null
+  }
 })
 
 watch(isMobile, (mobile) => {
   if (!mobile) {
     mobileInlineDayListDate.value = null
+    return
   }
+  syncMobileInlineDayListDefaultDate()
 })
 
 async function openScheduleFromRouteQuery(scheduleId: string) {
