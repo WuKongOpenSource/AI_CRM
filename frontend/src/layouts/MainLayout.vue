@@ -64,14 +64,14 @@
 
             <template v-else>
               <template v-if="groupedChatSessions.today.length > 0">
-                <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">今天</p>
+                <!-- <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">今天</p> -->
                 <button
                   v-for="session in groupedChatSessions.today"
                   :key="session.sessionId"
-                  class="group w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[10px] px-[10px] py-[8px] mx-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
-                    : 'border-transparent hover:bg-slate-100/50'"
+                    ? 'bg-[#f3f3f3]'
+                    : 'hover:bg-slate-100/50'"
                   @click="handleSelectSession(session.sessionId)"
                 >
                   <div class="flex min-w-0 items-center gap-2">
@@ -93,14 +93,14 @@
               </template>
 
               <template v-if="groupedChatSessions.yesterday.length > 0">
-                <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">昨天</p>
+                <!-- <p class="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">昨天</p> -->
                 <button
                   v-for="session in groupedChatSessions.yesterday"
                   :key="session.sessionId"
-                  class="group w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[10px] px-[10px] py-[8px] mx-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
-                    : 'border-transparent hover:bg-slate-100/50'"
+                    ? 'bg-[#f3f3f3]'
+                    : 'hover:bg-slate-100/50'"
                   @click="handleSelectSession(session.sessionId)"
                 >
                   <div class="flex min-w-0 items-center gap-2">
@@ -126,10 +126,10 @@
                 <button
                   v-for="session in groupedChatSessions.earlier"
                   :key="session.sessionId"
-                  class="group w-full min-w-0 overflow-hidden rounded-xl border p-3 text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[10px] px-[10px] py-[8px] mx-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'border-slate-200 bg-white shadow-sm shadow-slate-200/80'
-                    : 'border-transparent hover:bg-slate-100/50'"
+                    ? 'bg-[#f3f3f3]'
+                    : 'hover:bg-slate-100/50'"
                   @click="handleSelectSession(session.sessionId)"
                 >
                   <div class="flex min-w-0 items-center gap-2">

@@ -331,7 +331,7 @@
             <div class="max-w-4xl mx-auto space-y-4">
 
               <!-- Selected Files Preview -->
-              <div v-if="selectedFiles.length > 0" class="flex flex-wrap gap-2">
+              <div v-if="false && selectedFiles.length > 0" class="flex flex-wrap gap-2">
                 <div
                   v-for="(file, index) in selectedFiles"
                   :key="index"
@@ -357,7 +357,7 @@
                   class="relative flex bg-white border border-[#0d0d0d0d] rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
                   :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center rounded-[28px] p-[6px]'"
                 >
-                  <div class="flex items-center w-full">
+                  <div class="w-full">
                   <input
                     ref="fileInputRef"
                     type="file"
@@ -366,23 +366,74 @@
                     class="hidden"
                     @change="handleFileSelect"
                   />
-                  <button
-                    class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
-                    :disabled="isUploading"
-                    @click="handleUpload"
-                  >
-                    <span class="material-symbols-outlined">attach_file</span>
-                  </button>
-                  <input
-                    v-model="inputText"
-                    type="text"
-                    class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#909090] placeholder:text-[16px]"
-                    placeholder="输入指令，如：总结今天与张总的会议..."
-                    :disabled="chatStore.isStreaming || isUploading"
-                    @keydown.enter.exact.prevent="handleSend"
-                    @paste="handlePaste"
-                  />
-                  <div class="flex items-center gap-2 pr-1 shrink-0">
+
+                  <div v-if="selectedFiles.length > 0" class="flex items-center gap-2 px-2 pt-2 mb-4">
+                    <template v-for="(file, index) in selectedFiles.slice(0, 3)" :key="`${file.name}-${index}`">
+                      <div
+                        v-if="file.type.startsWith('image/')"
+                        class="relative w-[54px] h-[54px] rounded-xl border border-[#0d0d0d0d] bg-white overflow-hidden shrink-0"
+                      >
+                        <img
+                          :src="getSelectedFilePreviewUrl(file)"
+                          :alt="file.name"
+                          class="size-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          class="absolute top-[0.3rem] right-[-0.01rem] size-5 rounded-full bg-[#0d0d0d] text-white flex items-center justify-center"
+                          @click="removeSelectedFile(index)"
+                        >
+                          <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                        </button>
+                      </div>
+
+                      <div
+                        v-else
+                        class="relative w-[320px] h-[54px] rounded-xl border border-[#0d0d0d0d] bg-white overflow-hidden shrink-0 flex items-center gap-3 px-3"
+                      >
+                        <div class="size-10 rounded-xl bg-[#0d0d0d0d] flex items-center justify-center shrink-0">
+                          <span class="material-symbols-outlined text-[20px] leading-none text-[#0d0d0d]">description</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="text-[14px] leading-[18px] text-[#0d0d0d] truncate">{{ file.name }}</div>
+                          <div class="text-[12px] leading-[14px] text-[#909090]">文件</div>
+                        </div>
+                        <button
+                          type="button"
+                          class="absolute top-2 right-2 size-5 rounded-full bg-[#0d0d0d] text-white flex items-center justify-center"
+                          @click="removeSelectedFile(index)"
+                        >
+                          <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                        </button>
+                      </div>
+                    </template>
+
+                    <div
+                      v-if="selectedFiles.length > 3"
+                      class="h-12 flex items-center text-xs text-[#909090] pr-1"
+                    >
+                      +{{ selectedFiles.length - 3 }}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center w-full">
+                    <button
+                      class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors"
+                      :disabled="isUploading"
+                      @click="handleUpload"
+                    >
+                      <span class="material-symbols-outlined">attach_file</span>
+                    </button>
+                    <input
+                      v-model="inputText"
+                      type="text"
+                      class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[16px] placeholder:text-[#909090] placeholder:text-[16px]"
+                      placeholder="输入指令，如：总结今天与张总的会议..."
+                      :disabled="chatStore.isStreaming || isUploading"
+                      @keydown.enter.exact.prevent="handleSend"
+                      @paste="handlePaste"
+                    />
+                    <div class="flex items-center gap-2 pr-1 shrink-0">
                     <button
                       v-if="!isMobile"
                       type="button"
@@ -416,6 +467,7 @@
                       <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                       <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                     </button>
+                    </div>
                   </div>
                   </div>
 
@@ -617,6 +669,26 @@ const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
+const selectedFilePreviewUrlMap = new WeakMap<File, string>()
+function getSelectedFilePreviewUrl(file: File): string {
+  const cached = selectedFilePreviewUrlMap.get(file)
+  if (cached) return cached
+  const url = window.URL.createObjectURL(file)
+  selectedFilePreviewUrlMap.set(file, url)
+  return url
+}
+
+function revokeSelectedFilePreviewUrl(file: File) {
+  const url = selectedFilePreviewUrlMap.get(file)
+  if (!url) return
+  window.URL.revokeObjectURL(url)
+  selectedFilePreviewUrlMap.delete(file)
+}
+
+function revokeAllSelectedFilePreviewUrls() {
+  for (const file of selectedFiles.value) revokeSelectedFilePreviewUrl(file)
+}
+
 const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 
@@ -751,6 +823,7 @@ async function handleSend() {
     isUploading.value = true
     try {
       const files = [...selectedFiles.value]
+      revokeAllSelectedFilePreviewUrls()
       selectedFiles.value = []
 
       const results = await Promise.all(
@@ -858,6 +931,8 @@ function handlePaste(event: ClipboardEvent) {
 }
 
 function removeSelectedFile(index: number) {
+  const file = selectedFiles.value[index]
+  if (file) revokeSelectedFilePreviewUrl(file)
   selectedFiles.value.splice(index, 1)
 }
 
