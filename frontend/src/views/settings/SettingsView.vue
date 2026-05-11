@@ -74,11 +74,12 @@ const activeMainTab = computed<SettingsMainTab>({
   get: () => routeMainTab.value,
   set: (value) => {
     if (value === routeMainTab.value) return
+    const query = { ...route.query }
     if (value === 'system') {
-      router.push(`/settings/system/${lastSystemTab.value}`)
+      router.push({ path: `/settings/system/${lastSystemTab.value}`, query })
       return
     }
-    router.push(`/settings/${value}`)
+    router.push({ path: `/settings/${value}`, query })
   }
 })
 
@@ -87,7 +88,7 @@ const activeSystemTab = computed<SystemSettingsTab>({
   set: (value) => {
     lastSystemTab.value = value
     if (route.path === `/settings/system/${value}`) return
-    router.push(`/settings/system/${value}`)
+    router.push({ path: `/settings/system/${value}`, query: { ...route.query } })
   }
 })
 

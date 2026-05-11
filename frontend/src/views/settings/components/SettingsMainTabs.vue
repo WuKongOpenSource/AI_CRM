@@ -2,7 +2,7 @@
   <div class="bg-white border-b border-slate-200 px-4 md:px-8">
     <el-tabs v-model="currentTab" class="settings-main-tabs">
       <el-tab-pane
-        v-for="tab in SETTINGS_MAIN_TABS"
+        v-for="tab in visibleTabs"
         :key="tab.value"
         :label="tab.label"
         :name="tab.value"
@@ -13,6 +13,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { SETTINGS_MAIN_TABS } from '../constants'
 import type { SettingsMainTab } from '../types'
 
@@ -23,6 +24,20 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:activeTab', value: SettingsMainTab): void
 }>()
+
+const route = useRoute()
+
+const visibleTabs = computed(() => {
+  const rawScope = route.query.scope
+  const scope = Array.isArray(rawScope) ? rawScope[0] : rawScope
+  if (scope === 'crm') {
+    return SETTINGS_MAIN_TABS.filter((tab) => tab.value !== 'team')
+  }
+  if (scope === 'profile') {
+    return SETTINGS_MAIN_TABS.filter((tab) => tab.value === 'team')
+  }
+  return SETTINGS_MAIN_TABS
+})
 
 const currentTab = computed({
   get: () => props.activeTab,

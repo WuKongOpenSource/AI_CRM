@@ -165,9 +165,9 @@
         <button
           v-for="item in configNavItems"
           :key="item.route"
-          @click="navigateTo(item.route)"
+          @click="navigateTo(item.route, item.query)"
           class="flex w-full items-center gap-2 rounded-lg px-3 py-2 transition-colors"
-          :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
+          :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
         >
           <WkIcon :name="item.icon" :size="22" class="shrink-0" />
           <span class="truncate text-sm font-medium">{{ item.label }}</span>
@@ -231,14 +231,14 @@
                 v-for="item in configNavItems"
                 :key="item.route"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                @click="navigateTo(item.route)"
+                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                @click="navigateTo(item.route, item.query)"
               >
                 <WkIcon
                   :name="item.icon"
                   :size="24"
                   class="transition-colors"
-                  :class="isActive(item.route) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
+                  :class="isActive(item.route, item.query) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
                 />
                 <span class="text-sm font-medium">{{ item.label }}</span>
               </button>
@@ -274,17 +274,17 @@
               v-for="child in activeSecondaryItems"
               :key="child.key"
               class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-              :class="isActive(child.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-              @click="navigateTo(child.route)"
+              :class="isActive(child.route, child.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+              @click="navigateTo(child.route, child.query)"
             >
               <WkIcon
                 v-if="child.icon"
                 :name="child.icon"
                 :size="22"
                 class="shrink-0"
-                :class="isActive(child.route) ? 'text-primary' : 'text-slate-400'"
+                :class="isActive(child.route, child.query) ? 'text-primary' : 'text-slate-400'"
               />
-              <span v-else class="material-symbols-outlined shrink-0 text-[20px]" :class="isActive(child.route) ? 'text-primary' : 'text-slate-300'">
+              <span v-else class="material-symbols-outlined shrink-0 text-[20px]" :class="isActive(child.route, child.query) ? 'text-primary' : 'text-slate-300'">
                 subdirectory_arrow_right
               </span>
               <span class="truncate text-sm font-medium">{{ child.label }}</span>
@@ -425,17 +425,17 @@
                     v-for="child in item.children"
                     :key="child.key"
                     class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                    :class="isActive(child.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                    @click="mobileNavigate(child.route)"
+                    :class="isActive(child.route, child.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                    @click="mobileNavigate(child.route, child.query)"
                   >
                     <WkIcon
                       v-if="child.icon"
                       :name="child.icon"
                       :size="20"
                       class="shrink-0"
-                      :class="isActive(child.route) ? 'text-primary' : 'text-slate-400'"
+                      :class="isActive(child.route, child.query) ? 'text-primary' : 'text-slate-400'"
                     />
-                    <span v-else class="material-symbols-outlined shrink-0 text-[18px]" :class="isActive(child.route) ? 'text-primary' : 'text-slate-300'">
+                    <span v-else class="material-symbols-outlined shrink-0 text-[18px]" :class="isActive(child.route, child.query) ? 'text-primary' : 'text-slate-300'">
                       subdirectory_arrow_right
                     </span>
                     <span class="truncate text-sm font-medium">{{ child.label }}</span>
@@ -452,9 +452,9 @@
               <button
                 v-for="item in configNavItems"
                 :key="item.route"
-                @click="mobileNavigate(item.route)"
+                @click="mobileNavigate(item.route, item.query)"
                 class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
-                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
+                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
               >
                 <WkIcon :name="item.icon" :size="22" class="shrink-0" />
                 <span class="text-sm font-medium">{{ item.label }}</span>
@@ -519,14 +519,14 @@
                     v-for="item in configNavItems"
                     :key="item.route"
                     class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                    :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                    @click="navigateTo(item.route)"
+                    :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                    @click="navigateTo(item.route, item.query)"
                   >
                     <WkIcon
                       :name="item.icon"
                       :size="24"
                       class="transition-colors"
-                      :class="isActive(item.route) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
+                      :class="isActive(item.route, item.query) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
                     />
                     <span class="text-sm font-medium">{{ item.label }}</span>
                   </button>
@@ -593,14 +593,14 @@
                 v-for="item in configNavItems"
                 :key="item.route"
                 class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                :class="isActive(item.route) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                @click="navigateTo(item.route)"
+                :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
+                @click="navigateTo(item.route, item.query)"
               >
                 <WkIcon
                   :name="item.icon"
                   :size="24"
                   class="transition-colors"
-                  :class="isActive(item.route) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
+                  :class="isActive(item.route, item.query) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
                 />
                 <span class="text-sm font-medium">{{ item.label }}</span>
               </button>
@@ -775,6 +775,7 @@ type ConfigNavItem = {
   label: string
   route: string
   permission: string[]
+  query?: Record<string, string>
 }
 
 type SecondaryNavItem = {
@@ -782,6 +783,7 @@ type SecondaryNavItem = {
   icon?: WkIconName
   label: string
   route: string
+  query?: Record<string, string>
 }
 
 const allMainNavItems: MainNavItem[] = [
@@ -799,12 +801,13 @@ const allMainNavItems: MainNavItem[] = [
       { key: 'crm-customer', icon: 'customer', label: '客户管理', route: '/customer' },
       { key: 'crm-task', icon: 'task', label: '任务管理', route: '/task' },
       { key: 'crm-calendar', icon: 'meetingRecord', label: '日程安排', route: '/calendar' },
+      { key: 'crm-settings', icon: 'settings', label: '系统设置', route: '/settings/role', query: { scope: 'crm' } },
     ],
   },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
-  { icon: 'settings', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
+  { icon: 'settings', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
 ]
 
 const mainNavItems = computed(() =>
@@ -931,8 +934,21 @@ onBeforeUnmount(() => {
   }
 })
 
-function isActive(routePath: string) {
-  return activeMenu.value === routePath
+function isActive(routePath: string, itemQuery?: Record<string, string>) {
+  const pathMatches = routePath.startsWith('/settings')
+    ? route.path.startsWith('/settings')
+    : activeMenu.value === routePath
+  if (!pathMatches) return false
+
+  const expectedScope = itemQuery?.scope
+  const currentScope = typeof route.query.scope === 'string' ? route.query.scope : ''
+  if (expectedScope !== undefined) {
+    return currentScope === expectedScope
+  }
+  if (routePath.startsWith('/settings') && currentScope) {
+    return false
+  }
+  return true
 }
 
 function isPrimarySelected(item: MainNavItem) {
@@ -941,16 +957,16 @@ function isPrimarySelected(item: MainNavItem) {
 
 function isPrimaryActive(item: MainNavItem) {
   if (isPrimarySelected(item)) return true
-  if (item.children?.some(child => isActive(child.route))) return true
+  if (item.children?.some(child => isActive(child.route, child.query))) return true
   return isActive(item.route)
 }
 
 function handlePrimaryNavClick(item: MainNavItem) {
   if (item.children?.length) {
     selectedPrimaryKey.value = item.key
-    const firstChildRoute = item.children[0]?.route
-    if (firstChildRoute) {
-      navigateTo(firstChildRoute)
+    const firstChild = item.children[0]
+    if (firstChild?.route) {
+      navigateTo(firstChild.route, firstChild.query)
     }
     return
   }
@@ -1022,13 +1038,21 @@ async function handleDeleteSession(sessionId: string) {
   }
 }
 
-function navigateTo(path: string) {
-  void router.push(path)
+function navigateTo(path: string, query?: Record<string, string>) {
+  if (query) {
+    void router.push({ path, query })
+  } else {
+    void router.push(path)
+  }
   showUserMenu.value = false
 }
 
-function mobileNavigate(path: string) {
-  void router.push(path)
+function mobileNavigate(path: string, query?: Record<string, string>) {
+  if (query) {
+    void router.push({ path, query })
+  } else {
+    void router.push(path)
+  }
   drawerVisible.value = false
   showUserMenu.value = false
 }

@@ -239,7 +239,10 @@
                   </div>
                   <div class="flex-1 space-y-3 min-w-0">
                     <div class="relative text-[#0d0d0d] rounded-2xl rounded-tl-none p-4 inline-block max-w-full text-left leading-relaxed text-[16px]">
-                      <div class="absolute -bottom-7 left-0 z-10 size-10 flex items-center justify-center">
+                      <div
+                        v-if="!message.isStreaming"
+                        class="absolute -bottom-7 left-0 z-10 size-10 flex items-center justify-center"
+                      >
                         <button
                           type="button"
                           class="size-8 rounded-lg border-slate-200 bg-white text-slate-500 transition-colors hover:bg-[#E7E7E7] hover:text-slate-900 flex items-center justify-center"
