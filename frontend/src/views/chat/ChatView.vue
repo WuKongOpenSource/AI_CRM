@@ -406,7 +406,7 @@
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl transition-all opacity-0"></div>
                 <!-- focus-within:border-primary -->
                 <div
-                  class="relative flex bg-white border border-[#0d0d0d0d] rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
+                  class="relative flex bg-white rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
                   :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center rounded-[28px] p-[6px]'"
                   @mousedown="handleInputBoxMouseDown"
                 >
@@ -472,12 +472,13 @@
                   <!-- PC: input (2nd line) -->
                   <div v-if="!isMobile" class="w-full">
                     <textarea
-                      ref="textInputRef"
+                      ref="pcChatInputRef"
                       v-model="inputText"
                       rows="1"
-                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#909090] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
+                      class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 pt-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#909090] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
                       placeholder="输入指令，如：总结今天与张总的会议..."
                       :disabled="chatStore.isStreaming || isUploading"
+                      style="min-height: 90px;"
                       @input="resizeChatTextarea"
                       @keydown.enter.exact.prevent="handleSend"
                       @paste="handlePaste"
@@ -485,15 +486,83 @@
                   </div>
 
                   <!-- PC: controls (3rd line) -->
-                  <div v-if="!isMobile" class="flex items-center justify-between w-full px-1 pb-1 select-none mt-3">
+                  <div v-if="!isMobile" class="flex items-center justify-between w-full px-1 pb-1 select-none mt-1">
                     <div class="flex items-center gap-2">
-                      <button
-                        class="size-10 flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors"
+                      <el-popover
+                        v-model:visible="chatUploadMenuVisible"
+                        trigger="click"
+                        placement="top-start"
+                        width="200"
+                        :show-arrow="false"
                         :disabled="isUploading"
-                        @click="handleUpload"
+                        :teleported="true"
+                        popper-class="wk-chat-upload-menu-popper"
                       >
-                        <span class="material-symbols-outlined text-[1.2rem] leading-none">attach_file</span>
-                      </button>
+                        <template #reference>
+                          <button
+                            type="button"
+                            class="size-8 flex items-center justify-center rounded-full text-[#0d0d0d] hover:bg-[#F1F1F1] transition-colors"
+                            :disabled="isUploading"
+                          >
+                            <WkIcon name="add-1" :box-size="16" class="shrink-0" />
+                            <!-- <span class="material-symbols-outlined text-[18px] leading-none">add</span> -->
+                          </button>
+                        </template>
+                        <div class="wk-chat-upload-menu">
+                          <button
+                            type="button"
+                            class="wk-chat-upload-menu__item"
+                            :disabled="isUploading"
+                            @click="handleChatUploadMenuAddFile"
+                          >
+                            <span class="wk-chat-upload-menu__icon material-symbols-outlined">attach_file</span>
+                            <span class="wk-chat-upload-menu__label">上传照片和文件</span>
+                          </button>
+                          <button
+                            type="button"
+                            class="wk-chat-upload-menu__item"
+                            :disabled="isUploading"
+                            @click="handleChatUploadMenuChooseKnowledge"
+                          >
+                            <WkIcon name="knowledge-1" :size="18" class="shrink-0" />
+                            <!-- <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span> -->
+                            <span class="wk-chat-upload-menu__label">选择知识库文件</span>
+                          </button>
+                          <el-popover
+                            :trigger="isMobile ? 'click' : 'hover'"
+                            placement="right-end"
+                            :show-arrow="false"
+                            :disabled="isUploading"
+                            :teleported="true"
+                            :offset="8"
+                            :hide-after="isMobile ? 0 : 220"
+                            width="200"
+                            popper-class="wk-chat-upload-menu-popper wk-chat-upload-submenu-popper"
+                          >
+                            <template #reference>
+                              <div
+                                class="wk-chat-upload-menu__apps-ref"
+                                role="button"
+                                tabindex="0"
+                              >
+                                <WkIcon name="application" :size="18" class="shrink-0" />
+                                <!-- <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span> -->
+                                <span class="wk-chat-upload-menu__label">应用</span>
+                                <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
+                              </div>
+                            </template>
+                            <div class="wk-chat-upload-submenu">
+                              <button
+                                type="button"
+                                class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                                @click="handleChatUploadMenuOpenCrm"
+                              >
+                                <span class="wk-chat-upload-menu__label">CRM管理</span>
+                              </button>
+                            </div>
+                          </el-popover>
+                        </div>
+                      </el-popover>
                       <button
                         type="button"
                         class="h-10 rounded-full pl-1 pr-3.5 text-sm transition-all"
@@ -515,17 +584,24 @@
 
                     <div class="flex items-center pr-1 shrink-0">
                       <button
-                        class="size-10 rounded-full flex items-center justify-center transition-colors"
-                        :class="chatStore.isStreaming
-                          ? 'bg-[#e5e5e5] text-[#0d0d0d]'
-                          : ((!inputText.trim() && selectedFiles.length === 0) || isUploading)
-                            ? 'bg-[#e5e5e5] text-[#0d0d0d]'
-                            : 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'"
-                        :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
-                        @click="handleSend"
+                        type="button"
+                        class="group relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
+                        :class="sendBarActionButtonClass"
+                        :disabled="sendBarActionDisabled"
+                        :title="sendBarActionTitle"
+                        @click="handleSendBarClick"
                       >
                         <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
                         <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                        <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                        <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                        <span
+                          v-else-if="isChatInputEmpty"
+                          class="relative flex size-5 items-center justify-center"
+                        >
+                          <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-100 transition-opacity group-hover:opacity-0">arrow_upward</span>
+                          <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-0 transition-opacity group-hover:opacity-100">mic</span>
+                        </span>
                         <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                       </button>
                     </div>
@@ -533,15 +609,80 @@
 
                   <!-- Mobile: upload + multiline input -->
                   <div v-else class="flex items-end w-full">
-                    <button
-                      class="size-12 flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
+                    <el-popover
+                      v-model:visible="chatUploadMenuVisible"
+                      trigger="click"
+                      placement="top-start"
+                      width="240"
+                      :show-arrow="false"
                       :disabled="isUploading"
-                      @click="handleUpload"
+                      :teleported="true"
+                      popper-class="wk-chat-upload-menu-popper"
                     >
-                      <span class="material-symbols-outlined text-[0.875rem] leading-none">attach_file</span>
-                    </button>
+                      <template #reference>
+                        <button
+                          type="button"
+                          class="size-12 flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
+                          :disabled="isUploading"
+                        >
+                          <span class="material-symbols-outlined text-[0.875rem] leading-none">add</span>
+                        </button>
+                      </template>
+                      <div class="wk-chat-upload-menu">
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuAddFile"
+                        >
+                          <span class="wk-chat-upload-menu__icon material-symbols-outlined">attach_file</span>
+                          <span class="wk-chat-upload-menu__label">上传照片和文件</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuChooseKnowledge"
+                        >
+                          <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span>
+                          <span class="wk-chat-upload-menu__label">选择知识库文件</span>
+                        </button>
+                        <el-popover
+                          :trigger="isMobile ? 'click' : 'hover'"
+                          placement="right-end"
+                          :show-arrow="false"
+                          :disabled="isUploading"
+                          :teleported="true"
+                          :offset="8"
+                          :hide-after="isMobile ? 0 : 220"
+                          width="200"
+                          popper-class="wk-chat-upload-menu-popper wk-chat-upload-submenu-popper"
+                        >
+                          <template #reference>
+                            <div
+                              class="wk-chat-upload-menu__apps-ref"
+                              role="button"
+                              tabindex="0"
+                            >
+                              <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span>
+                              <span class="wk-chat-upload-menu__label">应用</span>
+                              <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
+                            </div>
+                          </template>
+                          <div class="wk-chat-upload-submenu">
+                            <button
+                              type="button"
+                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              @click="handleChatUploadMenuOpenCrm"
+                            >
+                              <span class="wk-chat-upload-menu__label">CRM管理</span>
+                            </button>
+                          </div>
+                        </el-popover>
+                      </div>
+                    </el-popover>
                     <textarea
-                      ref="textInputRef"
+                      ref="mobileChatInputRef"
                       v-model="inputText"
                       rows="1"
                       class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none pl-1 pr-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
@@ -574,17 +715,24 @@
                     </button>
 
                     <button
-                      class="size-10 rounded-full flex items-center justify-center transition-colors"
-                      :class="chatStore.isStreaming
-                        ? 'bg-[#e5e5e5] text-[#0d0d0d]'
-                        : ((!inputText.trim() && selectedFiles.length === 0) || isUploading)
-                          ? 'bg-[#e5e5e5] text-[#909090]'
-                          : 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'"
-                      :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
-                      @click="handleSend"
+                      type="button"
+                      class="group relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
+                      :class="sendBarActionButtonClass"
+                      :disabled="sendBarActionDisabled"
+                      :title="sendBarActionTitle"
+                      @click="handleSendBarClick"
                     >
                       <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
                       <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                      <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
+                      <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                      <span
+                        v-else-if="isChatInputEmpty"
+                        class="relative flex size-5 items-center justify-center"
+                      >
+                        <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-100 transition-opacity group-hover:opacity-0">arrow_upward</span>
+                        <span class="material-symbols-outlined absolute inset-0 flex items-center justify-center text-[20px] leading-none opacity-0 transition-opacity group-hover:opacity-100">mic</span>
+                      </span>
                       <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
                     </button>
                   </div>
@@ -596,13 +744,13 @@
                 <button
                   v-for="action in quickActions"
                   :key="action.label"
-                  class="px-4 py-[9px] bg-white border border-slate-200 rounded-full text-[14px] text-[#5d5d5d] hover:border-primary hover:text-primary transition-all shadow-sm"
+                  class="px-4 py-[9px] bg-white border border-slate-200 rounded-full text-[14px] text-[#5d5d5d] transition-all shadow-sm hover:bg-[#F1F1F1] hover:border-[#E0E0E0] hover:text-[#0d0d0d]"
                   @click="sendQuickMessage(action.text)"
                 >
                   {{ action.label }}
                 </button>
               </div>
-              <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase tracking-[0.4em]" style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
+              <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase " style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
             </div>
           </div>
         </div>
@@ -710,12 +858,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { transcribeFollowUpAudio } from '@/api/followup'
+import { getAiConfig } from '@/api/systemConfig'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,
@@ -737,7 +889,10 @@ import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 
+const route = useRoute()
+const router = useRouter()
 const chatStore = useChatStore()
+const { composerFocusNonce } = storeToRefs(chatStore)
 const agentStore = useAgentStore()
 const userStore = useUserStore()
 const { isMobile } = useResponsive()
@@ -748,7 +903,16 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const textInputRef = ref<HTMLTextAreaElement | null>(null)
+/** 桌面端多行输入（模板中 v-if="!isMobile" 的 textarea） */
+const pcChatInputRef = ref<HTMLTextAreaElement | null>(null)
+/** 移动端输入 */
+const mobileChatInputRef = ref<HTMLTextAreaElement | null>(null)
+
+function activeChatInputEl(): HTMLTextAreaElement | null {
+  return isMobile.value ? mobileChatInputRef.value : pcChatInputRef.value
+}
+
+const chatUploadMenuVisible = ref(false)
 
 /** 纵向最多展示约 10 行，再继续增高则出现纵向滚动条 */
 function getChatTextareaMaxHeightPx(el: HTMLTextAreaElement): number {
@@ -761,7 +925,7 @@ function getChatTextareaMaxHeightPx(el: HTMLTextAreaElement): number {
 }
 
 function resizeChatTextarea() {
-  const el = textInputRef.value
+  const el = activeChatInputEl()
   if (!el) return
   el.style.height = 'auto'
   const maxH = getChatTextareaMaxHeightPx(el)
@@ -772,6 +936,41 @@ watch(inputText, () => nextTick(resizeChatTextarea))
 watch(isMobile, () => nextTick(resizeChatTextarea))
 const selectedFiles = ref<File[]>([])
 const isUploading = ref(false)
+const isRecording = ref(false)
+const isTranscribing = ref(false)
+
+const isChatInputEmpty = computed(
+  () => !inputText.value.trim() && selectedFiles.value.length === 0
+)
+
+const sendBarActionButtonClass = computed(() => {
+  if (chatStore.isStreaming) return 'bg-[#e5e5e5] text-[#0d0d0d]'
+  if (isRecording.value) return 'bg-red-500 text-white hover:bg-red-600'
+  if (isTranscribing.value || isUploading.value) return 'bg-[#e5e5e5] text-[#909090]'
+  if (isChatInputEmpty.value) return 'bg-[#e5e5e5] text-[#0d0d0d] hover:bg-[#dcdcdc]'
+  return 'bg-[#0d0d0d] text-white hover:bg-[#0d0d0d]/90'
+})
+
+const sendBarActionDisabled = computed(
+  () => isUploading.value || isTranscribing.value || chatStore.isStreaming
+)
+
+const sendBarActionTitle = computed(() => {
+  if (chatStore.isStreaming) return '回复生成中'
+  if (isUploading.value) return '上传中'
+  if (isTranscribing.value) return '语音识别中…'
+  if (isRecording.value) return '点击结束录音'
+  if (isChatInputEmpty.value) return '语音输入（悬停显示麦克风）'
+  return '发送'
+})
+
+let mediaRecorder: MediaRecorder | null = null
+let mediaStream: MediaStream | null = null
+let recordedChunks: Blob[] = []
+let recordedMimeType = ''
+let skipNextTranscription = false
+let transcriptionToken = 0
+let speechInputBase = ''
 const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
@@ -819,13 +1018,50 @@ function revokeAllSelectedFilePreviewUrls() {
   for (const file of selectedFiles.value) revokeSelectedFilePreviewUrl(file)
 }
 
+/** 侧栏切换会话时移动端默认停在「历史」列表，输入区未挂载，需先切到聊天主区才能 focus。 */
+function prepareComposerForFocus() {
+  currentView.value = 'chat'
+  if (isMobile.value) {
+    mobilePanel.value = 'chat'
+  }
+}
+
+function focusChatTextarea() {
+  prepareComposerForFocus()
+  const maxAttempts = 20
+  const tryFocus = (attempt: number) => {
+    const el = activeChatInputEl()
+    if (el && !el.disabled) {
+      try {
+        el.focus({ preventScroll: true })
+      } catch {
+        el.focus()
+      }
+      if (document.activeElement === el) return
+    }
+    if (attempt + 1 >= maxAttempts) return
+    void nextTick(() => {
+      requestAnimationFrame(() => {
+        setTimeout(() => tryFocus(attempt + 1), 20)
+      })
+    })
+  }
+  void nextTick(() => {
+    requestAnimationFrame(() => tryFocus(0))
+  })
+}
+
+watch(composerFocusNonce, () => {
+  focusChatTextarea()
+}, { flush: 'post' })
+
 function handleInputBoxMouseDown(event: MouseEvent) {
   const target = event.target as HTMLElement | null
   if (!target) return
   // Don't steal focus from buttons / interactive elements.
   if (target.closest('button')) return
   if (chatStore.isStreaming || isUploading.value) return
-  textInputRef.value?.focus()
+  activeChatInputEl()?.focus()
 }
 
 const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
@@ -902,6 +1138,8 @@ const quickActions = [
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
+let abortChatViewMountSequence = false
+
 onMounted(async () => {
   registerAiQuotaResumeSendHandler(handleSend)
   await nextTick()
@@ -911,9 +1149,16 @@ onMounted(async () => {
     agentStore.fetchEnabledAgents(),
     loadAiConfig(),
   ])
+  if (abortChatViewMountSequence) return
+  await nextTick()
+  if (abortChatViewMountSequence) return
+  chatStore.requestComposerFocus()
 })
 
 onBeforeUnmount(() => {
+  abortChatViewMountSequence = true
+  abortChatVoiceRecording()
+  transcriptionToken += 1
   unregisterAiQuotaResumeSendHandler()
 })
 
@@ -1009,6 +1254,166 @@ async function handleSend() {
   await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
 }
 
+function handleSendBarClick() {
+  if (isUploading.value || isTranscribing.value || chatStore.isStreaming) return
+  if (isRecording.value) {
+    handleStopChatAudioRecording()
+    return
+  }
+  const text = inputText.value.trim()
+  const hasFiles = selectedFiles.value.length > 0
+  if (text || hasFiles) {
+    void handleSend()
+    return
+  }
+  void handleStartChatAudioRecording()
+}
+
+function releaseChatMediaStream() {
+  mediaStream?.getTracks().forEach(track => track.stop())
+  mediaStream = null
+}
+
+function abortChatVoiceRecording() {
+  skipNextTranscription = true
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  mediaRecorder = null
+  releaseChatMediaStream()
+  recordedChunks = []
+  recordedMimeType = ''
+  isRecording.value = false
+}
+
+async function ensureChatAudioTranscriptionSupported(): Promise<boolean> {
+  try {
+    const aiConfig = await getAiConfig()
+    if (aiConfig.capabilities?.supportsAudioTranscription) {
+      return true
+    }
+    ElMessage.warning('当前模型不支持语音识别，请配置支持的模型')
+    return false
+  } catch (err: unknown) {
+    console.error('Load AI config failed:', err)
+    if (!isRequestErrorHandled(err)) {
+      ElMessage.warning('暂时无法获取语音识别能力，请稍后再试')
+    }
+    return false
+  }
+}
+
+function resolveChatRecordingMimeType(): string {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return ''
+  }
+  return candidates.find(type => MediaRecorder.isTypeSupported(type)) || ''
+}
+
+function resolveChatAudioExtension(mimeType: string): string {
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('mpeg')) return 'mp3'
+  if (mimeType.includes('wav')) return 'wav'
+  return 'webm'
+}
+
+function buildChatRecordedAudioFile(): File | null {
+  if (recordedChunks.length === 0) return null
+  const mimeType = recordedMimeType || recordedChunks[0]?.type || 'audio/webm'
+  const blob = new Blob(recordedChunks, { type: mimeType })
+  return new File([blob], `chat-recording.${resolveChatAudioExtension(mimeType)}`, { type: mimeType })
+}
+
+async function transcribeChatRecordedAudio(file: File | null) {
+  if (!file) {
+    ElMessage.warning('未采集到有效录音，请重试')
+    return
+  }
+  const currentToken = ++transcriptionToken
+  isTranscribing.value = true
+  try {
+    const transcript = (await transcribeFollowUpAudio(file)).trim()
+    if (currentToken !== transcriptionToken) return
+    if (!transcript) {
+      ElMessage.warning('未识别到有效语音内容，请重试')
+      return
+    }
+    inputText.value = speechInputBase ? `${speechInputBase}\n${transcript}` : transcript
+    void nextTick(resizeChatTextarea)
+    ElMessage.success('语音已转成文字，可继续编辑后发送')
+  } catch (err: unknown) {
+    console.error('Audio transcription failed:', err)
+    if (!isRequestErrorHandled(err)) {
+      ElMessage.warning('语音识别失败，请稍后重试')
+    }
+  } finally {
+    if (currentToken === transcriptionToken) {
+      isTranscribing.value = false
+    }
+  }
+}
+
+async function handleChatRecordedAudioStop() {
+  const shouldSkip = skipNextTranscription
+  skipNextTranscription = false
+  isRecording.value = false
+  const file = shouldSkip ? null : buildChatRecordedAudioFile()
+  mediaRecorder = null
+  releaseChatMediaStream()
+  recordedChunks = []
+  recordedMimeType = ''
+  if (shouldSkip) return
+  await transcribeChatRecordedAudio(file)
+}
+
+async function handleStartChatAudioRecording() {
+  if (isRecording.value || isTranscribing.value) return
+  if (!(await ensureChatAudioTranscriptionSupported())) return
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
+    return
+  }
+  try {
+    speechInputBase = inputText.value.trim()
+    skipNextTranscription = false
+    recordedChunks = []
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const mimeType = resolveChatRecordingMimeType()
+    mediaRecorder = mimeType
+      ? new MediaRecorder(mediaStream, { mimeType })
+      : new MediaRecorder(mediaStream)
+    recordedMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm'
+    mediaRecorder.ondataavailable = (event: BlobEvent) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data)
+      }
+    }
+    mediaRecorder.onstop = () => {
+      void handleChatRecordedAudioStop()
+    }
+    mediaRecorder.onerror = (event: Event) => {
+      console.error('MediaRecorder error:', event)
+      ElMessage.warning('录音失败，请检查麦克风权限后重试')
+    }
+    mediaRecorder.start()
+    isRecording.value = true
+  } catch (err) {
+    console.error('Start recording failed:', err)
+    abortChatVoiceRecording()
+    ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+  }
+}
+
+function handleStopChatAudioRecording() {
+  if (!mediaRecorder) return
+  skipNextTranscription = false
+  if (mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  isRecording.value = false
+}
+
 function sendQuickMessage(text: string) {
   inputText.value = text
   handleSend()
@@ -1062,6 +1467,22 @@ function _getAssistantMessageStatus(message: { isStreaming?: boolean }): string 
 
 function handleUpload() {
   fileInputRef.value?.click()
+}
+
+function handleChatUploadMenuAddFile() {
+  chatUploadMenuVisible.value = false
+  handleUpload()
+}
+
+async function handleChatUploadMenuChooseKnowledge() {
+  chatUploadMenuVisible.value = false
+  // 当前聊天页暂不支持“从知识库选中文档后自动附加/指定范围”，先跳转到知识库页面。
+  await router.push('/knowledge')
+}
+
+async function handleChatUploadMenuOpenCrm() {
+  chatUploadMenuVisible.value = false
+  await router.push('/customer')
 }
 
 function appendSelectedFiles(files: File[]) {
@@ -1138,12 +1559,12 @@ function formatFileSize(bytes: number): string {
 }
 
 async function handleNewSession() {
-  chatStore.clearMessages()
-  await chatStore.startNewSession('新对话')
+  await chatStore.startNewSessionIfNeeded('新对话')
   currentView.value = 'chat'
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
+  chatStore.requestComposerFocus()
 }
 
 async function handleSelectSession(sessionId: string) {
@@ -1153,7 +1574,32 @@ async function handleSelectSession(sessionId: string) {
   if (isMobile.value) {
     mobilePanel.value = 'chat'
   }
+  chatStore.requestComposerFocus()
 }
+
+async function applyChatSessionRouteQuery() {
+  const raw = route.query.sessionId
+  const sessionId = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  if (!sessionId) return
+  if (!chatStore.sessions.some(s => s.sessionId === sessionId)) {
+    await chatStore.fetchSessions()
+  }
+  if (!chatStore.sessions.some(s => s.sessionId === sessionId)) {
+    ElMessage.warning('找不到该对话')
+    await router.replace({ path: '/chat' })
+    return
+  }
+  await handleSelectSession(sessionId)
+  await router.replace({ path: '/chat' })
+}
+
+watch(
+  () => route.query.sessionId,
+  () => {
+    void applyChatSessionRouteQuery()
+  },
+  { immediate: true }
+)
 
 function isSessionActive(sessionId: string): boolean {
   return currentView.value === 'chat' && chatStore.currentSessionId === sessionId
@@ -1278,4 +1724,98 @@ void _formatTime
   font-variation-settings: 'FILL' 1;
 }
 
+.wk-chat-upload-menu {
+  padding: 10px;
+}
+
+.wk-chat-upload-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 16px;
+  color: #0d0d0d;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.wk-chat-upload-menu__item:hover {
+  background: #fff;
+}
+
+.wk-chat-upload-menu__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wk-chat-upload-menu__icon {
+  font-size: 18px;
+  line-height: 1;
+  color: #0d0d0d;
+}
+
+.wk-chat-upload-menu__label {
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 400;
+}
+
+.wk-chat-upload-menu__apps-ref {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 16px;
+  color: #0d0d0d;
+  cursor: default;
+  outline: none;
+  transition: background-color 150ms ease;
+}
+
+.wk-chat-upload-menu__apps-ref:hover {
+  /* background: rgba(13, 13, 13, 0.06); */
+  background: #fff;
+}
+
+.wk-chat-upload-menu__chevron {
+  margin-left: auto;
+  font-size: 18px;
+  color: rgba(13, 13, 13, 0.55);
+}
+
+.wk-chat-upload-submenu {
+  padding: 8px;
+}
+
+.wk-chat-upload-submenu__btn {
+  justify-content: flex-start;
+}
+
+</style>
+
+<style>
+/* Popover 挂载到 body，scoped 选不中外层 .wk-chat-upload-menu-popper */
+.wk-chat-upload-menu-popper.el-popper {
+  padding: 0 !important;
+  border-radius: 16px !important;
+  overflow: hidden;
+  border: unset !important;
+  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
+  /* box-shadow: 0 12px 40px rgba(15, 23, 42, 0.14); */
+}
+
+/* 主菜单（不含子菜单类名）在更底层，子菜单气泡叠在上面 */
+.wk-chat-upload-menu-popper.el-popper:not(.wk-chat-upload-submenu-popper) {
+  z-index: 3000 !important;
+}
+
+.wk-chat-upload-menu-popper .el-popper__arrow,
+.wk-chat-upload-menu-popper .el-popper__arrow::before {
+  display: none !important;
+}
+
+.wk-chat-upload-submenu-popper.el-popper {
+  z-index: 3100 !important;
+}
 </style>

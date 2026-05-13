@@ -28,12 +28,60 @@ interface StreamingTask {
 
 export const useChatStore = defineStore('chat', () => {
   const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
+  const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
+  /** Incremented so ChatView can focus the composer after sidebar session / new-chat actions. */
+  const composerFocusNonce = ref(0)
+  function requestComposerFocus() {
+    composerFocusNonce.value += 1
+  }
   // Tracks the last "new session" that is still empty (draft).
   // Used to avoid creating multiple empty sessions by repeated clicks.
-  const draftSessionId = ref<string | null>(null)
+  // Persisted so refresh / new tab still treats the same empty session as draft.
+  const draftSessionId = ref<string | null>(loadDraftSessionIdFromStorage())
+
+  function loadDraftSessionIdFromStorage(): string | null {
+    try {
+      const v = localStorage.getItem(DRAFT_SESSION_STORAGE_KEY)
+      return v && v.length > 0 ? v : null
+    } catch {
+      return null
+    }
+  }
+
+  function persistDraftSessionId(id: string | null) {
+    try {
+      if (id) localStorage.setItem(DRAFT_SESSION_STORAGE_KEY, id)
+      else localStorage.removeItem(DRAFT_SESSION_STORAGE_KEY)
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function setDraftSessionId(id: string | null) {
+    draftSessionId.value = id
+    persistDraftSessionId(id)
+  }
+
+  async function reconcileDraftSessionAfterFetch() {
+    const id = draftSessionId.value
+    if (!id) return
+    const exists = sessions.value.some(s => s.sessionId === id)
+    if (!exists) {
+      setDraftSessionId(null)
+      return
+    }
+    try {
+      const dbMessages = await getMessageList(id)
+      if (dbMessages.length > 0) {
+        setDraftSessionId(null)
+      }
+    } catch {
+      setDraftSessionId(null)
+    }
+  }
   const messagesBySessionId = ref<Record<string, LocalMessage[]>>({})
   const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
@@ -59,6 +107,7 @@ export const useChatStore = defineStore('chat', () => {
     sessionsLoading.value = true
     try {
       sessions.value = await getSessionList()
+      await reconcileDraftSessionAfterFetch()
     } finally {
       sessionsLoading.value = false
     }
@@ -69,20 +118,24 @@ export const useChatStore = defineStore('chat', () => {
     setSessionMessages(sessionId, [])
     await fetchSessions()
     currentSessionId.value = sessionId
-    draftSessionId.value = sessionId
+    setDraftSessionId(sessionId)
     return sessionId
   }
 
   async function startNewSessionIfNeeded(title?: string, agentId?: string, customerId?: string): Promise<string> {
     const id = draftSessionId.value
     if (id) {
-      const msgs = messagesBySessionId.value[id] || []
-      if (msgs.length === 0 && !streamingTasks.value[id]) {
-        // Ensure we really switch to and load the draft session.
-        await selectSession(id)
-        return id
+      if (!streamingTasks.value[id]) {
+        let msgs = messagesBySessionId.value[id] || []
+        if (msgs.length === 0) {
+          await selectSession(id)
+          msgs = messagesBySessionId.value[id] || []
+        }
+        if (msgs.length === 0 && !streamingTasks.value[id]) {
+          return id
+        }
       }
-      draftSessionId.value = null
+      setDraftSessionId(null)
     }
     return await startNewSession(title, agentId, customerId)
   }
@@ -109,7 +162,7 @@ export const useChatStore = defineStore('chat', () => {
       currentSessionId.value = null
     }
     if (draftSessionId.value === sessionId) {
-      draftSessionId.value = null
+      setDraftSessionId(null)
     }
   }
 
@@ -137,7 +190,7 @@ export const useChatStore = defineStore('chat', () => {
       attachments: attachmentVOs
     })
     if (draftSessionId.value === sessionId) {
-      draftSessionId.value = null
+      setDraftSessionId(null)
     }
 
     appendSessionMessage(sessionId, {
@@ -343,6 +396,8 @@ export const useChatStore = defineStore('chat', () => {
   return {
     sessions,
     currentSessionId,
+    composerFocusNonce,
+    requestComposerFocus,
     messages,
     messagesBySessionId,
     streamingTasks,

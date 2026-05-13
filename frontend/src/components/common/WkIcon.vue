@@ -17,6 +17,8 @@ import type { WkIconName } from './wkIcon'
 const props = withDefaults(defineProps<{
   name: WkIconName
   size?: number | string
+  /** 固定宽高（px），iconfont 在盒内水平垂直居中 */
+  boxSize?: number
   color?: string
   label?: string
 }>(), {
@@ -29,8 +31,24 @@ const iconStyle = computed<CSSProperties>(() => {
     color: props.color,
   }
 
-  if (props.size !== undefined) {
-    style.fontSize = typeof props.size === 'number' ? `${props.size}px` : props.size
+  const fontSize =
+    props.size !== undefined
+      ? props.size
+      : props.boxSize !== undefined
+        ? props.boxSize
+        : undefined
+  if (fontSize !== undefined) {
+    style.fontSize = typeof fontSize === 'number' ? `${fontSize}px` : fontSize
+  }
+
+  if (props.boxSize !== undefined) {
+    const n = props.boxSize
+    style.width = `${n}px`
+    style.height = `${n}px`
+    style.display = 'inline-flex'
+    style.alignItems = 'center'
+    style.justifyContent = 'center'
+    style.lineHeight = 1
   }
 
   return style

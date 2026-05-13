@@ -2,75 +2,128 @@
   <div class="flex wk-screen bg-background-light">
     <aside
       v-if="!isMobile"
-      class="relative z-20 flex wk-screen flex-shrink-0 flex-col overflow-x-visible overflow-y-visible border-r border-slate-200 bg-white transition-[width] duration-200 ease-in-out"
-      :class="primarySidebarCollapsed ? 'w-16' : 'w-64'"
+      class="wk-primary-sidebar relative z-[110] flex wk-screen flex-shrink-0 flex-col overflow-x-visible overflow-y-visible border-r border-[#ececec] bg-white transition-[width] duration-200 ease-in-out"
+      :class="primarySidebarCollapsed ? 'w-[52px]' : 'w-64'"
     >
-      <div class="relative z-30 flex items-center gap-3 overflow-visible pt-6 pb-[6px] px-6" :class="primarySidebarCollapsed ? 'justify-center px-2' : ''">
-        <div
-          v-if="enterpriseStore.hasLogo"
-          class="flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent"
-          :class="primarySidebarCollapsed ? 'size-8' : 'size-10'"
-        >
-          <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
+      <!-- 展开：logo + 标题 + 折叠按钮；折叠：仅顶栏切换（ChatGPT 式） -->
+      <div
+        v-if="!primarySidebarCollapsed"
+        class="relative z-30 flex items-start justify-between gap-2 overflow-visible px-3 pb-1 pt-3"
+      >
+        <div class="flex min-w-0 flex-1 items-start gap-2.5 pl-[10px]">
+          <div
+            v-if="enterpriseStore.hasLogo"
+            class="size-8 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent"
+          >
+            <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
+          </div>
+          <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent">
+            <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+          </div>
+          <div class="min-w-0 flex-1 pr-1 pt-0.5">
+            <h1 class="line-clamp-2 text-[15px] font-semibold leading-snug text-[#0d0d0d]">
+              {{ enterpriseStore.displayName }}
+            </h1>
+            <p class="mt-0.5 line-clamp-1 text-[11px] uppercase tracking-wider text-slate-500">
+              {{ enterpriseStore.displayDescription }}
+            </p>
+          </div>
         </div>
-        <div
-          v-else
-          class="flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent"
-          :class="primarySidebarCollapsed ? 'size-8' : 'size-10'"
-        >
-          <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+        <div class="relative shrink-0 pt-0.5">
+          <button
+            type="button"
+            class="group/sb-toggle relative flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef]"
+            aria-label="关闭边栏"
+            @click="primarySidebarCollapsed = true"
+          >
+            <WkIcon name="fold" :size="18" class="shrink-0" />
+            <span
+              class="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+              role="tooltip"
+            >
+              关闭边栏
+            </span>
+          </button>
         </div>
-        <div v-if="!primarySidebarCollapsed" class="min-w-0 flex-1 pr-1">
-          <h1 class="line-clamp-2 text-lg font-bold leading-tight text-slate-900">{{ enterpriseStore.displayName }}</h1>
-          <p class="text-xs uppercase tracking-widest text-slate-500">{{ enterpriseStore.displayDescription }}</p>
-        </div>
+      </div>
+      <div v-else class="relative z-30 flex justify-center overflow-visible py-2 px-0 pl-[5px]">
         <button
           type="button"
-          class="absolute -right-3 top-10 z-[60] flex size-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-primary"
-          :title="primarySidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-          @click="primarySidebarCollapsed = !primarySidebarCollapsed"
+          class="group/sb-toggle relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-[#f5f5f5] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+          aria-label="打开边栏"
+          @click="primarySidebarCollapsed = false"
         >
-          <span class="material-symbols-outlined text-sm">{{ primarySidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+          <span
+            class="absolute inset-0 flex items-center justify-center transition-opacity duration-150 group-hover/sb-toggle:opacity-0"
+            aria-hidden="true"
+          >
+            <span class="size-7 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent">
+              <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+            </span>
+          </span>
+          <span
+            class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+            aria-hidden="true"
+          >
+            <WkIcon name="fold" :size="18" class="shrink-0" />
+          </span>
+          <span
+            class="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+            role="tooltip"
+          >
+            打开边栏
+          </span>
         </button>
       </div>
-
+      <!-- pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] -->
       <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-4 pt-[6px] pb-[6px]" :class="primarySidebarCollapsed ? 'px-2' : ''">
+      <div class="px-3 pt-1 mb-[4px]" :class="primarySidebarCollapsed ? '!px-2' : ''">
         <button
-          class="flex w-full items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-slate-100"
-          :class="primarySidebarCollapsed ? 'justify-center px-0' : 'gap-2 px-3'"
+          class="flex w-full items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9] pl-[10px] pr-[10px] ml-[2px] mr-[6px] "
+          :class="primarySidebarCollapsed ? 'justify-center' : 'gap-2'"
           :title="primarySidebarCollapsed ? '新对话' : undefined"
           @click="handleNewSession"
         >
-          <span class="material-symbols-outlined wk-plus-button-icon text-[22px] leading-none">add</span>
+          <!-- <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">edit_square</span> -->
+          <WkIcon name="new-chat" :size="18" class="shrink-0" />
           <span v-if="!primarySidebarCollapsed">新对话</span>
         </button>
       </div>
 
-      <nav class="flex-1 overflow-y-auto px-4 pb-4" :class="primarySidebarCollapsed ? 'px-2' : ''">
+      <div
+        v-if="primaryNavHasScrollbar"
+        class="mx-3 h-px bg-slate-100"
+        :class="primarySidebarCollapsed ? '!mx-2' : ''"
+      />
+
+      <nav
+        ref="primaryNavRef"
+        class="wk-scrollbar-gutter-stable flex-1 overflow-y-auto px-3 pb-4"
+        :class="primarySidebarCollapsed ? '!px-2' : ''"
+      >
         <div class="space-y-1">
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
-            <div v-if="group.title && !primarySidebarCollapsed" class="pb-[6px] pt-3">
-              <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
+            <div v-if="group.title && !primarySidebarCollapsed" class="pt-[6px] pb-[5px]">
+              <p class="px-3 text-[14px] uppercase font-semibold tracking-tight text-[#0d0d0d]">{{ group.title }}</p>
             </div>
             <button
               v-for="item in group.items"
               :key="item.key"
               :title="primarySidebarCollapsed ? item.label : undefined"
               @click="handlePrimaryNavClick(item)"
-              class="flex w-full items-center rounded-lg pt-[6px] pb-[6px] transition-colors"
+              class="flex w-full items-center rounded-lg pt-[8px] pb-[8px] transition-colors pl-[10px] pr-[10px] ml-[2px] mr-[6px]"
               :class="[
-                isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100',
-                primarySidebarCollapsed ? 'justify-center px-0' : 'gap-2 px-3',
+                isPrimaryActive(item) ? 'bg-[#f0f0f0]' : 'text-[#0d0d0d] hover:bg-[#f9f9f9]',
+                primarySidebarCollapsed ? 'justify-center' : 'gap-2',
               ]"
             >
-              <WkIcon :name="item.icon" :size="22" class="shrink-0" />
+              <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />
               <span v-if="!primarySidebarCollapsed" class="truncate text-sm font-normal">{{ item.label }}</span>
               <span
                 v-if="item.children?.length && !primarySidebarCollapsed"
-                class="material-symbols-outlined ml-auto shrink-0 text-base"
-                :class="isPrimarySelected(item) ? 'text-primary' : 'text-slate-300'"
+                class="material-symbols-outlined ml-auto inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none"
+                :class="isPrimarySelected(item) ? 'text-[#c9c9c9]' : 'text-[#c9c9c9]'"
               >
                 chevron_right
               </span>
@@ -79,11 +132,30 @@
 
           <!-- Chat: recent sessions under Knowledge menu -->
           <template v-if="!primarySidebarCollapsed">
-          <div class="pt-2" />
+          <!-- <div class="pt-2" /> -->
           <div class="mx-1 h-px bg-slate-100" />
-          <div class="space-y-1 pt-2">
-            <p class="px-3 pb-1 text-xs font-bold uppercase tracking-widest text-slate-400">最近</p>
+          <div class="space-y-1 pt-0">
+            <button
+              type="button"
+              class="group flex w-full items-center justify-between gap-1 rounded-lg pb-1 pl-3 pr-1 text-left transition-colors "
+              :title="recentChatSessionsExpanded ? '收起最近对话' : '展开最近对话'"
+              :aria-expanded="recentChatSessionsExpanded"
+              aria-controls="recent-chat-sessions-panel"
+              @click="recentChatSessionsExpanded = !recentChatSessionsExpanded"
+            >
+              <span class="min-w-0 text-[14px] font-semibold tracking-tight text-[#0d0d0d]">最近</span>
+              <span
+                class="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150 "
+                :class="recentChatSessionsExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
+                aria-hidden="true"
+              >
+                <span class="material-symbols-outlined text-base text-[18px] text-[#c9c9c9] leading-none">
+                  {{ recentChatSessionsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                </span>
+              </span>
+            </button>
 
+            <div id="recent-chat-sessions-panel" v-show="recentChatSessionsExpanded">
             <div v-if="chatStore.sessionsLoading && chatStore.sessions.length === 0" class="flex justify-center py-6">
               <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
             </div>
@@ -98,26 +170,18 @@
                 <button
                   v-for="session in groupedChatSessions.today"
                   :key="session.sessionId"
-                  class="group w-full min-w-0 overflow-hidden rounded-[10px] px-[10px] py-[8px] mx-[6px] text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'bg-[#f3f3f3]'
-                    : 'hover:bg-slate-100/50'"
+                    ? 'bg-[#f0f0f0]'
+                    : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectSession(session.sessionId)"
                 >
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span
-                      class="block min-w-0 flex-1 truncate text-sm leading-5"
-                      :class="isSessionActive(session.sessionId) ? 'text-[#0d0d0d]' : 'text-[#0d0d0d]'"
-                      :title="session.title || '新对话'"
-                    >{{ session.title || '新对话' }}</span>
-                    <span
-                      class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
-                      :class="isSessionActive(session.sessionId)
-                        ? 'pointer-events-auto opacity-100'
-                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
-                      @click.stop="handleDeleteSession(session.sessionId)"
-                    >close</span>
-                  </div>
+                  <ChatSessionActionsPopover
+                    :session="session"
+                    :active="isSessionActive(session.sessionId)"
+                    @share="handleShareChatSession"
+                    @delete="handleDeleteSession"
+                  />
                   <!-- <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span> -->
                 </button>
               </template>
@@ -127,26 +191,18 @@
                 <button
                   v-for="session in groupedChatSessions.yesterday"
                   :key="session.sessionId"
-                  class="group w-full min-w-0 overflow-hidden rounded-[10px] px-[10px] py-[8px] mx-[6px] text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'bg-[#f3f3f3]'
-                    : 'hover:bg-slate-100/50'"
+                    ? 'bg-[#f0f0f0]'
+                    : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectSession(session.sessionId)"
                 >
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span
-                      class="block min-w-0 flex-1 truncate text-sm leading-5"
-                      :class="isSessionActive(session.sessionId) ? 'text-[#0d0d0d]' : 'text-[#0d0d0d]'"
-                      :title="session.title || '新对话'"
-                    >{{ session.title || '新对话' }}</span>
-                    <span
-                      class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
-                      :class="isSessionActive(session.sessionId)
-                        ? 'pointer-events-auto opacity-100'
-                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
-                      @click.stop="handleDeleteSession(session.sessionId)"
-                    >close</span>
-                  </div>
+                  <ChatSessionActionsPopover
+                    :session="session"
+                    :active="isSessionActive(session.sessionId)"
+                    @share="handleShareChatSession"
+                    @delete="handleDeleteSession"
+                  />
                   <!-- <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span> -->
                 </button>
               </template>
@@ -156,30 +212,23 @@
                 <button
                   v-for="session in groupedChatSessions.earlier"
                   :key="session.sessionId"
-                  class="group w-full min-w-0 overflow-hidden rounded-[10px] px-[10px] py-[8px] mx-[6px] text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isSessionActive(session.sessionId)
-                    ? 'bg-[#f3f3f3]'
-                    : 'hover:bg-slate-100/50'"
+                    ? 'bg-[#f0f0f0]'
+                    : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectSession(session.sessionId)"
                 >
-                  <div class="flex min-w-0 items-center gap-2">
-                    <span
-                      class="block min-w-0 flex-1 truncate text-sm leading-5"
-                      :class="isSessionActive(session.sessionId) ? 'text-[#0d0d0d]' : 'text-[#0d0d0d]'"
-                      :title="session.title || '新对话'"
-                    >{{ session.title || '新对话' }}</span>
-                    <span
-                      class="material-symbols-outlined inline-flex w-5 shrink-0 items-center justify-center text-[14px] leading-none text-slate-300 transition-all"
-                      :class="isSessionActive(session.sessionId)
-                        ? 'pointer-events-auto opacity-100'
-                        : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 hover:text-red-500'"
-                      @click.stop="handleDeleteSession(session.sessionId)"
-                    >close</span>
-                  </div>
+                  <ChatSessionActionsPopover
+                    :session="session"
+                    :active="isSessionActive(session.sessionId)"
+                    @share="handleShareChatSession"
+                    @delete="handleDeleteSession"
+                  />
                   <!-- <span class="text-xs font-medium text-slate-400">{{ formatSessionTime(session.updateTime || session.createTime) }}</span> -->
                 </button>
               </template>
             </template>
+            </div>
           </div>
           </template>
 
@@ -202,9 +251,9 @@
         </button>
       </div>
 
-      <div class="border-slate-200 p-4" :class="primarySidebarCollapsed ? 'px-2' : ''">
+      <div class="border-t border-[#ececec] p-3" :class="primarySidebarCollapsed ? '!px-2 !py-2' : ''">
         <div
-          class="flex cursor-pointer items-center rounded-xl bg-slate-50 p-2"
+          class="flex cursor-pointer items-center rounded-xl bg-[#fff] p-2 transition-colors hover:bg-[#f9f9f9]"
           :class="primarySidebarCollapsed ? 'justify-center' : 'gap-3'"
           :title="primarySidebarCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
           @click="showUserMenu = !showUserMenu"
@@ -433,7 +482,7 @@
               <p class="text-xs uppercase tracking-widest text-slate-500">{{ enterpriseStore.displayDescription }}</p>
             </div>
           </div>
-          <nav class="flex-1 space-y-1 overflow-y-auto px-4 py-4">
+          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-4 py-4">
             <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
               <div v-if="group.title" class="pb-2 pt-4">
                 <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
@@ -655,9 +704,11 @@
 
     <div class="flex flex-1 flex-col overflow-hidden" :class="{ 'pt-14': isMobile }">
       <header
-        v-if="showDesktopHeader"
-        class="relative z-[100] flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-[10px] md:px-8"
+        v-if="showDesktopHeader || showChatDesktopQuotaBar"
+        class="relative z-[100] flex h-16 shrink-0 items-center bg-white px-[10px] md:px-8"
+        :class="showDesktopHeader ? 'justify-between border-b border-slate-200' : 'border-b-0'"
       >
+        <template v-if="showDesktopHeader">
         <div class="flex flex-1 items-center gap-4 mr-1">
           <div ref="searchPanelRef" class="relative w-full max-w-md">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-xl text-slate-400">search</span>
@@ -730,6 +781,16 @@
             新增客户
           </button>
         </div>
+        </template>
+        <template v-else>
+          <div
+            class="flex w-full min-w-0 items-center gap-3 justify-end"
+          >
+            <div class="flex shrink-0 items-center gap-3">
+              <AiQuotaHeaderPopover />
+            </div>
+          </div>
+        </template>
       </header>
 
       <main class="flex-1 overflow-y-auto wk-safe-bottom">
@@ -759,6 +820,7 @@ import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AiQuotaHeaderPopover from '@/components/layout/AiQuotaHeaderPopover.vue'
 import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
+import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
@@ -781,6 +843,10 @@ const { isOpen: chatDrawerOpen } = useChatDrawer()
 const drawerVisible = ref(false)
 /** PC：一级侧栏收起为图标栏 */
 const primarySidebarCollapsed = ref(false)
+const primaryNavRef = ref<HTMLElement | null>(null)
+const primaryNavHasScrollbar = ref(false)
+/** PC 侧栏「最近」对话列表折叠 */
+const recentChatSessionsExpanded = ref(true)
 const showUserMenu = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
@@ -825,10 +891,10 @@ type SecondaryNavItem = {
 
 const allMainNavItems: MainNavItem[] = [
   { key: 'chat', icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat', groupTitle: 'AI 助手' },
-  { key: 'knowledge', icon: 'knowledge', label: '知识库', route: '/knowledge', permission: 'knowledge' },
+  { key: 'knowledge', icon: 'knowledge-1', label: '知识库', route: '/knowledge', permission: 'knowledge' },
   {
     key: 'crm',
-    icon: 'customer',
+    icon: 'crm',
     label: 'CRM管理',
     route: '/customer',
     permission: 'customer',
@@ -892,6 +958,9 @@ const showDesktopHeader = computed(() => {
   if (isMobile.value) return false
   return !route.path.startsWith('/knowledge') && !route.path.startsWith('/chat')
 })
+
+/** 桌面端 Chat：顶栏样式与主站一致，仅展示 AI 额度入口 */
+const showChatDesktopQuotaBar = computed(() => !isMobile.value && route.path.startsWith('/chat'))
 
 const selectedPrimaryKey = ref<string>('')
 
@@ -974,19 +1043,58 @@ watch(showUserMenu, open => {
   }
 })
 
+let primaryNavResizeObserver: ResizeObserver | null = null
+
+function updatePrimaryNavScrollbar() {
+  const el = primaryNavRef.value
+  if (!el) {
+    primaryNavHasScrollbar.value = false
+    return
+  }
+  // +1 to avoid off-by-one from subpixel layout
+  primaryNavHasScrollbar.value = el.scrollHeight > el.clientHeight + 1
+}
+
 onMounted(() => {
   enterpriseStore.loadConfig()
   void chatStore.fetchSessions()
   document.addEventListener('click', handleDocumentClick)
+
+  // Observe container size changes (window resize / sidebar width changes)
+  if (typeof ResizeObserver !== 'undefined') {
+    primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
+    if (primaryNavRef.value) primaryNavResizeObserver.observe(primaryNavRef.value)
+  }
+  // Initial measure
+  queueMicrotask(() => updatePrimaryNavScrollbar())
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
+  if (primaryNavResizeObserver) {
+    primaryNavResizeObserver.disconnect()
+    primaryNavResizeObserver = null
+  }
   if (globalSearchTimer) {
     clearTimeout(globalSearchTimer)
     globalSearchTimer = null
   }
 })
+
+watch(
+  () => [
+    isMobile.value,
+    primarySidebarCollapsed.value,
+    recentChatSessionsExpanded.value,
+    pcMainNavGroups.value.length,
+    chatStore.sessions.length,
+    chatStore.sessionsLoading,
+  ],
+  () => {
+    queueMicrotask(() => updatePrimaryNavScrollbar())
+  },
+  { flush: 'post' }
+)
 
 function isActive(routePath: string, itemQuery?: Record<string, string>) {
   const pathMatches = routePath.startsWith('/settings')
@@ -1061,16 +1169,18 @@ async function handleNewSession() {
   }
   if (api.startNewSessionIfNeeded) {
     await api.startNewSessionIfNeeded('新对话')
-    return
+  } else {
+    api.clearMessages?.()
+    await api.startNewSession?.('新对话')
   }
-  api.clearMessages?.()
-  await api.startNewSession?.('新对话')
+  chatStore.requestComposerFocus()
 }
 
 async function handleSelectSession(sessionId: string) {
   selectedPrimaryKey.value = ''
   await router.push('/chat')
   await chatStore.selectSession(sessionId)
+  chatStore.requestComposerFocus()
 }
 
 function isSessionActive(sessionId: string): boolean {
@@ -1089,6 +1199,26 @@ async function handleDeleteSession(sessionId: string) {
     ElMessage.success('对话已删除')
   } catch {
     // User cancelled
+  }
+}
+
+async function handleShareChatSession(session: ChatSession) {
+  const resolved = router.resolve({ name: 'Chat', query: { sessionId: session.sessionId } })
+  const url = new URL(resolved.href, window.location.href).href
+  const title = session.title || '新对话'
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title, text: title, url })
+      return
+    } catch (e) {
+      if ((e as { name?: string })?.name === 'AbortError') return
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url)
+    ElMessage.success('对话链接已复制')
+  } catch {
+    ElMessage.error('复制失败，请手动复制链接')
   }
 }
 
