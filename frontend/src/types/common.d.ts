@@ -203,6 +203,8 @@ export interface ChatModelOption {
   modelName: string
   displayName: string
   creditMultiplier: number
+  /** 模型图标 URL（可选）；缺省或加载失败时用首字占位 */
+  icon?: string
 }
 
 export interface ChatAttachmentVO {

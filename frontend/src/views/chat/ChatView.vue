@@ -675,26 +675,101 @@
                     </div>
 
                     <div class="flex items-center gap-2 pr-1 shrink-0">
-                      <el-select
-                        v-model="chatStore.selectedModelKey"
-                        class="w-[220px]"
-                        size="large"
+                      <el-popover
+                        v-model:visible="chatModelPopoverVisible"
+                        trigger="click"
+                        placement="top-end"
+                        width="280"
+                        :show-arrow="false"
+                        :teleported="true"
                         :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
-                        :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
-                        @change="chatStore.setSelectedModelKey"
+                        transition="el-zoom-in-bottom"
+                        popper-class="wk-chat-model-popper"
                       >
-                        <el-option
-                          v-for="option in chatStore.modelOptions"
-                          :key="chatStore.toModelKey(option)"
-                          :label="option.displayName || option.modelName"
-                          :value="chatStore.toModelKey(option)"
-                        >
-                          <div class="flex items-center justify-between gap-4">
-                            <span class="truncate">{{ option.displayName || option.modelName }}</span>
-                            <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
-                          </div>
-                        </el-option>
-                      </el-select>
+                        <template #reference>
+                          <button
+                            type="button"
+                            class="inline-flex h-9 max-w-[220px] shrink-0 items-center gap-1.5 rounded-[18px] border border-[#ececec] bg-[#f5f5f5] pl-2 pr-2 text-left text-[13px] text-[#0d0d0d] transition-colors hover:bg-[#ececec] disabled:cursor-not-allowed disabled:opacity-50"
+                            :disabled="chatStore.isStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                            :title="`当前模型：${chatComposerModelLabel}`"
+                          >
+                            <span
+                              class="relative size-7 shrink-0 overflow-hidden rounded-md bg-[#ececec]"
+                              aria-hidden="true"
+                            >
+                              <template v-if="chatStore.selectedModel">
+                                <img
+                                  v-if="chatModelShowImage(chatStore.selectedModel)"
+                                  :src="chatModelIconSrc(chatStore.selectedModel)"
+                                  alt=""
+                                  class="size-full object-cover"
+                                  @error="onChatModelImageError($event)"
+                                />
+                                <span
+                                  v-else
+                                  class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
+                                >
+                                  {{ modelOptionLabel(chatStore.selectedModel).slice(0, 1) }}
+                                </span>
+                              </template>
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
+                              >
+                                ?
+                              </span>
+                            </span>
+                            <span class="min-w-0 flex-1 truncate">{{ chatComposerModelLabel }}</span>
+                            <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-[#8f8f8f]">expand_more</span>
+                          </button>
+                        </template>
+                        <div class="wk-chat-model-menu">
+                          <button
+                            v-for="option in chatStore.modelOptions"
+                            :key="chatStore.toModelKey(option)"
+                            type="button"
+                            class="wk-chat-model-menu__item"
+                            @click="selectChatModelFromPopover(chatStore.toModelKey(option))"
+                          >
+                            <span
+                              class="relative mt-0.5 size-8 shrink-0 overflow-hidden rounded-lg bg-[#ececec]"
+                              aria-hidden="true"
+                            >
+                              <img
+                                v-if="chatModelShowImage(option)"
+                                :src="chatModelIconSrc(option)"
+                                alt=""
+                                class="size-full object-cover"
+                                @error="onChatModelImageError($event)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
+                              >
+                                {{ modelOptionLabel(option).slice(0, 1) }}
+                              </span>
+                            </span>
+                            <div class="min-w-0 flex-1">
+                              <div class="flex items-start justify-between gap-2">
+                                <div class="min-w-0 flex-1 text-[14px] leading-tight text-[#0d0d0d]">
+                                  {{ modelOptionLabel(option) }}
+                                </div>
+                                <span class="shrink-0 text-xs text-slate-400">{{ formatModelMultiplier(option.creditMultiplier) }}</span>
+                              </div>
+                              <div class="mt-0.5 truncate text-[12px] leading-snug text-[#909090]">
+                                {{ option.providerLabel || option.provider }}
+                              </div>
+                            </div>
+                            <span
+                              v-if="chatStore.selectedModelKey === chatStore.toModelKey(option)"
+                              class="material-symbols-outlined mt-0.5 shrink-0 text-[20px] leading-none text-primary"
+                            >
+                              check
+                            </span>
+                          </button>
+                        </div>
+                      </el-popover>
+
 
                       <button
                         type="button"
@@ -1074,8 +1149,12 @@ import {
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
+import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
+import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
+import deepseekBrandUrl from '@/assets/model-provider-brands/deepseek.svg?url'
+import moonshotBrandUrl from '@/assets/model-provider-brands/moonshot.svg?url'
 
 const route = useRoute()
 const router = useRouter()
@@ -1103,6 +1182,71 @@ function activeChatInputEl(): HTMLTextAreaElement | null {
 const chatUploadMenuVisible = ref(false)
 const chatKnowledgePickerVisible = ref(false)
 const showKnowledgeFollowUpChips = ref(false)
+const chatModelPopoverVisible = ref(false)
+/** 按图片最终 URL 记录加载失败（含接口 icon 与本地 /model-provider-logos/{provider}.svg） */
+const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
+
+const chatComposerModelLabel = computed(() => {
+  if (chatStore.modelOptionsLoading) return '加载模型...'
+  if (!chatStore.modelOptions.length) return '暂无可选模型'
+  const m = chatStore.selectedModel
+  return m ? modelOptionLabel(m) : '选择模型'
+})
+
+function modelOptionLabel(option: ChatModelOption): string {
+  return option.displayName || option.modelName
+}
+
+/**
+ * 厂商标识 SVG（与接口 `provider` 一致）。
+ * dashscope → 通义 Qwen（Simple Icons）；deepseek / moonshot → Simple Icons；
+ * openai → Simple Icons 历史版本中的 OpenAI 官方路径图形（当前 npm 包已移除该标，故随仓库内置）。
+ * 许可：Simple Icons 为 CC0-1.0，见 https://github.com/simple-icons/simple-icons
+ */
+const MODEL_PROVIDER_BRAND_URL: Record<string, string> = {
+  dashscope: dashscopeBrandUrl,
+  openai: openaiBrandUrl,
+  deepseek: deepseekBrandUrl,
+  moonshot: moonshotBrandUrl,
+}
+
+function providerBrandAssetUrl(provider: string): string | undefined {
+  const id = provider?.trim()
+  if (!id || !/^[-a-zA-Z0-9._]+$/.test(id)) return undefined
+  return MODEL_PROVIDER_BRAND_URL[id]
+}
+
+function chatModelIconSrc(option: ChatModelOption): string | undefined {
+  const fromApi = option.icon?.trim()
+  if (fromApi) return fromApi
+  return providerBrandAssetUrl(option.provider)
+}
+
+function chatModelShowImage(option: ChatModelOption): boolean {
+  const src = chatModelIconSrc(option)
+  if (!src) return false
+  return !chatModelImageLoadFailed.value[src]
+}
+
+function onChatModelImageError(ev: Event) {
+  const t = ev.target as HTMLImageElement | null
+  const src = t?.currentSrc || t?.src
+  if (!src) return
+  chatModelImageLoadFailed.value = { ...chatModelImageLoadFailed.value, [src]: true }
+}
+
+function selectChatModelFromPopover(modelKey: string) {
+  chatStore.setSelectedModelKey(modelKey)
+  chatModelPopoverVisible.value = false
+}
+
+watch(
+  () => chatStore.modelOptions,
+  () => {
+    chatModelImageLoadFailed.value = {}
+  },
+  { deep: true }
+)
 
 /** 纵向最多展示约 10 行，再继续增高则出现纵向滚动条 */
 function getChatTextareaMaxHeightPx(el: HTMLTextAreaElement): number {
@@ -2190,5 +2334,46 @@ void _formatTime
 .wk-chat-upload-submenu-popper.el-popper {
   z-index: 3100 !important;
 }
+
+.wk-chat-model-popper.el-popper {
+  padding: 0 !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  border: unset !important;
+  box-shadow: 0 0 #0000, 0 0 #0000, 0 0 #0000, 0 0 #0000, 0px 8px 12px 0px #00000014, 0px 0px 1px 0px #0000009e !important;
+  z-index: 3000 !important;
+}
+
+.wk-chat-model-popper .el-popper__arrow,
+.wk-chat-model-popper .el-popper__arrow::before {
+  display: none !important;
+}
+
+.wk-chat-model-menu {
+  padding: 6px;
+  max-height: min(52vh, 360px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.wk-chat-model-menu__item {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  padding: 10px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.wk-chat-model-menu__item:hover {
+  background: #f5f5f5;
+}
+
 
 </style>
