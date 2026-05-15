@@ -11,6 +11,7 @@
             s.customer_id,
             c.company_name AS customer_name,
             s.title,
+            s.app_code,
             s.status,
             s.create_time,
             s.update_time,
@@ -32,6 +33,7 @@
             s.customer_id,
             c.company_name AS customer_name,
             s.title,
+            s.app_code,
             s.status,
             s.create_time,
             s.update_time

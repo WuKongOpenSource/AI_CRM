@@ -6,10 +6,11 @@ import {
   deleteSession,
   getMessageList,
   getChatModelOptions,
+  getChatAppOptions,
   sendMessageStream,
   sendMessageSync
 } from '@/api/chat'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage, ChatModelOption } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatMessage, ChatModelOption, ChatAppOption } from '@/types/common'
 
 interface LocalMessage {
   id: string
@@ -31,7 +32,11 @@ export const useChatStore = defineStore('chat', () => {
   const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
   const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
   const CRM_CONTEXT_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_crm_context_enabled:v1'
+  const APP_CODE_STORAGE_KEY = 'wk_ai_crm:chat_selected_app_code:v1'
   const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
+  const GENERAL_APP_CODE = 'general'
+  const CRM_APP_CODE = 'crm'
+  const KNOWLEDGE_APP_CODE = 'knowledge'
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
@@ -90,10 +95,13 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false)
   const sessionsLoading = ref(false)
   const modelOptionsLoading = ref(false)
+  const appOptionsLoading = ref(false)
   const modelOptions = ref<ChatModelOption[]>([])
-  const ragEnabled = ref(loadRagEnabled())
+  const appOptions = ref<ChatAppOption[]>([])
+  const selectedAppCode = ref(loadSelectedAppCode())
   const selectedModelKey = ref(loadSelectedModelKey())
-  const crmContextEnabled = ref(loadCrmContextEnabled())
+  const ragEnabled = computed(() => selectedAppCode.value === KNOWLEDGE_APP_CODE)
+  const crmContextEnabled = computed(() => selectedAppCode.value === CRM_APP_CODE)
 
   const messages = computed(() => {
     if (!currentSessionId.value) return []
@@ -114,6 +122,12 @@ export const useChatStore = defineStore('chat', () => {
     if (!modelOptions.value.length) return null
     return modelOptions.value.find(option => toModelKey(option) === selectedModelKey.value) || modelOptions.value[0]
   })
+
+  const selectedApp = computed(() =>
+    appOptions.value.find(option => option.code === selectedAppCode.value)
+    || appOptions.value.find(option => option.code === GENERAL_APP_CODE)
+    || null
+  )
 
   async function fetchSessions() {
     sessionsLoading.value = true
@@ -142,35 +156,68 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function startNewSession(title?: string, agentId?: string, customerId?: string): Promise<string> {
-    const sessionId = await createSession({ title, agentId, customerId })
+  async function fetchAppOptions() {
+    appOptionsLoading.value = true
+    try {
+      appOptions.value = await getChatAppOptions()
+      const exists = appOptions.value.some(option => option.code === selectedAppCode.value)
+      if (!exists) {
+        setSelectedAppCode(GENERAL_APP_CODE)
+      }
+    } finally {
+      appOptionsLoading.value = false
+    }
+  }
+
+  async function startNewSession(
+    title?: string,
+    agentId?: string,
+    customerId?: string,
+    appCode = selectedAppCode.value
+  ): Promise<string> {
+    const normalizedAppCode = normalizeAppCode(appCode)
+    const sessionId = await createSession({ title, agentId, customerId, appCode: normalizedAppCode })
     setSessionMessages(sessionId, [])
     await fetchSessions()
     currentSessionId.value = sessionId
+    setSelectedAppCode(normalizedAppCode)
     setDraftSessionId(sessionId)
     return sessionId
   }
 
-  async function startNewSessionIfNeeded(title?: string, agentId?: string, customerId?: string): Promise<string> {
+  async function startNewSessionIfNeeded(
+    title?: string,
+    agentId?: string,
+    customerId?: string,
+    appCode = selectedAppCode.value
+  ): Promise<string> {
+    const normalizedAppCode = normalizeAppCode(appCode)
     const id = draftSessionId.value
     if (id) {
       if (!streamingTasks.value[id]) {
         let msgs = messagesBySessionId.value[id] || []
+        const draftSession = sessions.value.find(s => s.sessionId === id)
+        const draftAppCode = normalizeAppCode(draftSession?.appCode)
         if (msgs.length === 0) {
           await selectSession(id)
           msgs = messagesBySessionId.value[id] || []
         }
-        if (msgs.length === 0 && !streamingTasks.value[id]) {
+        if (msgs.length === 0 && !streamingTasks.value[id] && draftAppCode === normalizedAppCode) {
+          setSelectedAppCode(normalizedAppCode)
           return id
         }
       }
       setDraftSessionId(null)
     }
-    return await startNewSession(title, agentId, customerId)
+    return await startNewSession(title, agentId, customerId, normalizedAppCode)
   }
 
   async function selectSession(sessionId: string) {
     currentSessionId.value = sessionId
+    const session = sessions.value.find(s => s.sessionId === sessionId)
+    if (session?.appCode) {
+      setSelectedAppCode(session.appCode)
+    }
     loading.value = true
     try {
       const dbMessages = await getMessageList(sessionId)
@@ -199,13 +246,18 @@ export const useChatStore = defineStore('chat', () => {
     content: string,
     attachments?: ChatAttachmentDTO[],
     attachmentVOs?: ChatAttachmentVO[],
-    useRag?: boolean,
+    appCodeOrUseRag?: string | boolean,
     knowledgeIds?: string[]
   ): Promise<void> {
     if (isStreaming.value) return
 
+    const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag, knowledgeIds)
     if (!currentSessionId.value) {
-      await startNewSession()
+      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
+    } else if (shouldStartNewSessionForApp(effectiveAppCode)) {
+      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
+    } else {
+      setSelectedAppCode(effectiveAppCode)
     }
 
     const sessionId = currentSessionId.value!
@@ -260,7 +312,8 @@ export const useChatStore = defineStore('chat', () => {
           assistantMessage.isStreaming = false
         },
         attachments,
-        useRag ?? ragEnabled.value,
+        effectiveAppCode,
+        effectiveAppCode === KNOWLEDGE_APP_CODE,
         selectedModel.value?.provider,
         selectedModel.value?.modelName,
         knowledgeIds
@@ -273,9 +326,14 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessageWithSync(content: string, useRag?: boolean): Promise<string> {
+  async function sendMessageWithSync(content: string, appCodeOrUseRag?: string | boolean): Promise<string> {
+    const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag)
     if (!currentSessionId.value) {
-      await startNewSession()
+      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
+    } else if (shouldStartNewSessionForApp(effectiveAppCode)) {
+      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
+    } else {
+      setSelectedAppCode(effectiveAppCode)
     }
 
     const sessionId = currentSessionId.value!
@@ -293,7 +351,8 @@ export const useChatStore = defineStore('chat', () => {
         sessionId,
         content,
         undefined,
-        useRag ?? ragEnabled.value,
+        effectiveAppCode,
+        effectiveAppCode === KNOWLEDGE_APP_CODE,
         selectedModel.value?.provider,
         selectedModel.value?.modelName
       )
@@ -320,12 +379,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function setRagEnabled(value: boolean) {
-    ragEnabled.value = value
-    try {
-      localStorage.setItem(RAG_ENABLED_STORAGE_KEY, value ? '1' : '0')
-    } catch {
-      // ignore storage failures
-    }
+    setSelectedAppCode(value ? KNOWLEDGE_APP_CODE : GENERAL_APP_CODE)
   }
 
   function setSelectedModelKey(value: string) {
@@ -338,9 +392,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function setCrmContextEnabled(value: boolean) {
-    crmContextEnabled.value = value
+    setSelectedAppCode(value ? CRM_APP_CODE : GENERAL_APP_CODE)
+  }
+
+  function setSelectedAppCode(value: string) {
+    const normalized = normalizeAppCode(value)
+    selectedAppCode.value = normalized
     try {
-      localStorage.setItem(CRM_CONTEXT_ENABLED_STORAGE_KEY, value ? '1' : '0')
+      localStorage.setItem(APP_CODE_STORAGE_KEY, normalized)
+      localStorage.setItem(RAG_ENABLED_STORAGE_KEY, normalized === KNOWLEDGE_APP_CODE ? '1' : '0')
+      localStorage.setItem(CRM_CONTEXT_ENABLED_STORAGE_KEY, normalized === CRM_APP_CODE ? '1' : '0')
     } catch {
       // ignore storage failures
     }
@@ -443,12 +504,52 @@ export const useChatStore = defineStore('chat', () => {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   }
 
-  function loadRagEnabled(): boolean {
-    try {
-      return localStorage.getItem(RAG_ENABLED_STORAGE_KEY) === '1'
-    } catch {
-      return false
+  function resolveEffectiveAppCode(appCodeOrUseRag?: string | boolean, knowledgeIds?: string[]): string {
+    if (typeof appCodeOrUseRag === 'string' && appCodeOrUseRag.trim()) {
+      return normalizeAppCode(appCodeOrUseRag)
     }
+    if (typeof appCodeOrUseRag === 'boolean') {
+      return appCodeOrUseRag ? KNOWLEDGE_APP_CODE : selectedAppCode.value
+    }
+    if (knowledgeIds?.length && selectedAppCode.value === GENERAL_APP_CODE) {
+      return KNOWLEDGE_APP_CODE
+    }
+    return normalizeAppCode(selectedAppCode.value)
+  }
+
+  function shouldStartNewSessionForApp(appCode: string): boolean {
+    const sessionId = currentSessionId.value
+    if (!sessionId) return false
+    const session = sessions.value.find(s => s.sessionId === sessionId)
+    const currentAppCode = normalizeAppCode(session?.appCode || selectedAppCode.value)
+    if (currentAppCode === appCode) return false
+    return (messagesBySessionId.value[sessionId] || []).length > 0
+  }
+
+  function normalizeAppCode(appCode?: string): string {
+    const code = (appCode || GENERAL_APP_CODE).trim().toLowerCase()
+    const knownCodes = appOptions.value.map(option => option.code)
+    if (knownCodes.length === 0) {
+      return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
+    }
+    return knownCodes.includes(code) ? code : GENERAL_APP_CODE
+  }
+
+  function loadSelectedAppCode(): string {
+    try {
+      const saved = localStorage.getItem(APP_CODE_STORAGE_KEY)
+      if (saved) return normalizeStoredAppCode(saved)
+      if (localStorage.getItem(CRM_CONTEXT_ENABLED_STORAGE_KEY) === '1') return CRM_APP_CODE
+      if (localStorage.getItem(RAG_ENABLED_STORAGE_KEY) === '1') return KNOWLEDGE_APP_CODE
+      return GENERAL_APP_CODE
+    } catch {
+      return GENERAL_APP_CODE
+    }
+  }
+
+  function normalizeStoredAppCode(appCode: string): string {
+    const code = appCode.trim().toLowerCase()
+    return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
   }
 
   function loadSelectedModelKey(): string {
@@ -456,14 +557,6 @@ export const useChatStore = defineStore('chat', () => {
       return localStorage.getItem(MODEL_STORAGE_KEY) || ''
     } catch {
       return ''
-    }
-  }
-
-  function loadCrmContextEnabled(): boolean {
-    try {
-      return localStorage.getItem(CRM_CONTEXT_ENABLED_STORAGE_KEY) === '1'
-    } catch {
-      return false
     }
   }
 
@@ -485,14 +578,19 @@ export const useChatStore = defineStore('chat', () => {
     loading,
     sessionsLoading,
     modelOptionsLoading,
+    appOptionsLoading,
     modelOptions,
+    appOptions,
     selectedModelKey,
     selectedModel,
+    selectedAppCode,
+    selectedApp,
     ragEnabled,
     crmContextEnabled,
     currentSession,
     fetchSessions,
     fetchModelOptions,
+    fetchAppOptions,
     startNewSession,
     startNewSessionIfNeeded,
     selectSession,
@@ -502,6 +600,7 @@ export const useChatStore = defineStore('chat', () => {
     clearMessages,
     setRagEnabled,
     setSelectedModelKey,
+    setSelectedAppCode,
     toModelKey,
     setCrmContextEnabled,
     isSessionStreaming

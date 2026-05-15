@@ -4,6 +4,8 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
+import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
 import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
@@ -72,6 +74,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private SystemAiModelProperties systemAiModelProperties;
+
+    @Autowired
+    private ChatApplicationRegistry chatApplicationRegistry;
 
     @Autowired
     private CustomerTools customerTools;
@@ -145,12 +150,18 @@ public class DynamicChatClientProvider {
      * 获取指定模型的聊天客户端。
      */
     public ChatClient getChatClient(String providerCode, String modelName) {
-        if (StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)) {
-            return getChatClient();
-        }
-        AiRuntimeConfig runtimeConfig = resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
-        String cacheKey = buildSelectedClientCacheKey(runtimeConfig);
-        return selectedModelChatClients.computeIfAbsent(cacheKey, key -> createChatClient(runtimeConfig));
+        return getChatClient(providerCode, modelName, ChatApplicationCodes.GENERAL);
+    }
+
+    /**
+     * 鑾峰彇鎸囧畾妯″瀷鍜屽簲鐢ㄧ殑鑱婂ぉ瀹㈡埛绔€?
+     */
+    public ChatClient getChatClient(String providerCode, String modelName, String appCode) {
+        AiRuntimeConfig runtimeConfig = StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)
+                ? resolveRuntimeConfig(loadAiConfigsFromDB())
+                : resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
+        String cacheKey = buildSelectedClientCacheKey(runtimeConfig, appCode);
+        return selectedModelChatClients.computeIfAbsent(cacheKey, key -> createChatClient(runtimeConfig, appCode));
     }
 
     /**
@@ -166,7 +177,7 @@ public class DynamicChatClientProvider {
                 log.warn("AI 运行 Key 未配置，tenantId={}, mode={}", key, runtimeConfig.mode().getCode());
             }
 
-            ChatClient client = createChatClient(runtimeConfig);
+            ChatClient client = createChatClient(runtimeConfig, ChatApplicationCodes.GENERAL);
             tenantChatClients.put(key, client);
             evictSelectedModelChatClients(key);
 
@@ -286,7 +297,7 @@ public class DynamicChatClientProvider {
         String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
         String providerCode = AiProviderRegistry.resolve(null, normalizedBaseUrl).getCode();
         return createChatClient(providerCode, normalizedBaseUrl, apiKey, model, temperature, maxTokens,
-                null, defaultCapabilities(), true);
+                null, defaultCapabilities(), false, ChatApplicationCodes.GENERAL);
     }
 
     /**
@@ -296,6 +307,17 @@ public class DynamicChatClientProvider {
                                        Double temperature, Integer maxTokens,
                                        String extraHeadersJson, AiModelCapabilities capabilities,
                                        boolean registerTools) {
+        return createChatClient(providerCode, baseUrl, apiKey, model, temperature, maxTokens,
+                extraHeadersJson, capabilities, registerTools, ChatApplicationCodes.CRM);
+    }
+
+    /**
+     * 鍒涘缓鑱婂ぉ瀹㈡埛绔€?
+     */
+    public ChatClient createChatClient(String providerCode, String baseUrl, String apiKey, String model,
+                                       Double temperature, Integer maxTokens,
+                                       String extraHeadersJson, AiModelCapabilities capabilities,
+                                       boolean registerTools, String appCode) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
@@ -313,7 +335,10 @@ public class DynamicChatClientProvider {
 
         ChatClient.Builder builder = ChatClient.builder(chatModel);
         if (registerTools && capabilities != null && capabilities.isSupportsToolCall()) {
-            builder.defaultTools(customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools);
+            Object[] tools = resolveDefaultTools(appCode);
+            if (tools.length > 0) {
+                builder.defaultTools(tools);
+            }
         }
         return builder.build();
     }
@@ -341,6 +366,13 @@ public class DynamicChatClientProvider {
      * 创建聊天客户端。
      */
     private ChatClient createChatClient(AiRuntimeConfig runtimeConfig) {
+        return createChatClient(runtimeConfig, ChatApplicationCodes.GENERAL);
+    }
+
+    /**
+     * 鍒涘缓鎸囧畾搴旂敤鐨勮亰澶╁鎴风銆?
+     */
+    private ChatClient createChatClient(AiRuntimeConfig runtimeConfig, String appCode) {
         return createChatClient(
                 runtimeConfig.providerCode(),
                 runtimeConfig.apiUrl(),
@@ -350,8 +382,20 @@ public class DynamicChatClientProvider {
                 runtimeConfig.maxTokens(),
                 runtimeConfig.extraHeadersJson(),
                 runtimeConfig.capabilities(),
-                true
+                true,
+                appCode
         );
+    }
+
+    private Object[] resolveDefaultTools(String appCode) {
+        String normalizedAppCode = chatApplicationRegistry.normalize(appCode);
+        if (ChatApplicationCodes.KNOWLEDGE.equals(normalizedAppCode)) {
+            return new Object[]{knowledgeTools};
+        }
+        if (ChatApplicationCodes.CRM.equals(normalizedAppCode)) {
+            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools};
+        }
+        return new Object[0];
     }
 
     /**
@@ -607,10 +651,11 @@ public class DynamicChatClientProvider {
     /**
      * 构建指定模型 ChatClient 缓存 Key。
      */
-    private String buildSelectedClientCacheKey(AiRuntimeConfig runtimeConfig) {
+    private String buildSelectedClientCacheKey(AiRuntimeConfig runtimeConfig, String appCode) {
         Long tenantId = TenantContextHolder.getTenantId();
         long tenantKey = tenantId != null ? tenantId : 0L;
         return tenantKey
+                + "|" + chatApplicationRegistry.normalize(appCode)
                 + "|" + runtimeConfig.providerCode()
                 + "|" + runtimeConfig.apiUrl()
                 + "|" + runtimeConfig.model()

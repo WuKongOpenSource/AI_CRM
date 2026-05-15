@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.service;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
+import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import reactor.core.publisher.Flux;
@@ -38,6 +39,11 @@ public interface IChatService {
      * 获取聊天可选模型。
      */
     List<AiModelOptionVO> getModelOptions();
+
+    /**
+     * Get available chat applications.
+     */
+    List<ChatAppOptionVO> getAppOptions();
 
     /**
      * 发送消息（流式响应）

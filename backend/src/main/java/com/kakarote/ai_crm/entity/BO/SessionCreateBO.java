@@ -18,4 +18,7 @@ public class SessionCreateBO {
 
     @Schema(description = "会话标题")
     private String title;
+
+    @Schema(description = "聊天应用编码: general/crm/knowledge")
+    private String appCode;
 }

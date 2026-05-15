@@ -174,6 +174,7 @@ export interface AiAgentUpdateBO {
 export interface ChatSession {
   sessionId: string
   title?: string
+  appCode?: string
   agentId?: string
   customerId?: string
   createTime: string
@@ -207,6 +208,15 @@ export interface ChatModelOption {
   icon?: string
 }
 
+export interface ChatAppOption {
+  code: string
+  label: string
+  iconName?: string
+  description?: string
+  defaultRagEnabled: boolean
+  recommendedQuestions?: string[]
+}
+
 export interface ChatAttachmentVO {
   id: string
   fileName: string
@@ -227,6 +237,7 @@ export interface ChatSendBO {
   sessionId: string
   content: string
   attachments?: ChatAttachmentDTO[]
+  appCode?: string
   ragEnabled?: boolean
   modelProvider?: string
   modelName?: string

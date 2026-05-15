@@ -612,17 +612,34 @@
                               <button
                                 type="button"
                                 class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                                @click="handleChatUploadMenuOpenCrm"
+                                @click="handleChatUploadMenuSelectApp('crm')"
                               >
                                 <WkIcon
                                   name="customer"
                                   :size="18"
                                   class="shrink-0"
-                                  :class="chatStore.crmContextEnabled ? '!text-[#0169cc]' : ''"
+                                  :class="chatStore.selectedAppCode === 'crm' ? '!text-[#0169cc]' : ''"
                                 />
-                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.crmContextEnabled ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">CRM管理</span>
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'crm' ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">CRM管理</span>
                                 <span
-                                  v-if="chatStore.crmContextEnabled"
+                                  v-if="chatStore.selectedAppCode === 'crm'"
+                                  class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                                >check</span>
+                              </button>
+                              <button
+                                type="button"
+                                class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                                @click="handleChatUploadMenuSelectApp('knowledge')"
+                              >
+                                <WkIcon
+                                  name="knowledge-1"
+                                  :size="18"
+                                  class="shrink-0"
+                                  :class="chatStore.selectedAppCode === 'knowledge' ? '!text-[#0169cc]' : ''"
+                                />
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'knowledge' ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">知识库</span>
+                                <span
+                                  v-if="chatStore.selectedAppCode === 'knowledge'"
                                   class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
                                 >check</span>
                               </button>
@@ -631,19 +648,19 @@
                         </div>
                       </el-popover>
                       <button
-                        v-if="chatStore.crmContextEnabled"
+                        v-if="chatStore.selectedAppCode !== 'general'"
                         type="button"
                         class="group/crm-toolbar h-[36px] rounded-full hover:bg-primary/10 pl-1 pr-3.5 text-sm text-[#0285FF] shadow-primary/10 transition-all"
                         aria-pressed="true"
-                        title="已启用 CRM 管理，点击关闭"
-                        @click="chatStore.setCrmContextEnabled(false)"
+                        :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
+                        @click="chatStore.setSelectedAppCode('general')"
                       >
                         <span class="flex items-center gap-1.5">
                           <span class="relative flex size-[22px] shrink-0 items-center justify-center">
                             <span
                               class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
                             >
-                              <WkIcon name="customer" :size="18" class="shrink-0" />
+                              <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                             </span>
                             <span
                               class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-primary/25 text-primary opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
@@ -652,7 +669,7 @@
                               <span class="material-symbols-outlined text-[14px] leading-none">close</span>
                             </span>
                           </span>
-                          <span>CRM管理</span>
+                          <span>{{ selectedChatAppLabel }}</span>
                         </span>
                       </button>
                       <!-- <button
@@ -866,17 +883,34 @@
                             <button
                               type="button"
                               class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              @click="handleChatUploadMenuOpenCrm"
+                              @click="handleChatUploadMenuSelectApp('crm')"
                             >
                               <WkIcon
                                 name="customer"
                                 :size="18"
                                 class="shrink-0"
-                                :class="chatStore.crmContextEnabled ? 'text-primary' : ''"
+                                :class="chatStore.selectedAppCode === 'crm' ? 'text-primary' : ''"
                               />
                               <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">CRM管理</span>
                               <span
-                                v-if="chatStore.crmContextEnabled"
+                                v-if="chatStore.selectedAppCode === 'crm'"
+                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                              >check</span>
+                            </button>
+                            <button
+                              type="button"
+                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              @click="handleChatUploadMenuSelectApp('knowledge')"
+                            >
+                              <WkIcon
+                                name="knowledge-1"
+                                :size="18"
+                                class="shrink-0"
+                                :class="chatStore.selectedAppCode === 'knowledge' ? 'text-primary' : ''"
+                              />
+                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库</span>
+                              <span
+                                v-if="chatStore.selectedAppCode === 'knowledge'"
                                 class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
                               >check</span>
                             </button>
@@ -901,19 +935,19 @@
                   <div v-if="isMobile" class="flex items-center justify-between gap-2">
                     <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                       <button
-                        v-if="chatStore.crmContextEnabled"
+                        v-if="chatStore.selectedAppCode !== 'general'"
                         type="button"
                         class="group/crm-toolbar h-[36px] self-start inline-flex hover:bg-primary/10 rounded-xl px-3.5 text-sm text-primary shadow-sm shadow-primary/10 transition-all"
                         aria-pressed="true"
-                        title="已启用 CRM 管理，点击关闭"
-                        @click="chatStore.setCrmContextEnabled(false)"
+                        :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
+                        @click="chatStore.setSelectedAppCode('general')"
                       >
                         <span class="flex items-center justify-center gap-1.5">
                           <span class="relative flex size-[22px] shrink-0 items-center justify-center">
                             <span
                               class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
                             >
-                              <WkIcon name="customer" :size="18" class="shrink-0" />
+                              <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                             </span>
                             <span
                               class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-primary/25 text-primary opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
@@ -922,7 +956,7 @@
                               <span class="material-symbols-outlined text-[14px] leading-none">close</span>
                             </span>
                           </span>
-                          <span>CRM管理</span>
+                          <span>{{ selectedChatAppLabel }}</span>
                         </span>
                       </button>
                       <!-- <button
@@ -1150,6 +1184,8 @@ import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
+import { wkIconNames } from '@/components/common/wkIcon'
+import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 import dashscopeBrandUrl from '@/assets/model-provider-brands/dashscope.svg?url'
 import openaiBrandUrl from '@/assets/model-provider-brands/openai.svg?url'
@@ -1195,6 +1231,26 @@ const chatComposerModelLabel = computed(() => {
 
 function modelOptionLabel(option: ChatModelOption): string {
   return option.displayName || option.modelName
+}
+
+const selectedChatAppLabel = computed(() => {
+  if (chatStore.selectedApp?.label) return chatStore.selectedApp.label
+  if (chatStore.selectedAppCode === 'crm') return 'CRM管理'
+  if (chatStore.selectedAppCode === 'knowledge') return '知识库'
+  return ''
+})
+
+const selectedChatAppIcon = computed<WkIconName>(() => {
+  if (chatStore.selectedApp?.iconName && isWkIconName(chatStore.selectedApp.iconName)) {
+    return chatStore.selectedApp.iconName
+  }
+  if (chatStore.selectedAppCode === 'crm') return 'customer'
+  if (chatStore.selectedAppCode === 'knowledge') return 'knowledge-1'
+  return 'application'
+})
+
+function isWkIconName(iconName: string): iconName is WkIconName {
+  return (wkIconNames as readonly string[]).includes(iconName)
 }
 
 /**
@@ -1526,6 +1582,7 @@ onMounted(async () => {
   await Promise.all([
     chatStore.fetchSessions(),
     chatStore.fetchModelOptions(),
+    chatStore.fetchAppOptions(),
     agentStore.fetchEnabledAgents(),
     loadAiConfig(),
   ])
@@ -1573,6 +1630,13 @@ watch(
   }
 )
 
+function resolveChatSendAppCode(hasKnowledge: boolean): string {
+  if (hasKnowledge && chatStore.selectedAppCode === 'general') {
+    return 'knowledge'
+  }
+  return chatStore.selectedAppCode || 'general'
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
@@ -1592,6 +1656,10 @@ async function handleSend() {
   const knowledgeIdsPayload = hasKnowledge
     ? selectedKnowledgeItems.value.map((k) => k.knowledgeId)
     : undefined
+  const effectiveAppCode = resolveChatSendAppCode(hasKnowledge)
+  if (effectiveAppCode !== chatStore.selectedAppCode) {
+    chatStore.setSelectedAppCode(effectiveAppCode)
+  }
   selectedKnowledgeItems.value = []
 
   let attachmentDTOs: ChatAttachmentDTO[] | undefined
@@ -1647,7 +1715,7 @@ async function handleSend() {
     content,
     attachmentDTOs,
     attachmentVOs,
-    chatStore.ragEnabled,
+    effectiveAppCode,
     knowledgeIdsPayload
   )
 }
@@ -1887,9 +1955,9 @@ async function handleChatUploadMenuChooseKnowledge() {
   chatKnowledgePickerVisible.value = true
 }
 
-function handleChatUploadMenuOpenCrm() {
+function handleChatUploadMenuSelectApp(appCode: string) {
   chatUploadMenuVisible.value = false
-  chatStore.setCrmContextEnabled(!chatStore.crmContextEnabled)
+  chatStore.setSelectedAppCode(chatStore.selectedAppCode === appCode ? 'general' : appCode)
 }
 
 function appendSelectedFiles(files: File[]) {
@@ -1929,6 +1997,9 @@ function onKnowledgePickerConfirm(items: Knowledge[]) {
     return
   }
   selectedKnowledgeItems.value = [...selectedKnowledgeItems.value, ...toAdd]
+  if (chatStore.selectedAppCode === 'general') {
+    chatStore.setSelectedAppCode('knowledge')
+  }
   showKnowledgeFollowUpChips.value = true
 }
 

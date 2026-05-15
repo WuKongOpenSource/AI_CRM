@@ -28,6 +28,9 @@ public class ChatSendBO {
     @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
     private Boolean ragEnabled;
 
+    @Schema(description = "聊天应用编码: general/crm/knowledge")
+    private String appCode;
+
     @Schema(description = "本次对话选择的 AI 服务商编码")
     private String modelProvider;
 

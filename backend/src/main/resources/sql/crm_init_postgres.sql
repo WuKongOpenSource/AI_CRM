@@ -324,6 +324,7 @@ CREATE TABLE crm_chat_session (
     agent_id BIGINT,
     customer_id BIGINT,
     title VARCHAR(255),
+    app_code VARCHAR(50) NOT NULL DEFAULT 'general',
     status SMALLINT DEFAULT 1,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -333,6 +334,7 @@ CREATE TABLE crm_chat_session (
 CREATE INDEX idx_chat_session_user_id ON crm_chat_session (user_id);
 CREATE INDEX idx_chat_session_agent_id ON crm_chat_session (agent_id);
 CREATE INDEX idx_chat_session_customer_id ON crm_chat_session (customer_id);
+CREATE INDEX idx_chat_session_app_code ON crm_chat_session (app_code);
 
 CREATE TRIGGER trg_chat_session_update_time
     BEFORE UPDATE ON crm_chat_session

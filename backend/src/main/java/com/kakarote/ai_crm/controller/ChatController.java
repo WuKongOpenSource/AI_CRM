@@ -4,6 +4,7 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.VO.AiModelOptionVO;
+import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.service.IChatService;
@@ -13,14 +14,16 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
 
-/**
- * AI聊天控制器
- */
 @RestController
 @RequestMapping("/chat")
 @Tag(name = "AI聊天")
@@ -29,9 +32,6 @@ public class ChatController {
     @Autowired
     private IChatService chatService;
 
-    /**
-     * 创建会话。
-     */
     @PostMapping("/session/create")
     @Operation(summary = "创建会话")
     public Result<Long> createSession(@Valid @RequestBody SessionCreateBO sessionCreateBO) {
@@ -39,18 +39,12 @@ public class ChatController {
         return Result.ok(sessionId);
     }
 
-    /**
-     * 获取会话列表。
-     */
     @GetMapping("/session/list")
     @Operation(summary = "获取会话列表")
     public Result<List<ChatSessionVO>> getSessionList() {
         return Result.ok(chatService.getSessionList());
     }
 
-    /**
-     * 删除会话。
-     */
     @PostMapping("/session/delete/{id}")
     @Operation(summary = "删除会话")
     public Result<String> deleteSession(@PathVariable("id") Long id) {
@@ -58,27 +52,24 @@ public class ChatController {
         return Result.ok();
     }
 
-    /**
-     * 获取会话消息历史。
-     */
     @GetMapping("/message/list/{sessionId}")
     @Operation(summary = "获取会话消息历史")
     public Result<List<ChatMessageVO>> getMessageList(@PathVariable("sessionId") Long sessionId) {
         return Result.ok(chatService.getMessageList(sessionId));
     }
 
-    /**
-     * 获取聊天可选模型。
-     */
     @GetMapping("/model/options")
     @Operation(summary = "获取聊天可选模型")
     public Result<List<AiModelOptionVO>> getModelOptions() {
         return Result.ok(chatService.getModelOptions());
     }
 
-    /**
-     * 发送消息（流式响应，支持附件）。
-     */
+    @GetMapping("/app/options")
+    @Operation(summary = "获取聊天可选应用")
+    public Result<List<ChatAppOptionVO>> getAppOptions() {
+        return Result.ok(chatService.getAppOptions());
+    }
+
     @PostMapping(value = "/send", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "发送消息（流式响应，支持附件）")
     public Flux<ServerSentEvent<String>> send(@RequestBody ChatSendBO sendBO) {
@@ -89,9 +80,6 @@ public class ChatController {
                 .build());
     }
 
-    /**
-     * 发送消息（同步响应，支持附件）。
-     */
     @PostMapping("/sendSync")
     @Operation(summary = "发送消息（同步响应，支持附件）")
     public Result<String> sendSync(@RequestBody ChatSendBO sendBO) {

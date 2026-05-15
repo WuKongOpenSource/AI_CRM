@@ -1,5 +1,5 @@
 import { post, get, getToken, getApiBaseUrl } from '@/utils/request'
-import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatModelOption } from '@/types/common'
+import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatModelOption, ChatAppOption } from '@/types/common'
 
 /**
  * Create chat session
@@ -8,6 +8,7 @@ export function createSession(data: {
   title?: string
   agentId?: string
   customerId?: string
+  appCode?: string
 }): Promise<string> {
   return post('/chat/session/create', data)
 }
@@ -37,6 +38,10 @@ export function getChatModelOptions(): Promise<ChatModelOption[]> {
   return get('/chat/model/options')
 }
 
+export function getChatAppOptions(): Promise<ChatAppOption[]> {
+  return get('/chat/app/options')
+}
+
 /**
  * Send message (streaming)
  * Handles SSE (Server-Sent Events) format parsing
@@ -48,6 +53,7 @@ export async function sendMessageStream(
   onComplete?: () => void,
   onError?: (error: Error) => void,
   attachments?: ChatAttachmentDTO[],
+  appCode?: string,
   ragEnabled?: boolean,
   modelProvider?: string,
   modelName?: string,
@@ -80,6 +86,7 @@ export async function sendMessageStream(
         sessionId,
         content,
         attachments: attachments || undefined,
+        appCode: appCode || undefined,
         ragEnabled,
         modelProvider: modelProvider || undefined,
         modelName: modelName || undefined,
@@ -168,11 +175,21 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean,  modelProvider?: string,modelName?: string,knowledgeIds?: string[]): Promise<string> {
+export function sendMessageSync(
+  sessionId: string,
+  content: string,
+  attachments?: ChatAttachmentDTO[],
+  appCode?: string,
+  ragEnabled?: boolean,
+  modelProvider?: string,
+  modelName?: string,
+  knowledgeIds?: string[]
+): Promise<string> {
   return post('/chat/sendSync', {
     sessionId,
     content,
     attachments: attachments || undefined,
+    appCode: appCode || undefined,
     ragEnabled,
     modelProvider: modelProvider || undefined,
     modelName: modelName || undefined,

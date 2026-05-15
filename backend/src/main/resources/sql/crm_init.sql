@@ -227,13 +227,15 @@ CREATE TABLE `crm_chat_session` (
     `agent_id` BIGINT COMMENT '智能体ID',
     `customer_id` BIGINT COMMENT '关联客户ID',
     `title` VARCHAR(255) COMMENT '会话标题',
+    `app_code` VARCHAR(50) NOT NULL DEFAULT 'general' COMMENT '聊天应用编码',
     `status` TINYINT DEFAULT 1 COMMENT '状态: 0-已归档, 1-活跃',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     PRIMARY KEY (`session_id`),
     INDEX `idx_user_id` (`user_id`),
     INDEX `idx_agent_id` (`agent_id`),
-    INDEX `idx_customer_id` (`customer_id`)
+    INDEX `idx_customer_id` (`customer_id`),
+    INDEX `idx_app_code` (`app_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话表';
 
 -- ============================================
