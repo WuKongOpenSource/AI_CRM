@@ -420,41 +420,76 @@
                     @change="handleFileSelect"
                   />
 
-                  <div v-if="selectedFiles.length > 0" class="flex items-center gap-2 px-2 pt-2 mb-4">
-                    <template v-for="(file, index) in selectedFiles.slice(0, 3)" :key="`${file.name}-${index}`">
+                  <div
+                    v-if="composerAttachmentPreviewItems.length > 0 || composerAttachmentPreviewMoreCount > 0"
+                    class="flex flex-wrap gap-2 px-2 pt-2 mb-2"
+                  >
+                    <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
                       <div
-                        v-if="file.type.startsWith('image/')"
-                        class="relative w-[54px] h-[54px] rounded-xl border border-[#0d0d0d0d] bg-white overflow-hidden shrink-0"
+                        v-if="item.kind === 'knowledge'"
+                        class="relative h-[54px] min-w-[200px] max-w-[320px] flex-1 rounded-2xl bg-[#f5f5f5] overflow-hidden shrink-0 flex items-center gap-3 px-3"
                       >
-                        <img
-                          :src="getSelectedFilePreviewUrl(file)"
-                          :alt="file.name"
-                          class="size-full object-cover"
-                        />
+                        <div
+                          class="size-10 rounded-xl flex items-center justify-center shrink-0"
+                          :class="getKnowledgeDocIconMeta(item.knowledge).bg"
+                        >
+                          <span
+                            class="material-symbols-outlined text-[22px] leading-none"
+                            :class="getKnowledgeDocIconMeta(item.knowledge).color"
+                          >{{ getKnowledgeDocIconMeta(item.knowledge).icon }}</span>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="text-[14px] leading-[18px] text-[#0d0d0d] truncate">{{ item.knowledge.name }}</div>
+                          <div class="text-[12px] leading-[14px] text-[#909090]">{{ getKnowledgeCardSubtitle(item.knowledge) }}</div>
+                        </div>
                         <button
                           type="button"
-                          class="absolute top-[0.3rem] right-[-0.01rem] size-5 rounded-full bg-[#0d0d0d] text-white flex items-center justify-center"
-                          @click="removeSelectedFile(index)"
+                          class="absolute top-2 right-2 size-5 rounded-full bg-[#0d0d0d] text-white flex items-center justify-center"
+                          @click="removeSelectedKnowledgeById(item.knowledge.knowledgeId)"
                         >
                           <span class="material-symbols-outlined text-[14px] leading-none">close</span>
                         </button>
                       </div>
 
                       <div
-                        v-else
-                        class="relative w-[320px] h-[54px] rounded-xl border border-[#0d0d0d0d] bg-white overflow-hidden shrink-0 flex items-center gap-3 px-3"
+                        v-else-if="item.kind === 'file' && item.file.type.startsWith('image/')"
+                        class="relative w-[54px] h-[54px] rounded-xl border border-[#0d0d0d0d] bg-white overflow-hidden shrink-0"
                       >
-                        <div class="size-10 rounded-xl bg-[#0d0d0d0d] flex items-center justify-center shrink-0">
-                          <span class="material-symbols-outlined text-[20px] leading-none text-[#0d0d0d]">description</span>
+                        <img
+                          :src="getSelectedFilePreviewUrl(item.file)"
+                          :alt="item.file.name"
+                          class="size-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          class="absolute top-[0.3rem] right-[-0.01rem] size-5 rounded-full bg-[#0d0d0d] text-white flex items-center justify-center"
+                          @click="removeSelectedFile(item.fileIndex)"
+                        >
+                          <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                        </button>
+                      </div>
+
+                      <div
+                        v-else-if="item.kind === 'file'"
+                        class="relative h-[54px] min-w-[200px] max-w-[320px] flex-1 rounded-2xl bg-[#f5f5f5] overflow-hidden shrink-0 flex items-center gap-3 px-3"
+                      >
+                        <div
+                          class="size-10 rounded-xl flex items-center justify-center shrink-0"
+                          :class="getChatDocIconMeta(item.file).bg"
+                        >
+                          <span
+                            class="material-symbols-outlined text-[22px] leading-none"
+                            :class="getChatDocIconMeta(item.file).color"
+                          >{{ getChatDocIconMeta(item.file).icon }}</span>
                         </div>
                         <div class="min-w-0 flex-1">
-                          <div class="text-[14px] leading-[18px] text-[#0d0d0d] truncate">{{ file.name }}</div>
-                          <div class="text-[12px] leading-[14px] text-[#909090]">文件</div>
+                          <div class="text-[14px] leading-[18px] text-[#0d0d0d] truncate">{{ item.file.name }}</div>
+                          <div class="text-[12px] leading-[14px] text-[#909090]">{{ getChatDocumentSubtitle(item.file) }}</div>
                         </div>
                         <button
                           type="button"
                           class="absolute top-2 right-2 size-5 rounded-full bg-[#0d0d0d] text-white flex items-center justify-center"
-                          @click="removeSelectedFile(index)"
+                          @click="removeSelectedFile(item.fileIndex)"
                         >
                           <span class="material-symbols-outlined text-[14px] leading-none">close</span>
                         </button>
@@ -462,11 +497,27 @@
                     </template>
 
                     <div
-                      v-if="selectedFiles.length > 3"
+                      v-if="composerAttachmentPreviewMoreCount > 0"
                       class="h-12 flex items-center text-xs text-[#909090] pr-1"
                     >
-                      +{{ selectedFiles.length - 3 }}
+                      +{{ composerAttachmentPreviewMoreCount }}
                     </div>
+                  </div>
+
+                  <div
+                    v-if="showKnowledgeFollowUpChips && (selectedFiles.length > 0 || selectedKnowledgeItems.length > 0)"
+                    class="flex flex-wrap gap-2 px-2 pb-2"
+                  >
+                    <button
+                      v-for="(t, i) in KNOWLEDGE_DOC_PROMPTS"
+                      :key="i"
+                      type="button"
+                      class="inline-flex max-w-full items-center gap-1.5 rounded-xl bg-[#f5f5f5] px-3 py-2 text-left text-[13px] leading-snug text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+                      @click="applyKnowledgeDocPrompt(t)"
+                    >
+                      <span class="min-w-0">{{ t }}</span>
+                      <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-[#909090]">arrow_forward</span>
+                    </button>
                   </div>
 
                   <!-- PC: input (2nd line) -->
@@ -476,7 +527,7 @@
                       v-model="inputText"
                       rows="1"
                       class="w-full bg-transparent border-none focus:ring-0 focus:outline-none px-3 pt-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#909090] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
-                      placeholder="输入指令，如：总结今天与张总的会议..."
+                      :placeholder="chatInputPlaceholder"
                       :disabled="chatStore.isStreaming || isUploading"
                       style="min-height: 90px;"
                       @input="resizeChatTextarea"
@@ -496,16 +547,23 @@
                         :show-arrow="false"
                         :disabled="isUploading"
                         :teleported="true"
+                        transition="el-zoom-in-bottom"
                         popper-class="wk-chat-upload-menu-popper"
                       >
                         <template #reference>
                           <button
                             type="button"
-                            class="size-8 flex items-center justify-center rounded-full text-[#0d0d0d] hover:bg-[#F1F1F1] transition-colors"
+                            class="group/chat-upload-trigger relative flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors hover:bg-[#F1F1F1]"
                             :disabled="isUploading"
+                            aria-label="添加文件等"
                           >
                             <WkIcon name="add-1" :box-size="16" class="shrink-0" />
-                            <!-- <span class="material-symbols-outlined text-[18px] leading-none">add</span> -->
+                            <span
+                              class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/chat-upload-trigger:opacity-100"
+                              role="tooltip"
+                            >
+                              添加文件等
+                            </span>
                           </button>
                         </template>
                         <div class="wk-chat-upload-menu">
@@ -525,7 +583,6 @@
                             @click="handleChatUploadMenuChooseKnowledge"
                           >
                             <WkIcon name="knowledge-1" :size="18" class="shrink-0" />
-                            <!-- <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span> -->
                             <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                           </button>
                           <el-popover
@@ -557,13 +614,48 @@
                                 class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
                                 @click="handleChatUploadMenuOpenCrm"
                               >
-                                <span class="wk-chat-upload-menu__label">CRM管理</span>
+                                <WkIcon
+                                  name="customer"
+                                  :size="18"
+                                  class="shrink-0"
+                                  :class="chatStore.crmContextEnabled ? '!text-[#0169cc]' : ''"
+                                />
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.crmContextEnabled ? 'text-[#0169cc]' : 'text-[#0d0d0d]'">CRM管理</span>
+                                <span
+                                  v-if="chatStore.crmContextEnabled"
+                                  class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                                >check</span>
                               </button>
                             </div>
                           </el-popover>
                         </div>
                       </el-popover>
                       <button
+                        v-if="chatStore.crmContextEnabled"
+                        type="button"
+                        class="group/crm-toolbar h-[36px] rounded-full hover:bg-primary/10 pl-1 pr-3.5 text-sm text-[#0285FF] shadow-primary/10 transition-all"
+                        aria-pressed="true"
+                        title="已启用 CRM 管理，点击关闭"
+                        @click="chatStore.setCrmContextEnabled(false)"
+                      >
+                        <span class="flex items-center gap-1.5">
+                          <span class="relative flex size-[22px] shrink-0 items-center justify-center">
+                            <span
+                              class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
+                            >
+                              <WkIcon name="customer" :size="18" class="shrink-0" />
+                            </span>
+                            <span
+                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-primary/25 text-primary opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                              aria-hidden="true"
+                            >
+                              <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                            </span>
+                          </span>
+                          <span>CRM管理</span>
+                        </span>
+                      </button>
+                      <!-- <button
                         type="button"
                         class="h-10 rounded-full pl-1 pr-3.5 text-sm transition-all"
                         :class="chatStore.ragEnabled
@@ -579,7 +671,7 @@
                           </span>
                           <span>知识库检索</span>
                         </span>
-                      </button>
+                      </button> -->
                     </div>
 
                     <div class="flex items-center gap-1.5 pr-1 shrink-0">
@@ -590,15 +682,34 @@
                         width="280"
                         :show-arrow="false"
                         :teleported="true"
+                        transition="el-zoom-in-bottom"
                         popper-class="wk-chat-model-popper"
                       >
                         <template #reference>
                           <button
                             type="button"
-                            class="inline-flex h-9 max-w-[148px] shrink-0 items-center gap-0.5 rounded-full border border-[#ececec] bg-[#f5f5f5] px-2.5 text-left text-[13px] font-semibold text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+                            class="inline-flex h-9 max-w-[178px] shrink-0 items-center gap-1.5 rounded-[18px] border border-[#ececec] bg-[#f5f5f5] pl-2 pr-2 text-left text-[13px] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
                             :title="`当前模型：${selectedChatModel.label}`"
                           >
-                            <span class="min-w-0 truncate">{{ selectedChatModel.label }}</span>
+                            <span
+                              class="relative size-7 shrink-0 overflow-hidden rounded-md bg-[#ececec]"
+                              aria-hidden="true"
+                            >
+                              <img
+                                v-if="chatModelShowImage(selectedChatModel)"
+                                :src="chatModelIconSrc(selectedChatModel)"
+                                alt=""
+                                class="size-full object-cover"
+                                @error="onChatModelIconError(selectedChatModel.id)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[11px] font-semibold text-[#909090]"
+                              >
+                                {{ selectedChatModel.label.slice(0, 1) }}
+                              </span>
+                            </span>
+                            <span class="min-w-0 flex-1 truncate">{{ selectedChatModel.label }}</span>
                             <span class="material-symbols-outlined shrink-0 text-[18px] leading-none text-[#8f8f8f]">expand_more</span>
                           </button>
                         </template>
@@ -610,13 +721,31 @@
                             class="wk-chat-model-menu__item"
                             @click="selectChatModel(m.id)"
                           >
+                            <span
+                              class="relative mt-0.5 size-8 shrink-0 overflow-hidden rounded-lg bg-[#ececec]"
+                              aria-hidden="true"
+                            >
+                              <img
+                                v-if="chatModelShowImage(m)"
+                                :src="chatModelIconSrc(m)"
+                                alt=""
+                                class="size-full object-cover"
+                                @error="onChatModelIconError(m.id)"
+                              />
+                              <span
+                                v-else
+                                class="flex size-full items-center justify-center text-[12px] font-semibold text-[#909090]"
+                              >
+                                {{ m.label.slice(0, 1) }}
+                              </span>
+                            </span>
                             <div class="min-w-0 flex-1">
-                              <div class="text-[14px] font-semibold leading-tight text-[#0d0d0d]">{{ m.label }}</div>
+                              <div class="text-[14px] leading-tight text-[#0d0d0d]">{{ m.label }}</div>
                               <div class="mt-0.5 text-[12px] leading-snug text-[#909090]">{{ m.description }}</div>
                             </div>
                             <span
                               v-if="selectedChatModelId === m.id"
-                              class="material-symbols-outlined shrink-0 text-[20px] leading-none text-primary"
+                              class="material-symbols-outlined mt-0.5 shrink-0 text-[20px] leading-none text-primary"
                             >
                               check
                             </span>
@@ -625,10 +754,10 @@
                       </el-popover>
                       <button
                         type="button"
-                        class="relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
+                        class="group/send-bar-action relative flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full transition-colors"
                         :class="sendBarActionButtonClass"
                         :disabled="sendBarActionDisabled"
-                        :title="sendBarActionTitle"
+                        :aria-label="sendBarActionTitle"
                         @click="handleSendBarClick"
                       >
                         <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
@@ -642,6 +771,12 @@
                           class="material-symbols-outlined text-[20px] leading-none"
                         />
                         <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
+                        <span
+                          class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/send-bar-action:opacity-100"
+                          role="tooltip"
+                        >
+                          {{ sendBarActionTitle }}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -714,7 +849,17 @@
                               class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
                               @click="handleChatUploadMenuOpenCrm"
                             >
-                              <span class="wk-chat-upload-menu__label">CRM管理</span>
+                              <WkIcon
+                                name="customer"
+                                :size="18"
+                                class="shrink-0"
+                                :class="chatStore.crmContextEnabled ? 'text-primary' : ''"
+                              />
+                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">CRM管理</span>
+                              <span
+                                v-if="chatStore.crmContextEnabled"
+                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                              >check</span>
                             </button>
                           </div>
                         </el-popover>
@@ -725,7 +870,7 @@
                       v-model="inputText"
                       rows="1"
                       class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none pl-1 pr-3 py-3 text-[#0d0d0d] text-[16px] leading-[26px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto min-h-[50px]"
-                      placeholder="输入指令，如：总结今天与张总的会议..."
+                      :placeholder="chatInputPlaceholder"
                       :disabled="chatStore.isStreaming || isUploading"
                       @input="resizeChatTextarea"
                       @keydown.enter.exact.prevent="handleSend"
@@ -735,30 +880,57 @@
                   </div>
 
                   <div v-if="isMobile" class="flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      class="h-10 self-start inline-flex rounded-xl border px-3.5 text-sm shadow-sm transition-all"
-                      :class="chatStore.ragEnabled
-                        ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
-                        : 'border-slate-200 bg-white text-[#0d0d0d] hover:border-slate-300 hover:text-slate-700'"
-                      :aria-pressed="chatStore.ragEnabled"
-                      :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
-                      @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
-                    >
-                      <span class="flex items-center justify-center gap-1.5">
-                        <span class="material-symbols-outlined text-[18px] leading-none">
-                          menu_book
+                    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <button
+                        v-if="chatStore.crmContextEnabled"
+                        type="button"
+                        class="group/crm-toolbar h-[36px] self-start inline-flex hover:bg-primary/10 rounded-xl px-3.5 text-sm text-primary shadow-sm shadow-primary/10 transition-all"
+                        aria-pressed="true"
+                        title="已启用 CRM 管理，点击关闭"
+                        @click="chatStore.setCrmContextEnabled(false)"
+                      >
+                        <span class="flex items-center justify-center gap-1.5">
+                          <span class="relative flex size-[22px] shrink-0 items-center justify-center">
+                            <span
+                              class="flex size-full items-center justify-center transition-opacity duration-150 max-sm:pointer-events-none max-sm:opacity-0 group-hover/crm-toolbar:pointer-events-none group-hover/crm-toolbar:opacity-0"
+                            >
+                              <WkIcon name="customer" :size="18" class="shrink-0" />
+                            </span>
+                            <span
+                              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-primary/25 text-primary opacity-0 transition-opacity duration-150 max-sm:opacity-100 group-hover/crm-toolbar:opacity-100"
+                              aria-hidden="true"
+                            >
+                              <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                            </span>
+                          </span>
+                          <span>CRM管理</span>
                         </span>
-                        <span>知识库检索</span>
-                      </span>
-                    </button>
+                      </button>
+                      <!-- <button
+                        type="button"
+                        class="h-10 self-start inline-flex rounded-xl border px-3.5 text-sm shadow-sm transition-all"
+                        :class="chatStore.ragEnabled
+                          ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
+                          : 'border-slate-200 bg-white text-[#0d0d0d] hover:border-slate-300 hover:text-slate-700'"
+                        :aria-pressed="chatStore.ragEnabled"
+                        :title="chatStore.ragEnabled ? '已启用 知识库 检索' : '点击启用 知识库 检索'"
+                        @click="chatStore.setRagEnabled(!chatStore.ragEnabled)"
+                      >
+                        <span class="flex items-center justify-center gap-1.5">
+                          <span class="material-symbols-outlined text-[18px] leading-none">
+                            menu_book
+                          </span>
+                          <span>知识库检索</span>
+                        </span>
+                      </button> -->
+                    </div>
 
                     <button
                       type="button"
-                      class="relative size-10 shrink-0 rounded-full flex items-center justify-center transition-colors"
+                      class="group/send-bar-action relative flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full transition-colors"
                       :class="sendBarActionButtonClass"
                       :disabled="sendBarActionDisabled"
-                      :title="sendBarActionTitle"
+                      :aria-label="sendBarActionTitle"
                       @click="handleSendBarClick"
                     >
                       <span v-if="chatStore.isStreaming" class="material-symbols-outlined text-[20px] leading-none">stop</span>
@@ -772,6 +944,12 @@
                         class="material-symbols-outlined text-[20px] leading-none"
                       />
                       <span v-else class="material-symbols-outlined text-[20px] leading-none">arrow_upward</span>
+                      <span
+                        class="pointer-events-none absolute left-1/2 top-full z-[200] mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/send-bar-action:opacity-100"
+                        role="tooltip"
+                      >
+                        {{ sendBarActionTitle }}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -891,6 +1069,11 @@
       </template>
     </div>
 
+    <ChatKnowledgePickerModal
+      v-model="chatKnowledgePickerVisible"
+      :remaining-slots="Math.max(0, MAX_FILE_COUNT - selectedFiles.length - selectedKnowledgeItems.length)"
+      @confirm="onKnowledgePickerConfirm"
+    />
   </div>
 </template>
 
@@ -925,7 +1108,9 @@ import {
 } from '@/utils/chatMessage'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
+import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge } from '@/types/common'
+import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -951,18 +1136,42 @@ function activeChatInputEl(): HTMLTextAreaElement | null {
 }
 
 const chatUploadMenuVisible = ref(false)
+const chatKnowledgePickerVisible = ref(false)
+const showKnowledgeFollowUpChips = ref(false)
 
 type ChatModelOption = {
   id: string
   label: string
   description: string
+  /** 模型图标图片路径（如 `/logo.png` 或完整 URL），缺省或加载失败时显示占位 */
+  icon?: string
 }
 
 /** 模型切换（测试数据，后续可对接接口） */
 const CHAT_MODEL_OPTIONS: ChatModelOption[] = [
-  { id: 'sonnet-46', label: 'Sonnet 4.6', description: '适合日常工作的均衡模型' },
+  {
+    id: 'sonnet-46',
+    label: 'Sonnet 4.6',
+    description: '适合日常工作的均衡模型',
+    icon: '/logo.png',
+  },
   { id: 'haiku-45', label: 'Haiku 4.5', description: '更快、更省资源' },
 ]
+
+const chatModelIconLoadFailed = ref<Record<string, boolean>>({})
+
+function onChatModelIconError(id: string) {
+  chatModelIconLoadFailed.value = { ...chatModelIconLoadFailed.value, [id]: true }
+}
+
+function chatModelIconSrc(m: ChatModelOption): string | undefined {
+  const u = m.icon?.trim()
+  return u || undefined
+}
+
+function chatModelShowImage(m: ChatModelOption): boolean {
+  return Boolean(chatModelIconSrc(m)) && !chatModelIconLoadFailed.value[m.id]
+}
 
 const chatModelPopoverVisible = ref(false)
 const selectedChatModelId = ref(CHAT_MODEL_OPTIONS[0]!.id)
@@ -997,12 +1206,51 @@ function resizeChatTextarea() {
 watch(inputText, () => nextTick(resizeChatTextarea))
 watch(isMobile, () => nextTick(resizeChatTextarea))
 const selectedFiles = ref<File[]>([])
+const selectedKnowledgeItems = ref<Knowledge[]>([])
+watch(
+  () => selectedFiles.value.length + selectedKnowledgeItems.value.length,
+  (total) => {
+    if (total === 0) showKnowledgeFollowUpChips.value = false
+  }
+)
 const isUploading = ref(false)
 const isRecording = ref(false)
 const isTranscribing = ref(false)
 
 const isChatInputEmpty = computed(
-  () => !inputText.value.trim() && selectedFiles.value.length === 0
+  () =>
+    !inputText.value.trim() &&
+    selectedFiles.value.length === 0 &&
+    selectedKnowledgeItems.value.length === 0
+)
+
+const chatInputPlaceholder = computed(() =>
+  selectedFiles.value.length > 0 || selectedKnowledgeItems.value.length > 0
+    ? '发消息...'
+    : '发消息...'
+)
+
+const COMPOSER_PREVIEW_MAX = 3
+
+const composerAttachmentPreviewItems = computed(() => {
+  type Item =
+    | { kind: 'knowledge'; knowledge: Knowledge; key: string }
+    | { kind: 'file'; file: File; fileIndex: number; key: string }
+  const out: Item[] = []
+  for (const k of selectedKnowledgeItems.value) {
+    if (out.length >= COMPOSER_PREVIEW_MAX) break
+    out.push({ kind: 'knowledge', knowledge: k, key: `k-${k.knowledgeId}` })
+  }
+  for (let index = 0; index < selectedFiles.value.length; index++) {
+    if (out.length >= COMPOSER_PREVIEW_MAX) break
+    const file = selectedFiles.value[index]!
+    out.push({ kind: 'file', file, fileIndex: index, key: `f-${file.name}-${index}` })
+  }
+  return out
+})
+
+const composerAttachmentPreviewMoreCount = computed(() =>
+  Math.max(0, selectedKnowledgeItems.value.length + selectedFiles.value.length - COMPOSER_PREVIEW_MAX)
 )
 
 const sendBarActionButtonClass = computed(() => {
@@ -1022,8 +1270,8 @@ const sendBarActionTitle = computed(() => {
   if (isUploading.value) return '上传中'
   if (isTranscribing.value) return '语音识别中…'
   if (isRecording.value) return '点击结束录音'
-  if (isChatInputEmpty.value) return '语音输入'
-  return '发送'
+  if (isChatInputEmpty.value) return '使用语音功能'
+  return '发送提示'
 })
 
 let mediaRecorder: MediaRecorder | null = null
@@ -1197,6 +1445,12 @@ const quickActions = [
   { label: '总结本周的销售情况', text: '总结本周的销售情况，并生成销售报告' }
 ]
 
+const KNOWLEDGE_DOC_PROMPTS = [
+  '详细总结这些文档内容',
+  '用通俗易懂的话，说说这些文档讲了什么',
+  '生成一个简短摘要'
+] as const
+
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 
@@ -1258,11 +1512,23 @@ watch(
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
-  if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
+  const hasKnowledge = selectedKnowledgeItems.value.length > 0
+  if ((!text && !hasFiles && !hasKnowledge) || chatStore.isStreaming || isUploading.value) return
   if (!(await ensureAiAvailableForSend())) return
 
-  const content = text || '请分析这些文件'
+  const content =
+    text ||
+    (hasFiles && hasKnowledge
+      ? '请结合上传的附件与选中的知识库文档回答'
+      : hasFiles
+        ? '请分析这些文件'
+        : '请结合选中的知识库文档回答')
   inputText.value = ''
+
+  const knowledgeIdsPayload = hasKnowledge
+    ? selectedKnowledgeItems.value.map((k) => k.knowledgeId)
+    : undefined
+  selectedKnowledgeItems.value = []
 
   let attachmentDTOs: ChatAttachmentDTO[] | undefined
   let attachmentVOs: ChatAttachmentVO[] | undefined
@@ -1313,7 +1579,13 @@ async function handleSend() {
 
   // Switch to chat view when sending
   currentView.value = 'chat'
-  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
+  await chatStore.sendMessage(
+    content,
+    attachmentDTOs,
+    attachmentVOs,
+    chatStore.ragEnabled,
+    knowledgeIdsPayload
+  )
 }
 
 function handleSendBarClick() {
@@ -1324,7 +1596,8 @@ function handleSendBarClick() {
   }
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
-  if (text || hasFiles) {
+  const hasKnowledge = selectedKnowledgeItems.value.length > 0
+  if (text || hasFiles || hasKnowledge) {
     void handleSend()
     return
   }
@@ -1537,24 +1810,61 @@ function handleChatUploadMenuAddFile() {
 }
 
 async function handleChatUploadMenuChooseKnowledge() {
+  if (selectedFiles.value.length + selectedKnowledgeItems.value.length >= MAX_CHAT_ATTACHMENT_COUNT) {
+    ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
+    return
+  }
   chatUploadMenuVisible.value = false
-  // 当前聊天页暂不支持“从知识库选中文档后自动附加/指定范围”，先跳转到知识库页面。
-  await router.push('/knowledge')
+  chatKnowledgePickerVisible.value = true
 }
 
-async function handleChatUploadMenuOpenCrm() {
+function handleChatUploadMenuOpenCrm() {
   chatUploadMenuVisible.value = false
-  await router.push('/customer')
+  chatStore.setCrmContextEnabled(!chatStore.crmContextEnabled)
 }
 
 function appendSelectedFiles(files: File[]) {
-  const result = mergeChatFiles(selectedFiles.value, files)
+  const slotsLeft =
+    MAX_CHAT_ATTACHMENT_COUNT - selectedKnowledgeItems.value.length - selectedFiles.value.length
+  if (slotsLeft <= 0) {
+    ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
+    return
+  }
+  const capped = files.slice(0, slotsLeft)
+  const result = mergeChatFiles(selectedFiles.value, capped)
   if (result.error) {
     ElMessage.warning(result.error)
     return
   }
 
   selectedFiles.value = result.files
+}
+
+function onKnowledgePickerConfirm(items: Knowledge[]) {
+  const cap = MAX_CHAT_ATTACHMENT_COUNT
+  const room = cap - selectedFiles.value.length - selectedKnowledgeItems.value.length
+  if (room <= 0) {
+    ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
+    return
+  }
+  const existing = new Set(selectedKnowledgeItems.value.map((k) => k.knowledgeId))
+  const toAdd: Knowledge[] = []
+  for (const it of items) {
+    if (toAdd.length >= room) break
+    if (existing.has(it.knowledgeId)) continue
+    existing.add(it.knowledgeId)
+    toAdd.push(it)
+  }
+  if (toAdd.length === 0) {
+    ElMessage.warning('所选文档已在列表中或超出数量上限')
+    return
+  }
+  selectedKnowledgeItems.value = [...selectedKnowledgeItems.value, ...toAdd]
+  showKnowledgeFollowUpChips.value = true
+}
+
+function removeSelectedKnowledgeById(knowledgeId: string) {
+  selectedKnowledgeItems.value = selectedKnowledgeItems.value.filter((k) => k.knowledgeId !== knowledgeId)
 }
 
 function handleFileSelect(event: Event) {
@@ -1564,7 +1874,7 @@ function handleFileSelect(event: Event) {
   const newFiles = Array.from(input.files)
 
   // Validate file count
-  if (selectedFiles.value.length + newFiles.length > MAX_FILE_COUNT) {
+  if (selectedFiles.value.length + newFiles.length + selectedKnowledgeItems.value.length > MAX_FILE_COUNT) {
     ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
     input.value = ''
     return
@@ -1614,10 +1924,72 @@ function getDocumentAttachments(message: { attachments?: ChatAttachmentVO[] }): 
   return (message.attachments || []).filter(isDocumentAttachment)
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+function getFriendlyFileKind(file: File): string {
+  const m = (file.type || '').toLowerCase()
+  if (m.includes('spreadsheetml') || m.includes('ms-excel') || m === 'application/vnd.ms-excel') return 'Excel'
+  if (m.includes('wordprocessingml') || m.includes('msword') || m === 'application/msword') return 'Word'
+  if (m === 'application/pdf') return 'PDF'
+  if (m.startsWith('text/')) return '文本'
+  if (m.startsWith('image/')) return '图片'
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext === 'xlsx' || ext === 'xls') return 'Excel'
+  if (ext === 'docx' || ext === 'doc') return 'Word'
+  if (ext === 'pdf') return 'PDF'
+  return '文件'
+}
+
+function getChatDocumentSubtitle(file: File): string {
+  return `${getFriendlyFileKind(file)} · ${formatFileSize(file.size)}`
+}
+
+function getChatDocIconMeta(file: File): { icon: string; bg: string; color: string } {
+  const m = (file.type || '').toLowerCase()
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+  if (
+    m.includes('spreadsheetml') ||
+    m.includes('ms-excel') ||
+    m === 'application/vnd.ms-excel' ||
+    ext === 'xlsx' ||
+    ext === 'xls'
+  ) {
+    return { icon: 'table_chart', bg: 'bg-emerald-50', color: 'text-emerald-700' }
+  }
+  if (
+    m.includes('wordprocessingml') ||
+    m.includes('msword') ||
+    m === 'application/msword' ||
+    ext === 'docx' ||
+    ext === 'doc'
+  ) {
+    return { icon: 'article', bg: 'bg-blue-50', color: 'text-blue-700' }
+  }
+  if (m === 'application/pdf' || ext === 'pdf') {
+    return { icon: 'picture_as_pdf', bg: 'bg-red-50', color: 'text-red-600' }
+  }
+  if (m.startsWith('image/')) return { icon: 'image', bg: 'bg-violet-50', color: 'text-violet-700' }
+  return { icon: 'description', bg: 'bg-[#0d0d0d0d]', color: 'text-[#0d0d0d]' }
+}
+
+function getKnowledgeDocIconMeta(k: Knowledge) {
+  return getChatDocIconMeta(
+    new File([], k.name || 'document', { type: k.mimeType || 'application/octet-stream' })
+  )
+}
+
+function getKnowledgeCardSubtitle(k: Knowledge): string {
+  const stub = new File([], k.name || 'document', { type: k.mimeType || 'application/octet-stream' })
+  const kind = getFriendlyFileKind(stub)
+  const formatted = k.fileSizeFormatted?.trim()
+  if (formatted) return `${kind} · ${formatted}`
+  const bytes = resolveKnowledgeFileSizeBytes(k.fileSize)
+  if (bytes > 0) return `${kind} · ${formatFileSize(bytes)}`
+  return kind
+}
+
+function applyKnowledgeDocPrompt(text: string) {
+  inputText.value = text
+  nextTick(() => resizeChatTextarea())
+  chatStore.requestComposerFocus()
 }
 
 async function handleNewSession() {
@@ -1793,6 +2165,7 @@ void _formatTime
 .wk-chat-upload-menu__item {
   width: 100%;
   display: flex;
+  height: 36px;
   align-items: center;
   gap: 10px;
   padding: 10px 10px;
@@ -1802,7 +2175,7 @@ void _formatTime
 }
 
 .wk-chat-upload-menu__item:hover {
-  background: #fff;
+  background: #f9f9f9;
 }
 
 .wk-chat-upload-menu__item:disabled {
@@ -1824,6 +2197,7 @@ void _formatTime
 
 .wk-chat-upload-menu__apps-ref {
   width: 100%;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1836,8 +2210,7 @@ void _formatTime
 }
 
 .wk-chat-upload-menu__apps-ref:hover {
-  /* background: rgba(13, 13, 13, 0.06); */
-  background: #fff;
+  background: #f9f9f9;
 }
 
 .wk-chat-upload-menu__chevron {
@@ -1847,11 +2220,23 @@ void _formatTime
 }
 
 .wk-chat-upload-submenu {
-  padding: 8px;
+  padding: 2px;
 }
 
 .wk-chat-upload-submenu__btn {
   justify-content: flex-start;
+}
+
+.wk-chat-upload-submenu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.wk-chat-upload-menu__check {
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
 }
 
 </style>
@@ -1903,8 +2288,8 @@ void _formatTime
   display: flex;
   width: 100%;
   align-items: flex-start;
-  gap: 8px;
-  border-radius: 10px;
+  gap: 10px;
+  border-radius: 20px;
   border: none;
   background: transparent;
   padding: 10px 10px;

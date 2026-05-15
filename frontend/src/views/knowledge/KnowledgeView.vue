@@ -609,6 +609,7 @@ import {
 } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadRequestOptions } from 'element-plus'
 import type { Knowledge, KnowledgeQueryBO, KnowledgeType, KnowledgeAiSearchVO } from '@/types/common'
+import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 import KnowledgeSearchResultPanel from '@/components/knowledge/KnowledgeSearchResultPanel.vue'
 import KnowledgeScriptGeneratorDialog from '@/components/knowledge/KnowledgeScriptGeneratorDialog.vue'
@@ -973,11 +974,9 @@ function getTypeLabel(type: string): string {
   return labels[type] || '文档'
 }
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return '未知'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+function formatFileSize(bytes?: number | string | null): string {
+  if (resolveKnowledgeFileSizeBytes(bytes) <= 0) return '未知'
+  return formatFileSizeBytes(bytes)
 }
 
 function formatDate(dateStr: string): string {

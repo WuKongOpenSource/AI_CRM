@@ -44,7 +44,8 @@ export async function sendMessageStream(
   onComplete?: () => void,
   onError?: (error: Error) => void,
   attachments?: ChatAttachmentDTO[],
-  ragEnabled?: boolean
+  ragEnabled?: boolean,
+  knowledgeIds?: string[]
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -69,7 +70,16 @@ export async function sendMessageStream(
         'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined, ragEnabled })
+      body: JSON.stringify({
+        sessionId,
+        content,
+        attachments: attachments || undefined,
+        ragEnabled,
+        knowledgeIds:
+          knowledgeIds?.length && knowledgeIds.length > 0
+            ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+            : undefined
+      })
     })
 
     if (!response.ok) {
@@ -150,6 +160,15 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean): Promise<string> {
-  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined, ragEnabled })
+export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean, knowledgeIds?: string[]): Promise<string> {
+  return post('/chat/sendSync', {
+    sessionId,
+    content,
+    attachments: attachments || undefined,
+    ragEnabled,
+    knowledgeIds:
+      knowledgeIds?.length && knowledgeIds.length > 0
+        ? knowledgeIds.map((id) => Number(id)).filter((n) => !Number.isNaN(n))
+        : undefined
+  })
 }

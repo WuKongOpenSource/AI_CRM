@@ -378,6 +378,7 @@ import {
   getKnowledgePreviewHtml
 } from '@/api/knowledge'
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
+import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 
 type PreviewKind = 'doc' | 'docx' | 'excel' | 'pdf' | 'pptx' | 'text' | 'unsupported' | 'none'
 
@@ -805,11 +806,9 @@ function formatDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return ''
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+function formatFileSize(bytes?: number | string | null): string {
+  if (resolveKnowledgeFileSizeBytes(bytes) <= 0) return ''
+  return formatFileSizeBytes(bytes)
 }
 
 function getTypeIcon(type?: string): string {

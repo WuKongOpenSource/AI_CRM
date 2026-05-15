@@ -28,6 +28,9 @@ public class ChatSendBO {
     @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
     private Boolean ragEnabled;
 
+    @Schema(description = "知识库文件 ID 列表（限定 RAG 范围等），无需上传文件本体")
+    private List<Long> knowledgeIds;
+
     @Data
     @Schema(description = "附件信息")
     public static class AttachmentDTO {

@@ -28,6 +28,7 @@ interface StreamingTask {
 
 export const useChatStore = defineStore('chat', () => {
   const RAG_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_rag_enabled:v1'
+  const CRM_CONTEXT_ENABLED_STORAGE_KEY = 'wk_ai_crm:chat_crm_context_enabled:v1'
   const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
 
   const sessions = ref<ChatSession[]>([])
@@ -87,6 +88,7 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false)
   const sessionsLoading = ref(false)
   const ragEnabled = ref(loadRagEnabled())
+  const crmContextEnabled = ref(loadCrmContextEnabled())
 
   const messages = computed(() => {
     if (!currentSessionId.value) return []
@@ -170,7 +172,8 @@ export const useChatStore = defineStore('chat', () => {
     content: string,
     attachments?: ChatAttachmentDTO[],
     attachmentVOs?: ChatAttachmentVO[],
-    useRag?: boolean
+    useRag?: boolean,
+    knowledgeIds?: string[]
   ): Promise<void> {
     if (isStreaming.value) return
 
@@ -230,7 +233,8 @@ export const useChatStore = defineStore('chat', () => {
           assistantMessage.isStreaming = false
         },
         attachments,
-        useRag ?? ragEnabled.value
+        useRag ?? ragEnabled.value,
+        knowledgeIds
       )
     } catch (error) {
       console.error('sendMessage error:', error)
@@ -283,6 +287,15 @@ export const useChatStore = defineStore('chat', () => {
     ragEnabled.value = value
     try {
       localStorage.setItem(RAG_ENABLED_STORAGE_KEY, value ? '1' : '0')
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  function setCrmContextEnabled(value: boolean) {
+    crmContextEnabled.value = value
+    try {
+      localStorage.setItem(CRM_CONTEXT_ENABLED_STORAGE_KEY, value ? '1' : '0')
     } catch {
       // ignore storage failures
     }
@@ -393,6 +406,14 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function loadCrmContextEnabled(): boolean {
+    try {
+      return localStorage.getItem(CRM_CONTEXT_ENABLED_STORAGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  }
+
   return {
     sessions,
     currentSessionId,
@@ -407,6 +428,7 @@ export const useChatStore = defineStore('chat', () => {
     loading,
     sessionsLoading,
     ragEnabled,
+    crmContextEnabled,
     currentSession,
     fetchSessions,
     startNewSession,
@@ -417,6 +439,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessageWithSync,
     clearMessages,
     setRagEnabled,
+    setCrmContextEnabled,
     isSessionStreaming
   }
 })

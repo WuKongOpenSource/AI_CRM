@@ -4,6 +4,8 @@
       v-if="!isMobile"
       class="wk-primary-sidebar relative z-[110] flex wk-screen flex-shrink-0 flex-col overflow-x-visible overflow-y-visible border-r border-[#ececec] bg-white transition-[width] duration-200 ease-in-out"
       :class="primarySidebarCollapsed ? 'w-[52px]' : 'w-64'"
+      @mouseenter="onCollapsedPrimarySidebarEnter"
+      @mouseleave="onCollapsedPrimarySidebarLeave"
     >
       <!-- 展开：logo + 标题 + 折叠按钮；折叠：仅顶栏切换（ChatGPT 式） -->
       <div
@@ -17,7 +19,7 @@
           >
             <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
           </div>
-          <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg  bg-transparent">
+          <div v-else class="size-8 shrink-0 overflow-hidden rounded-lg bg-transparent">
             <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
           </div>
           <div v-if="false" class="min-w-0 flex-1 pr-1 pt-0.5">
@@ -49,12 +51,13 @@
       <div v-else class="relative z-30 flex justify-center overflow-visible py-2 px-0 pl-[5px]">
         <button
           type="button"
-          class="group/sb-toggle relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-[#f5f5f5] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
+          class="relative flex size-8 items-center justify-center overflow-hidden rounded-lg bg-[#f5f5f5] text-[#0d0d0d] transition-colors hover:bg-[#ececec]"
           aria-label="打开边栏"
           @click="primarySidebarCollapsed = false"
         >
           <span
-            class="absolute inset-0 flex items-center justify-center transition-opacity duration-150 group-hover/sb-toggle:opacity-0"
+            class="absolute inset-0 flex items-center justify-center transition-opacity duration-150"
+            :class="collapsedSidebarAsideHovered ? 'opacity-0' : 'opacity-100'"
             aria-hidden="true"
           >
             <span class="size-7 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent">
@@ -62,13 +65,15 @@
             </span>
           </span>
           <span
-            class="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+            class="absolute inset-0 flex items-center justify-center transition-opacity duration-150"
+            :class="collapsedSidebarAsideHovered ? 'opacity-100' : 'opacity-0'"
             aria-hidden="true"
           >
             <WkIcon name="fold" :size="18" class="shrink-0" />
           </span>
           <span
-            class="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/sb-toggle:opacity-100"
+            class="pointer-events-none absolute left-full top-1/2 z-[200] ml-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-black px-3 py-1.5 text-[13px] font-medium text-white shadow-md transition-opacity duration-150"
+            :class="collapsedSidebarAsideHovered ? 'opacity-100' : 'opacity-0'"
             role="tooltip"
           >
             打开边栏
@@ -90,11 +95,11 @@
         </button>
       </div>
 
-      <div
+      <!-- <div
         v-if="primaryNavHasScrollbar"
         class="mx-3 h-px bg-slate-100"
         :class="primarySidebarCollapsed ? '!mx-2' : ''"
-      />
+      /> -->
 
       <nav
         ref="primaryNavRef"
@@ -104,7 +109,7 @@
         <div class="space-y-1">
 
           <template v-for="group in pcMainNavGroups" :key="group.title || 'default'">
-            <div v-if="group.title && !primarySidebarCollapsed" class="pt-[6px] pb-[5px]">
+            <div v-if="group.title && !primarySidebarCollapsed" class="pt-[8px] pb-[3px]" style="margin-top: 8px; margin-bottom: 0px;">
               <p class="px-3 text-[14px] uppercase font-semibold tracking-tight text-[#0d0d0d]">{{ group.title }}</p>
             </div>
             <button
@@ -137,7 +142,7 @@
           <div class="space-y-1 pt-0">
             <button
               type="button"
-              class="group flex w-full items-center justify-between gap-1 rounded-lg pb-1 pl-3 pr-1 text-left transition-colors "
+              class="group flex w-full items-center justify-between gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
               :title="recentChatSessionsExpanded ? '收起最近对话' : '展开最近对话'"
               :aria-expanded="recentChatSessionsExpanded"
               aria-controls="recent-chat-sessions-panel"
@@ -149,7 +154,7 @@
                 :class="recentChatSessionsExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
                 aria-hidden="true"
               >
-                <span class="material-symbols-outlined text-base text-[18px] text-[#c9c9c9] leading-none">
+                <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
                   {{ recentChatSessionsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
                 </span>
               </span>
@@ -702,7 +707,11 @@
       </Transition>
     </Teleport>
 
-    <div class="flex flex-1 flex-col overflow-hidden" :class="{ 'pt-14': isMobile }">
+    <div
+      ref="mainContentColumnRef"
+      class="flex flex-1 flex-col overflow-hidden"
+      :class="{ 'pt-14': isMobile }"
+    >
       <header
         v-if="showDesktopHeader || showChatDesktopQuotaBar"
         class="relative z-[100] flex h-16 shrink-0 items-center bg-white px-[10px] md:px-8"
@@ -840,9 +849,63 @@ const chatStore = useChatStore()
 const { isMobile } = useResponsive()
 const { isOpen: chatDrawerOpen } = useChatDrawer()
 
+/**
+ * 主内容列（顶栏 + router-view 所在 flex 列）在侧栏展开时的宽度小于该值且仍为 PC 时，自动收起左侧一级导航；
+ * 宽度变回足够时恢复进入窄区前的展开/收起状态（用户在窄区内手动切换侧栏会更新该状态）。
+ *
+ * 恢复时用「收起侧栏下的主列宽度 − 侧栏宽度差」估算展开后的主列宽度，与阈值比较，避免收起后主列变宽立刻触发恢复导致抖动。
+ */
+const PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX = 780
+/** 与模板 `w-64` / `w-[52px]` 一致，用于主列宽度滞回 */
+const PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX = 256
+const PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX = 52
+const PRIMARY_SIDEBAR_WIDTH_DELTA_PX = PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX - PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX
+
+function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
+  return sidebarCollapsed ? mainColumnWidth - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : mainColumnWidth
+}
+
+const mainContentColumnRef = ref<HTMLElement | null>(null)
+const mainContentColumnWidth = ref(0)
+const mainContentColumnMeasured = ref(false)
+
+const layoutNarrowAutoCollapseActive = ref(false)
+/** 解除窄区限制后是否保持侧栏展开（非 collapsed） */
+const layoutNarrowSavedExpanded = ref(true)
+const layoutNarrowProgrammatic = ref(false)
+
+function updateMainContentColumnWidth() {
+  const el = mainContentColumnRef.value
+  if (!el) return
+  mainContentColumnWidth.value = el.getBoundingClientRect().width
+  mainContentColumnMeasured.value = true
+}
+
+function runLayoutNarrowProgrammatic(fn: () => void) {
+  layoutNarrowProgrammatic.value = true
+  try {
+    fn()
+  } finally {
+    queueMicrotask(() => {
+      layoutNarrowProgrammatic.value = false
+    })
+  }
+}
+
 const drawerVisible = ref(false)
 /** PC：一级侧栏收起为图标栏 */
 const primarySidebarCollapsed = ref(false)
+/** 一级侧栏收起时：鼠标在整块 aside 内则顶栏 logo 区显示为折叠图标 */
+const collapsedSidebarAsideHovered = ref(false)
+
+function onCollapsedPrimarySidebarEnter() {
+  if (primarySidebarCollapsed.value) collapsedSidebarAsideHovered.value = true
+}
+
+function onCollapsedPrimarySidebarLeave() {
+  collapsedSidebarAsideHovered.value = false
+}
+
 const primaryNavRef = ref<HTMLElement | null>(null)
 const primaryNavHasScrollbar = ref(false)
 /** PC 侧栏「最近」对话列表折叠 */
@@ -972,7 +1035,9 @@ const showSecondaryPanel = computed(() => activeSecondaryItems.value.length > 0)
 
 watch(showSecondaryPanel, open => {
   if (!isMobile.value && open) {
-    primarySidebarCollapsed.value = true
+    runLayoutNarrowProgrammatic(() => {
+      primarySidebarCollapsed.value = true
+    })
   }
 })
 
@@ -1043,7 +1108,57 @@ watch(showUserMenu, open => {
   }
 })
 
+watch(
+  () => [isMobile.value, mainContentColumnWidth.value, mainContentColumnMeasured.value, primarySidebarCollapsed.value] as const,
+  ([mobile, w, measured, collapsed]) => {
+    if (mobile) {
+      if (layoutNarrowAutoCollapseActive.value) {
+        runLayoutNarrowProgrammatic(() => {
+          primarySidebarCollapsed.value = !layoutNarrowSavedExpanded.value
+          layoutNarrowAutoCollapseActive.value = false
+        })
+      }
+      return
+    }
+    if (!measured) return
+
+    const mainIfExpanded = mainContentWidthAsIfSidebarExpanded(collapsed, w)
+
+    if (!collapsed && mainIfExpanded < PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX) {
+      runLayoutNarrowProgrammatic(() => {
+        layoutNarrowSavedExpanded.value = true
+        primarySidebarCollapsed.value = true
+        layoutNarrowAutoCollapseActive.value = true
+      })
+      return
+    }
+
+    if (layoutNarrowAutoCollapseActive.value && collapsed && mainIfExpanded >= PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX) {
+      runLayoutNarrowProgrammatic(() => {
+        primarySidebarCollapsed.value = !layoutNarrowSavedExpanded.value
+        layoutNarrowAutoCollapseActive.value = false
+        if (showSecondaryPanel.value) {
+          primarySidebarCollapsed.value = true
+        }
+      })
+    }
+  },
+  { immediate: true }
+)
+
+watch(primarySidebarCollapsed, collapsed => {
+  collapsedSidebarAsideHovered.value = false
+  if (layoutNarrowProgrammatic.value) return
+  if (isMobile.value || !layoutNarrowAutoCollapseActive.value) return
+  if (!mainContentColumnMeasured.value) return
+  const w = mainContentColumnWidth.value
+  const mainIfExpanded = mainContentWidthAsIfSidebarExpanded(collapsed, w)
+  if (mainIfExpanded >= PC_PRIMARY_SIDEBAR_AUTO_COLLAPSE_BELOW_PX) return
+  layoutNarrowSavedExpanded.value = !collapsed
+})
+
 let primaryNavResizeObserver: ResizeObserver | null = null
+let mainContentColumnResizeObserver: ResizeObserver | null = null
 
 function updatePrimaryNavScrollbar() {
   const el = primaryNavRef.value
@@ -1060,7 +1175,6 @@ onMounted(() => {
   void chatStore.fetchSessions()
   document.addEventListener('click', handleDocumentClick)
 
-  // Observe container size changes (window resize / sidebar width changes)
   if (typeof ResizeObserver !== 'undefined') {
     primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
     if (primaryNavRef.value) primaryNavResizeObserver.observe(primaryNavRef.value)
@@ -1069,8 +1183,31 @@ onMounted(() => {
   queueMicrotask(() => updatePrimaryNavScrollbar())
 })
 
+watch(
+  mainContentColumnRef,
+  el => {
+    if (typeof ResizeObserver === 'undefined') return
+    if (!mainContentColumnResizeObserver) {
+      mainContentColumnResizeObserver = new ResizeObserver(() => updateMainContentColumnWidth())
+    }
+    mainContentColumnResizeObserver.disconnect()
+    if (el) {
+      mainContentColumnResizeObserver.observe(el)
+      queueMicrotask(() => updateMainContentColumnWidth())
+    } else {
+      mainContentColumnWidth.value = 0
+      mainContentColumnMeasured.value = false
+    }
+  },
+  { flush: 'post', immediate: true }
+)
+
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
+  if (mainContentColumnResizeObserver) {
+    mainContentColumnResizeObserver.disconnect()
+    mainContentColumnResizeObserver = null
+  }
   if (primaryNavResizeObserver) {
     primaryNavResizeObserver.disconnect()
     primaryNavResizeObserver = null
