@@ -401,16 +401,16 @@
               </div>
 
               <!-- Input Box -->
-              <div class="relative group" :class="isMobile ? '' : 'w-[768px] mx-auto'">
+              <div class="relative group min-w-0" :class="isMobile ? '' : 'w-[768px] max-w-full mx-auto'">
                 <!-- <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div> -->
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl transition-all opacity-0"></div>
                 <!-- focus-within:border-primary -->
                 <div
                   class="relative flex bg-white rounded-2xl p-2 shadow-[0_0_#0000,0_0_#0000,0_0_#0000,0_0_#0000,0px_3px_6px_0px_#0000000a,0px_4px_80px_8px_#0000000a,0px_0px_1px_0px_#0000009e]  transition-all"
-                  :class="isMobile ? 'flex-col items-stretch gap-2' : 'items-center rounded-[28px] p-[6px]'"
+                  :class="isMobile ? 'flex-col items-stretch gap-2' : 'min-w-0 items-center rounded-[28px] p-[6px]'"
                   @mousedown="handleInputBoxMouseDown"
                 >
-                  <div class="w-full">
+                  <div class="w-full min-w-0">
                   <input
                     ref="fileInputRef"
                     type="file"
@@ -421,13 +421,47 @@
                   />
 
                   <div
-                    v-if="composerAttachmentPreviewItems.length > 0 || composerAttachmentPreviewMoreCount > 0"
-                    class="flex flex-wrap gap-2 px-2 pt-2 mb-2"
+                    v-if="composerAttachmentPreviewItems.length > 0"
+                    class="relative min-w-0 px-2 pt-2 mb-2"
                   >
+                    <div
+                      v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollLeft"
+                      class="pointer-events-none absolute left-0 top-2 bottom-2 z-[1] w-12 rounded-l-xl bg-gradient-to-r from-white to-transparent h-full"
+                      aria-hidden="true"
+                    />
+                    <div
+                      v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollRight"
+                      class="pointer-events-none absolute right-0 top-2 bottom-2 z-[1] w-12 rounded-r-xl bg-gradient-to-l from-white to-transparent h-full"
+                      aria-hidden="true"
+                    />
+                    <button
+                      v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollLeft"
+                      type="button"
+                      class="absolute left-3 top-1/2 z-[2] flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-black/[0.06] bg-[#f0f0f0] text-[#0d0d0d] shadow-sm transition-colors hover:bg-[#e6e6e6]"
+                      aria-label="向左查看附件"
+                      @click="scrollComposerAttachmentStep(-1)"
+                    >
+                      <span class="material-symbols-outlined text-[20px] leading-none">chevron_left</span>
+                    </button>
+                    <button
+                      v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollRight"
+                      type="button"
+                      class="absolute right-3 top-1/2 z-[2] flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-black/[0.06] bg-[#f0f0f0] text-[#0d0d0d] shadow-sm transition-colors hover:bg-[#e6e6e6]"
+                      aria-label="向右查看附件"
+                      @click="scrollComposerAttachmentStep(1)"
+                    >
+                      <span class="material-symbols-outlined text-[20px] leading-none">chevron_right</span>
+                    </button>
+                    <div
+                      ref="composerAttachmentScrollRef"
+                      class="flex min-h-[54px] min-w-0 w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      :class="composerAttachmentShowScrollArrows ? '' : ''"
+                      @scroll.passive="updateComposerAttachmentScrollState"
+                    >
                     <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
                       <div
                         v-if="item.kind === 'knowledge'"
-                        class="relative h-[54px] min-w-[200px] max-w-[320px] flex-1 rounded-2xl bg-[#f5f5f5] overflow-hidden shrink-0 flex items-center gap-3 px-3"
+                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] px-3"
                       >
                         <div
                           class="size-10 rounded-xl flex items-center justify-center shrink-0"
@@ -471,7 +505,7 @@
 
                       <div
                         v-else-if="item.kind === 'file'"
-                        class="relative h-[54px] min-w-[200px] max-w-[320px] flex-1 rounded-2xl bg-[#f5f5f5] overflow-hidden shrink-0 flex items-center gap-3 px-3"
+                        class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] px-3"
                       >
                         <div
                           class="size-10 rounded-xl flex items-center justify-center shrink-0"
@@ -495,12 +529,6 @@
                         </button>
                       </div>
                     </template>
-
-                    <div
-                      v-if="composerAttachmentPreviewMoreCount > 0"
-                      class="h-12 flex items-center text-xs text-[#909090] pr-1"
-                    >
-                      +{{ composerAttachmentPreviewMoreCount }}
                     </div>
                   </div>
 
@@ -521,7 +549,7 @@
                   </div>
 
                   <!-- PC: input (2nd line) -->
-                  <div v-if="!isMobile" class="w-full">
+                  <div v-if="!isMobile" class="w-full min-w-0">
                     <textarea
                       ref="pcChatInputRef"
                       v-model="inputText"
@@ -537,7 +565,7 @@
                   </div>
 
                   <!-- PC: controls (3rd line) -->
-                  <div v-if="!isMobile" class="flex items-center justify-between w-full px-1 pb-1 select-none mt-1">
+                  <div v-if="!isMobile" class="flex min-w-0 items-center justify-between w-full px-1 pb-1 select-none mt-1">
                     <div class="flex items-center gap-2">
                       <el-popover
                         v-model:visible="chatUploadMenuVisible"
@@ -1349,27 +1377,96 @@ const chatInputPlaceholder = computed(() =>
     : '发消息...'
 )
 
-const COMPOSER_PREVIEW_MAX = 3
-
 const composerAttachmentPreviewItems = computed(() => {
   type Item =
     | { kind: 'knowledge'; knowledge: Knowledge; key: string }
     | { kind: 'file'; file: File; fileIndex: number; key: string }
   const out: Item[] = []
   for (const k of selectedKnowledgeItems.value) {
-    if (out.length >= COMPOSER_PREVIEW_MAX) break
     out.push({ kind: 'knowledge', knowledge: k, key: `k-${k.knowledgeId}` })
   }
   for (let index = 0; index < selectedFiles.value.length; index++) {
-    if (out.length >= COMPOSER_PREVIEW_MAX) break
     const file = selectedFiles.value[index]!
     out.push({ kind: 'file', file, fileIndex: index, key: `f-${file.name}-${index}` })
   }
   return out
 })
 
-const composerAttachmentPreviewMoreCount = computed(() =>
-  Math.max(0, selectedKnowledgeItems.value.length + selectedFiles.value.length - COMPOSER_PREVIEW_MAX)
+const composerAttachmentScrollRef = ref<HTMLElement | null>(null)
+const composerAttachmentShowScrollArrows = ref(false)
+const composerAttachmentCanScrollLeft = ref(false)
+const composerAttachmentCanScrollRight = ref(false)
+
+let composerAttachmentScrollResizeObserver: ResizeObserver | null = null
+
+function disconnectComposerAttachmentScrollResizeObserver() {
+  composerAttachmentScrollResizeObserver?.disconnect()
+  composerAttachmentScrollResizeObserver = null
+}
+
+function updateComposerAttachmentScrollState() {
+  const el = composerAttachmentScrollRef.value
+  if (!el) {
+    composerAttachmentShowScrollArrows.value = false
+    composerAttachmentCanScrollLeft.value = false
+    composerAttachmentCanScrollRight.value = false
+    return
+  }
+  const { scrollLeft, scrollWidth, clientWidth } = el
+  const overflow = scrollWidth > clientWidth + 2
+  composerAttachmentShowScrollArrows.value = overflow
+  if (!overflow) {
+    composerAttachmentCanScrollLeft.value = false
+    composerAttachmentCanScrollRight.value = false
+    return
+  }
+  composerAttachmentCanScrollLeft.value = scrollLeft > 2
+  composerAttachmentCanScrollRight.value = scrollLeft + clientWidth < scrollWidth - 2
+}
+
+function scrollComposerAttachmentStep(dir: -1 | 1) {
+  const el = composerAttachmentScrollRef.value
+  if (!el) return
+  const step = Math.max(160, Math.floor(el.clientWidth * 0.65))
+  el.scrollBy({ left: dir * step, behavior: 'smooth' })
+}
+
+function bindComposerAttachmentScrollResizeObserver() {
+  disconnectComposerAttachmentScrollResizeObserver()
+  const el = composerAttachmentScrollRef.value
+  if (!el || typeof ResizeObserver === 'undefined') return
+  composerAttachmentScrollResizeObserver = new ResizeObserver(() => {
+    updateComposerAttachmentScrollState()
+  })
+  composerAttachmentScrollResizeObserver.observe(el)
+}
+
+function scheduleComposerAttachmentScrollLayoutCheck() {
+  void nextTick(() => {
+    updateComposerAttachmentScrollState()
+    bindComposerAttachmentScrollResizeObserver()
+  })
+}
+
+watch(
+  () => [
+    selectedFiles.value.length,
+    selectedKnowledgeItems.value.length,
+    composerAttachmentPreviewItems.value.length,
+    isMobile.value,
+  ],
+  () => {
+    const hasStrip = composerAttachmentPreviewItems.value.length > 0
+    if (!hasStrip) {
+      disconnectComposerAttachmentScrollResizeObserver()
+      composerAttachmentShowScrollArrows.value = false
+      composerAttachmentCanScrollLeft.value = false
+      composerAttachmentCanScrollRight.value = false
+      return
+    }
+    scheduleComposerAttachmentScrollLayoutCheck()
+  },
+  { flush: 'post' }
 )
 
 const sendBarActionButtonClass = computed(() => {
@@ -1597,6 +1694,7 @@ onBeforeUnmount(() => {
   abortChatVoiceRecording()
   transcriptionToken += 1
   unregisterAiQuotaResumeSendHandler()
+  disconnectComposerAttachmentScrollResizeObserver()
 })
 
 // Auto scroll to bottom when new messages arrive or during streaming
