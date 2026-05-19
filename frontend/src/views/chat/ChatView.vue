@@ -307,7 +307,7 @@
                 </div>
 
                 <!-- User Message -->
-                <div v-else class="flex gap-4 md:gap-5 flex-row-reverse">
+                <div v-else class="group w-full flex flex-wrap gap-x-4 gap-y-0 md:gap-x-5 flex-row-reverse">
                   <div v-if="false" class="size-9 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
                     <img
                       v-if="showUserAvatarImage"
@@ -322,19 +322,7 @@
                   </div>
                   <div class="space-y-3 min-w-0" :class="isMobile ? 'max-w-[85%]' : 'max-w-[70%]'">
                     <!-- <div class="bg-primary text-white rounded-2xl rounded-tr-none p-4 shadow-lg shadow-primary/10 text-sm leading-relaxed"> -->
-                    <div class="group relative bg-[#e9e9e980] text-[#0d0d0d] rounded-[22px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
-                      <div
-                        class="absolute -bottom-10 right-0 z-10 size-10 flex items-center justify-center opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto"
-                      >
-                        <button
-                          type="button"
-                          class="size-8 rounded-lg border-slate-200 bg-white text-[#8f8f8f] transition-colors flex items-center justify-center hover:bg-[#E8E8E8] hover:text-slate-900"
-                          aria-label="复制内容"
-                          @click="copyMessageContent(message, 'user')"
-                        >
-                        <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
-                        </button>
-                      </div>
+                    <div class="bg-[#e9e9e980] text-[#0d0d0d] rounded-[22px] px-4 py-[0.6rem] text-[16px] leading-relaxed">
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
@@ -367,6 +355,18 @@
                     </div>
                     <!-- <div class="text-xs text-slate-400 font-medium text-right">{{ formatTime(message.timestamp) }}</div> -->
                   </div>
+                  <div
+                    class="w-full basis-full h-10 z-10 flex items-center justify-end"
+                  >
+                    <button
+                      type="button"
+                      class="size-8 rounded-lg border-slate-200 bg-white text-[#8f8f8f] transition-all flex items-center justify-center opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-[#E8E8E8] hover:text-slate-900"
+                      aria-label="复制内容"
+                      @click="copyMessageContent(message, 'user')"
+                    >
+                      <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </template>
@@ -376,7 +376,7 @@
             <button
               v-if="showScrollToBottomButton"
               type="button"
-              class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[220px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
+              class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[330px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
               aria-label="回到底部"
               @click="scrollToBottomSmooth"
             >
@@ -1079,16 +1079,19 @@
               </div>
 
               <!-- Quick Action Chips -->
-              <div v-if="chatStore.messages.length === 0 && selectedChatAppLabel === 'CRM管理'" class="flex flex-wrap gap-2 justify-center mt-6">
-                <button
-                  v-for="action in quickActions"
-                  :key="action.label"
-                  class="px-4 py-[9px] bg-white border border-slate-200 rounded-full text-[14px] text-[#5d5d5d] transition-all shadow-sm hover:bg-[#F1F1F1] hover:border-[#E0E0E0] hover:text-[#0d0d0d]"
-                  @click="sendQuickMessage(action.text)"
-                >
-                  {{ action.label }}
-                </button>
+              <div class="flex flex-wrap gap-2 justify-center mt-6 min-h-[88px]">
+                <div v-if="chatStore.messages.length === 0 && selectedChatAppLabel === 'CRM管理'" >
+                  <button
+                    v-for="action in quickActions"
+                    :key="action.label"
+                    class="px-4 py-[9px] bg-white border border-slate-200 rounded-full text-[14px] text-[#5d5d5d] transition-all shadow-sm hover:bg-[#F1F1F1] hover:border-[#E0E0E0] hover:text-[#0d0d0d]"
+                    @click="sendQuickMessage(action.text)"
+                  >
+                    {{ action.label }}
+                  </button>
+                </div>
               </div>
+              
               <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase " style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
             </div>
           </div>

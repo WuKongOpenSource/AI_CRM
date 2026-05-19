@@ -275,7 +275,7 @@
               <p class="truncate text-xs font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
               <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
             </div>
-            <span class="material-symbols-outlined text-sm text-slate-400">unfold_more</span>
+            <!-- <span class="material-symbols-outlined text-sm text-slate-400">unfold_more</span> -->
           </template>
         </div>
       </div>
@@ -288,7 +288,7 @@
           <div class="p-4">
             <div class="space-y-1">
               <div class="flex items-center justify-between px-3 py-2">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
+                <p class="text-[12px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
                 <button class="text-slate-300 transition-colors hover:text-slate-500" @click="showUserMenu = false">
                   <span class="material-symbols-outlined text-sm">close</span>
                 </button>
@@ -576,7 +576,7 @@
               <div class="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
                 <div class="space-y-1">
                   <div class="flex items-center justify-between px-3 py-2">
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
+                    <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
                     <button class="text-slate-300 transition-colors hover:text-slate-500" @click="showUserMenu = false">
                       <span class="material-symbols-outlined text-sm">close</span>
                     </button>
@@ -650,7 +650,7 @@
           <div class="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <div class="space-y-1">
               <div class="flex items-center justify-between px-3 py-2">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
                 <button class="text-slate-300 transition-colors hover:text-slate-500" @click="showUserMenu = false">
                   <span class="material-symbols-outlined text-sm">close</span>
                 </button>

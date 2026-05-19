@@ -623,7 +623,7 @@ const userStore = useUserStore()
 const sidebarCollapsed = ref(false)
 const hotSearchTags = ['产品知识库', '销售话术', '售后服务', '入职培训', '客户FAQ']
 const viewMode = ref<'card' | 'list'>(
-  (localStorage.getItem('knowledge-view-mode') as 'card' | 'list') || 'card'
+  (localStorage.getItem('knowledge-view-mode') as 'card' | 'list') || 'list'
 )
 const loading = ref(false)
 const showUploadDialog = ref(false)
