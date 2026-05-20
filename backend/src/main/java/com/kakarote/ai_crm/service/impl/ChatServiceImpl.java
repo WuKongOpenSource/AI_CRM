@@ -373,12 +373,6 @@ public class ChatServiceImpl implements IChatService {
         Long tenantId = UserUtil.getTenantId();
         boolean canUseSystemModels = tenantId != null && tenantService.getTotalCreditRemaining(tenantId) > 0;
 
-        if (chatClientProvider.getCurrentMode() != AiMode.CUSTOM) {
-            List<AiModelOptionVO> options = new ArrayList<>(systemOptions);
-            options.addAll(customOptions);
-            return options;
-        }
-
         List<AiModelOptionVO> options = new ArrayList<>(customOptions);
         if (canUseSystemModels) {
             options.addAll(systemOptions);
