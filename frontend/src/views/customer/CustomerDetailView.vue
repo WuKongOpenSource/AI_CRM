@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full flex flex-col" :class="{ 'wk-customer-detail-embedded': embedded }">
     <!-- Loading -->
     <div v-if="loading" class="flex-1 flex items-center justify-center">
       <span class="material-symbols-outlined text-slate-300 text-4xl animate-spin">progress_activity</span>
@@ -11,7 +11,7 @@
         <!-- Sticky Header -->
         <div class="static z-20 bg-background-light/90 backdrop-blur-md px-4 md:px-8 pt-4 pb-4 border-b border-slate-200/50 shrink-0 md:sticky md:top-0">
           <!-- Breadcrumb -->
-          <div class="flex items-center gap-2 text-sm text-slate-500 mb-3">
+          <div v-if="!embedded" class="flex items-center gap-2 text-sm text-slate-500 mb-3">
             <button @click="handleBackToCustomerList" class="hover:text-primary flex items-center gap-1 transition-colors">
               <WkIcon name="customer" :size="14" />
               客户管理
@@ -1087,6 +1087,17 @@ const taskStore = useTaskStore()
 const userStore = useUserStore()
 const { isMobile } = useResponsive()
 
+const props = withDefaults(defineProps<{
+  customerId?: string
+  embedded?: boolean
+}>(), {
+  customerId: '',
+  embedded: false
+})
+
+const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
+const embedded = computed(() => props.embedded)
+
 const loading = ref(false)
 const submitting = ref(false)
 const showAddTagDialog = ref(false)
@@ -1450,7 +1461,7 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
 
   aiAnalysisPollTimer = setTimeout(async () => {
     aiAnalysisPollTimer = null
-    if (String(route.params.id || '') !== customerId) {
+    if (activeCustomerId.value !== customerId) {
       clearAiAnalysisPolling()
       return
     }
@@ -1462,7 +1473,7 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
       console.error('Failed to poll customer ai analysis status:', error)
     }
 
-    if (String(route.params.id || '') !== customerId) {
+    if (activeCustomerId.value !== customerId) {
       clearAiAnalysisPolling()
       return
     }
@@ -1513,8 +1524,8 @@ watch(showAddFollowUpDialog, (visible) => {
   }
 })
 
-onMounted(async () => {
-  const customerId = route.params.id as string
+async function loadCustomerDetailPage() {
+  const customerId = activeCustomerId.value
   if (customerId) {
     loading.value = true
 
@@ -1553,6 +1564,12 @@ onMounted(async () => {
     await Promise.all(fetchTasks)
     loading.value = false
   }
+}
+
+onMounted(loadCustomerDetailPage)
+
+watch(activeCustomerId, () => {
+  void loadCustomerDetailPage()
 })
 
 watch(
