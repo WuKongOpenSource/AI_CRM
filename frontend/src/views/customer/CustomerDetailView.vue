@@ -408,7 +408,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
           <div :class="[isEmbeddedMobileLayout || detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
-            <section class="bg-white py-4 shadow-sm">
+            <section class="bg-white py-4 shadow-sm px-4 rounded-xl border border-slate-200">
               <div class="mb-4 space-y-1">
                 <!-- 上：图标 + 标题（整行展示，可换行）+ 刷新 -->
                 <div class="flex items-center justify-between gap-2">
@@ -656,7 +656,7 @@
 
           <!-- Right Column: Related Modules (col-span-3) -->
           <div :class="[isEmbeddedMobileLayout || detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
-            <div class="flex items-center justify-between px-1">
+            <div v-if="!embedded" class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
                   <span :class="sectionMaterialIconClass">hub</span>
@@ -1234,7 +1234,7 @@ const sectionIconBgColors = {
   documentCenter: '#0052CC',
 } as const
 
-const savedAiAnalysisTitle = '\u0041\u0049 \u667a\u80fd\u5206\u6790'
+const savedAiAnalysisTitle = 'AI分析'
 const emptyAiAnalysisTitle = '\u6682\u65e0 AI \u5206\u6790'
 const emptyAiAnalysisDescription = '\u4fdd\u5b58\u5ba2\u6237\u540e\uff0c\u7cfb\u7edf\u4f1a\u81ea\u52a8\u89e6\u53d1 AI \u5206\u6790\uff0c\u7ed3\u679c\u4f1a\u5c55\u793a\u5728\u8fd9\u91cc\u3002'
 const viewBasicInfoButtonText = '\u57fa\u672c\u4fe1\u606f'

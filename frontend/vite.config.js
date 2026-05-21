@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
-var devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8088';
+var devProxyTarget = process.env.VITE_DEV_PROXY_TARGET || 'http://192.168.1.116:8088';
 var syncProxyTarget = process.env.VITE_SYNC_DEV_PROXY_TARGET || 'http://127.0.0.1:10456';
 export default defineConfig({
     base: './',
