@@ -245,6 +245,11 @@ type Option = {
   label: string
 }
 
+type DefaultCustomer = {
+  customerId?: string | number
+  companyName?: string | null
+} | null
+
 type ScheduleFormState = {
   title: string
   startTime: string
@@ -256,10 +261,14 @@ type ScheduleFormState = {
   description: string
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: boolean
   editingSchedule?: ScheduleVO | null
-}>()
+  defaultCustomer?: DefaultCustomer
+}>(), {
+  editingSchedule: null,
+  defaultCustomer: null
+})
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
@@ -316,7 +325,11 @@ watch(
 )
 
 watch(
-  () => props.editingSchedule?.scheduleId,
+  () => [
+    props.editingSchedule?.scheduleId,
+    props.defaultCustomer?.customerId,
+    props.defaultCustomer?.companyName
+  ] as const,
   () => {
     if (visible.value) {
       initScheduleForm()
@@ -336,7 +349,10 @@ function resetScheduleForm() {
 function initScheduleForm() {
   resetScheduleForm()
   const schedule = props.editingSchedule
-  if (!schedule) return
+  if (!schedule) {
+    applyDefaultCustomer()
+    return
+  }
 
   Object.assign(scheduleForm, {
     title: schedule.title || '',
@@ -363,6 +379,17 @@ function initScheduleForm() {
   } else if (schedule.participantUserIds?.length) {
     selectedParticipantUserIds.value = schedule.participantUserIds.map(userId => String(userId))
   }
+}
+
+function applyDefaultCustomer() {
+  const customer = props.defaultCustomer
+  if (!customer?.customerId) return
+
+  scheduleForm.customerId = String(customer.customerId)
+  customerOptions.value = [{
+    value: String(customer.customerId),
+    label: customer.companyName || String(customer.customerId)
+  }]
 }
 
 function normalizeScheduleType(type?: string): string {

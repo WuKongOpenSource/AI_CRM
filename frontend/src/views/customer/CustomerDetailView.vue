@@ -663,7 +663,7 @@
                 </span>
                 关联业务模块
               </h3>
-              <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">3个模块</span>
+              <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">{{ visibleRelatedModuleCount }}个模块</span>
             </div>
 
             <!-- Contacts Module -->
@@ -855,6 +855,76 @@
                       </span>
                     </div>
                   </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Schedules Module -->
+            <section v-if="canViewSchedules" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4" v-loading="scheduleLoading">
+              <div class="mb-4 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedSchedules')">
+                    <span :class="sectionMaterialIconClass">event_note</span>
+                  </span>
+                  关联日程
+                  <span class="text-slate-400 font-normal">({{ scheduleTotal }})</span>
+                </h4>
+                <button
+                  v-if="canCreateSchedules"
+                  type="button"
+                  class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
+                  title="新建日程"
+                  aria-label="新建日程"
+                  @click="handleAddSchedule"
+                >
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add</span>
+                </button>
+              </div>
+              <div class="space-y-4">
+                <div v-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-8 text-center">
+                  <span class="material-symbols-outlined text-3xl leading-none text-slate-200">event_busy</span>
+                  <p class="mt-2 text-xs font-medium text-slate-400">暂无关联日程</p>
+                </div>
+                <div
+                  v-for="schedule in customerSchedules"
+                  :key="schedule.scheduleId"
+                  class="group relative cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50/80 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/70"
+                  :class="selectedCustomerSchedule?.scheduleId === schedule.scheduleId ? 'border-primary ring-1 ring-primary/20' : ''"
+                  @click="handleViewCustomerSchedule(schedule)"
+                >
+                  <div class="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-sky-50/80 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                  <div class="relative flex items-start gap-3">
+                    <div class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500 transition-colors group-hover:border-primary/20 group-hover:bg-primary/10 group-hover:text-primary">
+                      <span class="material-symbols-outlined text-[18px] leading-none">{{ getScheduleTypeIcon(schedule.type) }}</span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex min-w-0 items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                          <h5 class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-primary">{{ schedule.title }}</h5>
+                          <p class="mt-1 truncate text-[11px] font-bold text-slate-400">
+                            {{ formatScheduleDateTime(schedule.startTime) }}
+                            <span v-if="schedule.endTime"> - {{ formatScheduleEndTime(schedule.startTime, schedule.endTime) }}</span>
+                          </p>
+                        </div>
+                        <span class="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-500">
+                          {{ getScheduleTypeLabel(schedule) }}
+                        </span>
+                      </div>
+                      <p class="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
+                        {{ getScheduleSummary(schedule) }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="scheduleTotal > schedulePageSize" class="pt-2 flex justify-center">
+                  <el-pagination
+                    v-model:current-page="schedulePage"
+                    :page-size="schedulePageSize"
+                    :total="scheduleTotal"
+                    layout="prev, pager, next"
+                    small
+                    @current-change="handleSchedulePageChange"
+                  />
                 </div>
               </div>
             </section>
@@ -1064,6 +1134,24 @@
       :default-customer="taskDefaultCustomer"
       @saved="handleTaskDialogSaved"
     />
+
+    <ScheduleDetailDrawer
+      v-model="showCustomerScheduleDetail"
+      :schedule="selectedCustomerSchedule"
+      :is-mobile="isMobile"
+      :can-edit="canEditSchedules"
+      :can-delete="canDeleteSchedules"
+      @edit="handleEditCustomerScheduleFromDetail"
+      @deleted="handleCustomerScheduleDeleted"
+    />
+
+    <ScheduleFormDialog
+      v-model="showScheduleFormDialog"
+      :editing-schedule="editingCustomerSchedule"
+      :default-customer="scheduleDefaultCustomer"
+      @created="handleCustomerScheduleCreated"
+      @updated="handleCustomerScheduleUpdated"
+    />
   </div>
 </template>
 
@@ -1076,6 +1164,7 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
 import { queryTaskList } from '@/api/task'
+import { queryScheduleList, type ScheduleVO } from '@/api/schedule'
 import type { CustomerAiParseVO } from '@/api/customer'
 import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
@@ -1098,6 +1187,8 @@ import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.
 import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.vue'
 import TaskDetailDrawer from '@/views/task/components/TaskDetailDrawer.vue'
 import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
+import ScheduleDetailDrawer from '@/views/calendar/components/ScheduleDetailDrawer.vue'
+import ScheduleFormDialog from '@/views/calendar/components/ScheduleFormDialog.vue'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 import KnowledgeUploadDialog from '@/components/knowledge/KnowledgeUploadDialog.vue'
 import {
@@ -1159,6 +1250,11 @@ const contactTotal = ref(0)
 const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
+const customerSchedules = ref<ScheduleVO[]>([])
+const scheduleTotal = ref(0)
+const schedulePage = ref(1)
+const schedulePageSize = ref(5)
+const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
 
 function parsePositivePageQuery(value: unknown): number | null {
@@ -1201,7 +1297,23 @@ const showCustomerTaskDetail = computed({
 })
 const showTaskEditDialog = ref(false)
 const editingCustomerTask = ref<Task | null>(null)
+const selectedCustomerSchedule = ref<ScheduleVO | null>(null)
+const showCustomerScheduleDetail = computed({
+  get: () => !!selectedCustomerSchedule.value,
+  set: (val: boolean) => {
+    if (!val) selectedCustomerSchedule.value = null
+  }
+})
+const showScheduleFormDialog = ref(false)
+const editingCustomerSchedule = ref<ScheduleVO | null>(null)
 const taskDefaultCustomer = computed(() => customer.value
+  ? {
+      customerId: customer.value.customerId,
+      companyName: customer.value.companyName || ''
+    }
+  : null
+)
+const scheduleDefaultCustomer = computed(() => customer.value
   ? {
       customerId: customer.value.customerId,
       companyName: customer.value.companyName || ''
@@ -1211,6 +1323,10 @@ const taskDefaultCustomer = computed(() => customer.value
 
 watch(showTaskEditDialog, visible => {
   if (!visible) editingCustomerTask.value = null
+})
+
+watch(showScheduleFormDialog, visible => {
+  if (!visible) editingCustomerSchedule.value = null
 })
 
 interface TransferUserOption {
@@ -1231,6 +1347,7 @@ const sectionIconBgColors = {
   relatedBusiness: '#00A3BF',
   relatedContacts: '#DE350B',
   todoTasks: '#00875A',
+  relatedSchedules: '#00A3BF',
   documentCenter: '#0052CC',
 } as const
 
@@ -1537,8 +1654,18 @@ const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:dele
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canToggleTasks = computed(() => userStore.hasPermission('task:update_status'))
+const canViewSchedules = computed(() => userStore.hasPermission('schedule:view'))
+const canCreateSchedules = computed(() => userStore.hasPermission('schedule:create'))
+const canEditSchedules = computed(() => userStore.hasPermission('schedule:edit'))
+const canDeleteSchedules = computed(() => userStore.hasPermission('schedule:delete'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
+const visibleRelatedModuleCount = computed(() => [
+  canViewContacts.value,
+  canViewTasks.value,
+  canViewSchedules.value,
+  canViewKnowledge.value
+].filter(Boolean).length)
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -1590,6 +1717,13 @@ async function loadCustomerDetailPage() {
       fetchTasks.push(fetchCustomerKnowledge(customerId))
     } else {
       customerKnowledgeList.value = []
+    }
+
+    if (canViewSchedules.value) {
+      fetchTasks.push(fetchCustomerSchedules(customerId))
+    } else {
+      customerSchedules.value = []
+      scheduleTotal.value = 0
     }
 
     await Promise.all(fetchTasks)
@@ -1697,6 +1831,37 @@ function handleContactPageChange(page: number) {
   if (customer.value) fetchContacts(customer.value.customerId)
 }
 
+async function fetchCustomerSchedules(customerId: string, reset = false) {
+  if (!canViewSchedules.value) {
+    customerSchedules.value = []
+    scheduleTotal.value = 0
+    return
+  }
+  if (reset) schedulePage.value = 1
+  scheduleLoading.value = true
+  try {
+    const result = await queryScheduleList({
+      customerId,
+      page: schedulePage.value,
+      limit: schedulePageSize.value
+    })
+    customerSchedules.value = result.list || []
+    scheduleTotal.value = result.totalRow || 0
+  } catch (error) {
+    console.error('Failed to fetch customer schedules:', error)
+    customerSchedules.value = []
+    scheduleTotal.value = 0
+  } finally {
+    syncSelectedCustomerSchedule()
+    scheduleLoading.value = false
+  }
+}
+
+function handleSchedulePageChange(page: number) {
+  schedulePage.value = page
+  if (customer.value) fetchCustomerSchedules(customer.value.customerId)
+}
+
 async function fetchCustomerKnowledge(customerId: string) {
   if (!canViewKnowledge.value) {
     customerKnowledgeList.value = []
@@ -1780,6 +1945,75 @@ function getKnowledgeTypeLabel(type?: string) {
     contract: '合同'
   }
   return labels[String(type || '').toLowerCase()] || '文档'
+}
+
+function getScheduleTypeLabel(schedule: ScheduleVO) {
+  if (schedule.typeName) return schedule.typeName
+  const labels: Record<string, string> = {
+    meeting: '会议',
+    call: '电话',
+    visit: '拜访',
+    other: '其他'
+  }
+  return labels[String(schedule.type || '').toLowerCase()] || '日程'
+}
+
+function getScheduleTypeIcon(type?: string) {
+  const icons: Record<string, string> = {
+    meeting: 'groups',
+    call: 'call',
+    visit: 'location_on',
+    other: 'event_note'
+  }
+  return icons[String(type || '').toLowerCase()] || 'event_note'
+}
+
+function getScheduleParticipantsLine(schedule: ScheduleVO) {
+  if (schedule.participantUsers?.length) {
+    return schedule.participantUsers
+      .map(user => (user.realname || user.username || '').trim())
+      .filter(Boolean)
+      .join('、')
+  }
+  return (schedule.participantNames || '').trim()
+}
+
+function getScheduleSummary(schedule: ScheduleVO) {
+  if (schedule.location) return `地点：${schedule.location}`
+  const participants = getScheduleParticipantsLine(schedule)
+  if (participants) return `参与人：${participants}`
+  if (schedule.description) return schedule.description
+  return '暂无补充信息'
+}
+
+function formatScheduleDateTime(dateStr?: string) {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '-'
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatScheduleTime(dateStr?: string) {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '-'
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatScheduleEndTime(startDateStr?: string, endDateStr?: string) {
+  if (!endDateStr) return ''
+  if (!startDateStr) return formatScheduleDateTime(endDateStr)
+
+  const startDate = new Date(startDateStr)
+  const endDate = new Date(endDateStr)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return formatScheduleDateTime(endDateStr)
+  }
+
+  const sameDay = startDate.getFullYear() === endDate.getFullYear()
+    && startDate.getMonth() === endDate.getMonth()
+    && startDate.getDate() === endDate.getDate()
+  return sameDay ? formatScheduleTime(endDateStr) : formatScheduleDateTime(endDateStr)
 }
 
 function handleEdit() {
@@ -2091,6 +2325,75 @@ function handleCustomerTaskEditFromDetail(task: Task) {
 async function handleTaskDialogSaved() {
   editingCustomerTask.value = null
   await refreshCustomerAfterTaskMutation()
+}
+
+function syncSelectedCustomerSchedule() {
+  const selectedScheduleId = selectedCustomerSchedule.value?.scheduleId
+  if (!selectedScheduleId) return
+  selectedCustomerSchedule.value = customerSchedules.value.find(schedule =>
+    String(schedule.scheduleId) === String(selectedScheduleId)
+  ) || selectedCustomerSchedule.value
+}
+
+function handleViewCustomerSchedule(schedule: ScheduleVO) {
+  if (!canViewSchedules.value) return
+  selectedCustomerSchedule.value = schedule
+}
+
+function handleAddSchedule() {
+  if (!canCreateSchedules.value) return
+  if (!customer.value) return
+  editingCustomerSchedule.value = null
+  showScheduleFormDialog.value = true
+}
+
+function handleEditCustomerSchedule(schedule: ScheduleVO) {
+  if (!canEditSchedules.value) return
+  editingCustomerSchedule.value = schedule
+  showScheduleFormDialog.value = true
+}
+
+function handleEditCustomerScheduleFromDetail(schedule: ScheduleVO) {
+  handleEditCustomerSchedule(schedule)
+  if (isMobile.value) selectedCustomerSchedule.value = null
+}
+
+async function resolveCustomerScheduleDetail(scheduleId: string): Promise<ScheduleVO | null> {
+  const normalizedScheduleId = String(scheduleId)
+  const localSchedule = customerSchedules.value.find(schedule =>
+    String(schedule.scheduleId) === normalizedScheduleId
+  ) || null
+  if (localSchedule) return localSchedule
+
+  const result = await queryScheduleList({
+    scheduleId: normalizedScheduleId,
+    page: 1,
+    limit: 1
+  })
+
+  return result.list?.[0] || null
+}
+
+async function handleCustomerScheduleCreated() {
+  if (!customer.value) return
+  editingCustomerSchedule.value = null
+  await fetchCustomerSchedules(customer.value.customerId, true)
+}
+
+async function handleCustomerScheduleUpdated(scheduleId: string) {
+  if (!customer.value) return
+  editingCustomerSchedule.value = null
+  await fetchCustomerSchedules(customer.value.customerId)
+  const updatedSchedule = await resolveCustomerScheduleDetail(scheduleId)
+  if (updatedSchedule) {
+    selectedCustomerSchedule.value = updatedSchedule
+  }
+}
+
+async function handleCustomerScheduleDeleted() {
+  if (!customer.value) return
+  await fetchCustomerSchedules(customer.value.customerId)
+  selectedCustomerSchedule.value = null
 }
 
 async function handleAddTag() {

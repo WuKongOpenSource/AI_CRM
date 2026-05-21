@@ -19,6 +19,7 @@
         </span>
         <div class="flex items-center gap-2">
           <button
+            v-if="allowEdit"
             :disabled="deleting"
             class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50"
             type="button"
@@ -29,6 +30,7 @@
             <span class="material-symbols-outlined flex size-[18px] items-center justify-center text-[18px] leading-none">edit</span>
           </button>
           <button
+            v-if="allowDelete"
             :disabled="deleting"
             class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             type="button"
@@ -157,7 +159,7 @@
         </div>
       </div>
 
-      <div class="border-t border-slate-100 bg-white p-6">
+      <div v-if="allowDelete" class="border-t border-slate-100 bg-white p-6">
         <button
           :disabled="deleting"
           class="w-full rounded-xl bg-red-50 py-3 text-sm font-bold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
@@ -177,11 +179,17 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteSchedule, type ScheduleVO } from '@/api/schedule'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: boolean
   schedule: ScheduleVO | null
   isMobile?: boolean
-}>()
+  canEdit?: boolean
+  canDelete?: boolean
+}>(), {
+  isMobile: false,
+  canEdit: true,
+  canDelete: true
+})
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
@@ -198,6 +206,8 @@ const visible = computed({
 })
 
 const isMobile = computed(() => !!props.isMobile)
+const allowEdit = computed(() => props.canEdit)
+const allowDelete = computed(() => props.canDelete)
 
 const displayCreateTime = computed(() => {
   const t = props.schedule?.createTime
@@ -255,12 +265,12 @@ function handleGoToCustomerDetail() {
 }
 
 function handleEditSchedule() {
-  if (!props.schedule || deleting.value) return
+  if (!allowEdit.value || !props.schedule || deleting.value) return
   emit('edit', props.schedule)
 }
 
 async function handleDeleteSchedule() {
-  if (!props.schedule || deleting.value) return
+  if (!allowDelete.value || !props.schedule || deleting.value) return
 
   try {
     await ElMessageBox.confirm('确定删除该日程？', '提示', { type: 'warning' })
