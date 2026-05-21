@@ -46,6 +46,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
@@ -114,6 +115,7 @@ public class ChatServiceImpl implements IChatService {
     private PermissionService permissionService;
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
+    private static final String CHAT_ERROR_MESSAGE = "抱歉，处理您的请求时发生错误。请稍后重试。";
 
     private static final String SYSTEM_PROMPT_TEMPLATE = """
         你是一个AI驱动的CRM系统助手，帮助用户管理客户关系。
@@ -177,6 +179,8 @@ public class ChatServiceImpl implements IChatService {
         - 客户名：带"公司""集团""科技""有限""工厂""企业"等后缀的词语
         - 联系人：带"总""经理""主任""工""姐""哥""先生""女士"等称呼的人名（如"王总""李经理""张工"）
         创建任何记录时，都应尽量关联提取到的客户名和联系人名，传给对应工具参数。
+        - 如果当前是客户对话，且用户没有明确指定其他客户，只说"这个客户""当前客户""该客户""他们"等代词，则不要把代词作为客户名传入；让工具使用当前绑定客户。
+        - 如果用户明确指定了另一个客户名称或客户ID，则以用户显式指定的客户为准，不要强制使用当前绑定客户。
 
         请用中文回复，保持专业友好。
         当用户请求创建或查询数据时，使用提供的工具函数来完成操作。
@@ -227,8 +231,8 @@ public class ChatServiceImpl implements IChatService {
 
         [Customer ID chaining rule]
         1. When createCustomer or confirmPendingCustomerCreation returns a customer ID, keep that exact customerId for the rest of the same user request and conversation turn.
-        2. If you create a follow-up, schedule, or other customer-related record for that newly created customer, pass the returned customerId into the tool instead of matching by customerName again.
-        3. If the user says "the above customer", "this customer", or asks for a follow-up/schedule immediately after customer creation, it refers to the most recently created customerId unless the user clearly names another customer.
+        2. If you create a follow-up, task, schedule, or other customer-related record for that newly created customer, pass the returned customerId into the tool instead of matching by customerName again.
+        3. If the user says "the above customer", "this customer", or asks for a follow-up/task/schedule immediately after customer creation, it refers to the most recently created customerId unless the user clearly names another customer.
         4. Do not claim that a follow-up or schedule is associated with the new customer unless the tool result confirms the same customerId.
 
         【重复客户确认规则】
@@ -610,10 +614,12 @@ public class ChatServiceImpl implements IChatService {
                 // 会话结束后清理当前会话的 AiContextHolder。
                 AiContextHolder.clear();
             })
-            .doOnError(error -> {
-                log.error("AI 对话错误: {}", error.getMessage(), error);
-                saveMessage(sessionId, "assistant", "抱歉，处理您的请求时发生错误。请稍后重试。");
+            .onErrorResume(error -> {
+                logAiChatError(error);
+                saveMessage(sessionId, "assistant", CHAT_ERROR_MESSAGE);
+                updateSessionTime(sessionId);
                 AiContextHolder.clear();
+                return Flux.just(CHAT_ERROR_MESSAGE);
             });
     }
 
@@ -792,10 +798,10 @@ public class ChatServiceImpl implements IChatService {
             updateSessionTime(sessionId);
             return e.getMsg();
         } catch (Exception e) {
-            String errorMsg = "抱歉，处理您的请求时发生错误。请稍后重试。";
-            saveMessage(sessionId, "assistant", errorMsg);
+            logAiChatError(e);
+            saveMessage(sessionId, "assistant", CHAT_ERROR_MESSAGE);
             updateSessionTime(sessionId);
-            return errorMsg;
+            return CHAT_ERROR_MESSAGE;
         } finally {
             // 非流式分支在 finally 清理当前会话的 AiContextHolder。
             AiContextHolder.clear();
@@ -979,6 +985,27 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
+    private void logAiChatError(Throwable error) {
+        WebClientResponseException exception = findWebClientResponseException(error);
+        if (exception != null) {
+            log.error("AI 对话错误: {}, response body: {}",
+                error.getMessage(), exception.getResponseBodyAsString(), error);
+            return;
+        }
+        log.error("AI 对话错误: {}", error.getMessage(), error);
+    }
+
+    private WebClientResponseException findWebClientResponseException(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof WebClientResponseException exception) {
+                return exception;
+            }
+            current = current.getCause();
+        }
+        return null;
+    }
+
     /**
      * 构建消息History。
      */
@@ -1159,7 +1186,7 @@ public class ChatServiceImpl implements IChatService {
         if (customer.getNextFollowTime() != null) {
             builder.append("- 下次跟进时间: ").append(customer.getNextFollowTime()).append("\n");
         }
-        builder.append("当用户未显式指定其他客户时，客户、跟进、任务、日程和知识库工具默认围绕该 customerId 执行。");
+        builder.append("当用户未显式指定其他客户时，客户、跟进、任务、日程和知识库工具默认围绕该 customerId 执行；如果用户明确指定其他客户名称或ID，则优先使用用户指定的客户。");
         return builder.toString();
     }
 

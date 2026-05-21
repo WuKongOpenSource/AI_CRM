@@ -2,15 +2,12 @@ package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.kakarote.ai_crm.ai.context.AiContextHolder;
-import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
+import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
-import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.service.IContactService;
-import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IScheduleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -32,20 +29,17 @@ public class ScheduleTools {
     private IScheduleService scheduleService;
 
     @Autowired
-    private AiCustomerMatcher aiCustomerMatcher;
-
-    @Autowired
     private IContactService contactService;
 
     @Autowired
-    private ICustomerService customerService;
+    private AiToolCustomerResolver customerResolver;
 
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
     /**
      * 创建日程。
      */
-    @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。直接传入客户名称和联系人姓名即可，无需先查询ID。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
+    @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。客户解析优先级：显式customerIdStr > 显式客户名称 > 当前客户对话绑定客户。当前客户对话中，如果用户只说“这个客户/当前客户/他们”等，不要把代词作为customerName，留空即可让工具默认关联当前客户。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
     @AiToolPermission(value = "schedule:create", action = "创建日程")
     public String createSchedule(
             @ToolParam(description = "Optional CRM customer ID returned by createCustomer or confirmPendingCustomerCreation. For a newly created customer, pass this ID to avoid name rematching.", required = false) String customerIdStr,
@@ -88,7 +82,8 @@ public class ScheduleTools {
 
             String matchedCompanyName = null;
             Long customerId = null;
-            CustomerResolveResult customerResolve = resolveCustomerById(customerIdStr, "createSchedule");
+            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                customerIdStr, customerName, "关联该客户创建日程", "创建日程失败", "创建日程");
             if (customerResolve.errorMessage() != null) {
                 return customerResolve.errorMessage();
             }
@@ -96,23 +91,6 @@ public class ScheduleTools {
                 customerId = customerResolve.customer().getCustomerId();
                 matchedCompanyName = customerResolve.customer().getCompanyName();
                 bo.setCustomerId(customerId);
-            }
-            if (customerResolve.customer() == null && hasTextValue(customerName)) {
-                AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
-                if (customerMatch.isExistsNoAccess()) {
-                    return customerMatch.formatNoAccessMessage("关联该客户创建日程");
-                }
-                if (customerMatch.isAmbiguous()) {
-                    return "创建日程失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
-                }
-                if (customerMatch.isMatched()) {
-                    customerId = customerMatch.getCustomer().getCustomerId();
-                    matchedCompanyName = customerMatch.getCustomer().getCompanyName();
-                    bo.setCustomerId(customerId);
-                } else {
-                    log.info("未找到客户「{}」，中止创建日程并提示先创建客户", customerName);
-                    return "创建日程失败: 系统中未找到名为「" + customerName + "」的客户。请先创建该客户后再创建日程，或确认客户名称是否正确。";
-                }
             }
 
             if (hasTextValue(contactName)) {
@@ -228,52 +206,6 @@ public class ScheduleTools {
         }
 
         return null;
-    }
-
-    /**
-     * 解析客户按ID。
-     */
-    private CustomerResolveResult resolveCustomerById(String customerIdStr, String actionName) {
-        String normalizedCustomerId = normalizeOptionalText(customerIdStr);
-        if (normalizedCustomerId == null) {
-            Long boundCustomerId = AiContextHolder.getCurrentCustomerId();
-            normalizedCustomerId = boundCustomerId == null ? null : String.valueOf(boundCustomerId);
-        }
-        if (normalizedCustomerId == null) {
-            return new CustomerResolveResult(null, null);
-        }
-
-        try {
-            Long customerId = Long.parseLong(normalizedCustomerId);
-            Customer customer = customerService.getById(customerId);
-            if (customer == null || Integer.valueOf(0).equals(customer.getStatus())) {
-                Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customerId);
-                if (existingCustomer != null && !Integer.valueOf(0).equals(existingCustomer.getStatus())) {
-                    String message = AiCustomerMatcher.CustomerMatchResult
-                        .existsNoAccess(normalizedCustomerId, existingCustomer)
-                        .formatNoAccessMessage("关联该客户创建日程");
-                    return new CustomerResolveResult(null, message);
-                }
-                return new CustomerResolveResult(null, "操作未执行：客户不存在或已停用，无法创建日程。");
-            }
-            return new CustomerResolveResult(customer, null);
-        } catch (NumberFormatException e) {
-            return new CustomerResolveResult(null, "操作未执行：客户ID必须是数字。");
-        }
-    }
-
-    /**
-     * 标准化Optional文本。
-     */
-    private String normalizeOptionalText(String value) {
-        String normalized = StrUtil.trim(value);
-        if (StrUtil.isBlank(normalized) || "null".equalsIgnoreCase(normalized)) {
-            return null;
-        }
-        return normalized;
-    }
-
-    private record CustomerResolveResult(Customer customer, String errorMessage) {
     }
 
     /**

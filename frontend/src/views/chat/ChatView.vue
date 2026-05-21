@@ -2383,6 +2383,13 @@ async function handleSend() {
   await nextTick()
   focusChatTextarea()
   await sendPromise
+  await refreshCurrentSessionCustomerContextAfterSend()
+}
+
+async function refreshCurrentSessionCustomerContextAfterSend() {
+  const customerId = currentSessionCustomerId.value
+  if (!customerId) return
+  await ensureSelectedCustomerDetail(customerId)
 }
 
 function handleSendBarClick() {

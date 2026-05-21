@@ -2,15 +2,13 @@ package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.kakarote.ai_crm.ai.context.AiContextHolder;
-import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
+import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.service.IContactService;
-import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IFollowUpService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -46,22 +44,19 @@ public class FollowupTools {
     private IFollowUpService followUpService;
 
     @Autowired
-    private AiCustomerMatcher aiCustomerMatcher;
+    private AiToolCustomerResolver customerResolver;
 
     @Autowired
     private IContactService contactService;
 
-    @Autowired
-    private ICustomerService customerService;
-
     /**
      * 创建跟进。
      */
-    @Tool(description = "创建跟进记录。当用户描述已经发生的沟通、拜访、电话、会议、邮件等事项时调用。直接传入客户名称和联系人姓名即可，无需先查询ID。如找不到联系人，仍继续创建跟进记录。涉及签约、回款、成交等关键节点时，可在内容前加【关键节点】标记。")
+    @Tool(description = "创建跟进记录。当用户描述已经发生的沟通、拜访、电话、会议、邮件等事项时调用。客户解析优先级：显式customerIdStr > 显式客户名称 > 当前客户对话绑定客户。当前客户对话中，如果用户只说“这个客户/当前客户/他们”等，不要把代词作为customerName，留空即可让工具默认关联当前客户。如找不到联系人，仍继续创建跟进记录。涉及签约、回款、成交等关键节点时，可在内容前加【关键节点】标记。")
     @AiToolPermission(value = "followup:create", action = "创建跟进记录")
     public String createFollowUp(
             @ToolParam(description = "Optional CRM customer ID returned by createCustomer or confirmPendingCustomerCreation. For a newly created customer, pass this ID to avoid name rematching.", required = false) String customerIdStr,
-            @ToolParam(description = "客户名称（公司名），必填") String customerName,
+            @ToolParam(description = "客户名称（公司名）；客户对话模式下未显式指定其他客户时可留空", required = false) String customerName,
             @ToolParam(description = "跟进类型：call(电话)/meeting(会议)/email(邮件)/visit(拜访)，可根据内容推断，默认visit", required = false) String type,
             @ToolParam(description = "跟进内容，必填") String content,
             @ToolParam(description = "跟进时间，优先使用 yyyy-MM-dd HH:mm:ss；也兼容 yyyy-MM-dd HH:mm 或 yyyy-MM-dd，默认当前时间", required = false) String followTime,
@@ -72,62 +67,15 @@ public class FollowupTools {
             customerName, type, content, followTime, contactName, nextFollowTime);
 
         try {
-            CustomerResolveResult customerResolve = resolveCustomerById(customerIdStr, "createFollowUp");
+            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                customerIdStr, customerName, "创建跟进记录", "创建跟进失败", "创建跟进记录");
             if (customerResolve.errorMessage() != null) {
                 return customerResolve.errorMessage();
             }
             if (customerResolve.customer() != null) {
                 return createFollowUpForCustomer(customerResolve.customer(), type, content, followTime, contactName, nextFollowTime);
             }
-
-            AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
-            if (customerMatch.isExistsNoAccess()) {
-                return customerMatch.formatNoAccessMessage("创建跟进记录");
-            }
-            if (customerMatch.isAmbiguous()) {
-                return "创建跟进失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
-            }
-            if (!customerMatch.isMatched()) {
-                return "创建跟进失败: 未找到名为「" + customerName + "」的客户，请确认客户名称是否正确";
-            }
-
-            Long customerId = customerMatch.getCustomer().getCustomerId();
-            String matchedCompanyName = customerMatch.getCustomer().getCompanyName();
-
-            Long contactId = null;
-            if (StrUtil.isNotBlank(contactName) && !"null".equalsIgnoreCase(contactName)) {
-                contactId = findContactIdByName(contactName, customerId);
-                if (contactId == null) {
-                    log.info("未找到联系人「{}」，将不关联联系人", contactName);
-                }
-            }
-
-            FollowUpAddBO bo = new FollowUpAddBO();
-            bo.setCustomerId(customerId);
-            bo.setContactId(contactId);
-            bo.setType(StrUtil.isNotBlank(type) && !"null".equalsIgnoreCase(type) ? type : "visit");
-            bo.setContent(content);
-            bo.setFollowTime(parseFollowUpTime(followTime, new Date()));
-            bo.setNextFollowTime(parseOptionalTime(nextFollowTime));
-
-            Long followUpId = followUpService.addFollowUp(bo);
-
-            StringBuilder result = new StringBuilder();
-            result.append("跟进记录创建成功！\n\n");
-            result.append("- 公司名称: ").append(matchedCompanyName);
-            result.append("\n- 类型: ").append(getTypeName(bo.getType()));
-            result.append("\n- 内容: ").append(content);
-            result.append("\n- 跟进时间: ").append(formatDateTime(bo.getFollowTime()));
-            if (contactId != null) {
-                result.append("\n- 联系人: ").append(contactName);
-            } else if (StrUtil.isNotBlank(contactName) && !"null".equalsIgnoreCase(contactName)) {
-                result.append("\n- 联系人: ").append(contactName).append("（未在系统中找到，未关联）");
-            }
-            if (bo.getNextFollowTime() != null) {
-                result.append("\n- 下次跟进时间: ").append(formatDateTime(bo.getNextFollowTime()));
-            }
-            result.append("\n\n跟进ID: ").append(followUpId);
-            return result.toString();
+            return "创建跟进失败: 缺少客户名称";
         } catch (Exception e) {
             log.error("【Tool调用】createFollowUp 失败: {}", e.getMessage(), e);
             return "创建跟进记录失败: " + e.getMessage();
@@ -144,7 +92,8 @@ public class FollowupTools {
 
         try {
             if (StrUtil.isBlank(customerName) || "null".equalsIgnoreCase(customerName)) {
-                CustomerResolveResult boundCustomerResolve = resolveCustomerById(null, "queryFollowUps");
+                AiToolCustomerResolver.CustomerResolveResult boundCustomerResolve =
+                    customerResolver.resolveBoundCustomer("查看跟进记录");
                 if (boundCustomerResolve.errorMessage() != null) {
                     return boundCustomerResolve.errorMessage();
                 }
@@ -155,19 +104,29 @@ public class FollowupTools {
                 return "查询跟进记录失败: 缺少客户名称";
             }
 
-            AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
-            if (customerMatch.isExistsNoAccess()) {
-                return customerMatch.formatNoAccessMessage("查看跟进记录");
-            }
-            if (customerMatch.isAmbiguous()) {
-                return "查询跟进记录失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
-            }
-            if (!customerMatch.isMatched()) {
-                return "查询跟进记录失败: 未找到名为「" + customerName + "」的客户";
+            if (customerResolver.isBoundCustomerReference(customerName)) {
+                AiToolCustomerResolver.CustomerResolveResult boundCustomerResolve =
+                    customerResolver.resolveBoundCustomer("查看跟进记录");
+                if (boundCustomerResolve.errorMessage() != null) {
+                    return boundCustomerResolve.errorMessage();
+                }
+                if (boundCustomerResolve.customer() != null) {
+                    List<FollowUpVO> followUps = followUpService.queryByCustomer(boundCustomerResolve.customer().getCustomerId());
+                    return formatFollowUpList(boundCustomerResolve.customer().getCompanyName(), followUps);
+                }
+                return "查询跟进记录失败: 缺少客户名称";
             }
 
-            List<FollowUpVO> followUps = followUpService.queryByCustomer(customerMatch.getCustomer().getCustomerId());
-            return formatFollowUpList(customerMatch.getCustomer().getCompanyName(), followUps);
+            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                null, customerName, "查看跟进记录", "查询跟进记录失败", "查询跟进记录");
+            if (customerResolve.errorMessage() != null) {
+                return customerResolve.errorMessage();
+            }
+            if (customerResolve.customer() == null) {
+                return "查询跟进记录失败: 缺少客户名称";
+            }
+            List<FollowUpVO> followUps = followUpService.queryByCustomer(customerResolve.customer().getCustomerId());
+            return formatFollowUpList(customerResolve.customer().getCompanyName(), followUps);
         } catch (Exception e) {
             return "查询跟进记录失败: " + e.getMessage();
         }
@@ -251,49 +210,6 @@ public class FollowupTools {
         return result.toString();
     }
 
-    /**
-     * 解析客户按ID。
-     */
-    private CustomerResolveResult resolveCustomerById(String customerIdStr, String actionName) {
-        String normalizedCustomerId = normalizeOptionalText(customerIdStr);
-        if (normalizedCustomerId == null) {
-            Long boundCustomerId = AiContextHolder.getCurrentCustomerId();
-            normalizedCustomerId = boundCustomerId == null ? null : String.valueOf(boundCustomerId);
-        }
-        if (normalizedCustomerId == null) {
-            return new CustomerResolveResult(null, null);
-        }
-
-        try {
-            Long customerId = Long.parseLong(normalizedCustomerId);
-            Customer customer = customerService.getById(customerId);
-            if (customer == null || Integer.valueOf(0).equals(customer.getStatus())) {
-                Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customerId);
-                if (existingCustomer != null && !Integer.valueOf(0).equals(existingCustomer.getStatus())) {
-                    String message = AiCustomerMatcher.CustomerMatchResult
-                        .existsNoAccess(normalizedCustomerId, existingCustomer)
-                        .formatNoAccessMessage("创建跟进记录");
-                    return new CustomerResolveResult(null, message);
-                }
-                return new CustomerResolveResult(null, "操作未执行：客户不存在或已停用，无法创建跟进记录。");
-            }
-            return new CustomerResolveResult(customer, null);
-        } catch (NumberFormatException e) {
-            return new CustomerResolveResult(null, "操作未执行：客户ID必须是数字。");
-        }
-    }
-
-    /**
-     * 标准化Optional文本。
-     */
-    private String normalizeOptionalText(String value) {
-        String normalized = StrUtil.trim(value);
-        if (StrUtil.isBlank(normalized) || "null".equalsIgnoreCase(normalized)) {
-            return null;
-        }
-        return normalized;
-    }
-
     private String formatFollowUpList(String companyName, List<FollowUpVO> followUps) {
         if (followUps.isEmpty()) {
             return "该客户暂无跟进记录。";
@@ -310,9 +226,6 @@ public class FollowupTools {
             sb.append("\n");
         }
         return sb.toString();
-    }
-
-    private record CustomerResolveResult(Customer customer, String errorMessage) {
     }
 
     /**

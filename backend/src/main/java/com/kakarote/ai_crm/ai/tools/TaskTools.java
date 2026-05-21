@@ -1,14 +1,12 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
-import com.kakarote.ai_crm.ai.context.AiContextHolder;
-import com.kakarote.ai_crm.ai.tools.support.AiCustomerMatcher;
+import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
-import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.ITaskService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -30,10 +28,7 @@ public class TaskTools {
     private ITaskService taskService;
 
     @Autowired
-    private ICustomerService customerService;
-
-    @Autowired
-    private AiCustomerMatcher aiCustomerMatcher;
+    private AiToolCustomerResolver customerResolver;
 
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
@@ -93,42 +88,31 @@ public class TaskTools {
     /**
      * 创建任务。
      */
-    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期也用此工具。直接传入客户名称即可，无需先查询ID。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
+    @Tool(description = "创建新任务。当用户描述需要做但还没做的事情，且没有具体执行时间点时调用。只有截止日期也用此工具。客户解析优先级：显式customerIdStr > 显式客户名称 > 当前客户对话绑定客户。当前客户对话中，如果用户只说“这个客户/当前客户/他们”等，不要把代词作为customerName，留空即可让工具默认关联当前客户。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
     @AiToolPermission(value = "task:create", action = "创建任务")
     public String createTask(
+            @ToolParam(description = "Optional CRM customer ID returned by createCustomer or confirmPendingCustomerCreation. Explicit ID has highest priority.", required = false) String customerIdStr,
             @ToolParam(description = "任务标题，必填") String title,
             @ToolParam(description = "任务描述", required = false) String description,
             @ToolParam(description = "关联客户名称（公司名）", required = false) String customerName,
             @ToolParam(description = "优先级：high/medium/low，默认medium", required = false) String priority,
             @ToolParam(description = "截止日期，格式：yyyy-MM-dd", required = false) String dueDate) {
 
-        log.info("【Tool调用】createTask 被调用: title={}, customerName={}, priority={}, dueDate={}",
-            title, customerName, priority, dueDate);
+        log.info("【Tool调用】createTask 被调用: customerIdStr={}, title={}, customerName={}, priority={}, dueDate={}",
+            customerIdStr, title, customerName, priority, dueDate);
 
         try {
             Long customerId = null;
             String matchedCompanyName = null;
-            if (hasTextValue(customerName)) {
-                AiCustomerMatcher.CustomerMatchResult customerMatch = aiCustomerMatcher.match(customerName);
-                if (customerMatch.isExistsNoAccess()) {
-                    return customerMatch.formatNoAccessMessage("关联该客户创建任务");
-                }
-                if (customerMatch.isAmbiguous()) {
-                    return "创建任务失败: 客户名称「" + customerName + "」无法唯一匹配，可能是：" + customerMatch.formatCandidateNames() + "。请提供更完整的客户名称。";
-                }
-                if (customerMatch.isMatched()) {
-                    customerId = customerMatch.getCustomer().getCustomerId();
-                    matchedCompanyName = customerMatch.getCustomer().getCompanyName();
-                } else {
-                    log.info("未找到客户「{}」，中止创建任务并提示先创建客户", customerName);
-                    return "创建任务失败: 系统中未找到名为「" + customerName + "」的客户。请先创建该客户后再创建任务，或确认客户名称是否正确。";
-                }
-            } else {
-                Customer boundCustomer = resolveBoundCustomer();
-                if (boundCustomer != null) {
-                    customerId = boundCustomer.getCustomerId();
-                    matchedCompanyName = boundCustomer.getCompanyName();
-                }
+            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                customerIdStr, customerName, "关联该客户创建任务", "创建任务失败", "创建任务");
+            if (customerResolve.errorMessage() != null) {
+                return customerResolve.errorMessage();
+            }
+            Customer resolvedCustomer = customerResolve.customer();
+            if (resolvedCustomer != null) {
+                customerId = resolvedCustomer.getCustomerId();
+                matchedCompanyName = resolvedCustomer.getCompanyName();
             }
 
             TaskAddBO bo = new TaskAddBO();
@@ -150,6 +134,9 @@ public class TaskTools {
             result.append("\n- 优先级: ").append(getPriorityLabel(priority != null ? priority : "medium"));
             if (matchedCompanyName != null) {
                 result.append("\n- 公司名称: ").append(matchedCompanyName);
+            }
+            if (customerId != null) {
+                result.append("\n- customerId: ").append(customerId);
             }
             if (hasTextValue(dueDate)) {
                 result.append("\n- 截止日期: ").append(dueDate);
@@ -285,18 +272,6 @@ public class TaskTools {
      */
     private boolean hasTextValue(String value) {
         return StrUtil.isNotBlank(value) && !"null".equalsIgnoreCase(StrUtil.trim(value));
-    }
-
-    private Customer resolveBoundCustomer() {
-        Long customerId = AiContextHolder.getCurrentCustomerId();
-        if (customerId == null) {
-            return null;
-        }
-        Customer customer = customerService.getById(customerId);
-        if (customer == null || Integer.valueOf(0).equals(customer.getStatus())) {
-            return null;
-        }
-        return customer;
     }
 
     /**

@@ -65,6 +65,7 @@ public class DynamicChatClientProvider {
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
     private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
     private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
+    private static final double MOONSHOT_K2_FIXED_TEMPERATURE = 1.0D;
 
     private final ConcurrentHashMap<Long, ChatClient> tenantChatClients = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ChatClient> selectedModelChatClients = new ConcurrentHashMap<>();
@@ -367,10 +368,11 @@ public class DynamicChatClientProvider {
                                        String extraHeadersJson, AiModelCapabilities capabilities,
                                        boolean registerTools, String appCode) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
+        Double requestTemperature = resolveRequestTemperature(providerCode, model, temperature);
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(model)
-                .temperature(temperature)
+                .temperature(requestTemperature)
                 .maxCompletionTokens(maxTokens)
                 .build();
         options.setStreamUsage(Boolean.TRUE);
@@ -389,6 +391,28 @@ public class DynamicChatClientProvider {
             }
         }
         return builder.build();
+    }
+
+    private Double resolveRequestTemperature(String providerCode, String model, Double temperature) {
+        if (isMoonshotK2FixedTemperatureModel(providerCode, model)) {
+            if (temperature == null || Double.compare(temperature, MOONSHOT_K2_FIXED_TEMPERATURE) != 0) {
+                log.info("Moonshot model {} requires temperature {}, override configured temperature {}",
+                        model, MOONSHOT_K2_FIXED_TEMPERATURE, temperature);
+            }
+            return MOONSHOT_K2_FIXED_TEMPERATURE;
+        }
+        return temperature;
+    }
+
+    private boolean isMoonshotK2FixedTemperatureModel(String providerCode, String model) {
+        if (!"moonshot".equalsIgnoreCase(StrUtil.nullToEmpty(providerCode).trim())) {
+            return false;
+        }
+        String normalizedModel = StrUtil.nullToEmpty(model).trim().toLowerCase();
+        return normalizedModel.startsWith("kimi-k2.5")
+                || normalizedModel.startsWith("kimi-k2.6")
+                || normalizedModel.startsWith("kimi-k2-5")
+                || normalizedModel.startsWith("kimi-k2-6");
     }
 
     /**
