@@ -181,17 +181,32 @@
             v-if="selectedCustomer"
             class="relative shrink-0 border-b border-[#ececec] bg-white pl-4 pr-1 py-2 md:pl-8"
           >
-            <div class="mx-auto flex h-9 w-full max-w-[768px] items-center justify-between gap-3">
-              <h2 class="min-w-[110px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
-                {{ selectedCustomer.companyName }}
-              </h2>
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3 pr-20">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img
+                    v-if="selectedCustomer.logoUrl"
+                    :src="selectedCustomer.logoUrl"
+                    :alt="selectedCustomer.companyName || 'company logo'"
+                    class="size-full bg-white object-contain"
+                  />
+                  <span v-else class="text-xs font-bold text-slate-400">
+                    {{ selectedCustomer.companyName?.charAt(0) || '?' }}
+                  </span>
+                </div>
+                <h2 class="min-w-[110px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
+                  {{ selectedCustomer.companyName }}
+                </h2>
+              </div>
               <el-dropdown trigger="click" @command="handleCustomerStageCommand">
                 <button
                   type="button"
-                  class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-semibold transition-colors"
+                  class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold transition-colors"
                   :class="selectedCustomerStageButtonClass"
                 >
-                  <span class="size-1.5 rounded-full bg-current opacity-70"></span>
+                  <span class="material-symbols-outlined text-[15px] leading-none">
+                    {{ getCustomerStageIcon(selectedCustomer.stage) }}
+                  </span>
                   <span>{{ selectedCustomerStageText }}</span>
                   <span class="material-symbols-outlined text-[15px] leading-none">expand_more</span>
                 </button>
@@ -203,7 +218,9 @@
                       :command="stage.value"
                     >
                       <span class="flex items-center gap-2">
-                        <span class="size-1.5 rounded-full" :class="getCustomerStageDotClass(stage.value)"></span>
+                        <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">
+                          {{ getCustomerStageIcon(stage.value) }}
+                        </span>
                         {{ stage.label }}
                       </span>
                     </el-dropdown-item>
@@ -214,7 +231,7 @@
             <button
               v-if="showCustomerPanelShell && customerPanelVisible"
               type="button"
-              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] md:right-8"
+              class="group/sb-toggle absolute right-4 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] md:right-4"
               aria-label="收起客户侧栏"
               @click="customerPanelVisible = false"
             >
@@ -812,7 +829,7 @@
                         v-model:visible="chatModelPopoverVisible"
                         trigger="click"
                         placement="top-end"
-                        width="300"
+                        width="340"
                         :show-arrow="false"
                         :teleported="true"
                         :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
@@ -911,6 +928,20 @@
                                 aria-hidden="true"
                               >
                                 check
+                              </span>
+                            </button>
+                            <button
+                              v-if="group.source === 'custom' && canManageAiConfig"
+                              type="button"
+                              class="wk-chat-model-menu__more"
+                              @click="handleOpenMoreModels"
+                            >
+                              <span class="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+                                add_circle
+                              </span>
+                              <span class="min-w-0 flex-1 truncate">更多模型</span>
+                              <span class="material-symbols-outlined text-[18px] leading-none text-[#8f8f8f]" aria-hidden="true">
+                                chevron_right
                               </span>
                             </button>
                           </template>
@@ -1188,7 +1219,7 @@
 
               <!-- Quick Action Chips -->
               <div v-if="chatStore.messages.length === 0" class="mt-6 min-h-[88px]">
-                <div v-if="selectedChatAppLabel === 'CRM管理'" class="flex flex-wrap gap-2 justify-center" >
+                <div v-if="chatStore.selectedAppCode === 'crm'" class="flex flex-wrap gap-2 justify-center" >
                   <button
                     v-for="action in quickActions"
                     :key="action.label"
@@ -1419,7 +1450,7 @@ const agentStore = useAgentStore()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const { isMobile } = useResponsive()
-const { aiConfig, loadAiConfig, ensureAiAvailableForSend } = useAiQuota()
+const { aiConfig, canManageAiConfig, loadAiConfig, ensureAiAvailableForSend, goToAiSettings } = useAiQuota()
 const boundCustomerId = computed(() => {
   const customerId = chatStore.currentSession?.customerId
   return customerId ? String(customerId) : ''
@@ -1510,11 +1541,11 @@ const chatComposerShellStyle = computed(() => (
 
 const CUSTOMER_STAGE_FLOW = [
   { value: 'lead', label: '线索' },
-  { value: 'qualified', label: '已确认' },
-  { value: 'proposal', label: '方案' },
-  { value: 'negotiation', label: '谈判' },
-  { value: 'closed', label: '成交' },
-  { value: 'lost', label: '流失' },
+  { value: 'qualified', label: '资格审查' },
+  { value: 'proposal', label: '方案报价' },
+  { value: 'negotiation', label: '谈判中' },
+  { value: 'closed', label: '已成交' },
+  { value: 'lost', label: '已流失' },
 ] as const
 
 const selectedCustomerStageText = computed(() => {
@@ -1563,6 +1594,9 @@ function modelOptionLabel(option: ChatModelOption): string {
 
 const selectedChatAppLabel = computed(() => {
   if (chatStore.selectedAppCode === 'general') return ''
+  if (chatStore.selectedAppCode === 'crm' && (selectedCustomerId.value || currentSessionCustomerId.value)) {
+    return selectedCustomer.value?.companyName || boundCustomerName.value || '客户'
+  }
   if (chatStore.selectedApp?.label) {
     return chatStore.selectedApp.label == '知识库' ? '知识库检索' : chatStore.selectedApp.label
   }
@@ -1630,6 +1664,11 @@ function handleChatModelChange(modelKey: string) {
   chatStore.setSelectedModelKey(modelKey)
   chatModelPopoverVisible.value = false
   focusChatTextarea()
+}
+
+function handleOpenMoreModels() {
+  chatModelPopoverVisible.value = false
+  goToAiSettings()
 }
 
 watch(
@@ -2938,16 +2977,16 @@ function getCustomerStageButtonClass(stage?: string): string {
   return map[stage || ''] || 'bg-slate-100 text-slate-600 hover:bg-slate-200'
 }
 
-function getCustomerStageDotClass(stage?: string): string {
+function getCustomerStageIcon(stage?: string): string {
   const map: Record<string, string> = {
-    lead: 'bg-sky-500',
-    qualified: 'bg-violet-500',
-    proposal: 'bg-amber-500',
-    negotiation: 'bg-orange-500',
-    closed: 'bg-emerald-500',
-    lost: 'bg-slate-400',
+    lead: 'person_search',
+    qualified: 'verified',
+    proposal: 'description',
+    negotiation: 'forum',
+    closed: 'handshake',
+    lost: 'block',
   }
-  return map[stage || ''] || 'bg-slate-400'
+  return map[stage || ''] || 'lens'
 }
 
 async function handleCustomerStageCommand(stage: string) {
@@ -3315,6 +3354,29 @@ void _formatTime
 
 .wk-chat-model-menu__item:hover {
   background: var(--wk-bg-surface-hover);
+}
+
+.wk-chat-model-menu__more {
+  display: flex;
+  width: calc(100% - 4px);
+  align-items: center;
+  gap: 8px;
+  margin: 4px 2px 6px;
+  border-radius: 8px;
+  border: 0px solid var(--wk-border-subtle);
+  background: #f8fafc;
+  padding: 8px 10px;
+  color: var(--wk-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.wk-chat-model-menu__more:hover {
+  border-color: color-mix(in srgb, var(--wk-primary) 24%, var(--wk-border-subtle));
+  background: color-mix(in srgb, var(--wk-primary) 8%, var(--wk-bg-surface));
 }
 
 

@@ -96,12 +96,11 @@
               :aria-selected="selectedChannel === channel.code"
               @click="handleChannelSelect(channel)"
             >
-              <span
-                class="material-symbols-outlined text-[18px] leading-none"
-                :class="channel.code === 'wechat' ? 'text-[#14c56f]' : 'text-[#6b7280]'"
-              >
-                {{ channel.code === 'wechat' ? 'chat' : 'account_balance_wallet' }}
-              </span>
+              <img
+                :src="paymentChannelLogos[channel.code]"
+                :alt="`${channel.label} logo`"
+                class="token-channel-logo"
+              />
               <span>{{ channel.label }}</span>
             </button>
           </div>
@@ -220,6 +219,8 @@ import {
   getTokenPurchaseOrder,
   listRecentTokenPurchaseOrders
 } from '@/api/tokenPurchase'
+import alipayLogoUrl from '@/assets/payment/alipay.png'
+import wechatLogoUrl from '@/assets/payment/wechat.png'
 import type {
   PaymentChannel,
   TokenPurchaseChannel,
@@ -236,6 +237,11 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'paid', order: TokenPurchaseOrder): void
 }>()
+
+const paymentChannelLogos: Record<PaymentChannel, string> = {
+  wechat: wechatLogoUrl,
+  alipay: alipayLogoUrl
+}
 
 const computeEstimates = [
   { model: 'Qwen3.6-plus', messages: '约 5000 条消息' },
@@ -610,6 +616,20 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
 .token-channel-tab.is-disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.token-channel-logo {
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.token-channel-tab.is-active .token-channel-logo {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92);
 }
 
 .token-payment-stage {

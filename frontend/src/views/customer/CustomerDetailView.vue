@@ -375,7 +375,7 @@
       </div>
 
       <!-- 3-Column Content -->
-      <div class="wk-mobile-px-15 md:px-8 pb-8 pt-1">
+      <div class="wk-mobile-px-15 md:px-8 pb-8 pt-4">
         <div v-if="!isEmbeddedMobileLayout" class="lg:hidden mb-4">
           <div class="flex items-center gap-2 p-1 rounded-xl bg-slate-100">
             <button
@@ -408,7 +408,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <!-- Left Column: Basic Info (col-span-3) -->
           <div :class="[isEmbeddedMobileLayout || detailTab === 'ai' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
-            <section class="bg-white py-4 shadow-sm px-4 rounded-xl border border-slate-200">
+            <section class="bg-white py-4" :class="[!isEmbeddedMobileLayout ? 'rounded-xl border border-slate-200 px-4 shadow-sm' : '']">
               <div class="mb-4 space-y-1">
                 <!-- 上：图标 + 标题（整行展示，可换行）+ 刷新 -->
                 <div class="flex items-center justify-between gap-2">
@@ -505,6 +505,7 @@
           <!-- Center Column: Follow-ups Timeline (col-span-6) -->
           <div
             v-if="canViewFollowUps"
+            class="wk-customer-detail-activity group/activity"
             :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4']"
           >
             <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
@@ -515,10 +516,11 @@
                 >
                   <span :class="sectionMaterialIconClass">history</span>
                 </span>
-                <h3 class="min-w-0 truncate text-lg font-bold text-slate-900">最近活动 - AI时间轴</h3>
+                <h3 class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900 break-words">{{ isEmbeddedMobileLayout ? '活动' : '最近活动 - AI时间轴' }}</h3>
                 <button
+                  v-if="followUps.length > 0"
                   type="button"
-                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                  class="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 opacity-0 pointer-events-none transition-[opacity,background-color,color,border-color] hover:border-primary/30 hover:bg-primary/5 hover:text-primary group-hover/activity:pointer-events-auto group-hover/activity:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   :aria-expanded="followUpTimelineExpanded"
                   :aria-label="followUpTimelineExpanded ? '收起跟进记录' : '展开跟进记录'"
                   :title="followUpTimelineExpanded ? '收起跟进记录' : '展开跟进记录'"
@@ -561,10 +563,18 @@
               </div>
             </div>
 
-            <div v-if="followUpTimelineExpanded && followUps.length === 0 && !followUpLoading" class="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm">
-              <span class="material-symbols-outlined text-slate-300 text-4xl mb-3">event_note</span>
-              <p class="text-sm text-slate-400">暂无跟进记录</p>
-              <p class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
+            <div
+              v-if="followUpTimelineExpanded && followUps.length === 0 && !followUpLoading"
+              :class="isEmbeddedMobileLayout
+                ? 'rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center'
+                : 'bg-white border border-slate-200 rounded-xl p-12 text-center shadow-sm'"
+            >
+              <span
+                class="material-symbols-outlined"
+                :class="isEmbeddedMobileLayout ? 'text-3xl leading-none text-slate-200' : 'mb-3 text-4xl text-slate-300'"
+              >event_note</span>
+              <p :class="isEmbeddedMobileLayout ? 'mt-2 text-xs font-medium text-slate-400' : 'text-sm text-slate-400'">暂无跟进记录</p>
+              <p v-if="!isEmbeddedMobileLayout" class="text-xs text-slate-300 mt-1">点击上方按钮添加第一条跟进记录</p>
             </div>
 
             <div v-else-if="followUpTimelineExpanded" v-loading="followUpLoading">
@@ -655,7 +665,10 @@
           </div>
 
           <!-- Right Column: Related Modules (col-span-3) -->
-          <div :class="[isEmbeddedMobileLayout || detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3 space-y-4']">
+          <div
+            class="wk-related-modules"
+            :class="[isEmbeddedMobileLayout || detailTab === 'related' ? 'block' : 'hidden', 'lg:block lg:col-span-3', isEmbeddedMobileLayout ? '' : 'space-y-4']"
+          >
             <div v-if="!embedded" class="flex items-center justify-between px-1">
               <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedBusiness')">
@@ -667,13 +680,13 @@
             </div>
 
             <!-- Contacts Module -->
-            <section v-if="canViewContacts" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4" v-loading="contactLoading">
+            <section v-if="canViewContacts" class="wk-related-contacts bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']" v-loading="contactLoading">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
                     <span :class="sectionMaterialIconClass">group</span>
                   </span>
-                  关联联系人
+                  联系人
                   <span class="text-slate-400 font-normal">({{ contactTotal }})</span>
                 </h4>
                 <div v-if="canCreateContacts" class="flex items-center gap-2">
@@ -698,8 +711,8 @@
                 </div>
               </div>
               <div class="space-y-4">
-                <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-8 text-center">
-                  <span class="material-symbols-outlined text-3xl leading-none text-slate-200">person_off</span>
+                <div v-if="contacts.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">person_off</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无关联联系人</p>
                 </div>
                 <div
@@ -814,13 +827,13 @@
             </section> -->
 
             <!-- Tasks Module -->
-            <section v-if="canViewTasks" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+            <section v-if="canViewTasks" class="bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']" v-loading="taskLoading">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
                     <WkIcon name="task" :size="15" />
                   </span>
-                  待办任务
+                  任务
                 </h4>
                 <button
                   v-if="canCreateTasks"
@@ -834,8 +847,9 @@
                 </button>
               </div>
               <div class="space-y-4">
-                <div v-if="!customer.tasks?.length" class="py-4 text-center">
-                  <p class="text-xs text-slate-400">暂无待办任务</p>
+                <div v-if="!customer.tasks?.length" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">task_alt</span>
+                  <p class="mt-2 text-xs font-medium text-slate-400">暂无待办任务</p>
                 </div>
                 <div
                   v-for="task in customer.tasks?.slice(0, 5)"
@@ -860,13 +874,13 @@
             </section>
 
             <!-- Schedules Module -->
-            <section v-if="canViewSchedules" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4" v-loading="scheduleLoading">
+            <section v-if="canViewSchedules" class="bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']" v-loading="scheduleLoading">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedSchedules')">
                     <span :class="sectionMaterialIconClass">event_note</span>
                   </span>
-                  关联日程
+                  日程
                   <span class="text-slate-400 font-normal">({{ scheduleTotal }})</span>
                 </h4>
                 <button
@@ -881,8 +895,8 @@
                 </button>
               </div>
               <div class="space-y-4">
-                <div v-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-8 text-center">
-                  <span class="material-symbols-outlined text-3xl leading-none text-slate-200">event_busy</span>
+                <div v-if="customerSchedules.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                  <span class="material-symbols-outlined text-2xl leading-none text-slate-200">event_busy</span>
                   <p class="mt-2 text-xs font-medium text-slate-400">暂无关联日程</p>
                 </div>
                 <div
@@ -930,29 +944,31 @@
             </section>
 
             <!-- Documents Module -->
-            <section v-if="canViewKnowledge" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+            <section v-if="canViewKnowledge" class="bg-white shadow-sm " :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('documentCenter')">
                     <WkIcon name="knowledge" :size="15" />
                   </span>
-                  文档中心
+                  文档
                 </h4>
                 <button
                   v-if="canUploadKnowledge"
                   type="button"
-                  class="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/20"
+                  class="size-7 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-all"
+                  title="上传文档"
+                  aria-label="上传文档"
                   @click="openCustomerKnowledgeUpload"
                 >
-                  <span class="material-symbols-outlined text-sm">upload</span>
-                  上传文档
+                  <span class="material-symbols-outlined text-[18px] leading-none">add</span>
                 </button>
               </div>
               <div v-if="customerKnowledgeLoading" class="py-8 text-center">
-                <span class="material-symbols-outlined text-3xl text-slate-300 animate-spin">progress_activity</span>
+                <span class="material-symbols-outlined text-2xl text-slate-300 animate-spin">progress_activity</span>
               </div>
-              <div v-else-if="customerKnowledgeList.length === 0">
-                <p class="py-4 text-center text-xs text-slate-400">{{ getKnowledgeEmptyText() }}</p>
+              <div v-else-if="customerKnowledgeList.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <span class="material-symbols-outlined text-2xl leading-none text-slate-200">folder_off</span>
+                <p class="mt-2 text-xs font-medium text-slate-400">{{ getKnowledgeEmptyText() }}</p>
               </div>
               <div v-else class="space-y-3">
                 <div
@@ -1121,7 +1137,7 @@
     <TaskDetailDrawer
       v-model="showCustomerTaskDetail"
       :task="selectedCustomerTask"
-      :is-mobile="isMobile"
+      :is-mobile="isMobile && !isEmbeddedMobileLayout"
       :can-edit="canCreateTasks"
       :can-toggle-complete="canToggleTasks"
       @edit="handleCustomerTaskEditFromDetail"
@@ -1250,6 +1266,7 @@ const contactTotal = ref(0)
 const contactPage = ref(1)
 const contactPageSize = ref(5)
 const contactLoading = ref(false)
+const taskLoading = ref(false)
 const customerSchedules = ref<ScheduleVO[]>([])
 const scheduleTotal = ref(0)
 const schedulePage = ref(1)
@@ -2842,5 +2859,21 @@ function formatCustomFieldValue(field: CustomField, value: any): string {
 
 .wk-customer-detail-mobile .lg\:block {
   display: block;
+}
+
+.wk-customer-detail-embedded-mobile .wk-related-modules {
+  display: contents !important;
+}
+
+.wk-customer-detail-embedded-mobile .wk-related-contacts {
+  order: 2;
+}
+
+.wk-customer-detail-embedded-mobile .wk-customer-detail-activity {
+  order: 3;
+}
+
+.wk-customer-detail-embedded-mobile .wk-related-modules > section:not(.wk-related-contacts) {
+  order: 4;
 }
 </style>

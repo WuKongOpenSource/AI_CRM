@@ -150,67 +150,67 @@
 
           <!-- Chat: recent sessions under Knowledge menu -->
           <template v-if="!primarySidebarContentCollapsed">
-          <!-- <div class="pt-2" /> -->
-          <!-- <div class="mx-1 h-px bg-slate-100" /> -->
-          <div class="space-y-1 pt-0">
-            <button
-              type="button"
-              class="group flex w-full items-center justify-between gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
-              :title="recentChatSessionsExpanded ? '收起最近对话' : '展开最近对话'"
-              :aria-expanded="recentChatSessionsExpanded"
-              aria-controls="recent-chat-sessions-panel"
-              @click="recentChatSessionsExpanded = !recentChatSessionsExpanded"
-            >
-              <span class="min-w-0 text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">最近</span>
-              <span
-                class="flex size-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150 pr-[2px]"
-                :class="recentChatSessionsExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
-                aria-hidden="true"
-              >
-                <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-end self-center text-[18px] leading-none text-[#c9c9c9]">
-                  {{ recentChatSessionsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
-                </span>
-              </span>
-            </button>
-
-            <div id="recent-chat-sessions-panel" v-show="recentChatSessionsExpanded">
-            <div v-if="chatStore.sessionsLoading && sidebarVisibleChatSessions.length === 0" class="flex justify-center py-6">
-              <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
-            </div>
-
-            <div v-else-if="sidebarVisibleChatSessions.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
-              暂无对话记录
-            </div>
-
-            <template v-else>
+            <!-- <div class="pt-2" /> -->
+            <!-- <div class="mx-1 h-px bg-slate-100" /> -->
+            <div class="space-y-1 pt-0">
               <button
-                v-for="session in limitedRecentChatSessions"
-                :key="session.sessionId"
-                class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
-                :class="isSessionActive(session.sessionId)
-                  ? 'bg-[#f3f3f3]'
-                  : 'hover:bg-[#f9f9f9]'"
-                @click="handleSelectSession(session.sessionId)"
-              >
-                <ChatSessionActionsPopover
-                  :session="session"
-                  :active="isSessionActive(session.sessionId)"
-                  @share="handleShareChatSession"
-                  @delete="handleDeleteSession"
-                />
-              </button>
-              <button
-                v-if="sidebarVisibleChatSessions.length > RECENT_CHAT_SESSION_LIMIT"
                 type="button"
-                class="group flex w-full min-w-0 items-center gap-2 rounded-[8px] pl-[10px] pr-[10px] py-[7px] mt-[1px] ml-[2px] mr-[6px] text-left text-[14px] text-[#0d0d0d] transition-all hover:bg-[#f9f9f9]"
-                @click="recentChatSessionsMoreVisible = true"
+                class="group flex shrink-0 items-center gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
+                :title="recentChatSessionsExpanded ? '收起最近对话' : '展开最近对话'"
+                :aria-expanded="recentChatSessionsExpanded"
+                aria-controls="recent-chat-sessions-panel"
+                @click="recentChatSessionsExpanded = !recentChatSessionsExpanded"
               >
-                <span class="material-symbols-outlined text-[20px] leading-none text-[#0d0d0d]">more_horiz</span>
-                <span>更多</span>
+                <span class="min-w-0 text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">最近</span>
+                <span
+                  class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150"
+                  :class="recentChatSessionsExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
+                  aria-hidden="true"
+                >
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ recentChatSessionsExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
+                </span>
               </button>
-            </template>
+
+              <div id="recent-chat-sessions-panel" v-show="recentChatSessionsExpanded">
+                <div v-if="chatStore.sessionsLoading && sidebarVisibleChatSessions.length === 0" class="flex justify-center py-6">
+                  <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+                </div>
+
+                <div v-else-if="sidebarVisibleChatSessions.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+                  暂无对话记录
+                </div>
+
+                <template v-else>
+                  <button
+                    v-for="session in limitedRecentChatSessions"
+                    :key="session.sessionId"
+                    class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                    :class="isSessionActive(session.sessionId)
+                      ? 'bg-[#f3f3f3]'
+                      : 'hover:bg-[#f9f9f9]'"
+                    @click="handleSelectSession(session.sessionId)"
+                  >
+                    <ChatSessionActionsPopover
+                      :session="session"
+                      :active="isSessionActive(session.sessionId)"
+                      @share="handleShareChatSession"
+                      @delete="handleDeleteSession"
+                    />
+                  </button>
+                  <button
+                    v-if="sidebarVisibleChatSessions.length > RECENT_CHAT_SESSION_LIMIT"
+                    type="button"
+                    class="group flex w-full min-w-0 items-center gap-2 rounded-[8px] pl-[10px] pr-[10px] py-[7px] mt-[1px] ml-[2px] mr-[6px] text-left text-[14px] text-[#0d0d0d] transition-all hover:bg-[#f9f9f9]"
+                    @click="recentChatSessionsMoreVisible = true"
+                  >
+                    <span class="material-symbols-outlined text-[20px] leading-none text-[#0d0d0d]">more_horiz</span>
+                    <span>更多</span>
+                  </button>
+                </template>
+              </div>
             </div>
-          </div>
 
           <div v-if="showSidebarCustomers" class="space-y-1 pt-1">
             <div class="mt-[12px] mb-[10px] flex w-full items-center gap-2 rounded-lg pl-3 pr-1">
@@ -223,7 +223,11 @@
                 @click="sidebarCustomersExpanded = !sidebarCustomersExpanded"
               >
                 <span class="text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">客户</span>
-                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                <span
+                  class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150"
+                  :class="sidebarCustomersExpanded ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'"
+                  aria-hidden="true"
+                >
                   <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
                     {{ sidebarCustomersExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
                   </span>
