@@ -194,9 +194,48 @@
                     {{ selectedCustomer.companyName?.charAt(0) || '?' }}
                   </span>
                 </div>
-                <h2 class="min-w-[110px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
+                <h2 class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
                   {{ selectedCustomer.companyName }}
                 </h2>
+                <div
+                  v-if="selectedCustomer.tags?.length || canEditSelectedCustomerTags"
+                  class="flex min-w-0 shrink items-center gap-1.5 overflow-hidden"
+                >
+                  <span
+                    v-for="tag in selectedCustomer.tags?.slice(0, 3)"
+                    :key="tag.tagId"
+                    class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-slate-100 px-2 text-[11px] font-medium text-slate-700"
+                    :title="tag.tagName"
+                  >
+                    <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                    <button
+                      v-if="canEditSelectedCustomerTags"
+                      type="button"
+                      class="hidden shrink-0 text-slate-400 transition-colors hover:text-red-500 group-hover/tag:inline-flex"
+                      title="删除标签"
+                      aria-label="删除标签"
+                      @click.stop="handleRemoveSelectedCustomerTag(tag)"
+                    >
+                      <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                    </button>
+                  </span>
+                  <span
+                    v-if="(selectedCustomer.tags?.length || 0) > 3"
+                    class="inline-flex h-6 shrink-0 items-center rounded-lg bg-slate-100 px-2 text-[11px] font-medium text-slate-500"
+                  >
+                    +{{ (selectedCustomer.tags?.length || 0) - 3 }}
+                  </span>
+                  <button
+                    v-if="canEditSelectedCustomerTags"
+                    type="button"
+                    class="inline-flex size-6 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/30 text-primary transition-colors hover:bg-primary/5"
+                    title="添加标签"
+                    aria-label="添加标签"
+                    @click.stop="showSelectedCustomerTagDialog = true"
+                  >
+                    <span class="material-symbols-outlined text-[15px] leading-none">add</span>
+                  </button>
+                </div>
               </div>
               <el-dropdown trigger="click" @command="handleCustomerStageCommand">
                 <button
@@ -1332,6 +1371,25 @@
       @confirm="onKnowledgePickerConfirm"
     />
 
+    <el-dialog
+      v-model="showSelectedCustomerTagDialog"
+      title="添加标签"
+      width="400px"
+      class="wk-dialog--flush"
+    >
+      <el-input
+        v-model="newSelectedCustomerTagName"
+        placeholder="请输入标签名称"
+        maxlength="20"
+        show-word-limit
+        @keyup.enter="handleAddSelectedCustomerTag"
+      />
+      <template #footer>
+        <el-button @click="showSelectedCustomerTagDialog = false">取消</el-button>
+        <el-button type="primary" :loading="selectedCustomerTagSubmitting" @click="handleAddSelectedCustomerTag">添加</el-button>
+      </template>
+    </el-dialog>
+
     <button
       v-if="showCustomerPanelShell && !customerPanelVisible"
       type="button"
@@ -1395,7 +1453,7 @@ import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
-import { getCustomerDetail, updateCustomerStage } from '@/api/customer'
+import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import {
   registerAiQuotaResumeSendHandler,
@@ -1420,7 +1478,7 @@ import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
-import type { CustomerDetailVO } from '@/types/customer'
+import type { CustomerDetailVO, CustomerTag } from '@/types/customer'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
@@ -1517,6 +1575,9 @@ const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
+const showSelectedCustomerTagDialog = ref(false)
+const newSelectedCustomerTagName = ref('')
+const selectedCustomerTagSubmitting = ref(false)
 const customerPanelVisible = ref(true)
 const customerPanelWidth = ref(380)
 const customerPanelResizing = ref(false)
@@ -1545,6 +1606,7 @@ const selectedCustomerStageText = computed(() => {
   return stage?.label || c.stage || '--'
 })
 const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage || 'lead'))
+const canEditSelectedCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
 const currentSessionCustomerId = computed(() => {
   const customerId = chatStore.currentSession?.customerId
   return customerId ? String(customerId) : ''
@@ -2968,6 +3030,37 @@ async function handleCustomerStageCommand(stage: string) {
   } catch (err) {
     console.error('Update customer stage failed:', err)
     if (!isRequestErrorHandled(err)) ElMessage.error('客户阶段更新失败')
+  }
+}
+
+async function handleAddSelectedCustomerTag() {
+  if (!canEditSelectedCustomerTags.value || !selectedCustomer.value) return
+  const tagName = newSelectedCustomerTagName.value.trim()
+  if (!tagName) return
+  selectedCustomerTagSubmitting.value = true
+  try {
+    await addCustomerTag(selectedCustomer.value.customerId, tagName)
+    await ensureSelectedCustomerDetail(selectedCustomer.value.customerId)
+    showSelectedCustomerTagDialog.value = false
+    newSelectedCustomerTagName.value = ''
+    ElMessage.success('标签添加成功')
+  } catch (err) {
+    console.error('Add customer tag failed:', err)
+    if (!isRequestErrorHandled(err)) ElMessage.error('标签添加失败')
+  } finally {
+    selectedCustomerTagSubmitting.value = false
+  }
+}
+
+async function handleRemoveSelectedCustomerTag(tag: CustomerTag) {
+  if (!canEditSelectedCustomerTags.value || !selectedCustomer.value) return
+  try {
+    await removeCustomerTag(selectedCustomer.value.customerId, tag.tagId)
+    await ensureSelectedCustomerDetail(selectedCustomer.value.customerId)
+    ElMessage.success('标签已删除')
+  } catch (err) {
+    console.error('Remove customer tag failed:', err)
+    if (!isRequestErrorHandled(err)) ElMessage.error('标签删除失败')
   }
 }
 

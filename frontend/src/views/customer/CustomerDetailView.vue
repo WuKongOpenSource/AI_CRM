@@ -475,6 +475,7 @@
                 :result="savedAiParseResult"
                 :show-tip="false"
                 :compact-score="isEmbeddedMobileLayout"
+                unified
                 :empty-title="aiAnalysisEmptyTitle"
                 :empty-description="aiAnalysisEmptyDescription"
               >
@@ -505,7 +506,7 @@
           <div
             v-if="canViewFollowUps"
             class="wk-customer-detail-activity group/activity"
-            :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4']"
+            :class="[isEmbeddedMobileLayout || detailTab === 'activity' ? 'block' : 'hidden', 'lg:block lg:col-span-6 space-y-4', isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : '']"
           >
             <div class="flex min-w-0 flex-col items-start gap-2 md:flex-row md:items-center md:justify-between">
               <div class="flex min-w-0 items-center gap-2">
@@ -679,7 +680,7 @@
             </div>
 
             <!-- Contacts Module -->
-            <section v-if="canViewContacts" class="wk-related-contacts bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']" v-loading="contactLoading">
+            <section v-if="canViewContacts" class="wk-related-contacts bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']" v-loading="contactLoading">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedContacts')">
@@ -826,7 +827,7 @@
             </section> -->
 
             <!-- Tasks Module -->
-            <section v-if="canViewTasks" class="bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']" v-loading="taskLoading">
+            <section v-if="canViewTasks" class="bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']" v-loading="taskLoading">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('todoTasks')">
@@ -873,7 +874,7 @@
             </section>
 
             <!-- Schedules Module -->
-            <section v-if="canViewSchedules" class="bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']" v-loading="scheduleLoading">
+            <section v-if="canViewSchedules" class="bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']" v-loading="scheduleLoading">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('relatedSchedules')">
@@ -943,7 +944,7 @@
             </section>
 
             <!-- Documents Module -->
-            <section v-if="canViewKnowledge" class="bg-white shadow-sm " :class="[isEmbeddedMobileLayout ? '' : 'border border-slate-200 rounded-2xl p-4']">
+            <section v-if="canViewKnowledge" class="bg-white shadow-sm " :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
                 <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <span :class="sectionIconBoxClass" :style="getSectionIconStyle('documentCenter')">
