@@ -37,7 +37,7 @@
             <div class="space-y-6">
               <h1 class="text-4xl font-bold leading-tight">
                 赋能销售团队<br />
-                <span class="text-primary">开启智能管理新时代</span>
+                <span class="text-white">开启智能管理新时代</span>
               </h1>
               <p class="max-w-md text-lg leading-relaxed text-slate-400">
                 集成 AI 智能解析、自动化跟进与深度数据分析，助您轻松掌控每一个商机。
@@ -50,7 +50,7 @@
               <div
                 class="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
               >
-                <el-icon class="text-primary" :size="24"><CircleCheck /></el-icon>
+                <el-icon class="text-white" :size="24"><CircleCheck /></el-icon>
               </div>
               <div>
                 <h4 class="text-sm font-bold">企业级安全保障</h4>
@@ -61,7 +61,7 @@
               <div
                 class="flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5"
               >
-                <el-icon class="text-primary" :size="24"><MagicStick /></el-icon>
+                <el-icon class="text-white" :size="24"><MagicStick /></el-icon>
               </div>
               <div>
                 <h4 class="text-sm font-bold">AI 驱动的洞察</h4>

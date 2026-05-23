@@ -1,9 +1,9 @@
 @font-face {
   font-family: "wk"; /* Project id 5142164 */
   src:
-  url('../assets/iconfont/iconfont.woff2?t=1778635657689') format('woff2'),
-  url('../assets/iconfont/iconfont.woff?t=1778635657689') format('woff'),
-  url('../assets/iconfont/iconfont.ttf?t=1778635657689') format('truetype');
+  url('../assets/iconfont/iconfont.woff2?t=1779502010419') format('woff2'),
+  url('../assets/iconfont/iconfont.woff?t=1779502010419') format('woff'),
+  url('../assets/iconfont/iconfont.ttf?t=1779502010419') format('truetype');
   font-display: block;
 }
 
@@ -13,6 +13,26 @@
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.wk-icon-search:before {
+  content: "\e6be";
+}
+
+.wk-icon-k-icon-minimax:before {
+  content: "\e614";
+}
+
+.wk-icon-a-zhipuAI:before {
+  content: "\e673";
+}
+
+.wk-icon-tengxunhunyuan:before {
+  content: "\e609";
+}
+
+.wk-icon-doubao2:before {
+  content: "\e600";
 }
 
 .wk-icon-OpenAi:before {

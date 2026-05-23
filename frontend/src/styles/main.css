@@ -508,15 +508,31 @@ html.dark .via-white {
   --tw-gradient-stops: var(--tw-gradient-from), var(--wk-bg-surface) var(--tw-gradient-via-position), var(--tw-gradient-to);
 }
 
-/* Streaming text cursor */
-.streaming-cursor::after {
-  content: '|';
-  animation: blink 1s infinite;
+/* Streaming thinking text */
+.wk-thinking-shimmer > :first-child {
+  display: inline-block;
+  margin: 0;
+  background: linear-gradient(90deg, #8f8f8f 0%, #0d0d0d 38%, #8f8f8f 76%);
+  background-size: 220% 100%;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  font-weight: 700;
+  animation: thinkingTextGlow 0.95s linear infinite;
 }
 
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+@keyframes thinkingTextGlow {
+  0% {
+    background-position: 120% 0;
+    opacity: 0.58;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    background-position: -120% 0;
+    opacity: 0.58;
+  }
 }
 
 /* Page transition animations */

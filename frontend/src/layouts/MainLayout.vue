@@ -85,12 +85,12 @@
       </div>
       <!-- pl-[10px] pr-[10px] py-[6px] mt-[0px] ml-[2px] mr-[6px] -->
       <!-- Chat: New session (fixed, not scroll with nav) -->
-      <div class="px-3 pt-1 mb-[0px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
+      <div class="px-3 pt-1 mb-[0px] pr-[10px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
         <button
           class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9]"
           :class="primarySidebarContentCollapsed
             ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
-            : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px]'"
+            : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] w-[248px]'"
           :title="primarySidebarContentCollapsed ? '新对话' : undefined"
           @click="handleNewSession"
         >
@@ -115,7 +115,7 @@
         @scroll.passive="onPrimaryNavScroll"
       >
         <div
-          class="space-y-1 w-full"
+          class="w-full"
           :class="primarySidebarContentCollapsed ? 'flex flex-col items-center' : ''"
         >
 
@@ -219,16 +219,16 @@
             </div>
 
           <div v-if="showSidebarCustomers" class="space-y-1 pt-1">
-            <div class="group/customer-header mt-[12px] mb-[10px] flex w-full items-center gap-2 rounded-lg pl-3 pr-1">
+            <div class="group/customer-header flex w-full items-center gap-2">
               <button
                 type="button"
-                class="group flex shrink-0 items-center gap-1 text-left transition-colors"
+                class="group flex min-w-0 shrink items-center gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
                 :title="sidebarCustomersExpanded ? '收起客户列表' : '展开客户列表'"
                 :aria-expanded="sidebarCustomersExpanded"
                 aria-controls="sidebar-customers-panel"
                 @click="sidebarCustomersExpanded = !sidebarCustomersExpanded"
               >
-                <span class="text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">客户</span>
+                <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">客户列表</span>
                 <span
                   class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150"
                   :class="sidebarCustomersExpanded ? 'opacity-0 group-hover/customer-header:opacity-100' : 'opacity-100'"
@@ -239,6 +239,36 @@
                   </span>
                 </span>
               </button>
+              <div class="ml-auto mt-[12px] mb-[0px] flex shrink-0 items-center justify-end gap-1 pr-1">
+                <button
+                  type="button"
+                  class="group/customer-action relative flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                  aria-label="新建客户"
+                  @click.stop="showCreateCustomer = true"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">person_add</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/customer-action:opacity-100"
+                    role="tooltip"
+                  >
+                    新建客户
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="group/customer-action relative flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                  aria-label="查看客户列表"
+                  @click.stop="navigateTo('/customer')"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/customer-action:opacity-100"
+                    role="tooltip"
+                  >
+                    查看客户列表
+                  </span>
+                </button>
+              </div>
             </div>
             <div id="sidebar-customers-panel" v-show="sidebarCustomersExpanded">
               <div v-if="sidebarCustomersLoading && sidebarCustomers.length === 0" class="flex justify-center py-6">
@@ -367,8 +397,8 @@
         </button>
       </div>
 
-      <div class="border-t border-[#ececec] p-3" :class="primarySidebarContentCollapsed ? '!px-2 !py-2' : ''">
-        <div class="space-y-1">
+      <div class="border-t border-[#ececec] px-2 py-1.5" :class="primarySidebarContentCollapsed ? '!px-2 !py-1.5' : ''">
+        <div class="space-y-0.5">
           <button
             v-if="false"
             type="button"
@@ -383,25 +413,22 @@
           </button>
           <div
             class="flex cursor-pointer items-center rounded-xl bg-[#fff] transition-colors hover:bg-[#f9f9f9] dark:bg-slate-900 dark:hover:bg-slate-800"
-            :class="primarySidebarContentCollapsed ? 'justify-center' : 'gap-3 p-2'"
+            :class="primarySidebarContentCollapsed ? 'justify-center' : 'gap-2 px-1.5 py-1'"
             :title="primarySidebarContentCollapsed ? (userStore.realname || userStore.username || '用户') : undefined"
             @click="showUserMenu = !showUserMenu"
           >
-            <div v-if="userStore.avatar" class="size-8 overflow-hidden rounded-full">
+            <div v-if="userStore.avatar" class="size-7 overflow-hidden rounded-full">
               <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
             </div>
-            <div v-else class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+            <div v-else class="flex size-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white">
               {{ userStore.realname?.charAt(0) || 'U' }}
             </div>
             <template v-if="!primarySidebarContentCollapsed">
               <div class="min-w-0 flex-1">
-                <p class="truncate text-xs font-semibold text-slate-900">{{ userStore.realname || userStore.username }}</p>
-                <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
+                <p class="truncate text-[13px] font-semibold leading-5 text-slate-900">{{ userStore.realname || userStore.username }}</p>
               </div>
+              <AiQuotaHeaderPopover compact />
             </template>
-          </div>
-          <div v-if="!primarySidebarContentCollapsed" class="px-1">
-            <AiQuotaHeaderPopover compact />
           </div>
         </div>
       </div>
@@ -436,7 +463,7 @@
               <div class="mx-3 my-1 h-px bg-slate-100" />
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-0.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
                 @click="handleOpenAccountSettings"
               >
                 <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
@@ -446,7 +473,7 @@
               <button
                 v-for="item in configNavItems"
                 :key="item.route"
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-0.5 text-left transition-colors"
                 :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
                 @click="navigateTo(item.route, item.query)"
               >
@@ -460,7 +487,7 @@
               </button>
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
+                class="group flex w-full items-center gap-3 rounded-xl px-3 py-0.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
                 @click="handleLogout"
               >
                 <span class="material-symbols-outlined text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
@@ -477,14 +504,14 @@
         v-if="!isMobile && showSecondaryPanel"
         class="relative z-10 flex wk-screen w-64 flex-shrink-0 flex-col border-r border-slate-200 bg-white"
       >
-        <div class="flex items-center justify-between px-4 py-5">
+        <div v-if="secondaryTitle" class="flex items-center justify-between px-4 py-5">
           <p class="truncate text-xs font-bold tracking-wider text-slate-400">{{ secondaryTitle }}</p>
           <!-- <button class="text-slate-300 transition-colors hover:text-slate-500" @click="selectedPrimaryKey = ''">
             <span class="material-symbols-outlined text-sm">close</span>
           </button> -->
         </div>
 
-        <div class="flex-1 overflow-y-auto px-4 pb-4">
+        <div class="flex-1 overflow-y-auto px-4 pb-4" :class="secondaryTitle ? '' : 'pt-3'">
           <div class="space-y-1">
             <button
               v-for="child in activeSecondaryItems"
@@ -1191,7 +1218,6 @@ const activeSearchResultIndex = ref(-1)
 const searchPanelRef = ref<HTMLElement | null>(null)
 
 let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
-let sidebarCustomerSearchTimer: ReturnType<typeof setTimeout> | null = null
 let customerSearchTimer: ReturnType<typeof setTimeout> | null = null
 let globalSearchRequestId = 0
 let customerSearchRequestId = 0
@@ -1299,22 +1325,9 @@ type SecondaryNavItem = {
 const allMainNavItems: MainNavItem[] = [
   { key: 'chat', icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat', groupTitle: 'AI 助手' },
   { key: 'knowledge', icon: 'knowledge-1', label: '知识库', route: '/knowledge', permission: 'knowledge' },
-  { key: 'customer-search', icon: 'customer', materialIcon: 'search', label: '搜索', route: '', permission: 'customer', action: 'customerSearch' },
-  {
-    key: 'crm',
-    icon: 'crm',
-    label: 'CRM管理',
-    route: '/customer',
-    permission: 'customer',
-    groupTitle: '悟空技能',
-    secondaryTitle: 'CRM管理',
-    children: [
-      { key: 'crm-customer', icon: 'customer', label: '客户管理', route: '/customer' },
-      { key: 'crm-settings', icon: 'set', label: '系统设置', route: '/settings/role', query: { scope: 'crm' } },
-    ],
-  },
-  { key: 'task', icon: 'task-1', label: '任务管理', route: '/task', permission: 'task', groupTitle: '悟空技能' },
-  { key: 'calendar', icon: 'event', label: '日程安排', route: '/calendar', permission: 'schedule', groupTitle: '悟空技能' },
+  { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer', action: 'customerSearch' },
+  { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
+  { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
@@ -1387,8 +1400,11 @@ watch(showSecondaryPanel, open => {
 })
 
 const secondaryTitle = computed(() => {
-  if (!selectedPrimaryItem.value) return '二级菜单'
-  return selectedPrimaryItem.value.secondaryTitle || `${selectedPrimaryItem.value.label} / 二级菜单`
+  if (!selectedPrimaryItem.value) return ''
+  if (Object.prototype.hasOwnProperty.call(selectedPrimaryItem.value, 'secondaryTitle')) {
+    return selectedPrimaryItem.value.secondaryTitle || ''
+  }
+  return `${selectedPrimaryItem.value.label} / 二级菜单`
 })
 
 const expandedMobilePrimaryKeys = ref<string[]>([])
@@ -1610,10 +1626,6 @@ onBeforeUnmount(() => {
     clearTimeout(globalSearchTimer)
     globalSearchTimer = null
   }
-  if (sidebarCustomerSearchTimer) {
-    clearTimeout(sidebarCustomerSearchTimer)
-    sidebarCustomerSearchTimer = null
-  }
   if (customerSearchTimer) {
     clearTimeout(customerSearchTimer)
     customerSearchTimer = null
@@ -1760,25 +1772,6 @@ function maybeLoadMoreSidebarCustomers() {
 
 function loadMoreSidebarCustomers() {
   void fetchSidebarCustomers()
-}
-
-function handleSidebarCustomerSearchInput() {
-  if (sidebarCustomerSearchTimer) {
-    clearTimeout(sidebarCustomerSearchTimer)
-  }
-  sidebarCustomerSearchTimer = setTimeout(() => {
-    void fetchSidebarCustomers({ reset: true, preserveScroll: true })
-  }, 250)
-}
-
-function clearSidebarCustomerSearch() {
-  if (!sidebarCustomerKeyword.value) return
-  sidebarCustomerKeyword.value = ''
-  if (sidebarCustomerSearchTimer) {
-    clearTimeout(sidebarCustomerSearchTimer)
-    sidebarCustomerSearchTimer = null
-  }
-  void fetchSidebarCustomers({ reset: true, preserveScroll: true })
 }
 
 async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?: boolean } = {}) {

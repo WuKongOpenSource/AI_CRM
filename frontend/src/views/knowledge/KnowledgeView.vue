@@ -1,145 +1,74 @@
 <template>
   <div :class="['flex h-full min-h-0 bg-slate-50/30', isMobile ? 'overflow-y-auto' : 'overflow-hidden']">
-    <!-- Sidebar Navigation (Desktop) -->
-    <aside
-      v-if="!isMobile"
-      :class="[
-        'bg-white border-r border-slate-100 flex flex-col shrink-0 transition-all duration-300 relative',
-        sidebarCollapsed ? 'w-16' : 'w-64'
-      ]"
-    >
-      <button
-        type="button"
-        class="absolute -right-3 top-10 z-0 size-6 flex items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm hover:text-primary"
-        :title="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-        @click="sidebarCollapsed = !sidebarCollapsed"
-      >
-        <span class="material-symbols-outlined text-sm">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
-      </button>
-
-      <div
-        :class="[
-          'border-b border-slate-50',
-          sidebarCollapsed ? 'px-2 py-6' : 'p-6'
-        ]"
-      >
-        <el-upload
-          class="w-full"
-          :show-file-list="false"
-          :before-upload="onUploadTriggerBeforeUpload"
-          :http-request="noopHttpRequest"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
-        >
-          <button
-            type="button"
-            :class="[
-              'w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-primary text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90',
-              sidebarCollapsed ? 'px-0' : ''
-            ]"
-          >
-            <span class="material-symbols-outlined text-sm">upload</span>
-            <span v-if="!sidebarCollapsed">上传新知识</span>
-          </button>
-        </el-upload>
-      </div>
-      <div class="flex-1 min-h-0 overflow-y-auto space-y-1 p-2">
-        <p
-          v-if="!sidebarCollapsed"
-          class="px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-400"
-        >
-          知识分类
-        </p>
-        <button
-          v-for="cat in categories"
-          :key="cat.id"
-          type="button"
-          :title="sidebarCollapsed ? cat.label : ''"
-          @click="handleCategoryFilter(cat.id)"
-          :class="[
-            'w-full rounded-xl py-2 transition-all',
-            sidebarCollapsed ? 'flex items-center justify-center px-0' : 'flex items-center gap-3 px-4 text-left',
-            selectedCategory === cat.id
-              ? 'bg-primary/5 font-bold text-primary'
-              : 'text-slate-600 hover:bg-slate-50'
-          ]"
-        >
-          <span class="material-symbols-outlined text-lg shrink-0">{{ cat.icon }}</span>
-          <span v-if="!sidebarCollapsed" class="text-sm">{{ cat.label }}</span>
-        </button>
-
-        <div v-if="!sidebarCollapsed" class="px-4 pt-8">
-          <p class="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">最近使用</p>
-          <div class="space-y-4">
-            <div
-              v-for="doc in knowledgeList.slice(0, 3)"
-              :key="'recent-' + doc.knowledgeId"
-              class="group flex cursor-pointer items-center gap-3"
-              @click="openDetail(doc)"
-            >
-              <div
-                class="flex size-8 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-colors group-hover:bg-primary/10 group-hover:text-primary"
-              >
-                <span class="material-symbols-outlined text-sm">history</span>
-              </div>
-              <span class="truncate text-xs text-slate-600 transition-colors group-hover:text-primary">{{ doc.name }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </aside>
-
     <!-- Main Content -->
     <div class="flex min-w-0 min-h-0 flex-1 flex-col">
-      <!-- Search & AI Ask Header -->
-      <div v-if="false" class="shrink-0 border-b border-slate-100 bg-white px-6 py-8 md:p-10">
-        <div class="mx-auto flex max-w-5xl flex-col items-center gap-6 md:gap-8">
-          <div class="flex flex-col items-center gap-2 text-center">
-            <h2 class="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">语义知识中心</h2>
-            <p class="text-sm text-slate-500">不再只是搜索文档，直接向 AI 提问获取业务答案。</p>
+      <!-- Desktop Header -->
+      <div v-if="!isMobile" class="wk-knowledge-desktop-header shrink-0">
+        <div class="flex min-h-[84px] items-center justify-between gap-6 px-3 py-4">
+          <div class="flex min-w-0 flex-col gap-1.5">
+            <h1 class="text-[22px] font-bold leading-7 text-slate-900">知识库</h1>
+            <p class="text-[13px] leading-5 text-slate-500">
+              保存产品文档、方案等资料，随时通过 AI 智能检索与赋能销售
+            </p>
           </div>
 
-          <div
-            v-if="!isMobile"
-            class="flex flex-wrap items-center justify-center gap-3"
-          >
-            <span class="mr-1 text-xs text-slate-400">热门搜索：</span>
-            <button
-              v-for="tag in hotSearchTags"
-              :key="'hot-' + tag"
-              type="button"
-              class="rounded-full bg-slate-50 px-4 py-1.5 text-xs text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700"
-              @click="handleHotSearch(tag)"
+          <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
+            <div
+              class="flex h-10 w-[386px] max-w-[38vw] min-w-[260px] items-center rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-1.5 shadow-[0_2px_8px_rgba(15,81,159,0.08)] transition-all focus-within:border-primary/60 focus-within:ring-4 focus-within:ring-primary/10"
             >
-              {{ tag }}
-            </button>
-          </div>
+              <span class="material-symbols-outlined shrink-0 pl-2 pr-1 text-[22px] leading-none text-[#8fa6c5]">search</span>
+              <input
+                v-model="queryParams.keyword"
+                type="text"
+                placeholder="搜索文档或向 AI 提问..."
+                class="min-w-0 flex-1 border-none bg-transparent px-1 text-[13px] leading-5 text-slate-900 outline-none placeholder:text-[#8fa6c5] focus:ring-0"
+                @keydown.enter="handleSearch"
+              />
+              <button
+                type="button"
+                class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 text-[12px] text-white shadow-[0_4px_10px_rgba(22,119,255,0.28)] transition-all hover:bg-primary/90"
+                @click="handleSearch"
+              >
+                <span class="material-symbols-outlined text-[17px] leading-none">auto_awesome</span>
+                AI 提问
+              </button>
+            </div>
 
-          <!-- Category Pills (Mobile) -->
-          <div v-if="isMobile" class="flex w-full gap-2 overflow-x-auto pb-1">
             <button
-              v-for="cat in categories"
-              :key="'pill-' + cat.id"
               type="button"
-              @click="handleCategoryFilter(cat.id)"
-              :class="[
-                'shrink-0 rounded-full px-4 py-2 text-xs font-bold whitespace-nowrap transition-all',
-                selectedCategory === cat.id
-                  ? 'bg-primary text-white'
-                  : 'border border-slate-100 bg-slate-50 text-slate-500 hover:border-primary hover:text-primary'
-              ]"
+              class="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-[#dbe8f8] bg-[#f8fbff] px-4 text-[13px] text-primary shadow-[0_2px_8px_rgba(15,81,159,0.06)] transition-all hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:text-slate-400"
+              :disabled="totalCount === 0"
+              @click="openScriptGenerator"
             >
-              {{ cat.label }}
+              <span class="material-symbols-outlined text-[21px] leading-none">forum</span>
+              AI话术生成
             </button>
+
+            <el-upload
+              class="wk-knowledge-desktop-upload shrink-0"
+              :show-file-list="false"
+              :before-upload="onUploadTriggerBeforeUpload"
+              :http-request="noopHttpRequest"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md"
+            >
+              <button
+                type="button"
+                class="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-5 text-[13px] text-white shadow-[0_6px_16px_rgba(22,119,255,0.28)] transition-all hover:bg-primary/90"
+              >
+                <span class="material-symbols-outlined text-[21px] leading-none">upload</span>
+                上传
+              </button>
+            </el-upload>
           </div>
         </div>
       </div>
 
       <!-- Content Grid -->
-      <div :class="['min-h-0 flex-1 p-6 md:px-6', isMobile ? '' : 'overflow-y-auto']">
+      <div :class="['min-h-0 flex-1', isMobile ? 'p-6' : 'overflow-y-auto px-3 py-6']">
         <div class="mx-auto px-[0px]">
           <!-- max-w-7xl -->
           <!-- Section Header -->
-          <div class="mb-6 flex flex-wrap items-center gap-3 md:gap-4">
+          <div v-if="isMobile" class="mb-6 flex flex-wrap items-center gap-3 md:gap-4">
             <div
               v-if="!showAiSearchResult"
               class="flex min-w-0 flex-wrap items-center gap-3"
@@ -225,6 +154,80 @@
             </div>
           </div>
 
+          <div
+            v-if="!isMobile && !showAiSearchResult"
+            class="wk-knowledge-desktop-filterbar mb-6 flex items-center justify-between gap-4"
+          >
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <button
+                v-for="cat in categories"
+                :key="'desktop-pill-' + cat.id"
+                type="button"
+                @click="handleCategoryFilter(cat.id)"
+                :class="[
+                  'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-all',
+                  selectedCategory === cat.id
+                    ? 'border-primary/25 bg-primary/10 text-primary shadow-[0_3px_8px_rgba(22,119,255,0.08)]'
+                    : 'border-[#dce7f5] bg-white text-[#284462] hover:border-primary/25 hover:bg-primary/5 hover:text-primary'
+                ]"
+              >
+                <span class="material-symbols-outlined text-[17px] leading-none">{{ cat.icon }}</span>
+                {{ getDesktopCategoryLabel(cat.id, cat.label) }}
+              </button>
+            </div>
+
+            <div class="flex shrink-0 items-center gap-3">
+              <el-dropdown trigger="click">
+                <button
+                  type="button"
+                  class="inline-flex size-9 items-center justify-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] text-primary shadow-[0_3px_8px_rgba(15,81,159,0.08)] transition-all hover:border-primary/30 hover:bg-primary/5"
+                  title="文件类型"
+                >
+                  <span class="material-symbols-outlined text-[21px] leading-none">filter_list</span>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu class="wk-knowledge-file-type-menu">
+                    <div class="px-5 pb-2 pt-3 text-xs font-bold text-[#8aa1c2]">文件类型</div>
+                    <el-dropdown-item
+                      v-for="item in fileTypeMenuItems"
+                      :key="item.label"
+                    >
+                      <span class="flex min-w-[130px] items-center gap-3 py-1 text-[13px] text-[#526982]">
+                        <span class="material-symbols-outlined text-[21px] leading-none text-[#8aa1c2]">{{ item.icon }}</span>
+                        {{ item.label }}
+                      </span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+
+              <div class="inline-flex h-9 items-center rounded-lg border border-[#dbe8f8] bg-[#f8fbff] p-1 shadow-[0_3px_8px_rgba(15,81,159,0.08)]">
+                <button
+                  type="button"
+                  @click="setViewMode('card')"
+                  :class="[
+                    'inline-flex size-7 items-center justify-center rounded-md transition-all',
+                    viewMode === 'card' ? 'bg-white text-primary shadow-sm' : 'text-[#8aa1c2] hover:text-primary'
+                  ]"
+                  title="网格视图"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">grid_view</span>
+                </button>
+                <button
+                  type="button"
+                  @click="setViewMode('list')"
+                  :class="[
+                    'inline-flex size-7 items-center justify-center rounded-md transition-all',
+                    viewMode === 'list' ? 'bg-white text-primary shadow-sm' : 'text-[#8aa1c2] hover:text-primary'
+                  ]"
+                  title="列表视图"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">list</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <KnowledgeSearchResultPanel
             v-if="showAiSearchResult"
             :loading="aiSearchLoading"
@@ -293,14 +296,7 @@
               @click="openDetail(item)"
             >
               <div class="mb-4 flex items-start justify-between">
-                <div
-                  :class="[
-                    'flex size-8 items-center justify-center rounded-lg',
-                    getTypeIconBg(item.type)
-                  ]"
-                >
-                  <span class="material-symbols-outlined text-sm">{{ getTypeIconName(item.type) }}</span>
-                </div>
+                <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="md" />
                 <div class="text-right">
                   <p class="mb-0.5 text-xs text-slate-400">文件大小</p>
                   <p class="text-sm font-bold text-slate-900">{{ formatFileSize(item.fileSize) }}</p>
@@ -389,134 +385,155 @@
           <!-- Document List View -->
           <div
             v-else
-            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+            :class="[
+              'overflow-hidden bg-white',
+              isMobile
+                ? 'rounded-2xl border border-slate-200 shadow-sm'
+                : 'wk-knowledge-list-shell rounded-2xl border border-[#dbe8f8] shadow-[0_3px_10px_rgba(15,81,159,0.08)]'
+            ]"
           >
             <!-- Table Header -->
             <div
-              class="hidden grid-cols-12 gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-3 text-xs font-bold uppercase tracking-widest text-slate-400 md:grid"
+              class="hidden border-b border-[#edf3fb] bg-[#fbfdff] px-6 py-3 text-[11px] font-bold text-[#8aa1c2] md:grid md:grid-cols-[minmax(260px,3fr)_100px_minmax(250px,3fr)_150px_130px_152px] md:items-center md:gap-4"
             >
-              <div class="col-span-4">文档名称</div>
-              <div class="col-span-1">分类</div>
-              <div class="col-span-3">AI 摘要</div>
-              <div class="col-span-1">关联业务</div>
-              <div class="col-span-1">更新时间</div>
-              <div class="col-span-2 text-right">操作</div>
+              <div>文档名称</div>
+              <div>分类</div>
+              <div>AI 摘要</div>
+              <div>关联业务</div>
+              <div>更新时间</div>
+              <div class="text-right">操作</div>
             </div>
             <!-- Table Rows -->
             <div
               v-for="item in knowledgeList"
               :key="'list-' + item.knowledgeId"
-              class="group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-slate-50 px-4 py-4 transition-colors last:border-0 hover:bg-primary/5 md:grid-cols-12 md:gap-4 md:px-6"
+              class="group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-[#f2f6fb] px-4 py-4 transition-colors last:border-0 hover:bg-primary/5 md:grid-cols-[minmax(260px,3fr)_100px_minmax(250px,3fr)_150px_130px_152px] md:gap-4 md:px-6 md:py-4"
               @click="openDetail(item)"
             >
               <!-- Name -->
-              <div class="col-span-2 flex min-w-0 items-center gap-3 md:col-span-4">
-                <div
-                  :class="[
-                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                    getTypeIconBg(item.type)
-                  ]"
-                >
-                  <span class="material-symbols-outlined text-lg">{{ getTypeIconName(item.type) }}</span>
-                </div>
+              <div class="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
+                <FileTypeIcon :file-name="item.name" :mime-type="item.mimeType" :knowledge-type="item.type" size="md" />
                 <span
                   class="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-primary"
                   >{{ item.name }}</span
                 >
               </div>
               <!-- Category -->
-              <div class="md:col-span-1 flex items-center">
+              <div class="flex items-center md:col-span-1">
                 <span :class="[
-                  'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold',
+                  'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold',
                   getTypeTagClass(item.type)
                 ]">
                   {{ getTypeLabel(item.type) }}
                 </span>
               </div>
               <!-- AI Summary (hidden on mobile) -->
-              <div class="hidden md:flex md:col-span-3 items-center min-w-0">
-                <p class="text-xs text-slate-400 truncate">{{ item.summary || '暂无摘要' }}</p>
+              <div class="hidden min-w-0 items-center md:col-span-1 md:flex">
+                <p class="truncate text-xs text-[#526982]">{{ item.summary || '暂无摘要' }}</p>
               </div>
               <!-- Related Business (hidden on mobile) -->
-              <div class="hidden md:flex md:col-span-1 items-center">
-                <span v-if="item.customerName" class="flex items-center gap-1.5 text-xs text-slate-500">
-                  <span class="size-1.5 rounded-full bg-emerald-400"></span>
+              <div class="hidden items-center md:col-span-1 md:flex">
+                <span v-if="item.customerName" class="flex min-w-0 items-center gap-1.5 text-xs text-[#526982]">
+                  <span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                    {{ item.customerName.slice(0, 1) }}
+                  </span>
+                  <span class="truncate">
                   {{ item.customerName }}
+                  </span>
                 </span>
-                <span v-else class="text-xs text-slate-300">—</span>
+                <span v-else class="text-xs text-[#b8c5d6]">-</span>
               </div>
               <!-- Date -->
-              <div class="hidden md:flex md:col-span-1 items-center">
-                <span class="text-xs text-slate-400">{{ formatDate(item.createTime) }}</span>
+              <div class="hidden items-center md:col-span-1 md:flex">
+                <span class="text-xs text-[#8aa1c2]">{{ formatDate(item.createTime) }}</span>
               </div>
               <!-- Actions -->
-              <div class="md:col-span-2 flex flex-nowrap md:flex-wrap items-center justify-end gap-1" @click.stop>
+              <div class="flex flex-nowrap items-center justify-end gap-1 md:col-span-1" @click.stop>
                 <button
                   type="button"
-                  class="rounded-lg px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
+                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-primary/10 hover:text-primary"
+                  title="阅读"
                   @click.stop="openDetail(item)"
                 >
-                  阅读
+                  <span class="material-symbols-outlined text-[19px] leading-none">visibility</span>
                 </button>
                 <button
                   type="button"
-                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-primary/10 hover:text-primary"
+                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-primary/10 hover:text-primary"
                   title="下载"
                   @click.stop="handleDownload(item)"
                 >
-                  <span class="material-symbols-outlined text-sm">download</span>
-                </button>
-                <button
-                  type="button"
-                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-red-50 hover:text-red-500"
-                  title="删除"
-                  @click.stop="handleDelete(item)"
-                >
-                  <span class="material-symbols-outlined text-sm">delete</span>
+                  <span class="material-symbols-outlined text-[19px] leading-none">download</span>
                 </button>
                 <button
                   v-if="canUploadKnowledge"
                   type="button"
-                  class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-emerald-50 hover:text-emerald-600"
+                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-primary/10 hover:text-primary"
                   title="关联客户"
                   @click.stop="openAssociateDialog(item)"
                 >
-                  <span class="material-symbols-outlined text-sm">link</span>
+                  <span class="material-symbols-outlined text-[19px] leading-none">link</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 items-center justify-center rounded-lg text-[#8aa1c2] transition-all hover:bg-red-50 hover:text-red-500"
+                  title="删除"
+                  @click.stop="handleDelete(item)"
+                >
+                  <span class="material-symbols-outlined text-[19px] leading-none">delete</span>
                 </button>
               </div>
             </div>
           </div>
 
           <!-- Pagination -->
-          <div v-if="totalCount > (queryParams.limit || 12)" class="mt-6 md:mt-8 flex justify-center">
-            <div class="flex items-center gap-2">
-              <button
-                class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                :disabled="(queryParams.page || 1) <= 1"
-                @click="handlePageChange((queryParams.page || 1) - 1)"
-              >
-                <span class="material-symbols-outlined text-lg">chevron_left</span>
-              </button>
-              <button
-                v-for="p in visiblePages"
-                :key="p"
-                @click="handlePageChange(p)"
-                :class="[
-                  'size-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors',
-                  p === (queryParams.page || 1)
-                    ? 'bg-primary text-white'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                ]"
-              >
-                {{ p }}
-              </button>
-              <button
-                class="size-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                :disabled="(queryParams.page || 1) >= totalPages"
-                @click="handlePageChange((queryParams.page || 1) + 1)"
-              >
-                <span class="material-symbols-outlined text-lg">chevron_right</span>
-              </button>
+          <div
+            v-if="showPagination"
+            :class="[
+              'mt-6 flex items-center',
+              isMobile ? 'justify-center' : 'justify-end'
+            ]"
+          >
+            <div class="flex flex-wrap items-center justify-center gap-4">
+              <p class="text-sm font-semibold text-[#0f2a4d]">
+                共 {{ totalCount }} 个文件
+                <span class="font-medium text-[#6f86a6]">（第 {{ currentPage }} / {{ totalPages }} 页）</span>
+              </p>
+              <div class="flex items-center gap-2">
+                <button
+                  class="flex size-8 items-center justify-center rounded-lg border border-[#dbe8f8] bg-white text-[#8aa1c2] shadow-[0_2px_6px_rgba(15,81,159,0.06)] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  :disabled="currentPage <= 1"
+                  title="上一页"
+                  aria-label="上一页"
+                  @click="handlePageChange(currentPage - 1)"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">chevron_left</span>
+                </button>
+                <button
+                  v-for="p in visiblePages"
+                  :key="p"
+                  @click="handlePageChange(p)"
+                  :aria-current="p === currentPage ? 'page' : undefined"
+                  :aria-label="`第 ${p} 页`"
+                  :class="[
+                    'flex size-8 items-center justify-center rounded-lg text-sm font-bold shadow-[0_2px_6px_rgba(15,81,159,0.06)] transition-colors',
+                    p === currentPage
+                      ? 'bg-primary text-white shadow-[0_6px_14px_rgba(22,119,255,0.25)]'
+                      : 'border border-[#dbe8f8] bg-white text-[#284462] hover:bg-slate-50'
+                  ]"
+                >
+                  {{ p }}
+                </button>
+                <button
+                  class="flex size-8 items-center justify-center rounded-lg border border-[#dbe8f8] bg-white text-[#8aa1c2] shadow-[0_2px_6px_rgba(15,81,159,0.06)] transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                  :disabled="currentPage >= totalPages"
+                  title="下一页"
+                  aria-label="下一页"
+                  @click="handlePageChange(currentPage + 1)"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">chevron_right</span>
+                </button>
+              </div>
             </div>
           </div>
           </template>
@@ -619,17 +636,15 @@ import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vu
 import KnowledgeSearchResultPanel from '@/components/knowledge/KnowledgeSearchResultPanel.vue'
 import KnowledgeScriptGeneratorDialog from '@/components/knowledge/KnowledgeScriptGeneratorDialog.vue'
 import KnowledgeUploadDialog from '@/components/knowledge/KnowledgeUploadDialog.vue'
+import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 
 const { isMobile } = useResponsive()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-/** 桌面侧栏折叠，仅 UI */
-const sidebarCollapsed = ref(false)
-const hotSearchTags = ['产品知识库', '销售话术', '售后服务', '入职培训', '客户FAQ']
-const viewMode = ref<'card' | 'list'>(
-  (localStorage.getItem('knowledge-view-mode') as 'card' | 'list') || 'list'
-)
+const DEFAULT_PAGE_SIZE = 10
+const DESKTOP_LIST_PAGE_SIZE = 10
+const viewMode = ref<'card' | 'list'>('list')
 const loading = ref(false)
 const showUploadDialog = ref(false)
 const knowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
@@ -658,20 +673,32 @@ const categories = [
   { id: 'recording', label: '录音文件', icon: 'mic' }
 ]
 
+const fileTypeMenuItems = [
+  { label: '图片', icon: 'image' },
+  { label: '文档', icon: 'description' },
+  { label: '电子表格', icon: 'table_chart' },
+  { label: '演示文稿', icon: 'slideshow' },
+  { label: 'PDF', icon: 'picture_as_pdf' },
+  { label: '音频', icon: 'audio_file' },
+  { label: '视频', icon: 'video_file' }
+]
+
 const queryParams = reactive<KnowledgeQueryBO>({
   page: 1,
-  limit: 12,
+  limit: DEFAULT_PAGE_SIZE,
   keyword: '',
   type: undefined
 })
 
-const totalPages = computed(() => Math.ceil(totalCount.value / (queryParams.limit || 12)))
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / (queryParams.limit || DEFAULT_PAGE_SIZE))))
+const currentPage = computed(() => queryParams.page || 1)
 const showAiSearchResult = computed(() => aiSearchLoading.value || aiSearchResult.value !== null)
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
+const showPagination = computed(() => totalCount.value > (queryParams.limit || DEFAULT_PAGE_SIZE))
 
 const visiblePages = computed(() => {
   const total = totalPages.value
-  const current = queryParams.page || 1
+  const current = currentPage.value
   const pages: number[] = []
   let start = Math.max(1, current - 2)
   const end = Math.min(total, start + 4)
@@ -681,6 +708,7 @@ const visiblePages = computed(() => {
 })
 
 onMounted(async () => {
+  applyKnowledgePageSize()
   await fetchList()
 
   if (typeof route.query.openKnowledgeId === 'string') {
@@ -706,15 +734,37 @@ watch(showAssociateDialog, (visible) => {
   }
 })
 
+watch([isMobile, viewMode], () => {
+  if (!applyKnowledgePageSize() || showAiSearchResult.value) return
+  void fetchList()
+})
+
 async function fetchList() {
   loading.value = true
   try {
     const result = await queryKnowledgeList(queryParams)
     knowledgeList.value = result.list
     totalCount.value = result.totalRow
+    const lastPage = Math.max(1, Math.ceil(totalCount.value / (queryParams.limit || DEFAULT_PAGE_SIZE)))
+    if ((queryParams.page || 1) > lastPage) {
+      queryParams.page = lastPage
+      const fallbackResult = await queryKnowledgeList(queryParams)
+      knowledgeList.value = fallbackResult.list
+      totalCount.value = fallbackResult.totalRow
+    }
   } finally {
     loading.value = false
   }
+}
+
+function applyKnowledgePageSize(): boolean {
+  const nextLimit = !isMobile.value && viewMode.value === 'list'
+    ? DESKTOP_LIST_PAGE_SIZE
+    : DEFAULT_PAGE_SIZE
+  if (queryParams.limit === nextLimit) return false
+  queryParams.limit = nextLimit
+  queryParams.page = 1
+  return true
 }
 
 async function handleSearch() {
@@ -739,11 +789,6 @@ async function handleSearch() {
   }
 }
 
-function handleHotSearch(keyword: string) {
-  queryParams.keyword = keyword
-  void handleSearch()
-}
-
 function handleCategoryFilter(categoryId: string) {
   selectedCategory.value = categoryId
   queryParams.type = categoryId === 'all' ? undefined : categoryId as KnowledgeType
@@ -756,9 +801,10 @@ function handleCategoryFilter(categoryId: string) {
 }
 
 function handlePageChange(page: number) {
-  if (queryParams.page === page) return
-  queryParams.page = page
-  fetchList()
+  const nextPage = Math.min(Math.max(1, page), totalPages.value)
+  if (currentPage.value === nextPage || loading.value) return
+  queryParams.page = nextPage
+  void fetchList()
 }
 
 function onUploadTriggerBeforeUpload(file: File) {
@@ -921,7 +967,6 @@ function resetAiSearchView() {
 
 function setViewMode(mode: 'card' | 'list') {
   viewMode.value = mode
-  localStorage.setItem('knowledge-view-mode', mode)
 }
 
 function getCategoryLabel(): string {
@@ -930,31 +975,12 @@ function getCategoryLabel(): string {
   return cat?.label ?? '推荐知识'
 }
 
-function getTypeIconName(type: string): string {
-  const icons: Record<string, string> = {
-    meeting: 'groups',
-    email: 'mail',
-    recording: 'mic',
-    document: 'description',
-    proposal: 'slideshow',
-    contract: 'gavel'
-  }
-  return icons[type] || 'description'
-}
-
-function getTypeIconBg(type: string): string {
-  const colors: Record<string, string> = {
-    meeting: 'bg-blue-50 text-blue-500',
-    email: 'bg-green-50 text-green-500',
-    recording: 'bg-purple-50 text-purple-500',
-    document: 'bg-red-50 text-red-500',
-    proposal: 'bg-amber-50 text-amber-500',
-    contract: 'bg-slate-100 text-slate-500'
-  }
-  return colors[type] || 'bg-slate-100 text-slate-500'
+function getDesktopCategoryLabel(id: string, label: string): string {
+  return id === 'all' ? '全部' : label
 }
 
 function getTypeTagClass(type: string): string {
+  const normalized = String(type || '').toLowerCase()
   const classes: Record<string, string> = {
     meeting: 'bg-blue-50 text-blue-600',
     email: 'bg-green-50 text-green-600',
@@ -963,10 +989,11 @@ function getTypeTagClass(type: string): string {
     proposal: 'bg-amber-50 text-amber-600',
     contract: 'bg-slate-100 text-slate-600'
   }
-  return classes[type] || 'bg-slate-100 text-slate-600'
+  return classes[normalized] || 'bg-slate-100 text-slate-600'
 }
 
 function getTypeLabel(type: string): string {
+  const normalized = String(type || '').toLowerCase()
   const labels: Record<string, string> = {
     meeting: '会议记录',
     email: '邮件',
@@ -975,7 +1002,7 @@ function getTypeLabel(type: string): string {
     proposal: '方案',
     contract: '合同'
   }
-  return labels[type] || '文档'
+  return labels[normalized] || '文档'
 }
 
 function formatFileSize(bytes?: number | string | null): string {
@@ -1040,5 +1067,23 @@ function getParseStatusLabel(status?: string): string {
 
 :deep(.el-upload) {
   width: 100%;
+}
+
+:deep(.wk-knowledge-desktop-upload),
+:deep(.wk-knowledge-desktop-upload .el-upload) {
+  width: auto;
+}
+
+:deep(.wk-knowledge-file-type-menu) {
+  min-width: 206px;
+  padding: 10px 8px 12px;
+  border-radius: 22px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+}
+
+:deep(.wk-knowledge-file-type-menu .el-dropdown-menu__item) {
+  border-radius: 12px;
+  line-height: 1;
+  padding: 7px 12px;
 }
 </style>

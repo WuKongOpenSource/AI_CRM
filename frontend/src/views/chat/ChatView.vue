@@ -202,7 +202,7 @@
                   class="flex min-w-0 shrink items-center gap-1.5 overflow-hidden"
                 >
                   <span
-                    v-for="tag in selectedCustomer.tags?.slice(0, 3)"
+                    v-for="tag in selectedCustomerVisibleTags"
                     :key="tag.tagId"
                     class="group/tag inline-flex h-6 max-w-[88px] shrink-0 items-center gap-1 rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]"
                     :title="tag.tagName"
@@ -219,12 +219,31 @@
                       <span class="material-symbols-outlined text-[12px] leading-none">close</span>
                     </button>
                   </span>
-                  <span
-                    v-if="(selectedCustomer.tags?.length || 0) > 3"
-                    class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-muted)]"
+                  <el-popover
+                    v-if="selectedCustomerHiddenTags.length > 0"
+                    trigger="hover"
+                    placement="bottom-start"
+                    :width="220"
+                    popper-class="wk-customer-tags-popover"
                   >
-                    +{{ (selectedCustomer.tags?.length || 0) - 3 }}
-                  </span>
+                    <template #reference>
+                      <span
+                        class="inline-flex h-6 shrink-0 cursor-default items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-muted)]"
+                      >
+                        +{{ selectedCustomerHiddenTags.length }}
+                      </span>
+                    </template>
+                    <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+                      <span
+                        v-for="tag in selectedCustomerHiddenTags"
+                        :key="tag.tagId"
+                        class="inline-flex max-w-full items-center rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                        :title="tag.tagName"
+                      >
+                        <span class="truncate">{{ tag.tagName }}</span>
+                      </span>
+                    </div>
+                  </el-popover>
                   <button
                     v-if="canEditSelectedCustomerTags"
                     type="button"
@@ -237,35 +256,46 @@
                   </button>
                 </div>
               </div>
-              <el-dropdown trigger="click" @command="handleCustomerStageCommand">
+              <div class="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
-                  class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold transition-colors"
-                  :class="selectedCustomerStageButtonClass"
+                  class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 text-[12px] font-semibold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
+                  aria-label="基本信息"
+                  @click="showSelectedCustomerBasicInfoDrawer = true"
                 >
-                  <span class="material-symbols-outlined text-[15px] leading-none">
-                    {{ getCustomerStageIcon(selectedCustomer.stage) }}
-                  </span>
-                  <span>{{ selectedCustomerStageText }}</span>
-                  <span class="material-symbols-outlined text-[15px] leading-none">expand_more</span>
+                  <span class="material-symbols-outlined text-[15px] leading-none">description</span>
+                  <span>基本信息</span>
                 </button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item
-                      v-for="stage in CUSTOMER_STAGE_FLOW"
-                      :key="stage.value"
-                      :command="stage.value"
-                    >
-                      <span class="flex items-center gap-2">
-                        <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">
-                          {{ getCustomerStageIcon(stage.value) }}
+                <el-dropdown trigger="click" @command="handleCustomerStageCommand">
+                  <button
+                    type="button"
+                    class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold transition-colors"
+                    :class="selectedCustomerStageButtonClass"
+                  >
+                    <span class="material-symbols-outlined text-[15px] leading-none">
+                      {{ getCustomerStageIcon(selectedCustomer.stage) }}
+                    </span>
+                    <span>{{ selectedCustomerStageText }}</span>
+                    <span class="material-symbols-outlined text-[15px] leading-none">expand_more</span>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        v-for="stage in CUSTOMER_STAGE_FLOW"
+                        :key="stage.value"
+                        :command="stage.value"
+                      >
+                        <span class="flex items-center gap-2">
+                          <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">
+                            {{ getCustomerStageIcon(stage.value) }}
+                          </span>
+                          {{ stage.label }}
                         </span>
-                        {{ stage.label }}
-                      </span>
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </div>
             </div>
             <button
               v-if="showCustomerPanelShell && customerPanelVisible"
@@ -365,7 +395,7 @@
                     <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                       <div
                         class="wk-markdown"
-                        :class="{ 'streaming-cursor': message.isStreaming && message.content.length == 0 }"
+                        :class="{ 'wk-thinking-shimmer': message.isStreaming && message.content.length === 0 }"
                         v-html="renderAssistantMessage(message.content, message.isStreaming)"
                       />
                     </div>
@@ -1250,7 +1280,7 @@
 
               <!-- Quick Action Chips -->
               <div v-if="chatStore.messages.length === 0" class="mt-6 min-h-[88px]">
-                <div v-if="chatStore.selectedAppCode === 'crm'" class="flex flex-wrap gap-2 justify-center" >
+                <!-- <div v-if="chatStore.selectedAppCode === 'crm'" class="flex flex-wrap gap-2 justify-center" >
                   <button
                     v-for="action in quickActions"
                     :key="action.label"
@@ -1259,7 +1289,7 @@
                   >
                     {{ action.label }}
                   </button>
-                </div>
+                </div> -->
               </div>
 
               <p v-if="chatStore.messages.length > 0" class="text-center text-xs text-[#5d5d5d] uppercase " style="margin-top: 10px !important;">内容由AI生成，请核查重要信息</p>
@@ -1390,6 +1420,14 @@
       </template>
     </el-dialog>
 
+    <CustomerBasicInfoDrawer
+      v-model="showSelectedCustomerBasicInfoDrawer"
+      :customer="selectedCustomer"
+      :contacts="selectedCustomerContacts"
+      :custom-fields="[]"
+      @contacts-updated="handleSelectedCustomerContactsUpdated"
+    />
+
     <button
       v-if="showCustomerPanelShell && !customerPanelVisible"
       type="button"
@@ -1420,7 +1458,7 @@
       >
         <span class="absolute left-0 top-1/2 h-10 w-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-[#cfcfcf]"></span>
       </div>
-      <div class="min-h-0 flex-1 overflow-hidden py-4">
+      <div class="min-h-0 flex-1 overflow-hidden pb-4">
         <div v-if="selectedCustomerLoading" class="flex h-full items-center justify-center">
           <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
         </div>
@@ -1432,7 +1470,12 @@
           <p class="mt-1 max-w-[220px] text-xs leading-relaxed text-slate-400">选择后会创建或打开该客户的 CRM 对话，并在这里展示相关资料。</p>
         </div>
         <div v-else class="h-full pr-0">
-          <CustomerDetailView embedded force-mobile :customer-id="selectedCustomer.customerId" />
+          <CustomerDetailView
+            embedded
+            force-mobile
+            :customer-id="selectedCustomer.customerId"
+            @quote-attachment="handleQuoteCustomerAttachment"
+          />
         </div>
       </div>
     </aside>
@@ -1455,6 +1498,7 @@ import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
+import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,
@@ -1478,7 +1522,7 @@ import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
-import type { CustomerDetailVO, CustomerTag } from '@/types/customer'
+import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
@@ -1576,6 +1620,7 @@ const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
 const showSelectedCustomerTagDialog = ref(false)
+const showSelectedCustomerBasicInfoDrawer = ref(false)
 const newSelectedCustomerTagName = ref('')
 const selectedCustomerTagSubmitting = ref(false)
 const customerPanelVisible = ref(true)
@@ -1607,6 +1652,9 @@ const selectedCustomerStageText = computed(() => {
 })
 const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage || 'lead'))
 const canEditSelectedCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
+const selectedCustomerVisibleTags = computed(() => selectedCustomer.value?.tags?.slice(0, 3) || [])
+const selectedCustomerHiddenTags = computed(() => selectedCustomer.value?.tags?.slice(3) || [])
+const selectedCustomerContacts = computed<Contact[]>(() => selectedCustomer.value?.contacts || [])
 const currentSessionCustomerId = computed(() => {
   const customerId = chatStore.currentSession?.customerId
   return customerId ? String(customerId) : ''
@@ -2633,6 +2681,23 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
+function handleQuoteCustomerAttachment(payload: { followUp: FollowUp; attachment: FollowUpAttachment }) {
+  const fileName = payload.attachment.fileName || '附件'
+  const time = formatAttachmentQuoteTime(payload.attachment.analysisTime || payload.followUp.followTime || payload.followUp.createTime)
+  const quoteText = `引用附件：${fileName}${time ? `（${time}）` : ''}`
+  inputText.value = inputText.value.trim()
+    ? `${inputText.value.trimEnd()}\n${quoteText}`
+    : quoteText
+  focusChatTextarea()
+}
+
+function formatAttachmentQuoteTime(value?: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value.replace('T', ' ').slice(0, 16)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
 function shouldShowModelMultiplier(option: ChatModelOption): boolean {
   return option.modelSource !== 'custom'
 }
@@ -3110,6 +3175,14 @@ async function handleRemoveSelectedCustomerTag(tag: CustomerTag) {
   }
 }
 
+function handleSelectedCustomerContactsUpdated(contacts: Contact[]) {
+  if (!selectedCustomer.value) return
+  selectedCustomer.value = {
+    ...selectedCustomer.value,
+    contacts
+  }
+}
+
 function _formatTime(date: Date): string {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
@@ -3119,6 +3192,8 @@ function _formatTime(date: Date): string {
 
 void _getAssistantMessageStatus
 void _formatTime
+void quickActions
+void sendQuickMessage
 
 </script>
 
@@ -3141,7 +3216,7 @@ void _formatTime
 
 .wk-chat-messages {
   --wk-chat-messages-scrollbar-offset: 0px;
-  background: var(--wk-bg-page);
+  /* background: var(--wk-bg-page); */
   overflow-x: hidden;
 }
 
@@ -3304,30 +3379,6 @@ void _formatTime
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-/* Streaming cursor */
-.streaming-cursor::after {
-  content: '';
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  margin-left: 6px;
-  border-radius: 9999px;
-  background: var(--wk-accent);
-  transform-origin: center;
-  animation: breathingDot 1.2s ease-in-out infinite;
-}
-
-@keyframes breathingDot {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.35;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
   }
 }
 

@@ -3,7 +3,7 @@
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 dark:border-slate-700 dark:bg-slate-900 dark:shadow-black/20">
       <div class="mb-3 flex items-center justify-between gap-3">
         <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">AI 积分</p>
-        <span class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold" :class="aiStatusBadgeClass">
+        <span v-if="showAiStatusBadge" class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold" :class="aiStatusBadgeClass">
           {{ aiStatusBadgeText }}
         </span>
       </div>
@@ -62,6 +62,7 @@
     <div class="mb-3 flex min-w-0 items-start justify-between gap-2">
       <p class="min-w-0 flex-1 text-sm font-bold leading-snug text-slate-900 dark:text-slate-100">AI 积分额度</p>
       <span
+        v-if="showAiStatusBadge"
         class="inline-flex max-w-[45%] shrink-0 items-center justify-center truncate rounded-full px-2 py-0.5 text-[11px] font-bold"
         :class="popoverBadgeClass"
       >
@@ -154,4 +155,6 @@ const popoverBadgeClass = computed(() => {
   }
   return aiStatusBadgeClass.value
 })
+
+const showAiStatusBadge = computed(() => currentAiMode.value !== 'gift' || giftCreditRemaining.value > 0)
 </script>

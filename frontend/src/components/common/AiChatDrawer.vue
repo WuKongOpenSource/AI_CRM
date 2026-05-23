@@ -139,7 +139,7 @@
                     <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-3 inline-block max-w-full text-left text-sm leading-relaxed border border-slate-100">
                       <div
                         class="wk-markdown"
-                        :class="{ 'streaming-cursor': message.isStreaming }"
+                        :class="{ 'wk-thinking-shimmer': message.isStreaming && message.content.length === 0 }"
                         v-html="renderAssistantMessage(message.content, message.isStreaming)"
                       />
                     </div>
@@ -669,15 +669,4 @@ function formatTime(date: Date): string {
   }
 }
 
-/* Streaming cursor */
-.streaming-cursor::after {
-  content: '▊';
-  animation: blink 1s infinite;
-  margin-left: 2px;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
 </style>

@@ -99,7 +99,47 @@
       </span>
     </div>
 
-    <div v-if="attachments.length > 0" class="mt-3 rounded-2xl border border-slate-200 overflow-hidden">
+    <div v-if="attachments.length > 0 && compact" class="mt-3 space-y-2">
+      <div
+        v-for="attachment in attachments"
+        :key="attachment.attachmentId"
+        class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2"
+      >
+        <div class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-primary">
+          <span class="material-symbols-outlined text-[18px] leading-none">{{ getAttachmentIcon(attachment) }}</span>
+        </div>
+        <button
+          type="button"
+          class="min-w-0 flex-1 text-left"
+          @click="handlePreview(attachment)"
+        >
+          <p class="truncate text-xs font-semibold leading-5 text-slate-900">{{ attachment.fileName }}</p>
+          <p class="truncate text-[11px] leading-4 text-slate-400">
+            {{ getAttachmentTypeLabel(attachment) }} · {{ formatAttachmentTime(attachment) }}
+          </p>
+        </button>
+        <button
+          type="button"
+          class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-primary/10 hover:text-primary"
+          title="引用到对话框"
+          aria-label="引用到对话框"
+          @click.stop="emit('attachment-quote', attachment)"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">format_quote</span>
+        </button>
+        <button
+          type="button"
+          class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-50 hover:text-primary"
+          title="下载附件"
+          aria-label="下载附件"
+          @click.stop="handleDownload(attachment)"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">download</span>
+        </button>
+      </div>
+    </div>
+
+    <div v-else-if="attachments.length > 0" class="mt-3 rounded-2xl border border-slate-200 overflow-hidden">
       <div
         v-for="attachment in attachments"
         :key="attachment.attachmentId"
@@ -286,11 +326,12 @@ const props = withDefaults(defineProps<{
   compact: false
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'edit', value: FollowUp): void
   (e: 'delete', value: string): void
   (e: 'task-click', value: FollowUpTask): void
   (e: 'task-toggle-complete', value: FollowUpTask): void
+  (e: 'attachment-quote', value: FollowUpAttachment): void
 }>()
 
 const attachments = ref<FollowUpAttachment[]>([])
@@ -318,6 +359,7 @@ onBeforeUnmount(() => {
 
 async function loadImagePreviews() {
   clearPreviewUrls()
+  if (props.compact) return
   for (const attachment of attachments.value) {
     if (!isImageAttachment(attachment)) continue
     try {
@@ -406,6 +448,20 @@ function getAttachmentIcon(attachment: FollowUpAttachment): string {
   return 'attach_file'
 }
 
+function getAttachmentTypeLabel(attachment: FollowUpAttachment): string {
+  if (isImageAttachment(attachment)) return '图片'
+  const mime = String(attachment.mimeType || '')
+  const fileName = String(attachment.fileName || '').toLowerCase()
+  if (mime.startsWith('audio/') || /\.(mp3|wav|m4a|aac|webm|ogg)$/.test(fileName)) return '音频'
+  if (mime.includes('pdf') || fileName.endsWith('.pdf')) return 'PDF'
+  if (mime.includes('word') || /\.(doc|docx)$/.test(fileName)) return 'Word'
+  if (mime.includes('excel') || /\.(xls|xlsx)$/.test(fileName)) return 'Excel'
+  if (mime.includes('csv') || fileName.endsWith('.csv')) return 'CSV'
+  if (mime.includes('markdown') || /\.(md|markdown)$/.test(fileName)) return 'Markdown'
+  if (mime.startsWith('text/') || /\.(txt|log)$/.test(fileName)) return '文本'
+  return '附件'
+}
+
 function isTaskCompleted(task: FollowUpTask): boolean {
   return String(task.status || '').toLowerCase() === 'completed'
 }
@@ -413,6 +469,10 @@ function isTaskCompleted(task: FollowUpTask): boolean {
 function formatDateTime(value?: string): string {
   if (!value) return '--'
   return value.replace('T', ' ').slice(0, 16)
+}
+
+function formatAttachmentTime(attachment: FollowUpAttachment): string {
+  return formatDateTime(attachment.analysisTime || props.item.followTime || props.item.createTime)
 }
 
 function formatFileSize(size?: number): string {

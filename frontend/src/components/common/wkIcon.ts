@@ -22,6 +22,7 @@ export const wkIconNames = [
   'task-1',
   'copy',
   'file',
+  'search',
 ] as const
 
 export type WkIconName = (typeof wkIconNames)[number]
@@ -50,4 +51,5 @@ export const wkIconClassMap = {
   'task-1': 'task-1',
   'copy': 'copy',
   'file': 'file',
+  'search': 'search',
 } as const satisfies Record<WkIconName, string>
