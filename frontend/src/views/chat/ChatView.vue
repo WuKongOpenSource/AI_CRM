@@ -2503,12 +2503,17 @@ async function handleSend() {
   await nextTick()
   focusChatTextarea()
   await sendPromise
-  await refreshCurrentSessionCustomerContextAfterSend()
+  await refreshCrmContextAfterSend(effectiveAppCode)
 }
 
-async function refreshCurrentSessionCustomerContextAfterSend() {
+async function refreshCrmContextAfterSend(effectiveAppCode: string) {
+  if (effectiveAppCode !== 'crm') return
+
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat' })
+
   const customerId = currentSessionCustomerId.value
   if (!customerId) return
+  appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, { customerId, source: 'chat' })
   await ensureSelectedCustomerDetail(customerId)
 }
 

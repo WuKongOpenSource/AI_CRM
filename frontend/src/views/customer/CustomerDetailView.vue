@@ -1445,6 +1445,11 @@ const emit = defineEmits<{
   (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
 }>()
 
+type CustomerDetailRefreshPayload = {
+  customerId?: string | number
+  source?: string
+}
+
 const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
 const embedded = computed(() => props.embedded)
 const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
@@ -1910,56 +1915,83 @@ watch(showAddFollowUpDialog, (visible) => {
   }
 })
 
+async function refreshCustomerDetailModules(
+  customerId: string,
+  options: { resetRelatedPages?: boolean } = {}
+) {
+  const resetRelatedPages = Boolean(options.resetRelatedPages)
+  const fetchTasks: Promise<any>[] = [
+    customerStore.fetchCustomerDetail(customerId).catch(err => {
+      console.error('Failed to fetch customer detail:', err)
+    })
+  ]
+
+  if (canViewFollowUps.value) {
+    fetchTasks.push(fetchFollowUps(customerId, resetRelatedPages))
+  } else {
+    followUps.value = []
+    followUpTotal.value = 0
+  }
+
+  if (canViewContacts.value) {
+    fetchTasks.push(fetchContacts(customerId, resetRelatedPages))
+  } else {
+    contacts.value = []
+    contactTotal.value = 0
+  }
+
+  if (canViewKnowledge.value) {
+    fetchTasks.push(fetchCustomerKnowledge(customerId))
+  } else {
+    customerKnowledgeList.value = []
+  }
+
+  if (canViewSchedules.value) {
+    fetchTasks.push(fetchCustomerSchedules(customerId, resetRelatedPages))
+  } else {
+    customerSchedules.value = []
+    scheduleTotal.value = 0
+  }
+
+  await Promise.all(fetchTasks)
+}
+
 async function loadCustomerDetailPage() {
   const customerId = activeCustomerId.value
-  if (customerId) {
-    loading.value = true
+  if (!customerId) return
 
-    const fetchTasks: Promise<any>[] = [
-      customerStore.fetchCustomerDetail(customerId).catch(err => {
-        console.error('Failed to fetch customer detail:', err)
-      }),
+  loading.value = true
+  try {
+    await Promise.all([
+      refreshCustomerDetailModules(customerId),
       getEnabledFieldsByEntity('customer').then(data => {
         customFields.value = data.filter(field => field.fieldSource !== 'system')
       }).catch(err => {
         console.error('Failed to fetch custom fields:', err)
         customFields.value = []
       })
-    ]
-
-    if (canViewFollowUps.value) {
-      fetchTasks.push(fetchFollowUps(customerId))
-    } else {
-      followUps.value = []
-      followUpTotal.value = 0
-    }
-
-    if (canViewContacts.value) {
-      fetchTasks.push(fetchContacts(customerId))
-    } else {
-      contacts.value = []
-      contactTotal.value = 0
-    }
-
-    if (canViewKnowledge.value) {
-      fetchTasks.push(fetchCustomerKnowledge(customerId))
-    } else {
-      customerKnowledgeList.value = []
-    }
-
-    if (canViewSchedules.value) {
-      fetchTasks.push(fetchCustomerSchedules(customerId))
-    } else {
-      customerSchedules.value = []
-      scheduleTotal.value = 0
-    }
-
-    await Promise.all(fetchTasks)
+    ])
+  } finally {
     loading.value = false
   }
 }
 
-onMounted(loadCustomerDetailPage)
+function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
+  const customerId = payload?.customerId ? String(payload.customerId) : ''
+  if (!customerId || customerId !== String(activeCustomerId.value)) return
+
+  void refreshCustomerDetailModules(customerId, { resetRelatedPages: true })
+}
+
+let offCustomerDetailRefresh: (() => void) | null = null
+
+onMounted(() => {
+  void loadCustomerDetailPage()
+  offCustomerDetailRefresh = appEvents.on<CustomerDetailRefreshPayload>(
+    APP_EVENT.CUSTOMER_DETAIL_REFRESH,
+    handleCustomerDetailRefresh
+  )
+})
 
 watch(activeCustomerId, () => {
   void loadCustomerDetailPage()
@@ -1989,6 +2021,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  offCustomerDetailRefresh?.()
+  offCustomerDetailRefresh = null
   clearAiAnalysisPolling()
 })
 
