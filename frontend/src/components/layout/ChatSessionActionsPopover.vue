@@ -26,11 +26,15 @@
           >more_horiz</span>
         </template>
         <div class="wk-chat-session-menu">
+          <button type="button" class="wk-chat-session-menu__item" @click="onPin">
+            <span class="material-symbols-outlined wk-chat-session-menu__icon">vertical_align_top</span>
+            <span class="wk-chat-session-menu__label">置顶</span>
+          </button>
           <!-- <button type="button" class="wk-chat-session-menu__item" @click="menuVisible = false; emit('share', session)">
             <span class="material-symbols-outlined wk-chat-session-menu__icon">upload</span>
             <span class="wk-chat-session-menu__label">分享</span>
           </button> -->
-          <!-- <div class="wk-chat-session-menu__divider" role="separator" /> -->
+          <div class="wk-chat-session-menu__divider" role="separator" />
           <button type="button" class="wk-chat-session-menu__item wk-chat-session-menu__item--danger" @click="onDelete">
             <span class="material-symbols-outlined wk-chat-session-menu__icon">delete</span>
             <span class="wk-chat-session-menu__label">删除</span>
@@ -74,6 +78,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   share: [session: ChatSession]
+  pin: [session: ChatSession]
   delete: [sessionId: string]
 }>()
 
@@ -86,6 +91,11 @@ const visibilityClass = computed(() =>
     ? 'pointer-events-auto opacity-100'
     : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'
 )
+
+function onPin() {
+  menuVisible.value = false
+  emit('pin', props.session)
+}
 
 function onDelete() {
   menuVisible.value = false

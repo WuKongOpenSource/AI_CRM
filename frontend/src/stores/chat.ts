@@ -30,13 +30,19 @@ interface StreamingTask {
   abortController: AbortController
 }
 
+interface PendingNewSessionDraft {
+  title?: string
+  agentId?: string
+  customerId?: string
+  appCode: string
+}
+
 export const useChatStore = defineStore('chat', () => {
   const MODEL_STORAGE_KEY = 'wk_ai_crm:chat_selected_model:v1'
   /** Per-session UI app selection (follows conversation across switches / refresh). */
   const SESSION_APP_BY_ID_STORAGE_KEY = 'wk_ai_crm:chat_session_app_by_id:v1'
   /** Unsent composer text per session (survives refresh). */
   const COMPOSER_DRAFT_BY_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_composer_draft_by_session:v1'
-  const DRAFT_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_draft_session_id:v1'
   const GENERAL_APP_CODE = 'general'
   const CRM_APP_CODE = 'crm'
   const KNOWLEDGE_APP_CODE = 'knowledge'
@@ -89,51 +95,8 @@ export const useChatStore = defineStore('chat', () => {
   function requestComposerFocus() {
     composerFocusNonce.value += 1
   }
-  // Tracks the last "new session" that is still empty (draft).
-  // Used to avoid creating multiple empty sessions by repeated clicks.
-  // Persisted so refresh / new tab still treats the same empty session as draft.
-  const draftSessionId = ref<string | null>(loadDraftSessionIdFromStorage())
-
-  function loadDraftSessionIdFromStorage(): string | null {
-    try {
-      const v = localStorage.getItem(DRAFT_SESSION_STORAGE_KEY)
-      return v && v.length > 0 ? v : null
-    } catch {
-      return null
-    }
-  }
-
-  function persistDraftSessionId(id: string | null) {
-    try {
-      if (id) localStorage.setItem(DRAFT_SESSION_STORAGE_KEY, id)
-      else localStorage.removeItem(DRAFT_SESSION_STORAGE_KEY)
-    } catch {
-      // ignore storage failures
-    }
-  }
-
-  function setDraftSessionId(id: string | null) {
-    draftSessionId.value = id
-    persistDraftSessionId(id)
-  }
-
-  async function reconcileDraftSessionAfterFetch() {
-    const id = draftSessionId.value
-    if (!id) return
-    const exists = sessions.value.some(s => s.sessionId === id)
-    if (!exists) {
-      setDraftSessionId(null)
-      return
-    }
-    try {
-      const dbMessages = await getMessageList(id)
-      if (dbMessages.length > 0) {
-        setDraftSessionId(null)
-      }
-    } catch {
-      setDraftSessionId(null)
-    }
-  }
+  const pendingNewSessionDraft = ref<PendingNewSessionDraft | null>(null)
+  const isNewSessionPending = computed(() => pendingNewSessionDraft.value !== null)
   const messagesBySessionId = ref<Record<string, LocalMessage[]>>({})
   const streamingTasks = ref<Record<string, StreamingTask>>({})
   const loading = ref(false)
@@ -180,7 +143,6 @@ export const useChatStore = defineStore('chat', () => {
     sessionsLoading.value = true
     try {
       sessions.value = await getSessionList()
-      await reconcileDraftSessionAfterFetch()
     } finally {
       sessionsLoading.value = false
     }
@@ -224,12 +186,29 @@ export const useChatStore = defineStore('chat', () => {
   ): Promise<string> {
     const normalizedAppCode = normalizeAppCode(appCode)
     const sessionId = await createSession({ title, agentId, customerId, appCode: normalizedAppCode })
+    pendingNewSessionDraft.value = null
     setSessionMessages(sessionId, [])
     await fetchSessions()
     currentSessionId.value = sessionId
     setSelectedAppCode(normalizedAppCode)
-    setDraftSessionId(sessionId)
     return sessionId
+  }
+
+  function beginNewSessionDraft(
+    title?: string,
+    agentId?: string,
+    customerId?: string,
+    appCode: string = GENERAL_APP_CODE
+  ) {
+    const normalizedAppCode = normalizeAppCode(appCode)
+    currentSessionId.value = null
+    pendingNewSessionDraft.value = {
+      title,
+      agentId,
+      customerId,
+      appCode: normalizedAppCode
+    }
+    selectedAppCode.value = normalizedAppCode
   }
 
   async function startNewSessionIfNeeded(
@@ -237,47 +216,12 @@ export const useChatStore = defineStore('chat', () => {
     agentId?: string,
     customerId?: string,
     appCode: string = GENERAL_APP_CODE
-  ): Promise<string> {
-    const normalizedAppCode = normalizeAppCode(appCode)
-    const id = draftSessionId.value
-    if (id) {
-      if (sessions.value.length === 0 && !sessionsLoading.value) {
-        await fetchSessions()
-      }
-      const draftSession = sessions.value.find(s => s.sessionId === id)
-      if (!draftSession) {
-        setDraftSessionId(null)
-        return await startNewSession(title, agentId, customerId, normalizedAppCode)
-      }
-      const draftCustomerId = draftSession?.customerId ? String(draftSession.customerId) : ''
-      const requestCustomerId = customerId ? String(customerId) : ''
-      const draftAgentId = draftSession?.agentId ? String(draftSession.agentId) : ''
-      const requestAgentId = agentId ? String(agentId) : ''
-      const draftAppCode = normalizeAppCode(draftSession?.appCode || sessionAppCodeBySessionId.value[id])
-      if (
-        draftSession &&
-        (draftCustomerId !== requestCustomerId || draftAgentId !== requestAgentId || draftAppCode !== normalizedAppCode)
-      ) {
-        setDraftSessionId(null)
-        return await startNewSession(title, agentId, customerId, normalizedAppCode)
-      }
-      if (!streamingTasks.value[id]) {
-        let msgs = messagesBySessionId.value[id] || []
-        if (msgs.length === 0) {
-          await selectSession(id)
-          msgs = messagesBySessionId.value[id] || []
-        }
-        if (msgs.length === 0 && !streamingTasks.value[id]) {
-          setSelectedAppCode(normalizedAppCode)
-          return id
-        }
-      }
-      setDraftSessionId(null)
-    }
-    return await startNewSession(title, agentId, customerId, normalizedAppCode)
+  ): Promise<void> {
+    beginNewSessionDraft(title, agentId, customerId, appCode)
   }
 
   async function selectSession(sessionId: string) {
+    pendingNewSessionDraft.value = null
     currentSessionId.value = sessionId
     const session = sessions.value.find(s => s.sessionId === sessionId)
     const fromMap = sessionAppCodeBySessionId.value[sessionId]
@@ -330,9 +274,6 @@ export const useChatStore = defineStore('chat', () => {
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = null
     }
-    if (draftSessionId.value === sessionId) {
-      setDraftSessionId(null)
-    }
   }
 
   async function sendMessage(
@@ -343,13 +284,7 @@ export const useChatStore = defineStore('chat', () => {
     knowledgeIds?: string[]
   ): Promise<void> {
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag, knowledgeIds)
-    if (!currentSessionId.value) {
-      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
-    } else {
-      setSelectedAppCode(effectiveAppCode)
-    }
-
-    const sessionId = currentSessionId.value!
+    const sessionId = await ensureSessionForSend(effectiveAppCode)
     // Allow other sessions to stream concurrently; only block double-send on this session.
     if (streamingTasks.value[sessionId]) return
 
@@ -363,9 +298,6 @@ export const useChatStore = defineStore('chat', () => {
       timestamp: new Date(),
       attachments: attachmentVOs
     })
-    if (draftSessionId.value === sessionId) {
-      setDraftSessionId(null)
-    }
 
     appendSessionMessage(sessionId, {
       id: assistantMessageId,
@@ -424,13 +356,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function sendMessageWithSync(content: string, appCodeOrUseRag?: string | boolean): Promise<string> {
     const effectiveAppCode = resolveEffectiveAppCode(appCodeOrUseRag)
-    if (!currentSessionId.value) {
-      await startNewSession(undefined, undefined, undefined, effectiveAppCode)
-    } else {
-      setSelectedAppCode(effectiveAppCode)
-    }
-
-    const sessionId = currentSessionId.value!
+    const sessionId = await ensureSessionForSend(effectiveAppCode)
 
     if (streamingTasks.value[sessionId]) {
       return ''
@@ -475,6 +401,7 @@ export const useChatStore = defineStore('chat', () => {
       setSessionMessages(sessionId, [])
     }
     currentSessionId.value = null
+    pendingNewSessionDraft.value = null
   }
 
   function setRagEnabled(value: boolean) {
@@ -571,6 +498,12 @@ export const useChatStore = defineStore('chat', () => {
   function setSelectedAppCode(value: string) {
     const normalized = normalizeAppCode(value)
     selectedAppCode.value = normalized
+    if (pendingNewSessionDraft.value) {
+      pendingNewSessionDraft.value = {
+        ...pendingNewSessionDraft.value,
+        appCode: normalized
+      }
+    }
     const sid = currentSessionId.value
     if (sid) {
       assignSessionAppCode(sid, normalized)
@@ -695,6 +628,23 @@ export const useChatStore = defineStore('chat', () => {
     return normalizeAppCode(selectedAppCode.value)
   }
 
+  async function ensureSessionForSend(effectiveAppCode: string): Promise<string> {
+    const normalizedAppCode = normalizeAppCode(effectiveAppCode)
+    if (!currentSessionId.value) {
+      const draft = pendingNewSessionDraft.value
+      return await startNewSession(
+        draft?.title,
+        draft?.agentId,
+        draft?.customerId,
+        normalizedAppCode || draft?.appCode || GENERAL_APP_CODE
+      )
+    }
+
+    pendingNewSessionDraft.value = null
+    setSelectedAppCode(normalizedAppCode)
+    return currentSessionId.value
+  }
+
   function normalizeAppCode(appCode?: string): string {
     const code = (appCode || GENERAL_APP_CODE).trim().toLowerCase()
     const knownCodes = appOptions.value.map(option => option.code)
@@ -719,6 +669,7 @@ export const useChatStore = defineStore('chat', () => {
   return {
     sessions,
     currentSessionId,
+    isNewSessionPending,
     composerFocusNonce,
     requestComposerFocus,
     messages,
@@ -744,6 +695,7 @@ export const useChatStore = defineStore('chat', () => {
     fetchModelOptions,
     fetchAppOptions,
     startNewSession,
+    beginNewSessionDraft,
     startNewSessionIfNeeded,
     selectSession,
     openCustomerChat,

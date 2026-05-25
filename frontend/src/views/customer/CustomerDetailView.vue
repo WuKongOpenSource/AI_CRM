@@ -116,10 +116,20 @@
                           <span
                             v-for="tag in customerHiddenTags"
                             :key="tag.tagId"
-                            class="inline-flex max-w-full items-center rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                            class="group/tag inline-flex max-w-full items-center gap-1 rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
                             :title="tag.tagName"
                           >
-                            <span class="truncate">{{ tag.tagName }}</span>
+                            <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                            <button
+                              v-if="canEditCustomerTags"
+                              type="button"
+                              class="inline-flex shrink-0 text-slate-400 transition-colors hover:text-red-500"
+                              title="删除标签"
+                              aria-label="删除标签"
+                              @click.stop="handleRemoveTag(tag)"
+                            >
+                              <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                            </button>
                           </span>
                         </div>
                       </el-popover>
@@ -1280,6 +1290,7 @@
       :custom-fields="customFields"
       :latest-ai-report="latestAiReport"
       @contacts-updated="onBasicInfoContactsUpdated"
+      @edit="handleBasicInfoEdit"
     />
 
     <!-- Edit Customer Dialog -->
@@ -2233,6 +2244,11 @@ function formatScheduleEndTime(startDateStr?: string, endDateStr?: string) {
 function handleEdit() {
   if (!canEditCustomer.value) return
   showEditDialog.value = true
+}
+
+function handleBasicInfoEdit() {
+  showBasicInfoDrawer.value = false
+  handleEdit()
 }
 
 async function loadTransferUserList() {

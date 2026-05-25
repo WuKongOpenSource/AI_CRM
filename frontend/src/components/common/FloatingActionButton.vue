@@ -14,9 +14,12 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useChatDrawer } from '@/composables/useChatDrawer'
+import { useRoute, useRouter } from 'vue-router'
+import { useChatStore } from '@/stores/chat'
 
-const { openChatDrawer } = useChatDrawer()
+const route = useRoute()
+const router = useRouter()
+const chatStore = useChatStore()
 
 type Point = { x: number; y: number }
 
@@ -76,9 +79,24 @@ const buttonStyle = computed(() => {
   return { left: `${pos.x}px`, top: `${pos.y}px` }
 })
 
-function handleClick() {
+async function handleClick() {
   if (draggedDuringPointer.value) return
-  openChatDrawer()
+  const detailCustomerId = resolveCustomerDetailId()
+  if (detailCustomerId) {
+    await router.push({ path: '/chat', query: { customerId: detailCustomerId } })
+    chatStore.requestComposerFocus()
+    return
+  }
+
+  chatStore.beginNewSessionDraft('新对话', undefined, undefined, 'crm')
+  await router.push({ path: '/chat' })
+  chatStore.requestComposerFocus()
+}
+
+function resolveCustomerDetailId(): string {
+  if (route.name !== 'CustomerDetail') return ''
+  const raw = route.params.id
+  return String(Array.isArray(raw) ? raw[0] || '' : raw || '')
 }
 
 function handlePointerDown(e: PointerEvent) {

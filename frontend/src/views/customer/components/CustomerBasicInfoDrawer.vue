@@ -19,13 +19,26 @@
             <p class="truncate text-xs text-slate-400">{{ drawerSubtitle }}</p>
           </div>
         </div>
-        <button
-          type="button"
-          class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
-          @click="$emit('update:modelValue', false)"
-        >
-          <span class="material-symbols-outlined text-[18px] leading-none">close</span>
-        </button>
+        <div class="flex shrink-0 items-center gap-1">
+          <button
+            v-if="canEditCustomer"
+            type="button"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
+            title="编辑客户"
+            aria-label="编辑客户"
+            @click="$emit('edit')"
+          >
+            <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+          </button>
+          <button
+            type="button"
+            class="flex size-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+            aria-label="关闭"
+            @click="$emit('update:modelValue', false)"
+          >
+            <span class="material-symbols-outlined text-[18px] leading-none">close</span>
+          </button>
+        </div>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
@@ -254,6 +267,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [open: boolean]
   contactsUpdated: [contacts: Contact[]]
+  edit: []
 }>()
 
 const { isMobile } = useResponsive()

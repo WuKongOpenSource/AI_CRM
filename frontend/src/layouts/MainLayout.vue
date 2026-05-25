@@ -86,10 +86,13 @@
       <!-- Chat: New session (fixed, not scroll with nav) -->
       <div class="px-3 pt-1 mb-[0px] pr-[10px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
         <button
-          class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors hover:bg-[#f9f9f9]"
-          :class="primarySidebarContentCollapsed
-            ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
-            : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] w-[248px]'"
+          class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors"
+          :class="[
+            chatStore.isNewSessionPending && route.path.startsWith('/chat') ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]',
+            primarySidebarContentCollapsed
+              ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
+              : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] max-w-[248px]',
+          ]"
           :title="primarySidebarContentCollapsed ? '新对话' : undefined"
           @click="handleNewSession"
         >
@@ -127,7 +130,7 @@
               :key="item.key"
               :title="primarySidebarContentCollapsed ? item.label : undefined"
               @click="handlePrimaryNavClick(item)"
-              class="flex items-center rounded-lg pt-[8px] pb-[8px] transition-colors"
+              class="flex items-center rounded-lg pt-[8px] pb-[8px] transition-colors mt-[1px]"
               :class="[
                 isPrimaryActive(item) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] hover:bg-[#f9f9f9]',
                 primarySidebarContentCollapsed
@@ -200,6 +203,7 @@
                     <ChatSessionActionsPopover
                       :session="session"
                       :active="isSessionActive(session.sessionId)"
+                      @pin="handlePinChatSession"
                       @share="handleShareChatSession"
                       @delete="handleDeleteSession"
                     />
@@ -369,6 +373,7 @@
                     <ChatSessionActionsPopover
                       :session="session"
                       :active="isSessionActive(session.sessionId)"
+                      @pin="handlePinChatSession"
                       @share="handleShareChatSession"
                       @delete="handleDeleteSession"
                     />
@@ -1841,15 +1846,16 @@ async function handleNewSession() {
   await router.push('/chat')
   // HMR can keep an old store instance; fall back to legacy behavior if method missing.
   const api = chatStore as unknown as {
-    startNewSessionIfNeeded?: (title?: string) => Promise<string>
+    beginNewSessionDraft?: (title?: string) => void
+    startNewSessionIfNeeded?: (title?: string) => Promise<unknown>
     clearMessages?: () => void
-    startNewSession?: (title?: string) => Promise<string>
   }
-  if (api.startNewSessionIfNeeded) {
+  if (api.beginNewSessionDraft) {
+    api.beginNewSessionDraft('新对话')
+  } else if (api.startNewSessionIfNeeded) {
     await api.startNewSessionIfNeeded('新对话')
   } else {
     api.clearMessages?.()
-    await api.startNewSession?.('新对话')
   }
   chatStore.requestComposerFocus()
 }
@@ -1964,6 +1970,10 @@ async function handleDeleteSession(sessionId: string) {
   } catch {
     // User cancelled
   }
+}
+
+function handlePinChatSession(_session: ChatSession) {
+  // Reserved for the future pin-session API.
 }
 
 async function handleShareChatSession(session: ChatSession) {

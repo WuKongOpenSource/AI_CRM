@@ -237,10 +237,20 @@
                       <span
                         v-for="tag in selectedCustomerHiddenTags"
                         :key="tag.tagId"
-                        class="inline-flex max-w-full items-center rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                        class="group/tag inline-flex max-w-full items-center gap-1 rounded-lg bg-[#f4f4f4] px-2 py-1 text-[12px] font-medium text-[#5f5f5f]"
                         :title="tag.tagName"
                       >
-                        <span class="truncate">{{ tag.tagName }}</span>
+                        <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                        <button
+                          v-if="canEditSelectedCustomerTags"
+                          type="button"
+                          class="inline-flex shrink-0 text-slate-400 transition-colors hover:text-red-500"
+                          title="删除标签"
+                          aria-label="删除标签"
+                          @click.stop="handleRemoveSelectedCustomerTag(tag)"
+                        >
+                          <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                        </button>
                       </span>
                     </div>
                   </el-popover>
@@ -1025,7 +1035,15 @@
                         />
                         <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                         <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
-                        <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                        <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
+                          <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
+                          <span class="wk-recording-indicator__bars">
+                            <span />
+                            <span />
+                            <span />
+                            <span />
+                          </span>
+                        </span>
                         <WkIcon
                           v-else-if="isChatInputEmpty"
                           name="voice"
@@ -1259,7 +1277,15 @@
                       />
                       <span v-else-if="isUploading" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
                       <span v-else-if="isTranscribing" class="material-symbols-outlined text-[20px] leading-none animate-spin">progress_activity</span>
-                      <span v-else-if="isRecording" class="material-symbols-outlined text-[20px] leading-none">stop</span>
+                      <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
+                        <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
+                        <span class="wk-recording-indicator__bars">
+                          <span />
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      </span>
                       <WkIcon
                         v-else-if="isChatInputEmpty"
                         name="voice"
@@ -1427,6 +1453,14 @@
       :contacts="selectedCustomerContacts"
       :custom-fields="[]"
       @contacts-updated="handleSelectedCustomerContactsUpdated"
+      @edit="handleSelectedCustomerBasicInfoEdit"
+    />
+
+    <CustomerUpsertDialog
+      v-model="showSelectedCustomerEditDialog"
+      mode="edit"
+      :customer="selectedCustomer"
+      @success="handleSelectedCustomerEditSuccess"
     />
 
     <button
@@ -1500,6 +1534,7 @@ import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
+import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,
@@ -1622,6 +1657,7 @@ const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
 const showSelectedCustomerTagDialog = ref(false)
 const showSelectedCustomerBasicInfoDrawer = ref(false)
+const showSelectedCustomerEditDialog = ref(false)
 const newSelectedCustomerTagName = ref('')
 const selectedCustomerTagSubmitting = ref(false)
 const customerPanelVisible = ref(true)
@@ -3008,7 +3044,7 @@ async function handleNewSession() {
   if (route.query.customerId || route.query.sessionId) {
     await router.replace({ path: '/chat' })
   }
-  await chatStore.startNewSessionIfNeeded('新对话')
+  chatStore.beginNewSessionDraft('新对话')
   currentView.value = 'chat'
   if (isMobile.value) {
     mobilePanel.value = 'chat'
@@ -3184,6 +3220,22 @@ function handleSelectedCustomerContactsUpdated(contacts: Contact[]) {
   }
 }
 
+function handleSelectedCustomerBasicInfoEdit() {
+  if (!canEditSelectedCustomerTags.value || !selectedCustomer.value) return
+  showSelectedCustomerBasicInfoDrawer.value = false
+  showSelectedCustomerEditDialog.value = true
+}
+
+async function handleSelectedCustomerEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
+  if (payload.mode !== 'edit') return
+  const customerId = payload.customerId || selectedCustomer.value?.customerId || selectedCustomerId.value
+  if (customerId) {
+    await ensureSelectedCustomerDetail(String(customerId))
+  }
+  await chatStore.fetchSessions()
+  appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+}
+
 function _formatTime(date: Date): string {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
@@ -3249,6 +3301,90 @@ void sendQuickMessage
   box-shadow:
     0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
     0 0 0 1px rgba(31, 30, 28, 0.04);
+}
+
+.wk-recording-indicator {
+  position: relative;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+}
+
+.wk-recording-indicator::before {
+  position: absolute;
+  inset: -4px;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 9999px;
+  content: "";
+  transition: opacity 0.14s ease;
+  animation: wk-recording-pulse 1.2s ease-out infinite;
+}
+
+.wk-recording-indicator__stop {
+  position: relative;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.84);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.wk-recording-indicator__bars {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+.wk-recording-indicator__bars span {
+  display: block;
+  width: 2px;
+  border-radius: 9999px;
+  background: #fff;
+  animation: wk-recording-bar 0.72s ease-in-out infinite;
+}
+
+.wk-recording-indicator__bars span:nth-child(1) {
+  height: 7px;
+}
+
+.wk-recording-indicator__bars span:nth-child(2) {
+  height: 13px;
+  animation-delay: 0.12s;
+}
+
+.wk-recording-indicator__bars span:nth-child(3) {
+  height: 10px;
+  animation-delay: 0.24s;
+}
+
+.wk-recording-indicator__bars span:nth-child(4) {
+  height: 15px;
+  animation-delay: 0.36s;
+}
+
+.group\/send-bar-action:hover .wk-recording-indicator::before {
+  opacity: 0;
+  animation-play-state: paused;
+}
+
+.group\/send-bar-action:hover .wk-recording-indicator__stop {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.group\/send-bar-action:hover .wk-recording-indicator__bars {
+  opacity: 0;
+  transform: scaleX(0.7);
+}
+
+.group\/send-bar-action:hover .wk-recording-indicator__bars span {
+  animation-play-state: paused;
 }
 
 .wk-chat-customer-panel {
@@ -3380,6 +3516,28 @@ void sendQuickMessage
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes wk-recording-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.72);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes wk-recording-bar {
+  0%,
+  100% {
+    transform: scaleY(0.55);
+  }
+  50% {
+    transform: scaleY(1);
   }
 }
 

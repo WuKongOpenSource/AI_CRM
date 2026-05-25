@@ -56,5 +56,6 @@
 - `npm run build` may emit a large Element Plus chunk warning; treat it as pre-existing unless the task is bundle-size work.
 
 ## Tests And Generated Files
+- Do not run `npm run build` as the default post-task verification step after finishing changes; only run it when the user explicitly asks or when the task specifically requires a production build check.
 - There are currently no backend or sync test files; `backend/.gitignore` ignores `src/test/*`, so adjust or verify ignore rules before adding backend tests you expect to commit.
 - Do not edit ignored/generated outputs: `frontend/dist`, `mcp_server/dist`, any `target/`, and frontend `*.tsbuildinfo`.
