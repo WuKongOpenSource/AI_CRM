@@ -21,7 +21,6 @@
     "element-plus": "^2.8.1",
     "marked": "^17.0.5",
     "material-symbols": "^0.40.2",
-    "pdfjs-dist": "^4.10.38",
     "pinia": "^2.2.2",
     "vue": "^3.4.38",
     "vue-demi": "^0.14.6",

@@ -1226,6 +1226,7 @@ let customerSearchTimer: ReturnType<typeof setTimeout> | null = null
 let globalSearchRequestId = 0
 let customerSearchRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
+let removeCustomerListRefreshListener: (() => void) | null = null
 
 type ChatComposerNarrowPayload = {
   narrow?: boolean
@@ -1578,6 +1579,9 @@ onMounted(() => {
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
     handleChatComposerNarrowChange
   )
+  removeCustomerListRefreshListener = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
+    void fetchSidebarCustomers({ reset: true, preserveScroll: true })
+  })
 
   if (typeof ResizeObserver !== 'undefined') {
     primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
@@ -1610,6 +1614,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleDocumentClick)
   removeChatComposerNarrowListener?.()
   removeChatComposerNarrowListener = null
+  removeCustomerListRefreshListener?.()
+  removeCustomerListRefreshListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null
@@ -2178,7 +2184,6 @@ async function handleLogout() {
 
 function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
-  void fetchSidebarCustomers({ reset: true })
   if (payload.mode === 'create' && payload.customerId) {
     void router.push(`/customer/${payload.customerId}`)
   }
