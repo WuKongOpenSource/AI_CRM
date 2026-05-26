@@ -24,6 +24,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 跟进记录相关 AI Tool - 用于 Spring AI Function Calling
@@ -57,7 +58,7 @@ public class FollowupTools {
     public String createFollowUp(
             @ToolParam(description = "Optional CRM customer ID returned by createCustomer or confirmPendingCustomerCreation. For a newly created customer, pass this ID to avoid name rematching.", required = false) String customerIdStr,
             @ToolParam(description = "客户名称（公司名）；客户对话模式下未显式指定其他客户时可留空", required = false) String customerName,
-            @ToolParam(description = "跟进类型：call(电话)/meeting(会议)/email(邮件)/visit(拜访)，可根据内容推断，默认visit", required = false) String type,
+            @ToolParam(description = "跟进类型：call(电话)/meeting(会议)/email(邮件)/visit(拜访)/other(其他)。只有用户明确说电话、会议、邮件、拜访等渠道时才传对应类型；仅说报价、沟通、完成事项但未说明渠道时传other。", required = false) String type,
             @ToolParam(description = "跟进内容，必填") String content,
             @ToolParam(description = "跟进时间，优先使用 yyyy-MM-dd HH:mm:ss；也兼容 yyyy-MM-dd HH:mm 或 yyyy-MM-dd，默认当前时间", required = false) String followTime,
             @ToolParam(description = "联系人姓名", required = false) String contactName,
@@ -184,7 +185,7 @@ public class FollowupTools {
         FollowUpAddBO bo = new FollowUpAddBO();
         bo.setCustomerId(customerId);
         bo.setContactId(contactId);
-        bo.setType(StrUtil.isNotBlank(type) && !"null".equalsIgnoreCase(type) ? type : "visit");
+        bo.setType(resolveFollowUpType(type, content));
         bo.setContent(content);
         bo.setFollowTime(parseFollowUpTime(followTime, new Date()));
         bo.setNextFollowTime(parseOptionalTime(nextFollowTime));
@@ -295,6 +296,43 @@ public class FollowupTools {
     }
 
     /**
+     * Resolve follow-up type only from explicit channel wording.
+     */
+    private String resolveFollowUpType(String requestedType, String content) {
+        String normalizedType = StrUtil.trimToEmpty(requestedType).toLowerCase(Locale.ROOT);
+        if ("other".equals(normalizedType)) {
+            return "other";
+        }
+
+        String text = StrUtil.trimToEmpty(content).toLowerCase(Locale.ROOT);
+        if (containsAny(text, "邮件", "发信", "email", "e-mail", "mail")) {
+            return "email";
+        }
+        if (containsAny(text, "会议", "开会", "会上", "评审会", "例会", "会谈", "meeting")) {
+            return "meeting";
+        }
+        if (containsAny(text, "电话", "电联", "通话", "致电", "来电", "call", "phone")) {
+            return "call";
+        }
+        if (containsAny(text, "拜访", "走访", "到访", "上门", "现场", "见面", "面谈", "visit")) {
+            return "visit";
+        }
+        return "other";
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        if (StrUtil.isBlank(text)) {
+            return false;
+        }
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 格式化日期时间。
      */
     private String formatDateTime(Date date) {
@@ -306,13 +344,14 @@ public class FollowupTools {
      */
     private String getTypeName(String type) {
         if (type == null) {
-            return "拜访";
+            return "其他";
         }
         return switch (type.toLowerCase()) {
             case "call" -> "电话";
             case "meeting" -> "会议";
             case "email" -> "邮件";
             case "visit" -> "拜访";
+            case "other" -> "其他";
             default -> type;
         };
     }
