@@ -11,7 +11,7 @@
       <template v-if="currentAiMode === 'gift'">
         <div class="mb-1 flex flex-wrap items-baseline gap-1">
           <span class="text-xs font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ giftCreditRemainingWan }}</span>
-          <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ {{ giftCreditTotalWan }} 万积分</span>
+          <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ {{ giftCreditTotalWan }} 积分</span>
         </div>
         <p v-if="giftCreditRemaining <= 0" class="mb-3 text-xs text-slate-500 dark:text-slate-400">
           积分已用完，可购买套餐或配置 AI 服务后继续使用。
@@ -75,7 +75,7 @@
         <p class="break-words font-medium leading-relaxed text-slate-600 dark:text-slate-300">
           已使用
           <span class="font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ creditUsedWan }}</span>
-          / {{ creditTotalWan }}万
+          / {{ creditTotalWan }}积分
         </p>
         <p class="font-semibold text-primary">剩余 {{ creditProgressPercent }}%</p>
       </div>

@@ -5,7 +5,7 @@ import com.kakarote.ai_crm.entity.PO.CrmTenant;
 
 public interface ICrmTenantService extends IService<CrmTenant> {
 
-    long DEFAULT_GIFT_CREDIT_TOTAL = 200_000L;
+    long DEFAULT_GIFT_CREDIT_TOTAL = 300L;
 
     /**
      * 获取租户赠送积分总量。

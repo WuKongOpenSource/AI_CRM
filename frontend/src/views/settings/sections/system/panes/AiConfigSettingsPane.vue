@@ -19,7 +19,7 @@
                 {{ currentMode === 'gift' ? '赠送额度模式' : '自定义模型模式' }}
               </el-tag>
               <span class="text-sm text-slate-500">
-                剩余 {{ giftCreditRemainingWan }} / {{ giftCreditTotalWan }} 万积分
+                剩余 {{ giftCreditRemainingWan }} / {{ giftCreditTotalWan }} 积分
               </span>
             </div>
             <p class="mt-2 text-xs text-slate-500">
@@ -291,6 +291,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Connection, Document, Hide, View } from '@element-plus/icons-vue'
 import TokenPurchaseDialog from '@/components/billing/TokenPurchaseDialog.vue'
+import { formatCreditAmount } from '@/composables/useAiQuota'
 import {
   activateAiProvider,
   getAiConfigDetail,
@@ -351,8 +352,8 @@ const configuredProviders = computed(() => providerOptions.value.filter((item) =
 const currentMode = computed(() => loadedConfig.value?.mode || 'gift')
 const giftCreditTotal = computed(() => loadedConfig.value?.creditTotal ?? loadedConfig.value?.giftCreditTotal ?? 0)
 const giftCreditRemaining = computed(() => loadedConfig.value?.creditRemaining ?? loadedConfig.value?.giftCreditRemaining ?? 0)
-const giftCreditRemainingWan = computed(() => (giftCreditRemaining.value / 10000).toFixed(1))
-const giftCreditTotalWan = computed(() => (giftCreditTotal.value / 10000).toFixed(1))
+const giftCreditRemainingWan = computed(() => formatCreditAmount(giftCreditRemaining.value))
+const giftCreditTotalWan = computed(() => formatCreditAmount(giftCreditTotal.value))
 const canUseGiftMode = computed(() => currentMode.value !== 'gift' && giftCreditRemaining.value > 0)
 const canUseSavedCustomMode = computed(() => currentMode.value !== 'custom' && Boolean(loadedConfig.value?.customConfigSaved))
 const currentProviderModels = computed(() => currentProviderPreset.value?.models || [])

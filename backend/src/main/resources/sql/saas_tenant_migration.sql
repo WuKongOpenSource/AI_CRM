@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS crm_tenant (
     status      INTEGER NOT NULL DEFAULT 1,  -- 0=禁用, 1=正常, 2=试用
     expire_time TIMESTAMP,                    -- 租户到期时间，NULL=永不过期
     max_users   INTEGER DEFAULT 50,           -- 最大用户数
-    gift_credit_total BIGINT DEFAULT 200000,  -- 注册赠送积分总量
+    gift_credit_total BIGINT DEFAULT 300,     -- 注册赠送积分总量
     gift_credit_used  BIGINT DEFAULT 0,       -- 赠送积分已使用量
     purchased_credit_total BIGINT DEFAULT 0,  -- 已购买积分总量
     purchased_credit_used  BIGINT DEFAULT 0,  -- 已购买积分已使用量
@@ -29,7 +29,7 @@ COMMENT ON COLUMN crm_tenant.status IS '状态：0=禁用, 1=正常, 2=试用';
 
 -- 插入默认租户（用于迁移现有数据）
 INSERT INTO crm_tenant (tenant_id, tenant_name, status, gift_credit_total, gift_credit_used, purchased_credit_total, purchased_credit_used)
-VALUES (1, '默认租户', 1, 200000, 0, 0, 0)
+VALUES (1, '默认租户', 1, 300, 0, 0, 0)
 ON CONFLICT (tenant_id) DO NOTHING;
 
 -- ============================================================

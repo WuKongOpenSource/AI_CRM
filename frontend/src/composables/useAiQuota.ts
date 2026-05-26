@@ -73,8 +73,18 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
   }
 }
 
+export function formatCreditAmount(value: number): string {
+  const normalizedValue = Number.isFinite(value) ? Math.max(0, value) : 0
+  if (normalizedValue >= 10000) {
+    const wanValue = normalizedValue / 10000
+    const formattedWan = Number.isInteger(wanValue) ? wanValue.toFixed(0) : wanValue.toFixed(1)
+    return `${formattedWan}万`
+  }
+  return new Intl.NumberFormat('zh-CN').format(normalizedValue)
+}
+
 export function formatWanCredit(value: number): string {
-  return (value / 10000).toFixed(1)
+  return formatCreditAmount(value)
 }
 
 export function useAiQuota() {
