@@ -13,7 +13,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 
 /**
  * 本地文件存储服务实现
@@ -32,8 +34,7 @@ public class LocalFileStorageService implements FileStorageService {
     @Override
     public String upload(MultipartFile file, String path) {
         try {
-            File baseDir = new File(uploadPath).getAbsoluteFile();
-            File targetFile = new File(baseDir, path);
+            File targetFile = resolveTargetFile(path);
 
             FileUtil.mkdir(targetFile.getParentFile());
             file.transferTo(targetFile);
@@ -97,8 +98,7 @@ public class LocalFileStorageService implements FileStorageService {
     @Override
     public InputStream getFileStream(String path) {
         try {
-            File baseDir = new File(uploadPath).getAbsoluteFile();
-            File targetFile = new File(baseDir, path);
+            File targetFile = resolveTargetFile(path);
             if (!targetFile.exists()) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "文件不存在");
             }
@@ -110,13 +110,93 @@ public class LocalFileStorageService implements FileStorageService {
     }
 
     /**
+     * 获取文件范围流。
+     */
+    @Override
+    public InputStream getFileRangeStream(String path, long offset, long length) {
+        if (offset < 0 || length < 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "invalid file range");
+        }
+        try {
+            File targetFile = resolveTargetFile(path);
+            if (!targetFile.exists()) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "file not found");
+            }
+            RandomAccessFile randomAccessFile = new RandomAccessFile(targetFile, "r");
+            randomAccessFile.seek(offset);
+            return new BoundedRandomAccessFileInputStream(randomAccessFile, length);
+        } catch (FileNotFoundException e) {
+            log.error("file not found: path={}", path);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "file not found");
+        } catch (IOException e) {
+            log.error("read local file range failed: path={}, offset={}, length={}", path, offset, length, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "file read failed");
+        }
+    }
+
+    /**
      * 获取本地路径。
      */
     @Override
     public String getLocalPath(String path) {
-        File baseDir = new File(uploadPath).getAbsoluteFile();
-        File targetFile = new File(baseDir, path);
+        File targetFile = resolveTargetFile(path);
         return targetFile.getAbsolutePath();
+    }
+
+    private File resolveTargetFile(String path) {
+        try {
+            File baseDir = new File(uploadPath).getCanonicalFile();
+            File targetFile = new File(baseDir, path).getCanonicalFile();
+            if (!targetFile.toPath().startsWith(baseDir.toPath())) {
+                log.warn("blocked local file path outside upload dir: path={}", path);
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "invalid file path");
+            }
+            return targetFile;
+        } catch (IOException e) {
+            log.error("resolve local file path failed: path={}", path, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "file path resolve failed");
+        }
+    }
+
+    private static class BoundedRandomAccessFileInputStream extends InputStream {
+
+        private final RandomAccessFile file;
+        private long remaining;
+
+        private BoundedRandomAccessFileInputStream(RandomAccessFile file, long length) {
+            this.file = file;
+            this.remaining = length;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int value = file.read();
+            if (value >= 0) {
+                remaining--;
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int bytesToRead = (int) Math.min(len, remaining);
+            int bytesRead = file.read(b, off, bytesToRead);
+            if (bytesRead > 0) {
+                remaining -= bytesRead;
+            }
+            return bytesRead;
+        }
+
+        @Override
+        public void close() throws IOException {
+            file.close();
+        }
     }
 
     /**

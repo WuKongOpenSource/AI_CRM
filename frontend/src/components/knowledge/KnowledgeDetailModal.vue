@@ -412,7 +412,8 @@ import {
   downloadKnowledge,
   getKnowledgeDetail,
   getKnowledgeFileBlob,
-  getKnowledgePreviewHtml
+  getKnowledgePreviewHtml,
+  getKnowledgePreviewToken
 } from '@/api/knowledge'
 import type { Knowledge, KnowledgeAiAnalyzeVO } from '@/types/common'
 import { formatFileSize as formatFileSizeBytes, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
@@ -474,6 +475,7 @@ const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
 const previewBlob = ref<Blob | null>(null)
 const officePreviewSource = ref<Blob | ArrayBuffer | null>(null)
 const mediaPreviewUrl = ref('')
+const mediaPreviewObjectUrl = ref(false)
 const previewKind = ref<PreviewKind>('none')
 const previewNotice = ref('')
 const previewText = ref('')
@@ -554,10 +556,11 @@ function resetPreviewState() {
   previewFailed.value = false
   docHtmlContent.value = ''
 
-  if (mediaPreviewUrl.value) {
+  if (mediaPreviewUrl.value && mediaPreviewObjectUrl.value) {
     URL.revokeObjectURL(mediaPreviewUrl.value)
-    mediaPreviewUrl.value = ''
   }
+  mediaPreviewUrl.value = ''
+  mediaPreviewObjectUrl.value = false
 }
 
 function close() {
@@ -635,54 +638,6 @@ function resolvePreviewKind(filename?: string, mimeType?: string): PreviewKind {
     return 'unsupported'
   }
   return 'unsupported'
-}
-
-function resolvePlayableMediaType(kind: PreviewKind, filename?: string, mimeType?: string, blobType?: string): string {
-  const normalizedBlobType = normalizeContentType(blobType)
-  if (
-    (kind === 'audio' && normalizedBlobType.startsWith('audio/')) ||
-    (kind === 'video' && normalizedBlobType.startsWith('video/'))
-  ) {
-    return normalizedBlobType
-  }
-
-  const normalizedMetadataType = normalizeContentType(mimeType)
-  if (
-    (kind === 'audio' && normalizedMetadataType.startsWith('audio/')) ||
-    (kind === 'video' && normalizedMetadataType.startsWith('video/'))
-  ) {
-    return normalizedMetadataType
-  }
-
-  const extension = getFileExtension(filename)
-  const fallbackTypes: Record<string, string> = {
-    mp3: 'audio/mpeg',
-    wav: 'audio/wav',
-    m4a: 'audio/mp4',
-    aac: 'audio/aac',
-    ogg: 'audio/ogg',
-    oga: 'audio/ogg',
-    opus: 'audio/ogg',
-    flac: 'audio/flac',
-    weba: 'audio/webm',
-    mp4: 'video/mp4',
-    m4v: 'video/mp4',
-    webm: 'video/webm',
-    mov: 'video/quicktime',
-    avi: 'video/x-msvideo',
-    mkv: 'video/x-matroska',
-    ogv: 'video/ogg',
-    '3gp': 'video/3gpp'
-  }
-  return fallbackTypes[extension] || ''
-}
-
-function createPlayableMediaBlob(blob: Blob, kind: PreviewKind, filename?: string, mimeType?: string): Blob {
-  const contentType = resolvePlayableMediaType(kind, filename, mimeType, blob.type)
-  if (!contentType || normalizeContentType(blob.type) === contentType) {
-    return blob
-  }
-  return blob.slice(0, blob.size, contentType)
 }
 
 async function tryReadJsonBlob(blob: Blob): Promise<{ msg?: string } | null> {
@@ -819,6 +774,16 @@ async function loadDocument(id: string) {
       return
     }
 
+    if (kind === 'audio' || kind === 'video') {
+      const previewToken = await getKnowledgePreviewToken(id)
+      if (!previewToken.url) {
+        throw new Error('Missing knowledge media preview URL')
+      }
+      mediaPreviewUrl.value = previewToken.url
+      mediaPreviewObjectUrl.value = false
+      return
+    }
+
     const fileBlob = await getKnowledgeFileBlob(id)
     const errorPayload = await tryReadJsonBlob(fileBlob)
     if (errorPayload) {
@@ -836,11 +801,9 @@ async function loadDocument(id: string) {
       return
     }
 
-    if (kind === 'image' || kind === 'audio' || kind === 'video') {
-      const playableBlob = kind === 'image'
-        ? fileBlob
-        : createPlayableMediaBlob(fileBlob, kind, detail.name, detail.mimeType)
-      mediaPreviewUrl.value = URL.createObjectURL(playableBlob)
+    if (kind === 'image') {
+      mediaPreviewUrl.value = URL.createObjectURL(fileBlob)
+      mediaPreviewObjectUrl.value = true
       return
     }
 

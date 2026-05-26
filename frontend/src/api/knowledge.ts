@@ -6,6 +6,7 @@ import type {
   KnowledgeAiAnalyzeVO,
   KnowledgeAiSearchBO,
   KnowledgeAiSearchVO,
+  KnowledgePreviewTokenVO,
   KnowledgeTargetedScriptBO
 } from '@/types/common'
 
@@ -80,6 +81,16 @@ export function updateKnowledgeCustomer(knowledgeId: string, customerId?: string
  */
 export function getKnowledgeFileBlob(id: string): Promise<Blob> {
   return get(`/knowledge/download/${id}`, { responseType: 'blob' })
+}
+
+/**
+ * Create a short-lived Range preview URL for audio/video files
+ */
+export function getKnowledgePreviewToken(id: string): Promise<KnowledgePreviewTokenVO> {
+  return post<KnowledgePreviewTokenVO>(`/knowledge/${id}/preview-token`).then(result => ({
+    ...result,
+    url: result.url.startsWith('/') ? `${getApiBaseUrl()}${result.url}` : result.url
+  }))
 }
 
 /**

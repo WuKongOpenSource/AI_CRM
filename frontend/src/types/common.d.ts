@@ -130,6 +130,12 @@ export interface KnowledgeAiSearchBO {
   limit?: number
 }
 
+export interface KnowledgePreviewTokenVO {
+  url: string
+  expiresAt: string
+  expiresInSeconds: number
+}
+
 export interface KnowledgeTargetedScriptBO {
   knowledgeIds: string[]
   customerId: string

@@ -84,6 +84,7 @@ public class SecurityConfig {
                         .requestMatchers("/tokenPurchase/notify/**").permitAll()
                         .requestMatchers("/api/enum/**").permitAll() // 枚举值接口允许访问
                         .requestMatchers("/cloud/**").permitAll() // saas版本接口
+                        .requestMatchers("/knowledge/preview-range/**").permitAll()
                         // OIDC 端点允许访问（用于 MinIO SSO）
                         .requestMatchers("/.well-known/openid-configuration", "/oauth2/authorize", "/oauth2/token", "/oauth2/userinfo", "/oauth2/jwks", "/oauth2/minio-sso").permitAll()
                         .anyRequest().authenticated() // 其他所有请求都需要认证

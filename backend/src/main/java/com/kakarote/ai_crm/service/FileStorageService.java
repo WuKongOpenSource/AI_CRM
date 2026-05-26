@@ -54,6 +54,16 @@ public interface FileStorageService {
     InputStream getFileStream(String path);
 
     /**
+     * Read a byte range from a stored file.
+     *
+     * @param path file path/key
+     * @param offset zero-based byte offset
+     * @param length number of bytes to read
+     * @return bounded file input stream
+     */
+    InputStream getFileRangeStream(String path, long offset, long length);
+
+    /**
      * 获取文件的本地路径（用于 WeKnora 上传等需要本地文件的场景）
      * 对于本地存储返回实际路径，对于 MinIO 返回 null
      *
