@@ -44,6 +44,7 @@ import com.kakarote.ai_crm.utils.DocumentTextExtractor;
 import com.kakarote.ai_crm.utils.KnowledgeAnswerLocalizationUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -55,6 +56,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 import java.io.File;
 import java.io.IOException;
@@ -72,6 +74,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -462,6 +465,26 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         AtomicReference<Integer> promptTokensRef = new AtomicReference<>(0);
         AtomicReference<Integer> completionTokensRef = new AtomicReference<>(0);
         AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
+        AtomicBoolean streamBilled = new AtomicBoolean(false);
+        AtomicBoolean streamFailed = new AtomicBoolean(false);
+        Runnable consumeTargetedScriptCredits = () -> {
+            if (!streamBilled.compareAndSet(false, true)) {
+                return;
+            }
+            aiQuotaService.consumeResolvedTokens(
+                currentTenantId,
+                "knowledge_targeted_script",
+                aiQuotaService.resolveTokenUsage(
+                    promptTokensRef.get(),
+                    completionTokensRef.get(),
+                    totalTokensRef.get(),
+                    null,
+                    null,
+                    prompt,
+                    fullResponse.toString()
+                )
+            );
+        };
 
         return chatClientProvider.getChatClient()
             .prompt()
@@ -476,12 +499,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                     }
                 }
                 if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
-                    var usage = chatResponse.getMetadata().getUsage();
-                    if (usage.getPromptTokens() > 0 || usage.getCompletionTokens() > 0) {
-                        promptTokensRef.set(usage.getPromptTokens());
-                        completionTokensRef.set(usage.getCompletionTokens());
-                        totalTokensRef.set(usage.getTotalTokens());
-                    }
+                    captureRawTokenUsage(
+                        chatResponse.getMetadata().getUsage(),
+                        promptTokensRef,
+                        completionTokensRef,
+                        totalTokensRef
+                    );
                 }
             })
             .mapNotNull(chatResponse -> {
@@ -490,23 +513,38 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 }
                 return null;
             })
-            .doOnComplete(() -> aiQuotaService.consumeResolvedTokens(
-                currentTenantId,
-                "knowledge_targeted_script",
-                aiQuotaService.resolveTokenUsage(
-                    promptTokensRef.get(),
-                    completionTokensRef.get(),
-                    totalTokensRef.get(),
-                    null,
-                    null,
-                    prompt,
-                    fullResponse.toString()
-                )
-            ))
-            .doOnError(error -> log.warn(
-                "流式生成定向销售话术失败: customerId={}, knowledgeIds={}, error={}",
-                scriptBO.getCustomerId(), requestedIds, error.getMessage()
-            ));
+            .doOnComplete(consumeTargetedScriptCredits)
+            .doOnError(error -> {
+                streamFailed.set(true);
+                log.warn(
+                    "流式生成定向销售话术失败: customerId={}, knowledgeIds={}, error={}",
+                    scriptBO.getCustomerId(), requestedIds, error.getMessage()
+                );
+            })
+            .doFinally(signalType -> {
+                if (signalType == SignalType.CANCEL && !streamFailed.get() && fullResponse.length() > 0) {
+                    consumeTargetedScriptCredits.run();
+                }
+            });
+    }
+
+    private void captureRawTokenUsage(Usage usage,
+                                      AtomicReference<Integer> promptTokensRef,
+                                      AtomicReference<Integer> completionTokensRef,
+                                      AtomicReference<Integer> totalTokensRef) {
+        AiQuotaService.RawTokenUsage rawUsage = aiQuotaService.readRawTokenUsage(usage);
+        if (!rawUsage.hasAnyToken()) {
+            return;
+        }
+        updatePositiveTokenRef(promptTokensRef, rawUsage.promptTokens());
+        updatePositiveTokenRef(completionTokensRef, rawUsage.completionTokens());
+        updatePositiveTokenRef(totalTokensRef, rawUsage.totalTokens());
+    }
+
+    private void updatePositiveTokenRef(AtomicReference<Integer> tokenRef, Integer value) {
+        if (value != null && value > 0) {
+            tokenRef.set(value);
+        }
     }
 
     private void pollWeKnoraParseStatus(Long knowledgeId, String weKnoraKnowledgeId, String tenantApiKey) {

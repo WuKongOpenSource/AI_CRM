@@ -2622,6 +2622,7 @@ async function handleSend() {
   await nextTick()
   focusChatTextarea()
   await sendPromise
+  await loadAiConfig(true)
   await refreshCrmContextAfterSend(effectiveAppCode)
 }
 

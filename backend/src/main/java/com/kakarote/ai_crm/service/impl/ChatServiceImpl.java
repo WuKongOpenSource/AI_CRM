@@ -5,6 +5,8 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
 import com.kakarote.ai_crm.ai.AiModelSource;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
@@ -41,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -55,6 +59,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -65,6 +70,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class ChatServiceImpl implements IChatService {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
@@ -521,6 +528,8 @@ public class ChatServiceImpl implements IChatService {
         AtomicReference<Integer> completionTokensRef = new AtomicReference<>(0);
         AtomicReference<Integer> totalTokensRef = new AtomicReference<>(0);
         AtomicReference<String> modelNameRef = new AtomicReference<>(null);
+        AtomicBoolean streamFinalized = new AtomicBoolean(false);
+        AtomicBoolean streamFailed = new AtomicBoolean(false);
 
         String unavailableTip = resolveAiUnavailableTip(currentTenantId, billingContext.runtimeConfig());
         if (unavailableTip != null) {
@@ -561,6 +570,32 @@ public class ChatServiceImpl implements IChatService {
         final String finalContent = enhancedContent;
         ChatClient.ChatClientRequestSpec requestSpec = buildChatRequestSpec(
             chatClient, finalSystemPrompt, finalContent, mediaList, sessionId, messageId);
+        Runnable finalizeSuccessfulStream = () -> {
+            if (!streamFinalized.compareAndSet(false, true)) {
+                return;
+            }
+            AiQuotaService.TokenUsageSnapshot usage = aiQuotaService.resolveTokenUsage(
+                promptTokensRef.get(),
+                completionTokensRef.get(),
+                totalTokensRef.get(),
+                finalSystemPrompt,
+                history,
+                finalContent,
+                fullResponse.toString()
+            );
+            log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
+                fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
+            long creditsUsed = aiQuotaService.resolveCredits(
+                usage.totalTokens(), billingContext.pricing().creditMultiplier());
+            saveMessage(sessionId, "assistant", fullResponse.toString(),
+                usage.promptTokens(), usage.completionTokens(),
+                usage.totalTokens(), StrUtil.blankToDefault(modelNameRef.get(), billingContext.runtimeConfig().model()),
+                creditsUsed, billingContext.pricing().creditMultiplier(),
+                billingContext.runtimeConfig().providerCode(), billingContext.runtimeConfig().model());
+            aiQuotaService.consumeResolvedTokens(
+                currentTenantId, "chat", usage, billingContext.pricing().creditMultiplier());
+            updateSessionTime(sessionId);
+        };
 
         return requestSpec
             .stream()
@@ -578,12 +613,12 @@ public class ChatServiceImpl implements IChatService {
                 }
                 // 捕获 token 用量（通常在最后一个 chunk 中携带）
                 if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
-                    var usage = chatResponse.getMetadata().getUsage();
-                    if (usage.getPromptTokens() > 0 || usage.getCompletionTokens() > 0) {
-                        promptTokensRef.set(usage.getPromptTokens());
-                        completionTokensRef.set(usage.getCompletionTokens());
-                        totalTokensRef.set(usage.getTotalTokens());
-                    }
+                    captureRawTokenUsage(
+                        chatResponse.getMetadata().getUsage(),
+                        promptTokensRef,
+                        completionTokensRef,
+                        totalTokensRef
+                    );
                 }
                 if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getModel() != null) {
                     modelNameRef.set(chatResponse.getMetadata().getModel());
@@ -595,40 +630,22 @@ public class ChatServiceImpl implements IChatService {
                 }
                 return null;
             })
-            .doOnComplete(() -> {
-                // SSE 场景下只有在流完成后才能拿到最终累积文本与较完整的 token 统计，因此持久化放在完成回调里统一处理。
-                AiQuotaService.TokenUsageSnapshot usage = aiQuotaService.resolveTokenUsage(
-                    promptTokensRef.get(),
-                    completionTokensRef.get(),
-                    totalTokensRef.get(),
-                    finalSystemPrompt,
-                    history,
-                    finalContent,
-                    fullResponse.toString()
-                );
-                log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
-                    fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
-                long creditsUsed = aiQuotaService.resolveCredits(
-                    usage.totalTokens(), billingContext.pricing().creditMultiplier());
-                saveMessage(sessionId, "assistant", fullResponse.toString(),
-                    usage.promptTokens(), usage.completionTokens(),
-                    usage.totalTokens(), StrUtil.blankToDefault(modelNameRef.get(), billingContext.runtimeConfig().model()),
-                    creditsUsed, billingContext.pricing().creditMultiplier(),
-                    billingContext.runtimeConfig().providerCode(), billingContext.runtimeConfig().model());
-                aiQuotaService.consumeResolvedTokens(
-                    currentTenantId, "chat", usage, billingContext.pricing().creditMultiplier());
-                updateSessionTime(sessionId);
-                // 会话结束后清理当前会话的 AiContextHolder。
-                AiContextHolder.clear();
-            })
+            .doOnComplete(finalizeSuccessfulStream)
             .onErrorResume(error -> {
+                streamFailed.set(true);
                 logAiChatError(error);
-                saveMessage(sessionId, "assistant", CHAT_ERROR_MESSAGE);
+                String errorMessage = resolveAiChatErrorMessage(error, billingContext);
+                saveMessage(sessionId, "assistant", errorMessage);
                 updateSessionTime(sessionId);
                 AiContextHolder.clear();
-                return Flux.just(CHAT_ERROR_MESSAGE);
+                return Flux.just(errorMessage);
             })
-            .doFinally(signalType -> AiContextHolder.clear());
+            .doFinally(signalType -> {
+                if (signalType == SignalType.CANCEL && !streamFailed.get() && fullResponse.length() > 0) {
+                    finalizeSuccessfulStream.run();
+                }
+                AiContextHolder.clear();
+            });
     }
 
     /**
@@ -760,22 +777,13 @@ public class ChatServiceImpl implements IChatService {
             var chatResponse = requestSpec.call().chatResponse();
             String response = chatResponse.getResult().getOutput().getText();
 
-            int promptTokens = 0, completionTokens = 0, totalTokens = 0;
             String modelName = null;
-            if (chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
-                var usage = chatResponse.getMetadata().getUsage();
-                promptTokens = usage.getPromptTokens();
-                completionTokens = usage.getCompletionTokens();
-                totalTokens = usage.getTotalTokens();
-            }
             if (chatResponse.getMetadata() != null) {
                 modelName = chatResponse.getMetadata().getModel();
             }
 
             AiQuotaService.TokenUsageSnapshot usageSnapshot = aiQuotaService.resolveTokenUsage(
-                promptTokens,
-                completionTokens,
-                totalTokens,
+                chatResponse,
                 finalSystemPrompt,
                 history,
                 finalContent,
@@ -800,12 +808,32 @@ public class ChatServiceImpl implements IChatService {
             return e.getMsg();
         } catch (Exception e) {
             logAiChatError(e);
-            saveMessage(sessionId, "assistant", CHAT_ERROR_MESSAGE);
+            String errorMessage = resolveAiChatErrorMessage(e, billingContext);
+            saveMessage(sessionId, "assistant", errorMessage);
             updateSessionTime(sessionId);
-            return CHAT_ERROR_MESSAGE;
+            return errorMessage;
         } finally {
             // 非流式分支在 finally 清理当前会话的 AiContextHolder。
             AiContextHolder.clear();
+        }
+    }
+
+    private void captureRawTokenUsage(Usage usage,
+                                      AtomicReference<Integer> promptTokensRef,
+                                      AtomicReference<Integer> completionTokensRef,
+                                      AtomicReference<Integer> totalTokensRef) {
+        AiQuotaService.RawTokenUsage rawUsage = aiQuotaService.readRawTokenUsage(usage);
+        if (!rawUsage.hasAnyToken()) {
+            return;
+        }
+        updatePositiveTokenRef(promptTokensRef, rawUsage.promptTokens());
+        updatePositiveTokenRef(completionTokensRef, rawUsage.completionTokens());
+        updatePositiveTokenRef(totalTokensRef, rawUsage.totalTokens());
+    }
+
+    private void updatePositiveTokenRef(AtomicReference<Integer> tokenRef, Integer value) {
+        if (value != null && value > 0) {
+            tokenRef.set(value);
         }
     }
 
@@ -1013,6 +1041,106 @@ public class ChatServiceImpl implements IChatService {
             return;
         }
         log.error("AI 对话错误: {}", error.getMessage(), error);
+    }
+
+    private String resolveAiChatErrorMessage(Throwable error, ChatBillingContext billingContext) {
+        WebClientResponseException exception = findWebClientResponseException(error);
+        if (exception == null) {
+            return CHAT_ERROR_MESSAGE;
+        }
+
+        int status = exception.getStatusCode().value();
+        String providerMessage = extractProviderErrorMessage(exception.getResponseBodyAsString());
+        String modelName = billingContext != null && billingContext.runtimeConfig() != null
+            ? billingContext.runtimeConfig().model()
+            : null;
+        String modelLabel = StrUtil.blankToDefault(modelName, "当前模型");
+
+        if (status == 404 || containsAny(providerMessage, "not found", "does not exist", "not exist")) {
+            return "当前 AI 模型不可用：" + modelLabel + " 不存在或当前 API Key 无权访问。请检查模型名称、服务商和 API Key 权限后重试。";
+        }
+        if (status == 401 || status == 403 || containsAny(providerMessage, "permission denied", "no permission", "unauthorized")) {
+            return "AI 服务认证失败：当前 API Key 无效或无权访问所选模型。请检查 API Key、服务商和模型权限后重试。";
+        }
+        if (status == 429 || containsAny(providerMessage, "rate limit", "too many requests", "quota", "insufficient")) {
+            return "AI 服务暂时无法处理请求：额度不足或请求过于频繁。请稍后重试，或检查服务商额度。";
+        }
+        if (status == 400) {
+            return StrUtil.isNotBlank(providerMessage)
+                ? "AI 请求参数有误：" + providerMessage + "。请检查模型名称、API 地址和高级配置后重试。"
+                : "AI 请求参数有误，请检查模型名称、API 地址和高级配置后重试。";
+        }
+        if (status >= 500) {
+            return "AI 服务商暂时不可用，请稍后重试。";
+        }
+        if (StrUtil.isNotBlank(providerMessage)) {
+            return "AI 服务返回错误：" + providerMessage + "。请检查 AI 配置后重试。";
+        }
+        return CHAT_ERROR_MESSAGE;
+    }
+
+    private String extractProviderErrorMessage(String responseBody) {
+        if (StrUtil.isBlank(responseBody)) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            String message = firstNonBlank(
+                textAt(root, "/error/message"),
+                textAt(root, "/message"),
+                textAt(root, "/error")
+            );
+            return sanitizeProviderErrorMessage(message);
+        } catch (Exception ignored) {
+            return sanitizeProviderErrorMessage(responseBody);
+        }
+    }
+
+    private String textAt(JsonNode root, String pointer) {
+        if (root == null || StrUtil.isBlank(pointer)) {
+            return null;
+        }
+        JsonNode node = root.at(pointer);
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        return node.isTextual() ? node.asText() : node.toString();
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String sanitizeProviderErrorMessage(String message) {
+        if (StrUtil.isBlank(message)) {
+            return null;
+        }
+        String sanitized = message
+            .replaceAll("(?i)(api[_ -]?key|authorization|bearer)\\s*[:=]?\\s*[^\\s,;，。]+", "$1=***")
+            .replaceAll("\\s+", " ")
+            .trim();
+        return sanitized.length() > 240 ? sanitized.substring(0, 240) + "..." : sanitized;
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        if (StrUtil.isBlank(value) || needles == null) {
+            return false;
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
+        for (String needle : needles) {
+            if (StrUtil.isNotBlank(needle) && normalized.contains(needle.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private WebClientResponseException findWebClientResponseException(Throwable error) {

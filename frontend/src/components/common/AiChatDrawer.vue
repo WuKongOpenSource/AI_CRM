@@ -360,6 +360,7 @@ import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
+import { useAiQuota } from '@/composables/useAiQuota'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -384,6 +385,7 @@ const { isOpen, closeChatDrawer } = useChatDrawer()
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 const userStore = useUserStore()
+const { loadAiConfig } = useAiQuota()
 const { isMobile } = useResponsive()
 
 const inputText = ref('')
@@ -529,6 +531,7 @@ async function handleSend() {
   }
 
   await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
+  await loadAiConfig(true)
 }
 
 function sendQuickMessage(text: string) {

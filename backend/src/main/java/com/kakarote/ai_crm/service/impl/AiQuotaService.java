@@ -8,6 +8,7 @@ import com.kakarote.ai_crm.service.ICrmTenantService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Unified AI credit validation and token usage billing service.
@@ -160,16 +162,55 @@ public class AiQuotaService {
                                                 List<Message> history,
                                                 String currentContent,
                                                 String responseContent) {
-        Integer promptTokens = null;
-        Integer completionTokens = null;
-        Integer totalTokens = null;
+        RawTokenUsage rawUsage = null;
         if (chatResponse != null && chatResponse.getMetadata() != null && chatResponse.getMetadata().getUsage() != null) {
-            var usage = chatResponse.getMetadata().getUsage();
-            promptTokens = usage.getPromptTokens();
-            completionTokens = usage.getCompletionTokens();
-            totalTokens = usage.getTotalTokens();
+            rawUsage = readRawTokenUsage(chatResponse.getMetadata().getUsage());
         }
-        return resolveTokenUsage(promptTokens, completionTokens, totalTokens, systemPrompt, history, currentContent, responseContent);
+        return resolveTokenUsage(rawUsage, systemPrompt, history, currentContent, responseContent);
+    }
+
+    /**
+     * Resolve TokenUsage directly from Spring AI usage metadata.
+     */
+    public TokenUsageSnapshot resolveTokenUsage(Usage usage,
+                                                String systemPrompt,
+                                                List<Message> history,
+                                                String currentContent,
+                                                String responseContent) {
+        return resolveTokenUsage(readRawTokenUsage(usage), systemPrompt, history, currentContent, responseContent);
+    }
+
+    /**
+     * Resolve TokenUsage from normalized raw values.
+     */
+    public TokenUsageSnapshot resolveTokenUsage(RawTokenUsage rawUsage,
+                                                String systemPrompt,
+                                                List<Message> history,
+                                                String currentContent,
+                                                String responseContent) {
+        return resolveTokenUsage(
+            rawUsage != null ? rawUsage.promptTokens() : null,
+            rawUsage != null ? rawUsage.completionTokens() : null,
+            rawUsage != null ? rawUsage.totalTokens() : null,
+            systemPrompt,
+            history,
+            currentContent,
+            responseContent
+        );
+    }
+
+    /**
+     * Read positive token counts returned by provider metadata.
+     */
+    public RawTokenUsage readRawTokenUsage(Usage usage) {
+        if (usage == null) {
+            return RawTokenUsage.empty();
+        }
+        return new RawTokenUsage(
+            readPositiveUsageToken(usage::getPromptTokens),
+            readPositiveUsageToken(usage::getCompletionTokens),
+            readPositiveUsageToken(usage::getTotalTokens)
+        );
     }
 
     /**
@@ -384,6 +425,27 @@ public class AiQuotaService {
             || script == Character.UnicodeScript.HIRAGANA
             || script == Character.UnicodeScript.KATAKANA
             || script == Character.UnicodeScript.HANGUL;
+    }
+
+    private Integer readPositiveUsageToken(Supplier<Integer> supplier) {
+        try {
+            Integer value = supplier.get();
+            return value != null && value > 0 ? value : null;
+        } catch (RuntimeException exception) {
+            log.debug("Failed to read AI usage token value: {}", exception.getMessage());
+            return null;
+        }
+    }
+
+    public record RawTokenUsage(Integer promptTokens, Integer completionTokens, Integer totalTokens) {
+
+        public static RawTokenUsage empty() {
+            return new RawTokenUsage(null, null, null);
+        }
+
+        public boolean hasAnyToken() {
+            return promptTokens != null || completionTokens != null || totalTokens != null;
+        }
     }
 
     public record TokenUsageSnapshot(int promptTokens, int completionTokens, int totalTokens) {
