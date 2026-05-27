@@ -35,6 +35,16 @@ public class CompanyBindingRepository {
             rs.getString("mq_group"),
             rs.getTimestamp("last_incremental_event_time"),
             rs.getString("last_incremental_offset"),
+            rs.getBoolean("crm_to_aicrm_enabled"),
+            rs.getBoolean("aicrm_to_crm_enabled"),
+            rs.getString("crm_to_aicrm_topic"),
+            rs.getString("crm_to_aicrm_group"),
+            rs.getString("aicrm_to_crm_topic"),
+            rs.getString("aicrm_to_crm_group"),
+            rs.getTimestamp("last_crm_to_aicrm_event_time"),
+            rs.getString("last_crm_to_aicrm_offset"),
+            rs.getTimestamp("last_aicrm_to_crm_event_time"),
+            rs.getString("last_aicrm_to_crm_offset"),
             rs.getInt("status"),
             rs.getString("remark"),
             rs.getTimestamp("create_time"),
@@ -54,23 +64,46 @@ public class CompanyBindingRepository {
     public CompanyBinding upsertBinding(Long tenantId, Long companyId, String companyName,
                                         boolean incrementalEnabled, String mqTopic,
                                         String mqGroup, String remark) {
+        return upsertBinding(tenantId, companyId, companyName,
+                incrementalEnabled, false, mqTopic, mqGroup, mqTopic, null, remark);
+    }
+
+    public CompanyBinding upsertBinding(Long tenantId, Long companyId, String companyName,
+                                        boolean crmToAicrmEnabled, boolean aicrmToCrmEnabled,
+                                        String crmToAicrmTopic, String crmToAicrmGroup,
+                                        String aicrmToCrmTopic, String aicrmToCrmGroup,
+                                        String remark) {
         target.update("""
                 INSERT INTO sync_company_binding(
                     binding_id, tenant_id, source_system, source_db, source_company_id, source_company_name,
-                    incremental_enabled, mq_topic, mq_group, status, remark
+                    incremental_enabled, mq_topic, mq_group,
+                    crm_to_aicrm_enabled, aicrm_to_crm_enabled,
+                    crm_to_aicrm_topic, crm_to_aicrm_group,
+                    aicrm_to_crm_topic, aicrm_to_crm_group,
+                    status, remark
                 )
-                VALUES (?, ?, ?, 'wk_crm', ?, ?, ?, ?, ?, 1, ?)
+                VALUES (?, ?, ?, 'wk_crm', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
                 ON CONFLICT (tenant_id)
                 DO UPDATE SET source_company_id = EXCLUDED.source_company_id,
                               source_company_name = EXCLUDED.source_company_name,
                               incremental_enabled = EXCLUDED.incremental_enabled,
                               mq_topic = EXCLUDED.mq_topic,
                               mq_group = EXCLUDED.mq_group,
+                              crm_to_aicrm_enabled = EXCLUDED.crm_to_aicrm_enabled,
+                              aicrm_to_crm_enabled = EXCLUDED.aicrm_to_crm_enabled,
+                              crm_to_aicrm_topic = EXCLUDED.crm_to_aicrm_topic,
+                              crm_to_aicrm_group = EXCLUDED.crm_to_aicrm_group,
+                              aicrm_to_crm_topic = EXCLUDED.aicrm_to_crm_topic,
+                              aicrm_to_crm_group = EXCLUDED.aicrm_to_crm_group,
                               status = 1,
                               remark = EXCLUDED.remark,
                               update_time = CURRENT_TIMESTAMP
                 """, idGenerator.nextId(), tenantId, SOURCE_SYSTEM, companyId, companyName,
-                incrementalEnabled, mqTopic, mqGroup, remark);
+                crmToAicrmEnabled, crmToAicrmTopic, crmToAicrmGroup,
+                crmToAicrmEnabled, aicrmToCrmEnabled,
+                crmToAicrmTopic, crmToAicrmGroup,
+                aicrmToCrmTopic, aicrmToCrmGroup,
+                remark);
         return findByTenantId(tenantId);
     }
 
@@ -218,8 +251,35 @@ public class CompanyBindingRepository {
                 UPDATE sync_company_binding
                 SET last_incremental_event_time = CURRENT_TIMESTAMP,
                     last_incremental_offset = ?,
+                    last_crm_to_aicrm_event_time = CURRENT_TIMESTAMP,
+                    last_crm_to_aicrm_offset = ?,
                     update_time = CURRENT_TIMESTAMP
                 WHERE binding_id = ?
-                """, offset, bindingId);
+                """, offset, offset, bindingId);
+    }
+
+    public void updateDirectionalCheckpoint(Long bindingId, String direction, String offset) {
+        if (bindingId == null) {
+            return;
+        }
+        if ("AICRM_TO_CRM".equals(direction)) {
+            target.update("""
+                    UPDATE sync_company_binding
+                    SET last_aicrm_to_crm_event_time = CURRENT_TIMESTAMP,
+                        last_aicrm_to_crm_offset = ?,
+                        update_time = CURRENT_TIMESTAMP
+                    WHERE binding_id = ?
+                    """, offset, bindingId);
+            return;
+        }
+        target.update("""
+                UPDATE sync_company_binding
+                SET last_incremental_event_time = CURRENT_TIMESTAMP,
+                    last_incremental_offset = ?,
+                    last_crm_to_aicrm_event_time = CURRENT_TIMESTAMP,
+                    last_crm_to_aicrm_offset = ?,
+                    update_time = CURRENT_TIMESTAMP
+                WHERE binding_id = ?
+                """, offset, offset, bindingId);
     }
 }

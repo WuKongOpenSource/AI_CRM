@@ -28,6 +28,24 @@ public record MigrationPreflightResult(
     public record CleanupInfo(boolean enabled, String message) {
     }
 
-    public record IncrementalCapability(boolean applicationAvailable, String status, String message) {
+    public record IncrementalCapability(
+            boolean applicationAvailable,
+            String status,
+            String message,
+            boolean crmToAicrmAvailable,
+            boolean aicrmToCrmAvailable,
+            String mqTopic,
+            String crmToAicrmTopic,
+            String crmToAicrmTag,
+            String crmToAicrmConsumerGroup,
+            String aicrmToCrmTopic,
+            String aicrmToCrmTag,
+            String aicrmToCrmProducerGroup,
+            String conflictPolicy
+    ) {
+        public IncrementalCapability(boolean applicationAvailable, String status, String message) {
+            this(applicationAvailable, status, message, applicationAvailable, applicationAvailable,
+                    null, null, null, null, null, null, null, "event_time_newer_wins");
+        }
     }
 }

@@ -52,9 +52,12 @@ export const migrationPreflightReadyFixture: MigrationPreflightResult = {
     message: '未启用同步前清理，重复执行将按 sync_mapping 幂等更新目标数据。'
   },
   incremental: {
-    applicationAvailable: false,
-    status: 'reserved',
-    message: '增量事件目前仅审计记录，尚未实现对目标业务表的增删改应用。'
+    applicationAvailable: true,
+    status: 'available',
+    message: '双向增量同步已启用，CRM 与 AICRM 的后续变更将自动同步。',
+    crmToAicrmAvailable: true,
+    aicrmToCrmAvailable: true,
+    conflictPolicy: 'event_time_newer_wins'
   }
 }
 

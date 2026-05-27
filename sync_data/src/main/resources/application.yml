@@ -26,6 +26,18 @@ sync:
       enabled: false
       topic: wk-crm-binlog
       consumer-group: ai-crm-sync-data
+  rocketmq:
+    enabled: ${SYNC_ROCKETMQ_ENABLED:false}
+    name-server: ${SYNC_ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+    topic: ${SYNC_ROCKETMQ_TOPIC:crm-aicrm-sync-events}
+    crm-to-aicrm:
+      topic: ${SYNC_ROCKETMQ_CRM_TO_AICRM_TOPIC:}
+      tag: ${SYNC_ROCKETMQ_CRM_TO_AICRM_TAG:crm-to-aicrm}
+      consumer-group: ${SYNC_ROCKETMQ_CRM_TO_AICRM_GROUP:sync-data-crm-to-aicrm}
+    aicrm-to-crm:
+      topic: ${SYNC_ROCKETMQ_AICRM_TO_CRM_TOPIC:}
+      tag: ${SYNC_ROCKETMQ_AICRM_TO_CRM_TAG:aicrm-to-crm}
+      producer-group: ${SYNC_ROCKETMQ_AICRM_TO_CRM_PRODUCER_GROUP:sync-data-aicrm-to-crm}
   old-crm:
     jdbc-url: ${SYNC_OLD_JDBC_URL:jdbc:mysql://192.168.1.210:3306/wk_crm?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=convertToNull}
     username: ${SYNC_OLD_USERNAME:root}

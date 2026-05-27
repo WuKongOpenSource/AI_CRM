@@ -31,6 +31,9 @@ public class SyncProperties {
     @Valid
     private IncrementalProperties incremental = new IncrementalProperties();
 
+    @Valid
+    private RocketMqProperties rocketmq = new RocketMqProperties();
+
     /**
      * 获取分页批量大小。
      */
@@ -141,6 +144,14 @@ public class SyncProperties {
      */
     public void setIncremental(IncrementalProperties incremental) {
         this.incremental = incremental;
+    }
+
+    public RocketMqProperties getRocketmq() {
+        return rocketmq;
+    }
+
+    public void setRocketmq(RocketMqProperties rocketmq) {
+        this.rocketmq = rocketmq;
     }
 
     public static class DataSourceProperties {
@@ -276,6 +287,146 @@ public class SyncProperties {
          */
         public void setConsumerGroup(String consumerGroup) {
             this.consumerGroup = consumerGroup;
+        }
+    }
+
+    public static class RocketMqProperties {
+        private boolean enabled;
+        private String nameServer = "127.0.0.1:9876";
+        private String topic = "crm-aicrm-sync-events";
+
+        @Valid
+        private DirectionConsumerProperties crmToAicrm = new DirectionConsumerProperties(
+                null, "sync-data-crm-to-aicrm", "crm-to-aicrm");
+
+        @Valid
+        private DirectionProducerProperties aicrmToCrm = new DirectionProducerProperties(
+                null, "sync-data-aicrm-to-crm", "aicrm-to-crm");
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getNameServer() {
+            return nameServer;
+        }
+
+        public void setNameServer(String nameServer) {
+            this.nameServer = nameServer;
+        }
+
+        public String getTopic() {
+            return topic;
+        }
+
+        public void setTopic(String topic) {
+            this.topic = topic;
+        }
+
+        public DirectionConsumerProperties getCrmToAicrm() {
+            return crmToAicrm;
+        }
+
+        public void setCrmToAicrm(DirectionConsumerProperties crmToAicrm) {
+            this.crmToAicrm = crmToAicrm;
+        }
+
+        public DirectionProducerProperties getAicrmToCrm() {
+            return aicrmToCrm;
+        }
+
+        public void setAicrmToCrm(DirectionProducerProperties aicrmToCrm) {
+            this.aicrmToCrm = aicrmToCrm;
+        }
+    }
+
+    public static class DirectionConsumerProperties {
+        private String topic;
+        private String consumerGroup;
+        private String tag = "crm-to-aicrm";
+
+        public DirectionConsumerProperties() {
+        }
+
+        public DirectionConsumerProperties(String topic, String consumerGroup) {
+            this(topic, consumerGroup, "crm-to-aicrm");
+        }
+
+        public DirectionConsumerProperties(String topic, String consumerGroup, String tag) {
+            this.topic = topic;
+            this.consumerGroup = consumerGroup;
+            this.tag = tag;
+        }
+
+        public String getTopic() {
+            return topic;
+        }
+
+        public void setTopic(String topic) {
+            this.topic = topic;
+        }
+
+        public String getConsumerGroup() {
+            return consumerGroup;
+        }
+
+        public void setConsumerGroup(String consumerGroup) {
+            this.consumerGroup = consumerGroup;
+        }
+
+        public String getTag() {
+            return tag;
+        }
+
+        public void setTag(String tag) {
+            this.tag = tag;
+        }
+    }
+
+    public static class DirectionProducerProperties {
+        private String topic;
+        private String producerGroup;
+        private String tag = "aicrm-to-crm";
+
+        public DirectionProducerProperties() {
+        }
+
+        public DirectionProducerProperties(String topic, String producerGroup) {
+            this(topic, producerGroup, "aicrm-to-crm");
+        }
+
+        public DirectionProducerProperties(String topic, String producerGroup, String tag) {
+            this.topic = topic;
+            this.producerGroup = producerGroup;
+            this.tag = tag;
+        }
+
+        public String getTopic() {
+            return topic;
+        }
+
+        public void setTopic(String topic) {
+            this.topic = topic;
+        }
+
+        public String getProducerGroup() {
+            return producerGroup;
+        }
+
+        public void setProducerGroup(String producerGroup) {
+            this.producerGroup = producerGroup;
+        }
+
+        public String getTag() {
+            return tag;
+        }
+
+        public void setTag(String tag) {
+            this.tag = tag;
         }
     }
 }

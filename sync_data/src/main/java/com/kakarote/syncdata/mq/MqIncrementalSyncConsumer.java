@@ -1,8 +1,12 @@
-package com.kakarote.syncdata.incremental;
+package com.kakarote.syncdata.mq;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.syncdata.SyncProperties;
+import com.kakarote.syncdata.incremental.IncrementalSyncEvent;
+import com.kakarote.syncdata.incremental.IncrementalSyncService;
+import com.kakarote.syncdata.incremental.SyncDirection;
+import com.kakarote.syncdata.incremental.SyncOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -43,16 +47,25 @@ public class MqIncrementalSyncConsumer {
             Map<String, Object> payload = objectMapper.readValue(messageBody, new TypeReference<>() {
             });
             IncrementalSyncEvent event = new IncrementalSyncEvent(
+                    stringValue(payload.getOrDefault("direction", SyncDirection.CRM_TO_AICRM.name())),
+                    stringValue(payload.get("type")),
+                    stringValue(payload.get("eventId")),
+                    stringValue(payload.get("traceId")),
+                    stringValue(payload.getOrDefault("originSystem", "crm")),
                     stringValue(payload.getOrDefault("sourceSystem", "wk_crm")),
+                    stringValue(payload.getOrDefault("targetSystem", "aicrm")),
+                    longValue(payload.get("tenantId")),
                     longValue(payload.get("sourceCompanyId")),
+                    stringValue(payload.get("entityType")),
                     stringValue(payload.get("sourceTable")),
                     stringValue(payload.get("sourceId")),
-                    stringValue(payload.getOrDefault("operation", "UNKNOWN")),
-                    stringValue(payload.get("traceId")),
+                    stringValue(payload.get("targetId")),
+                    stringValue(payload.getOrDefault("operation", SyncOperation.UPDATE.name())),
                     offset,
                     Instant.now(),
-                    payload,
-                    messageBody
+                    mapValue(payload.get("payload"), payload),
+                    messageBody,
+                    stringValue(payload.getOrDefault("schemaVersion", "1"))
             );
             incrementalSyncService.handleEvent(event);
         } catch (Exception ex) {
@@ -65,6 +78,11 @@ public class MqIncrementalSyncConsumer {
      */
     private String stringValue(Object value) {
         return value == null ? null : value.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> mapValue(Object value, Map<String, Object> fallback) {
+        return value instanceof Map<?, ?> map ? (Map<String, Object>) map : fallback;
     }
 
     /**

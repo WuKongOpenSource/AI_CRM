@@ -60,17 +60,12 @@
 
           <div class="mt-4 flex items-center justify-between rounded-xl bg-white px-4 py-3">
             <div>
-              <p class="text-sm font-bold text-slate-900">增量同步（预留）</p>
+              <p class="text-sm font-bold text-slate-900">双向增量同步</p>
               <p class="mt-1 text-xs text-slate-400">
-                {{ capabilities?.incrementalMessage || '当前仅记录增量事件，不会应用到目标业务表。' }}
+                {{ capabilities?.incrementalMessage || '启用后同步 CRM 与 AICRM 的后续变更。' }}
               </p>
             </div>
             <el-switch v-model="form.incrementalEnabled" :disabled="!incrementalApplicationAvailable" />
-          </div>
-
-          <div v-if="form.incrementalEnabled && incrementalApplicationAvailable" class="mt-3 grid gap-3 md:grid-cols-2">
-            <el-input v-model="form.mqTopic" placeholder="wk-crm-binlog" />
-            <el-input v-model="form.mqGroup" placeholder="ai-crm-sync-data" />
           </div>
 
           <div v-if="preflightResult" class="mt-4 rounded-xl bg-white px-4 py-3 text-left">
@@ -391,8 +386,6 @@ type BindingForm = {
   tenantId: string
   companyId?: SyncSafeId
   incrementalEnabled: boolean
-  mqTopic: string
-  mqGroup: string
 }
 
 type BaseModule = {
@@ -437,9 +430,7 @@ let verificationDialogTimer: number | null = null
 const form = reactive<BindingForm>({
   tenantId: normalizeId(userStore.userInfo?.tenantId),
   companyId: undefined,
-  incrementalEnabled: false,
-  mqTopic: '',
-  mqGroup: ''
+  incrementalEnabled: false
 })
 
 const currentTenantId = computed(() => normalizeId(userStore.userInfo?.tenantId))
@@ -598,8 +589,8 @@ async function loadCapabilities() {
   } catch {
     capabilities.value = {
       incrementalApplicationAvailable: false,
-      incrementalStatus: 'reserved',
-      incrementalMessage: '增量事件目前仅审计记录，尚未实现对目标业务表的增删改应用。'
+      incrementalStatus: 'rocketmq_disabled',
+      incrementalMessage: '双向增量同步暂不可用，请联系管理员检查系统消息通道配置。'
     }
   }
 }
@@ -657,9 +648,7 @@ function hydrateFromLatestBinding() {
   if (!verifiedPhone.value || bindingCompanyVisible) {
     form.companyId = binding.sourceCompanyId
   }
-  form.incrementalEnabled = false
-  form.mqTopic = binding.mqTopic || ''
-  form.mqGroup = binding.mqGroup || ''
+  form.incrementalEnabled = Boolean(binding.crmToAicrmEnabled ?? binding.incrementalEnabled)
   if (binding.fullSyncJobId) {
     activeJobId.value = binding.fullSyncJobId
     void loadJob(binding.fullSyncJobId)
@@ -717,8 +706,8 @@ async function startSyncFlow() {
       tenantId,
       companyId: form.companyId,
       incrementalEnabled: form.incrementalEnabled,
-      mqTopic: form.mqTopic.trim() || undefined,
-      mqGroup: form.mqGroup.trim() || undefined,
+      crmToAicrmEnabled: form.incrementalEnabled,
+      aicrmToCrmEnabled: form.incrementalEnabled,
       remark: 'AICRM 首次启用同步'
     })
     activeBinding.value = binding

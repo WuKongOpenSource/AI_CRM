@@ -3,6 +3,8 @@ package com.kakarote.syncdata.controller;
 import com.kakarote.syncdata.model.CompanyBinding;
 import com.kakarote.syncdata.model.MigrationPreflightResult;
 import com.kakarote.syncdata.model.OldCompanyOption;
+import com.kakarote.syncdata.SyncProperties;
+import com.kakarote.syncdata.mq.RocketMqSyncSettings;
 import com.kakarote.syncdata.service.CompanyBindingService;
 import com.kakarote.syncdata.service.FullSyncService;
 import com.kakarote.syncdata.service.MigrationPreflightService;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -30,6 +33,7 @@ public class SyncBindingController {
     private final FullSyncService fullSyncService;
     private final MigrationPreflightService preflightService;
     private final JdbcTemplate target;
+    private final SyncProperties properties;
 
     /**
      * 注入绑定服务、全量同步服务和目标库查询组件。
@@ -37,11 +41,13 @@ public class SyncBindingController {
     public SyncBindingController(CompanyBindingService bindingService,
                                  FullSyncService fullSyncService,
                                  MigrationPreflightService preflightService,
-                                 @Qualifier("targetJdbcTemplate") JdbcTemplate targetJdbcTemplate) {
+                                 @Qualifier("targetJdbcTemplate") JdbcTemplate targetJdbcTemplate,
+                                 SyncProperties properties) {
         this.bindingService = bindingService;
         this.fullSyncService = fullSyncService;
         this.preflightService = preflightService;
         this.target = targetJdbcTemplate;
+        this.properties = properties;
     }
 
     /**
@@ -77,11 +83,22 @@ public class SyncBindingController {
      */
     @GetMapping("/capabilities")
     public Map<String, Object> capabilities() {
-        return Map.of(
-                "incrementalApplicationAvailable", false,
-                "incrementalStatus", "reserved",
-                "incrementalMessage", "增量事件目前仅审计记录，尚未实现对目标业务表的增删改应用。"
-        );
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("incrementalApplicationAvailable", properties.getRocketmq().isEnabled());
+        result.put("incrementalStatus", properties.getRocketmq().isEnabled() ? "available" : "rocketmq_disabled");
+        result.put("incrementalMessage", properties.getRocketmq().isEnabled()
+                ? "双向增量同步已启用，CRM 与 AICRM 的后续变更将自动同步。"
+                : "双向增量同步暂不可用，请联系管理员检查系统消息通道配置。");
+        result.put("crmToAicrmAvailable", properties.getRocketmq().isEnabled());
+        result.put("aicrmToCrmAvailable", properties.getRocketmq().isEnabled());
+        result.put("mqTopic", RocketMqSyncSettings.topic(properties));
+        result.put("crmToAicrmTopic", RocketMqSyncSettings.topic(properties));
+        result.put("crmToAicrmTag", RocketMqSyncSettings.crmToAicrmTag(properties));
+        result.put("crmToAicrmConsumerGroup", RocketMqSyncSettings.crmToAicrmGroup(properties));
+        result.put("aicrmToCrmTopic", RocketMqSyncSettings.topic(properties));
+        result.put("aicrmToCrmTag", RocketMqSyncSettings.aicrmToCrmTag(properties));
+        result.put("aicrmToCrmProducerGroup", RocketMqSyncSettings.aicrmToCrmGroup(properties));
+        return result;
     }
 
     /**
@@ -89,14 +106,22 @@ public class SyncBindingController {
      */
     @PostMapping("/bindings")
     public CompanyBinding bind(@Valid @RequestBody BindCompanyRequest request) {
+        String mqTopic = firstNonBlank(request.mqTopic(), request.crmToAicrmTopic(), request.aicrmToCrmTopic());
         return bindingService.bind(
                 request.tenantId(),
                 request.companyId(),
-                request.incrementalEnabled(),
-                request.mqTopic(),
-                request.mqGroup(),
+                request.crmToAicrmEnabled() == null ? request.incrementalEnabled() : request.crmToAicrmEnabled(),
+                request.aicrmToCrmEnabled(),
+                mqTopic,
+                request.crmToAicrmGroup() == null ? request.mqGroup() : request.crmToAicrmGroup(),
+                mqTopic,
+                request.aicrmToCrmGroup(),
                 request.remark()
         );
+    }
+
+    private String firstNonBlank(String... values) {
+        return RocketMqSyncSettings.firstNonBlank(values);
     }
 
     /**
@@ -161,6 +186,12 @@ public class SyncBindingController {
             Boolean incrementalEnabled,
             String mqTopic,
             String mqGroup,
+            Boolean crmToAicrmEnabled,
+            Boolean aicrmToCrmEnabled,
+            String crmToAicrmTopic,
+            String crmToAicrmGroup,
+            String aicrmToCrmTopic,
+            String aicrmToCrmGroup,
             String remark
     ) {
     }

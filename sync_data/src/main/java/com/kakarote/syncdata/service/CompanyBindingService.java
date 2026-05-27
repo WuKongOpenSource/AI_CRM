@@ -2,7 +2,7 @@ package com.kakarote.syncdata.service;
 
 import com.kakarote.syncdata.SyncProperties;
 import com.kakarote.syncdata.db.CompanyBindingRepository;
-import com.kakarote.syncdata.db.TargetSchema;
+import com.kakarote.syncdata.mq.RocketMqSyncSettings;
 import com.kakarote.syncdata.model.CompanyBinding;
 import com.kakarote.syncdata.model.OldCompanyOption;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -20,7 +20,6 @@ import java.util.Set;
 public class CompanyBindingService {
 
     private final JdbcTemplate oldCrm;
-    private final TargetSchema targetSchema;
     private final CompanyBindingRepository bindingRepository;
     private final SyncProperties properties;
 
@@ -28,11 +27,9 @@ public class CompanyBindingService {
      * 注入老库读取、目标库结构准备、绑定关系持久化和默认同步配置。
      */
     public CompanyBindingService(@Qualifier("oldCrmJdbcTemplate") JdbcTemplate oldCrmJdbcTemplate,
-                                 TargetSchema targetSchema,
                                  CompanyBindingRepository bindingRepository,
                                  SyncProperties properties) {
         this.oldCrm = oldCrmJdbcTemplate;
-        this.targetSchema = targetSchema;
         this.bindingRepository = bindingRepository;
         this.properties = properties;
     }
@@ -187,7 +184,6 @@ public class CompanyBindingService {
      * 初始化同步元数据表，并返回所有已配置的绑定关系。
      */
     public List<CompanyBinding> listBindings() {
-        targetSchema.initialize();
         return bindingRepository.listBindings();
     }
 
@@ -196,28 +192,62 @@ public class CompanyBindingService {
      */
     public CompanyBinding bind(Long tenantId, Long companyId, Boolean incrementalEnabled,
                                String mqTopic, String mqGroup, String remark) {
-        targetSchema.initialize();
+        return bind(tenantId, companyId, incrementalEnabled, null, mqTopic, mqGroup, null, null, remark);
+    }
+
+    public CompanyBinding bind(Long tenantId, Long companyId,
+                               Boolean crmToAicrmEnabled,
+                               Boolean aicrmToCrmEnabled,
+                               String crmToAicrmTopic,
+                               String crmToAicrmGroup,
+                               String aicrmToCrmTopic,
+                               String aicrmToCrmGroup,
+                               String remark) {
         String companyName = listOldCompanies().stream()
                 .filter(option -> option.companyId().equals(companyId))
                 .map(OldCompanyOption::companyName)
                 .findFirst()
                 .orElse("WK CRM " + companyId);
+        String unifiedTopic = firstNonBlank(
+                crmToAicrmTopic,
+                aicrmToCrmTopic,
+                RocketMqSyncSettings.topic(properties),
+                properties.getRocketmq().getCrmToAicrm().getTopic(),
+                properties.getRocketmq().getAicrmToCrm().getTopic(),
+                properties.getIncremental().getMq().getTopic()
+        );
         return bindingRepository.upsertBinding(
                 tenantId,
                 companyId,
                 companyName,
-                Boolean.TRUE.equals(incrementalEnabled),
-                mqTopic == null || mqTopic.isBlank() ? properties.getIncremental().getMq().getTopic() : mqTopic,
-                mqGroup == null || mqGroup.isBlank() ? properties.getIncremental().getMq().getConsumerGroup() : mqGroup,
+                Boolean.TRUE.equals(crmToAicrmEnabled),
+                Boolean.TRUE.equals(aicrmToCrmEnabled),
+                unifiedTopic,
+                firstNonBlank(crmToAicrmGroup,
+                        RocketMqSyncSettings.crmToAicrmGroup(properties),
+                        properties.getIncremental().getMq().getConsumerGroup()),
+                unifiedTopic,
+                firstNonBlank(aicrmToCrmGroup, RocketMqSyncSettings.aicrmToCrmGroup(properties)),
                 remark
         );
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     /**
      * 根据绑定编号加载绑定关系，不存在时抛出明确异常。
      */
     public CompanyBinding getBinding(Long bindingId) {
-        targetSchema.initialize();
         CompanyBinding binding = bindingRepository.findById(bindingId);
         if (binding == null) {
             throw new IllegalArgumentException("Binding does not exist: " + bindingId);

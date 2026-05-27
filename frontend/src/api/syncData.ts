@@ -24,10 +24,14 @@ export interface CompanyBinding {
   fullSyncJobId?: SyncSafeId | null
   lastFullSyncAt?: string | null
   incrementalEnabled: boolean
-  mqTopic?: string | null
-  mqGroup?: string | null
   lastIncrementalEventTime?: string | null
   lastIncrementalOffset?: string | null
+  crmToAicrmEnabled?: boolean
+  aicrmToCrmEnabled?: boolean
+  lastCrmToAicrmEventTime?: string | null
+  lastCrmToAicrmOffset?: string | null
+  lastAicrmToCrmEventTime?: string | null
+  lastAicrmToCrmOffset?: string | null
   status: number
   remark?: string | null
   createTime?: string | null
@@ -38,8 +42,8 @@ export interface BindCompanyRequest {
   tenantId: SyncSafeId
   companyId: SyncSafeId
   incrementalEnabled?: boolean
-  mqTopic?: string
-  mqGroup?: string
+  crmToAicrmEnabled?: boolean
+  aicrmToCrmEnabled?: boolean
   remark?: string
 }
 
@@ -81,6 +85,9 @@ export interface SyncIncrementalCapability {
   applicationAvailable: boolean
   status: string
   message: string
+  crmToAicrmAvailable?: boolean
+  aicrmToCrmAvailable?: boolean
+  conflictPolicy?: string
 }
 
 export interface MigrationPreflightResult {
@@ -100,6 +107,8 @@ export interface SyncCapabilities {
   incrementalApplicationAvailable: boolean
   incrementalStatus: string
   incrementalMessage: string
+  crmToAicrmAvailable?: boolean
+  aicrmToCrmAvailable?: boolean
 }
 
 export type SyncJobRecord = Record<string, unknown>

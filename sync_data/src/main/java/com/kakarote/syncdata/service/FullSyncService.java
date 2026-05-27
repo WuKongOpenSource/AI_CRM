@@ -56,7 +56,6 @@ public class FullSyncService {
             9, new CustomFieldDefinition("multiselect", "TEXT"),
             13, new CustomFieldDefinition("datetime", "TIMESTAMP")
     );
-    private static final String CUSTOM_FIELD_POOL_TABLE = "crm_custom_field_pool";
     private static final String CUSTOM_FIELD_POOL_COLUMN_PREFIX = "field_";
     private static final String CUSTOM_FIELD_POOL_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int CUSTOM_FIELD_POOL_SUFFIX_LENGTH = 6;
@@ -124,7 +123,6 @@ public class FullSyncService {
      */
     public long startCompanyJob(Long tenantId, Long companyId, Long bindingId) {
         validateCompanyScope(tenantId, companyId);
-        targetSchema.initialize();
         long jobId = mappingRepository.startJob("full");
         activeJobIds.add(jobId);
         bindingRepository.markFullSyncRunning(bindingId, jobId);
@@ -142,7 +140,6 @@ public class FullSyncService {
      * 恢复当前进程没有持有的运行中任务状态，通常用于页面刷新或服务重启后的首次查询。
      */
     public void recoverInactiveRunningJobs() {
-        targetSchema.initialize();
         mappingRepository.markRunningJobsInterruptedExcept(activeJobIds);
         bindingRepository.markRunningFullSyncInterruptedExcept(activeJobIds);
     }
@@ -181,7 +178,6 @@ public class FullSyncService {
                 return -1L;
             }
 
-            targetSchema.initialize();
             encodedResetPassword = passwordEncoder.encode(properties.getResetPassword());
 
             if (jobId == null) {
@@ -364,7 +360,7 @@ public class FullSyncService {
                     remark,
                     create_time, update_time
                 )
-                VALUES (?, ?, 1, 200, 200000, 0, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (?, ?, 1, 200, 300, 0, 0, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (tenant_id) DO NOTHING
                 """, tenantId, "WK CRM " + companyId, "Bound to wk_crm.company_id=" + companyId);
         mappingRepository.upsertMapping("wk_admin_company", companyId, companyId, "crm_tenant", tenantId, tenantId);
@@ -385,7 +381,7 @@ public class FullSyncService {
         values.put("contact_phone", Rows.trimToLength(phone, 20));
         values.put("status", companyStatus == null || companyStatus == 1 ? 1 : 0);
         values.put("max_users", 200);
-        values.put("gift_credit_total", 200000L);
+        values.put("gift_credit_total", 300L);
         values.put("gift_credit_used", 0L);
         values.put("purchased_credit_total", 0L);
         values.put("purchased_credit_used", 0L);
@@ -409,7 +405,7 @@ public class FullSyncService {
         values.put("tenant_name", "WK CRM " + safeCompanyId);
         values.put("status", 1);
         values.put("max_users", 200);
-        values.put("gift_credit_total", 200000L);
+        values.put("gift_credit_total", 300L);
         values.put("gift_credit_used", 0L);
         values.put("purchased_credit_total", 0L);
         values.put("purchased_credit_used", 0L);
@@ -1110,21 +1106,14 @@ public class FullSyncService {
         if (!CRM_TARGET_TABLES.contains(tableName) && !"crm_global_search_index".equals(tableName)) {
             throw new IllegalArgumentException("Unexpected target table: " + tableName);
         }
-        if (!targetSchema.tableExists(tableName)) {
-            throw new IllegalStateException("Target table does not exist: " + tableName);
-        }
-        LinkedHashMap<String, Object> filtered = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            if (targetSchema.columnExists(tableName, entry.getKey())) {
-                filtered.put(entry.getKey(), entry.getValue());
-            }
-        }
-        if (!filtered.containsKey(keyColumn)) {
+        validateSafeIdentifier(keyColumn);
+        values.keySet().forEach(this::validateSafeIdentifier);
+        if (!values.containsKey(keyColumn)) {
             throw new IllegalStateException("Missing conflict key " + keyColumn + " for " + tableName);
         }
-        String columns = String.join(", ", filtered.keySet());
-        String placeholders = String.join(", ", filtered.keySet().stream().map(column -> "?").toList());
-        List<String> updateColumns = filtered.keySet().stream()
+        String columns = String.join(", ", values.keySet());
+        String placeholders = String.join(", ", values.keySet().stream().map(column -> "?").toList());
+        List<String> updateColumns = values.keySet().stream()
                 .filter(column -> !column.equals(keyColumn))
                 .map(column -> column + " = EXCLUDED." + column)
                 .toList();
@@ -1133,7 +1122,7 @@ public class FullSyncService {
                 : " DO UPDATE SET " + String.join(", ", updateColumns);
         String sql = "INSERT INTO " + tableName + " (" + columns + ") VALUES (" + placeholders + ") " +
                 "ON CONFLICT (" + keyColumn + ")" + conflict;
-        executeOrBatch(sql, filtered.values().toArray());
+        executeOrBatch(sql, values.values().toArray());
     }
 
     /**
@@ -1141,7 +1130,7 @@ public class FullSyncService {
      */
     private void ensureRoleViewPermissions(Long companyId, Long oldRoleId, long roleId, Long tenantId,
                                            Integer dataScope, Long createUserId, Long updateUserId) {
-        if (oldRoleId == null || !targetSchema.tableExists("manager_role_menu")) {
+        if (oldRoleId == null) {
             return;
         }
         for (Long menuId : MIGRATED_ROLE_VIEW_MENU_IDS) {
@@ -1176,9 +1165,6 @@ public class FullSyncService {
             return false;
         }
         return menuExistsCache.computeIfAbsent(menuId, ignored -> {
-            if (!targetSchema.tableExists("manager_menu")) {
-                return false;
-            }
             Integer count = target.queryForObject(
                     "SELECT COUNT(*) FROM manager_menu WHERE menu_id = ?",
                     Integer.class,
@@ -1195,7 +1181,7 @@ public class FullSyncService {
         validateSafeIdentifier(tableName);
         validateSafeIdentifier(idColumn);
         validateSafeIdentifier(columnName);
-        if (!targetSchema.columnExists(tableName, columnName)) {
+        if (targetId == null) {
             return;
         }
         executeOrBatch("UPDATE " + tableName + " SET " + columnName + " = ? WHERE " + idColumn + " = ?",
@@ -1229,65 +1215,52 @@ public class FullSyncService {
      * 刷新客户表中的联系人数量、首要联系人和搜索文本等冗余字段。
      */
     private void refreshCustomerDenormalizedFields() {
-        if (!targetSchema.tableExists("crm_customer") || !targetSchema.tableExists("crm_contact")) {
-            return;
-        }
-        if (targetSchema.columnExists("crm_customer", "contact_count")) {
-            target.update("""
-                    UPDATE crm_customer c
-                    SET contact_count = COALESCE((
-                        SELECT COUNT(*) FROM crm_contact ct WHERE ct.customer_id = c.customer_id
-                    ), 0)
-                    WHERE c.customer_id IN (%s)
-                    """.formatted(mappingTargetsSql("crm_customer")));
-        }
-        if (targetSchema.columnExists("crm_customer", "primary_contact_name")) {
-            target.update("""
-                    UPDATE crm_customer c
-                    SET primary_contact_name = (
-                        SELECT ct.name
-                        FROM crm_contact ct
-                        WHERE ct.customer_id = c.customer_id
-                        ORDER BY ct.is_primary DESC, ct.create_time ASC NULLS LAST, ct.contact_id ASC
-                        LIMIT 1
-                    ),
-                    primary_contact_phone = (
-                        SELECT ct.phone
-                        FROM crm_contact ct
-                        WHERE ct.customer_id = c.customer_id
-                        ORDER BY ct.is_primary DESC, ct.create_time ASC NULLS LAST, ct.contact_id ASC
-                        LIMIT 1
-                    ),
-                    primary_contact_position = (
-                        SELECT ct.position
-                        FROM crm_contact ct
-                        WHERE ct.customer_id = c.customer_id
-                        ORDER BY ct.is_primary DESC, ct.create_time ASC NULLS LAST, ct.contact_id ASC
-                        LIMIT 1
-                    )
-                    WHERE c.customer_id IN (%s)
-                    """.formatted(mappingTargetsSql("crm_customer")));
-        }
-        if (targetSchema.columnExists("crm_customer", "search_text")) {
-            target.update("""
-                    UPDATE crm_customer
-                    SET search_text = LOWER(TRIM(CONCAT_WS(' ',
-                        company_name, industry, source, address, website, remark,
-                        primary_contact_name, primary_contact_phone, primary_contact_position, tag_names, level, stage
-                    )))
-                    WHERE customer_id IN (%s)
-                    """.formatted(mappingTargetsSql("crm_customer")));
-        }
+        target.update("""
+                UPDATE crm_customer c
+                SET contact_count = COALESCE((
+                    SELECT COUNT(*) FROM crm_contact ct WHERE ct.customer_id = c.customer_id
+                ), 0)
+                WHERE c.customer_id IN (%s)
+                """.formatted(mappingTargetsSql("crm_customer")));
+        target.update("""
+                UPDATE crm_customer c
+                SET primary_contact_name = (
+                    SELECT ct.name
+                    FROM crm_contact ct
+                    WHERE ct.customer_id = c.customer_id
+                    ORDER BY ct.is_primary DESC, ct.create_time ASC NULLS LAST, ct.contact_id ASC
+                    LIMIT 1
+                ),
+                primary_contact_phone = (
+                    SELECT ct.phone
+                    FROM crm_contact ct
+                    WHERE ct.customer_id = c.customer_id
+                    ORDER BY ct.is_primary DESC, ct.create_time ASC NULLS LAST, ct.contact_id ASC
+                    LIMIT 1
+                ),
+                primary_contact_position = (
+                    SELECT ct.position
+                    FROM crm_contact ct
+                    WHERE ct.customer_id = c.customer_id
+                    ORDER BY ct.is_primary DESC, ct.create_time ASC NULLS LAST, ct.contact_id ASC
+                    LIMIT 1
+                )
+                WHERE c.customer_id IN (%s)
+                """.formatted(mappingTargetsSql("crm_customer")));
+        target.update("""
+                UPDATE crm_customer
+                SET search_text = LOWER(TRIM(CONCAT_WS(' ',
+                    company_name, industry, source, address, website, remark,
+                    primary_contact_name, primary_contact_phone, primary_contact_position, tag_names, level, stage
+                )))
+                WHERE customer_id IN (%s)
+                """.formatted(mappingTargetsSql("crm_customer")));
     }
 
     /**
      * 将已同步的客户、联系人、任务和日程写入全局搜索索引。
      */
     private void refreshGlobalSearchIndex() {
-        if (!targetSchema.tableExists("crm_global_search_index")) {
-            log.info("crm_global_search_index does not exist, search index refresh skipped.");
-            return;
-        }
         try {
             target.update("""
                     INSERT INTO crm_global_search_index (
@@ -1411,7 +1384,7 @@ public class FullSyncService {
                     """.formatted(mappingTargetsSql("crm_schedule")));
             log.info("Global search index refreshed for synced CRM rows.");
         } catch (Exception ex) {
-            log.warn("Global search index refresh failed: {}", ex.getMessage());
+            throw new IllegalStateException("Global search index refresh failed.", ex);
         }
     }
 
@@ -1756,9 +1729,6 @@ public class FullSyncService {
     }
 
     private FieldPoolSlot findReusableCustomFieldSlot(long targetFieldId, String expectedFieldType) {
-        if (!targetSchema.tableExists("crm_custom_field")) {
-            return null;
-        }
         List<Map<String, Object>> rows = target.queryForList("""
                 SELECT column_name, column_type, field_type
                 FROM crm_custom_field
@@ -1780,11 +1750,8 @@ public class FullSyncService {
 
     private Set<String> usedCustomFieldColumns(String entityType, Long tenantId) {
         Set<String> columns = new HashSet<>();
-        if (!targetSchema.tableExists("crm_custom_field")) {
-            return columns;
-        }
         List<String> used;
-        if (tenantId != null && targetSchema.columnExists("crm_custom_field", "tenant_id")) {
+        if (tenantId != null) {
             used = target.queryForList("""
                     SELECT column_name
                     FROM crm_custom_field
@@ -1854,14 +1821,11 @@ public class FullSyncService {
     }
 
     private void ensureCustomFieldPoolColumn(String entityType, FieldPoolSlot slot) {
-        targetSchema.addColumnIfMissing(customFieldTargetTable(entityType), slot.columnName(), slot.columnType());
+        targetSchema.addCustomFieldColumnIfMissing(customFieldTargetTable(entityType), slot.columnName(), slot.columnType());
         ensureCustomFieldPoolRecord(entityType, slot);
     }
 
     private void ensureCustomFieldPoolRecord(String entityType, FieldPoolSlot slot) {
-        if (!targetSchema.tableExists(CUSTOM_FIELD_POOL_TABLE)) {
-            throw new IllegalStateException("Target table does not exist: " + CUSTOM_FIELD_POOL_TABLE);
-        }
         target.update("""
                 INSERT INTO crm_custom_field_pool(
                     pool_id, entity_type, column_name, column_type, field_type, column_created, create_time
