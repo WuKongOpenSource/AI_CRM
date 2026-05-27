@@ -627,42 +627,73 @@
     </div>
 
     <Teleport to="body">
+      <input
+        v-if="isMobile"
+        ref="mobileCustomerSearchKeyboardProxyRef"
+        type="search"
+        class="wk-mobile-customer-search-keyboard-proxy"
+        tabindex="-1"
+        autocomplete="off"
+        autocapitalize="off"
+        enterkeyhint="search"
+        aria-hidden="true"
+      />
       <Transition name="drawer-overlay">
         <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="drawerVisible = false"></div>
       </Transition>
       <Transition name="drawer-panel">
-        <aside v-if="isMobile && drawerVisible" class="fixed bottom-0 left-0 top-0 z-[101] flex w-72 flex-col bg-white shadow-2xl">
-          <div class="flex items-center gap-3 pt-6 pb-[6px] px-6">
-            <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
-              <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
+        <aside v-if="isMobile && drawerVisible" class="fixed bottom-0 left-0 top-0 z-[101] flex w-[calc(100vw-56px)] max-w-[380px] flex-col bg-white shadow-2xl">
+          <div class="flex items-center justify-between gap-4 px-4 pb-4 pt-8">
+            <div class="flex min-w-0 flex-1 items-center gap-3">
+              <div v-if="enterpriseStore.hasLogo" class="size-9 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
+                <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
+              </div>
+              <div v-else class="size-9 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
+                <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+              </div>
+              <h1 class="min-w-0 truncate text-[22px] font-bold leading-tight text-[#0d0d0d]">{{ enterpriseStore.displayName }}</h1>
             </div>
-            <div v-else class="size-10 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
-              <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
-            </div>
-            <div class="min-w-0">
-              <h1 class="line-clamp-2 text-lg font-bold leading-tight text-slate-900">{{ enterpriseStore.displayName }}</h1>
-              <p class="text-xs uppercase tracking-widest text-slate-500">{{ enterpriseStore.displayDescription }}</p>
+            <div class="flex h-10 shrink-0 items-center gap-1 rounded-full bg-white px-1 shadow-[0_12px_34px_rgba(15,23,42,0.12)]">
+              <button
+                type="button"
+                class="flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-slate-50"
+                aria-label="搜索客户"
+                @click="openMobileCustomerSearchDialog"
+              >
+                <span class="material-symbols-outlined text-[24px] leading-none">search</span>
+              </button>
+              <button
+                type="button"
+                class="flex size-8 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-[#0d0d0d] transition-colors active:bg-slate-200"
+                aria-label="个人账户"
+                @click="showUserMenu = true"
+              >
+                <img v-if="userStore.avatar" :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
+                <span v-else class="text-xs font-bold text-primary">
+                  {{ userStore.realname?.charAt(0) || userStore.username?.charAt(0) || 'U' }}
+                </span>
+              </button>
             </div>
           </div>
-          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-4 py-4">
+          <nav class="wk-scrollbar-gutter-stable flex-1 space-y-1 overflow-y-auto px-2 pb-4 pt-1">
             <template v-for="group in mobileMainNavGroups" :key="group.title || 'default'">
               <div v-if="group.title" class="pb-2 pt-4">
                 <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">{{ group.title }}</p>
               </div>
               <div v-for="item in group.items" :key="item.key" class="space-y-1">
                 <button
-                  class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
+                  class="flex w-full items-center gap-4 rounded-[8px] px-3 py-[6px] text-left transition-colors"
                   :class="isPrimaryActive(item) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
                   @click="handleMobilePrimaryNavClick(item)"
                 >
                   <span
                     v-if="item.materialIcon"
-                    class="material-symbols-outlined inline-flex size-[22px] shrink-0 items-center justify-center text-[22px] leading-none"
+                    class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none"
                   >
                     {{ item.materialIcon }}
                   </span>
-                  <WkIcon v-else :name="item.icon" :size="22" class="shrink-0" />
-                  <span class="text-sm font-normal">{{ item.label }}</span>
+                  <WkIcon v-else :name="item.icon" :box-size="20" class="shrink-0" />
+                  <span class="truncate text-[14px] h-[20px] font-semibold">{{ item.label }}</span>
                   <span
                     v-if="item.children?.length"
                     class="material-symbols-outlined ml-auto shrink-0 text-base transition-transform"
@@ -696,7 +727,71 @@
               </div>
             </template>
 
-            <div v-if="showConfigSection" class="pb-2 pt-4">
+            <div class="pt-2">
+              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">最近</p>
+              <div v-if="chatStore.sessionsLoading && mobileRecentChatSessions.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="mobileRecentChatSessions.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无对话记录
+              </div>
+              <template v-else>
+                <button
+                  v-for="session in mobileRecentChatSessions"
+                  :key="session.sessionId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center rounded-xl px-3 py-[6px] text-left transition-colors"
+                  :class="isSessionActive(session.sessionId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectSession(session.sessionId)"
+                >
+                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ session.title || '新对话' }}</span>
+                </button>
+              </template>
+            </div>
+
+            <div v-if="showSidebarCustomers" class="pt-2">
+              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
+              <div v-if="sidebarCustomersLoading && sidebarCustomers.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarCustomers.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无客户数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="customer in sidebarCustomers"
+                  :key="customer.customerId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[6px] text-left transition-colors"
+                  :class="isCustomerActive(customer.customerId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectCustomerChat(customer)"
+                >
+                  <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                    <img
+                      v-if="customer.logoUrl"
+                      :src="customer.logoUrl"
+                      :alt="customer.companyName || 'company logo'"
+                      class="size-full object-contain"
+                    />
+                    <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
+                      {{ customer.companyName?.charAt(0) || '?' }}
+                    </span>
+                  </div>
+                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ customer.companyName }}</span>
+                </button>
+                <button
+                  v-if="sidebarCustomersHasMore"
+                  type="button"
+                  class="mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium text-[#8f8f8f] transition-colors active:bg-slate-100"
+                  :disabled="sidebarCustomersLoading"
+                  @click="loadMoreSidebarCustomers"
+                >
+                  {{ sidebarCustomersLoading ? '加载中...' : '加载更多客户' }}
+                </button>
+              </template>
+            </div>
+
+            <div v-if="showConfigSection" class="pb-2 pt-2">
               <p class="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">配置与服务</p>
             </div>
 
@@ -705,10 +800,10 @@
                 v-for="item in configNavItems"
                 :key="item.route"
                 @click="mobileNavigate(item.route, item.query)"
-                class="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors"
+                class="flex w-full items-center gap-3 rounded-lg px-3 py-[1px] transition-colors"
                 :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-[#0d0d0d] hover:bg-slate-100'"
               >
-                <WkIcon :name="item.icon" :size="22" class="shrink-0" />
+                <WkIcon :name="item.icon" :size="20" class="shrink-0" />
                 <span class="text-sm font-medium">{{ item.label }}</span>
               </button>
             </template>
@@ -716,6 +811,7 @@
 
           <div class="border-t border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <button
+            v-if="false"
               type="button"
               class="mb-2 flex w-full items-center gap-3 rounded-xl bg-slate-50 p-3 text-slate-600 transition-colors hover:bg-slate-100 hover:text-primary"
               @click="toggleTheme"
@@ -741,64 +837,66 @@
           <Transition name="profile-drawer">
             <div
               v-if="isMobile && drawerVisible && showUserMenu"
-              class="absolute bottom-0 left-0 right-0 z-20 overflow-hidden rounded-t-2xl border-t border-slate-200 bg-white shadow-[0_-8px_30px_rgb(0,0,0,0.12)]"
+              class="absolute inset-0 z-20 flex flex-col overflow-hidden bg-[#f4f4f7]"
             >
-              <div class="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between px-3 py-2">
-                    <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">个人账户</p>
-                    <button class="text-slate-300 transition-colors hover:text-slate-500" @click="showUserMenu = false">
-                      <span class="material-symbols-outlined text-sm">close</span>
-                    </button>
+              <div class="relative flex h-16 shrink-0 items-center justify-center px-4 pt-2">
+                <h2 class="text-[18px] font-bold text-[#0d0d0d]">设置</h2>
+                <button
+                  type="button"
+                  class="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-colors active:bg-slate-50"
+                  aria-label="关闭个人账户"
+                  @click="showUserMenu = false"
+                >
+                  <span class="material-symbols-outlined text-[30px] leading-none">close</span>
+                </button>
+              </div>
+
+              <div class="flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <section class="flex flex-col items-center pb-8 pt-6 text-center">
+                  <div class="flex size-24 items-center justify-center overflow-hidden rounded-full bg-[#a5ab87] text-[34px] font-medium text-white">
+                    <img v-if="userStore.avatar" :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
+                    <span v-else>{{ userAvatarInitials }}</span>
                   </div>
-
-                  <div class="mb-4 flex items-center gap-3 px-3 py-2">
-                    <div v-if="userStore.avatar" class="size-10 overflow-hidden rounded-full bg-slate-300">
-                      <img :src="userStore.avatar" class="h-full w-full object-cover" alt="avatar" />
-                    </div>
-                    <div v-else class="flex size-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-white">
-                      {{ userStore.realname?.charAt(0) || userStore.username?.charAt(0) || 'U' }}
-                    </div>
-                    <div class="min-w-0">
-                      <p class="truncate text-sm font-bold text-slate-900">{{ userStore.realname || userStore.username }}</p>
-                      <p class="truncate text-xs text-slate-500">{{ userStore.userInfo?.deptName || '用户' }}</p>
-                    </div>
-                  </div>
-
-                  <div class="mx-3 my-1 h-px bg-slate-100" />
-
+                  <h3 class="mt-4 max-w-full truncate text-[24px] font-bold leading-tight text-[#0d0d0d]">
+                    {{ userDisplayName }}
+                  </h3>
+                  <p class="mt-1 max-w-full truncate text-[16px] text-[#6b6b6b]">
+                    {{ userAccountName }}
+                  </p>
                   <button
-                    class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
+                    type="button"
+                    class="mt-4 rounded-full border border-[#d7d7dc] bg-transparent px-5 py-2 text-[14px] font-medium text-[#0d0d0d] transition-colors active:bg-white"
                     @click="handleOpenAccountSettings"
                   >
-                    <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
-                    <span class="text-sm font-medium">账号设置</span>
+                    编辑个人资料
                   </button>
+                </section>
 
-                  <button
-                    v-for="item in configNavItems"
-                    :key="item.route"
-                    class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                    :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
-                    @click="navigateTo(item.route, item.query)"
-                  >
-                    <WkIcon
-                      :name="item.icon"
-                      :size="24"
-                      class="transition-colors"
-                      :class="isActive(item.route, item.query) ? 'text-primary' : 'text-slate-400 group-hover:text-primary'"
-                    />
-                    <span class="text-sm font-medium">{{ item.label }}</span>
-                  </button>
+                <section class="space-y-3">
+                  <p class="px-2 text-[18px] font-bold text-[#8a8a92]">账户</p>
+                  <div class="overflow-hidden rounded-[26px] bg-white px-5">
+                    <button
+                      v-for="item in configNavItems"
+                      :key="item.route"
+                      type="button"
+                      class="flex w-full items-center gap-4 border-b border-[#ededed] py-4 text-left text-[#0d0d0d] last:border-b-0"
+                      @click="mobileProfileNavigate(item.route, item.query)"
+                    >
+                      <WkIcon :name="item.icon" :box-size="22" class="shrink-0" />
+                      <span class="min-w-0 flex-1 truncate text-[17px] font-medium">{{ item.label }}</span>
+                      <span class="material-symbols-outlined shrink-0 text-[24px] leading-none text-[#c7c7cc]">chevron_right</span>
+                    </button>
 
-                  <button
-                    class="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
-                    @click="handleLogout"
-                  >
-                    <span class="material-symbols-outlined text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
-                    <span class="text-sm font-medium">退出登录</span>
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-4 py-4 text-left text-rose-600"
+                      @click="handleLogout"
+                    >
+                      <span class="material-symbols-outlined inline-flex size-[22px] shrink-0 items-center justify-center text-[22px] leading-none">logout</span>
+                      <span class="min-w-0 flex-1 truncate text-[17px] font-medium">退出登录</span>
+                    </button>
+                  </div>
+                </section>
               </div>
             </div>
           </Transition>
@@ -978,18 +1076,59 @@
       <Transition name="customer-search-dialog">
         <div
           v-if="customerSearchDialogVisible"
-          class="fixed inset-0 z-[300] flex items-center justify-center bg-transparent px-4 py-8"
+          class="fixed inset-0 z-[300] flex"
+          :class="isMobile ? 'items-start justify-start bg-white px-0 py-0' : 'items-center justify-center bg-transparent px-4 py-8'"
           @click="closeCustomerSearchDialog"
         >
           <div
-            class="flex max-h-[min(560px,calc(100vh-4rem))] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl border border-[#d9d9d9] bg-white shadow-[0_24px_80px_rgb(15,23,42,0.18)]"
+            class="flex w-full flex-col overflow-hidden bg-white"
+            :class="isMobile
+              ? 'h-[100dvh] max-h-none max-w-none rounded-none border-0 shadow-none'
+              : 'max-h-[min(560px,calc(100vh-4rem))] max-w-[680px] rounded-2xl border border-[#d9d9d9] shadow-[0_24px_80px_rgb(15,23,42,0.18)]'"
             role="dialog"
             aria-modal="true"
             aria-label="搜索客户"
             @click.stop
           >
-            <div class="flex h-16 shrink-0 items-center gap-3 border-b border-[#ececec] px-6">
-              <!-- <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#8f8f8f]">search</span> -->
+            <div
+              v-if="isMobile"
+              class="flex shrink-0 items-center gap-3 px-4 pb-2 pt-[calc(1rem+env(safe-area-inset-top))]"
+            >
+              <div class="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-full bg-white px-4 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
+                <span class="material-symbols-outlined shrink-0 text-[30px] leading-none text-[#0d0d0d]">search</span>
+                <input
+                  ref="customerSearchInputRef"
+                  v-model="customerSearchKeyword"
+                  type="search"
+                  class="h-8 min-w-0 flex-1 border-none bg-transparent text-[16px] font-medium text-[#0d0d0d] outline-none placeholder:text-[#8f8f8f]"
+                  placeholder="搜索客户"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  enterkeyhint="search"
+                  @input="handleCustomerSearchInput"
+                  @keydown.esc.prevent="closeCustomerSearchDialog"
+                />
+                <button
+                  v-if="customerSearchKeyword"
+                  type="button"
+                  class="flex text-[16px] shrink-0 items-center justify-center rounded-full bg-[#0d0d0d] text-white transition-colors active:bg-[#333]"
+                  aria-label="清空搜索"
+                  @click="clearCustomerSearchKeyword"
+                >
+                  <span class="material-symbols-outlined text-[16px] leading-none">close</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                class="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#0d0d0d] shadow-[0_10px_28px_rgba(15,23,42,0.10)] transition-colors active:bg-slate-50"
+                aria-label="关闭搜索"
+                title="关闭搜索"
+                @click="closeCustomerSearchDialog"
+              >
+                <span class="material-symbols-outlined text-[28px] leading-none">close</span>
+              </button>
+            </div>
+            <div v-else class="flex h-16 shrink-0 items-center gap-3 border-b border-[#ececec] px-6">
               <input
                 ref="customerSearchInputRef"
                 v-model="customerSearchKeyword"
@@ -1010,7 +1149,10 @@
               </button>
             </div>
 
-            <div class="min-h-[320px] flex-1 overflow-y-auto px-4 py-3">
+            <div
+              class="flex-1 overflow-y-auto"
+              :class="isMobile ? 'min-h-0 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-2' : 'min-h-[320px] px-4 py-3'"
+            >
               <div v-if="customerSearchLoading && customerSearchCustomers.length === 0" class="flex h-56 items-center justify-center">
                 <span class="material-symbols-outlined animate-spin text-2xl leading-none text-[#c9c9c9]">progress_activity</span>
               </div>
@@ -1026,7 +1168,8 @@
                   v-for="customer in customerSearchCustomers"
                   :key="customer.customerId"
                   type="button"
-                  class="group flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-[#f9f9f9]"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-xl text-left transition-colors hover:bg-[#f9f9f9]"
+                  :class="isMobile ? 'px-0 py-4' : 'px-3 py-3'"
                   @click="handleSelectCustomerFromSearch(customer)"
                 >
                   <div class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#ececec] bg-white">
@@ -1196,6 +1339,7 @@ const sidebarCustomersExpanded = ref(true)
 const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
+const MOBILE_RECENT_CHAT_SESSION_LIMIT = 8
 const SIDEBAR_CUSTOMER_LIMIT = 10
 const CUSTOMER_SEARCH_LIMIT = 10
 const SIDEBAR_CUSTOMER_SCROLL_THRESHOLD_PX = 120
@@ -1212,6 +1356,7 @@ const customerSearchKeyword = ref('')
 const customerSearchCustomers = ref<CustomerListVO[]>([])
 const customerSearchLoading = ref(false)
 const customerSearchInputRef = ref<HTMLInputElement | null>(null)
+const mobileCustomerSearchKeyboardProxyRef = ref<HTMLInputElement | null>(null)
 
 const globalSearchKeyword = ref('')
 const globalSearchLoading = ref(false)
@@ -1225,6 +1370,7 @@ let globalSearchTimer: ReturnType<typeof setTimeout> | null = null
 let customerSearchTimer: ReturnType<typeof setTimeout> | null = null
 let globalSearchRequestId = 0
 let customerSearchRequestId = 0
+let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 
@@ -1371,13 +1517,29 @@ function groupMainNavItems(items: MainNavItem[]): MainNavGroup[] {
 }
 
 const pcMainNavGroups = computed(() => groupMainNavItems(pcMainNavItems.value))
-const mobileMainNavGroups = computed(() => groupMainNavItems(mainNavItems.value))
+const mobilePrimaryNavItems = computed<MainNavItem[]>(() =>
+  mainNavItems.value
+    .filter(item => item.key !== 'customer-search')
+    .map(item => {
+      if (item.key !== 'chat') return item
+      return {
+        ...item,
+        icon: 'new-chat',
+        label: '新对话',
+        groupTitle: undefined,
+      }
+    })
+)
+const mobileMainNavGroups = computed(() => groupMainNavItems(mobilePrimaryNavItems.value))
 
 const configNavItems = computed(() =>
   allConfigNavItems.filter(item => item.permission.some(permission => userStore.hasPermission(permission)))
 )
 
 const showConfigSection = computed(() => configNavItems.value.length > 0)
+const userDisplayName = computed(() => userStore.realname || userStore.username || '用户')
+const userAccountName = computed(() => userStore.username || userStore.userInfo?.email || userStore.userInfo?.mobile || '用户')
+const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 2).toUpperCase() || 'U')
 
 const activeMenu = computed(() => {
   const path = route.path
@@ -1440,9 +1602,14 @@ function toggleMobilePrimaryExpanded(key: string) {
 }
 
 function handleMobilePrimaryNavClick(item: MainNavItem) {
+  if (item.key === 'chat') {
+    drawerVisible.value = false
+    void handleNewSession()
+    return
+  }
   if (item.action === 'customerSearch') {
     drawerVisible.value = false
-    openCustomerSearchDialog()
+    openMobileCustomerSearchDialog()
     return
   }
   if (item.children?.length) {
@@ -1751,6 +1918,10 @@ const limitedRecentChatSessions = computed(() =>
   sidebarVisibleChatSessions.value.slice(0, RECENT_CHAT_SESSION_LIMIT)
 )
 
+const mobileRecentChatSessions = computed(() =>
+  sidebarVisibleChatSessions.value.slice(0, MOBILE_RECENT_CHAT_SESSION_LIMIT)
+)
+
 const filteredHistorySessions = computed(() => {
   const keyword = recentHistoryKeyword.value.trim().toLowerCase()
   if (!keyword) return sidebarVisibleChatSessions.value
@@ -1889,6 +2060,11 @@ async function handleSelectSessionFromMore(sessionId: string) {
   await handleSelectSession(sessionId)
 }
 
+async function handleMobileSelectSession(sessionId: string) {
+  drawerVisible.value = false
+  await handleSelectSession(sessionId)
+}
+
 function isSessionActive(sessionId: string): boolean {
   return route.path.startsWith('/chat') && chatStore.currentSessionId === sessionId
 }
@@ -1905,21 +2081,52 @@ async function handleSelectCustomerChat(customer: CustomerListVO) {
   chatStore.requestComposerFocus()
 }
 
+async function handleMobileSelectCustomerChat(customer: CustomerListVO) {
+  drawerVisible.value = false
+  await handleSelectCustomerChat(customer)
+}
+
+function focusCustomerSearchInput() {
+  customerSearchInputRef.value?.focus({ preventScroll: true })
+}
+
+function primeMobileCustomerSearchKeyboard() {
+  if (!isMobile.value) return
+  const input = mobileCustomerSearchKeyboardProxyRef.value
+  if (!input) return
+  input.value = ''
+  input.focus({ preventScroll: true })
+}
+
+function openMobileCustomerSearchDialog() {
+  primeMobileCustomerSearchKeyboard()
+  openCustomerSearchDialog()
+}
+
 function openCustomerSearchDialog() {
+  const focusRequestId = ++customerSearchFocusRequestId
   selectedPrimaryKey.value = ''
   showUserMenu.value = false
   closeGlobalSearchDropdown()
   customerSearchKeyword.value = ''
   customerSearchDialogVisible.value = true
   void fetchCustomerSearchCustomers()
-  void nextTick(() => customerSearchInputRef.value?.focus())
+  void nextTick(() => {
+    if (focusRequestId !== customerSearchFocusRequestId || !customerSearchDialogVisible.value) return
+    focusCustomerSearchInput()
+  })
 }
 
 function closeCustomerSearchDialog() {
+  customerSearchFocusRequestId++
   customerSearchDialogVisible.value = false
   if (customerSearchTimer) {
     clearTimeout(customerSearchTimer)
     customerSearchTimer = null
+  }
+  if (isMobile.value) {
+    customerSearchInputRef.value?.blur()
+    mobileCustomerSearchKeyboardProxyRef.value?.blur()
   }
 }
 
@@ -1930,6 +2137,16 @@ function handleCustomerSearchInput() {
   customerSearchTimer = setTimeout(() => {
     void fetchCustomerSearchCustomers()
   }, 250)
+}
+
+function clearCustomerSearchKeyword() {
+  customerSearchKeyword.value = ''
+  if (customerSearchTimer) {
+    clearTimeout(customerSearchTimer)
+    customerSearchTimer = null
+  }
+  void fetchCustomerSearchCustomers()
+  void nextTick(() => customerSearchInputRef.value?.focus())
 }
 
 async function fetchCustomerSearchCustomers() {
@@ -1957,6 +2174,7 @@ async function fetchCustomerSearchCustomers() {
 
 async function handleSelectCustomerFromSearch(customer: CustomerListVO) {
   closeCustomerSearchDialog()
+  drawerVisible.value = false
   await handleSelectCustomerChat(customer)
 }
 
@@ -2035,6 +2253,10 @@ function mobileNavigate(path: string, query?: Record<string, string>) {
   }
   drawerVisible.value = false
   showUserMenu.value = false
+}
+
+function mobileProfileNavigate(path: string, query?: Record<string, string>) {
+  mobileNavigate(path, query)
 }
 
 function handleOpenAccountSettings() {
@@ -2207,6 +2429,24 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 </script>
 
 <style scoped>
+.wk-mobile-customer-search-keyboard-proxy {
+  position: fixed;
+  left: 16px;
+  top: calc(1rem + env(safe-area-inset-top));
+  z-index: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0.01;
+  color: transparent;
+  caret-color: transparent;
+  background: transparent;
+  font-size: 16px;
+  pointer-events: none;
+  outline: none;
+}
+
 .wk-primary-sidebar {
   border-color: var(--wk-border-subtle) !important;
   background: linear-gradient(180deg, #fffefa 0%, var(--wk-bg-sidebar) 100%) !important;
