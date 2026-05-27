@@ -277,7 +277,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
-  (e: 'success', payload: { mode: Mode; customerId?: string }): void
+  (e: 'success', payload: { mode: Mode; customerId?: string; detail?: CustomerDetailVO | null }): void
 }>()
 
 const { isMobile } = useResponsive()
@@ -682,9 +682,9 @@ async function handleSubmit() {
         ElMessage.error('缺少 customerId，无法保存')
         return
       }
-      await customerStore.editCustomer({ ...submitData, customerId })
+      const detail = await customerStore.editCustomer({ ...submitData, customerId })
       ElMessage.success('更新成功')
-      emit('success', { mode: 'edit', customerId })
+      emit('success', { mode: 'edit', customerId, detail })
     } else {
       const customerId = await customerStore.createCustomer(submitData)
       ElMessage.success('创建成功')

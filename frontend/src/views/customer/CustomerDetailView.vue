@@ -1527,7 +1527,7 @@ import { getEnabledFieldsByEntity } from '@/api/customField'
 import { downloadKnowledge, queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
-import type { Contact, CustomerAiReportVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
+import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
 import { compactCustomerAiInsight, getCustomerAiStatusMeta } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -2499,10 +2499,10 @@ async function handleTransferOwner(user: TransferUserOption) {
   }
 }
 
-async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
+async function handleEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string; detail?: CustomerDetailVO | null }) {
   if (payload.mode !== 'edit') return
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
-  if (customer.value?.customerId) {
+  if (!payload.detail && customer.value?.customerId) {
     await customerStore.fetchCustomerDetail(customer.value.customerId)
   }
 }

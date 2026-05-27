@@ -19,6 +19,7 @@ interface LocalMessage {
   content: string
   timestamp: Date
   isStreaming?: boolean
+  isThinking?: boolean
   attachments?: ChatAttachmentVO[]
 }
 
@@ -28,6 +29,7 @@ interface StreamingTask {
   assistantMessageId: string
   startedAt: number
   abortController: AbortController
+  thinkingTimerId?: number
 }
 
 interface PendingNewSessionDraft {
@@ -46,6 +48,7 @@ export const useChatStore = defineStore('chat', () => {
   const GENERAL_APP_CODE = 'general'
   const CRM_APP_CODE = 'crm'
   const KNOWLEDGE_APP_CODE = 'knowledge'
+  const STREAM_IDLE_THINKING_DELAY_MS = 3000
 
   function loadSessionAppCodeBySessionId(): Record<string, string> {
     try {
@@ -315,6 +318,7 @@ export const useChatStore = defineStore('chat', () => {
       startedAt: Date.now(),
       abortController
     }
+    scheduleStreamingThinking(sessionId, assistantMessageId)
 
     try {
       await sendMessageStream(
@@ -322,19 +326,24 @@ export const useChatStore = defineStore('chat', () => {
         content,
         (chunk) => {
           const assistantMessage = ensureStreamingAssistantMessage(sessionId, assistantMessageId)
+          if (!chunk) return
+          assistantMessage.isThinking = false
           assistantMessage.content += chunk
+          scheduleStreamingThinking(sessionId, assistantMessageId)
         },
         async () => {
-          markAssistantMessageDone(sessionId, assistantMessageId)
+          finishStreamingAssistantMessage(sessionId, assistantMessageId)
           delete streamingTasks.value[sessionId]
           await fetchSessions()
         },
         (error) => {
           console.error('Stream error:', error)
+          clearStreamingThinkingTimer(streamingTasks.value[sessionId])
           const assistantMessage = ensureStreamingAssistantMessage(sessionId, assistantMessageId)
           if (!assistantMessage.content) {
             assistantMessage.content = '抱歉，发生错误，请重试。'
           }
+          assistantMessage.isThinking = false
           assistantMessage.isStreaming = false
         },
         attachments,
@@ -349,8 +358,8 @@ export const useChatStore = defineStore('chat', () => {
     } catch (error) {
       console.error('sendMessage error:', error)
     } finally {
+      finishStreamingAssistantMessage(sessionId, assistantMessageId)
       delete streamingTasks.value[sessionId]
-      markAssistantMessageDone(sessionId, assistantMessageId)
     }
     return sessionId
   }
@@ -520,6 +529,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!targetSessionId) return
     const task = streamingTasks.value[targetSessionId]
     if (!task) return
+    clearStreamingThinkingTimer(task)
     task.abortController.abort()
   }
 
@@ -561,7 +571,36 @@ export const useChatStore = defineStore('chat', () => {
     const assistantMessage = findSessionMessage(sessionId, assistantMessageId)
     if (assistantMessage) {
       assistantMessage.isStreaming = false
+      assistantMessage.isThinking = false
     }
+  }
+
+  function finishStreamingAssistantMessage(sessionId: string, assistantMessageId: string) {
+    clearStreamingThinkingTimer(streamingTasks.value[sessionId])
+    markAssistantMessageDone(sessionId, assistantMessageId)
+  }
+
+  function clearStreamingThinkingTimer(task?: StreamingTask) {
+    if (task?.thinkingTimerId === undefined) return
+    window.clearTimeout(task.thinkingTimerId)
+    task.thinkingTimerId = undefined
+  }
+
+  function scheduleStreamingThinking(sessionId: string, assistantMessageId: string) {
+    const task = streamingTasks.value[sessionId]
+    if (!task || task.assistantMessageId !== assistantMessageId) return
+
+    clearStreamingThinkingTimer(task)
+    task.thinkingTimerId = window.setTimeout(() => {
+      const currentTask = streamingTasks.value[sessionId]
+      if (!currentTask || currentTask.assistantMessageId !== assistantMessageId) return
+
+      const assistantMessage = findSessionMessage(sessionId, assistantMessageId)
+      if (assistantMessage?.isStreaming) {
+        assistantMessage.isThinking = true
+      }
+      currentTask.thinkingTimerId = undefined
+    }, STREAM_IDLE_THINKING_DELAY_MS)
   }
 
   function mergeLoadedMessagesWithStreaming(

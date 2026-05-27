@@ -139,9 +139,12 @@
                     <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-3 inline-block max-w-full text-left text-sm leading-relaxed border border-slate-100">
                       <div
                         class="wk-markdown"
-                        :class="{ 'wk-thinking-shimmer': message.isStreaming && message.content.length === 0 }"
-                        v-html="renderAssistantMessage(message.content, message.isStreaming)"
+                        :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
+                        v-html="renderAssistantMessage(message.content, message.isStreaming, message.isThinking)"
                       />
+                      <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
+                        <p>思考中</p>
+                      </div>
                     </div>
                     <!-- Attachments -->
                     <div v-if="getInlineAttachments(message).length > 0" class="space-y-1">
@@ -455,7 +458,16 @@ watch(isOpen, async (open) => {
 
 // Auto scroll on new messages
 watch(
-  () => chatStore.messages.length,
+  () => {
+    const msgs = chatStore.messages
+    const last = msgs[msgs.length - 1]
+    return {
+      length: msgs.length,
+      content: last?.content?.length ?? 0,
+      isStreaming: Boolean(last?.isStreaming),
+      isThinking: Boolean(last?.isThinking)
+    }
+  },
   () => {
     nextTick(() => {
       if (messagesContainer.value) {
@@ -539,9 +551,9 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
-function renderAssistantMessage(content: string, isStreaming = false): string {
+function renderAssistantMessage(content: string, isStreaming = false, isThinking = false): string {
   const normalized = normalizeAssistantMessageContent(content, isStreaming)
-  return renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming), {
+  return renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
     streaming: isStreaming
   })
 }

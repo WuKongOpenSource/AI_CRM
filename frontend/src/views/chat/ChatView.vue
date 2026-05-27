@@ -405,9 +405,12 @@
                     <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                       <div
                         class="wk-markdown"
-                        :class="{ 'wk-thinking-shimmer': message.isStreaming && message.content.length === 0 }"
-                        v-html="renderAssistantMessage(message.content, message.isStreaming)"
+                        :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
+                        v-html="renderAssistantMessage(message.content, message.isStreaming, message.isThinking)"
                       />
+                      <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
+                        <p>思考中</p>
+                      </div>
                     </div>
                     <!-- Attachments -->
                     <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
@@ -2338,7 +2341,7 @@ function handleSelectedCustomerDetailRefresh(payload?: CustomerDetailRefreshPayl
   const targetCustomerId = payload?.customerId ? String(payload.customerId) : ''
   if (!currentCustomerId || (targetCustomerId && targetCustomerId !== currentCustomerId)) return
 
-  void ensureSelectedCustomerDetail(currentCustomerId).then(() => {
+  void ensureSelectedCustomerDetail(currentCustomerId, { silent: Boolean(selectedCustomer.value) }).then(() => {
     if (isCustomerAiAnalysisPending(selectedCustomer.value)) {
       scheduleChatCustomerAiPolling(currentCustomerId, true)
     }
@@ -2507,7 +2510,12 @@ watch(
   () => {
     const msgs = chatStore.messages
     const last = msgs[msgs.length - 1]
-    return { length: msgs.length, content: last?.content?.length ?? 0 }
+    return {
+      length: msgs.length,
+      content: last?.content?.length ?? 0,
+      isStreaming: Boolean(last?.isStreaming),
+      isThinking: Boolean(last?.isThinking)
+    }
   },
   () => {
     nextTick(() => {
@@ -2850,9 +2858,9 @@ function formatModelMultiplier(value?: number | null) {
   return `${multiplier.toFixed(multiplier % 1 === 0 ? 0 : 2)}x 积分`
 }
 
-function renderAssistantMessage(content: string, isStreaming = false): string {
+function renderAssistantMessage(content: string, isStreaming = false, isThinking = false): string {
   const normalized = normalizeAssistantMessageContent(content, isStreaming)
-  const html = renderMarkdown(normalized || getAssistantMessagePlaceholder(isStreaming), {
+  const html = renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
     streaming: isStreaming
   })
   return wrapMarkdownHeadingLeadingEmoji(html)
@@ -3354,11 +3362,13 @@ function handleSelectedCustomerBasicInfoEdit() {
   showSelectedCustomerEditDialog.value = true
 }
 
-async function handleSelectedCustomerEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
+async function handleSelectedCustomerEditSuccess(payload: { mode: 'create' | 'edit'; customerId?: string; detail?: CustomerDetailVO | null }) {
   if (payload.mode !== 'edit') return
   const customerId = payload.customerId || selectedCustomer.value?.customerId || selectedCustomerId.value
-  if (customerId) {
-    await ensureSelectedCustomerDetail(String(customerId))
+  if (payload.detail) {
+    selectedCustomer.value = payload.detail
+  } else if (customerId) {
+    await ensureSelectedCustomerDetail(String(customerId), { silent: Boolean(selectedCustomer.value) })
   }
   await chatStore.fetchSessions()
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)

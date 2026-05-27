@@ -98,7 +98,7 @@ export const useCustomerStore = defineStore('customer', () => {
     }
   }
 
-  async function fetchCustomerDetail(customerId: string) {
+  async function fetchCustomerDetail(customerId: string): Promise<CustomerDetailVO> {
     loading.value = true
     try {
       const detail = await getCustomerDetail(customerId)
@@ -106,6 +106,7 @@ export const useCustomerStore = defineStore('customer', () => {
         ...detail,
         tasks: normalizeTaskList(detail.tasks)
       }
+      return currentCustomer.value
     } finally {
       loading.value = false
     }
@@ -115,11 +116,12 @@ export const useCustomerStore = defineStore('customer', () => {
     return addCustomer(data)
   }
 
-  async function editCustomer(data: CustomerUpdateBO): Promise<void> {
+  async function editCustomer(data: CustomerUpdateBO): Promise<CustomerDetailVO | null> {
     await updateCustomer(data)
     if (currentCustomer.value?.customerId === data.customerId) {
-      await fetchCustomerDetail(data.customerId)
+      return fetchCustomerDetail(data.customerId)
     }
+    return null
   }
 
   async function editCustomerField(data: CustomerFieldUpdateBO, options: { refreshList?: boolean } = {}): Promise<CustomerDetailVO> {
