@@ -147,36 +147,36 @@
     >
       <!-- Chat View -->
       <template v-if="currentView === 'chat'">
+        <!-- Mobile top bar (chat detail) -->
+        <div
+          v-if="isMobile"
+          class="shrink-0 sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
+              @click="mobilePanel = 'sessions'"
+            >
+              <span class="material-symbols-outlined text-[18px] leading-none">arrow_back</span>
+              历史对话
+            </button>
+
+            <button
+              type="button"
+              class="h-9 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-1.5"
+              @click="handleNewSession"
+            >
+              <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
+              开启新对话
+            </button>
+          </div>
+        </div>
+
         <div
           class="flex-1 flex flex-col overflow-hidden relative"
           :class="isCenteredEmptyChat ? 'justify-center -translate-y-[100px]' : ''"
         >
-          <!-- Mobile top bar (chat detail) -->
-          <div
-            v-if="isMobile"
-            class="shrink-0 sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-4 py-3"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-primary transition-colors"
-                @click="mobilePanel = 'sessions'"
-              >
-                <span class="material-symbols-outlined text-[18px] leading-none">arrow_back</span>
-                历史对话
-              </button>
-
-              <button
-                type="button"
-                class="h-9 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-1.5"
-                @click="handleNewSession"
-              >
-                <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
-                开启新对话
-              </button>
-            </div>
-          </div>
-
           <div
             v-if="selectedCustomer"
             class="wk-chat-customer-header relative shrink-0 border-b pl-4 pr-1 py-2 md:pl-8"
@@ -541,7 +541,7 @@
 
           <!-- Input Area -->
           <div
-            class="wk-chat-composer-wrap shrink-0 pb-2 md:pb-2 px-8"
+            class="wk-chat-composer-wrap shrink-0 pb-2 md:pb-2 px-2"
             :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : ''"
           >
             <div class="mx-auto space-y-8 w-[calc(100%-20px)] max-w-4xl md:w-full">
@@ -1065,7 +1065,7 @@
                   </div>
 
                   <!-- Mobile: upload + multiline input -->
-                  <div v-else class="flex items-end w-full">
+                  <div v-else class="flex items-center w-full">
                     <el-popover
                       v-model:visible="chatUploadMenuVisible"
                       trigger="click"
@@ -1079,7 +1079,7 @@
                       <template #reference>
                         <button
                           type="button"
-                          class="size-12 flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
+                          class="w-[20px] h-full flex items-center justify-center text-[#0d0d0d] hover:text-primary transition-colors shrink-0"
                           :disabled="isUploading"
                         >
                           <span class="material-symbols-outlined text-[0.875rem] leading-none">add</span>

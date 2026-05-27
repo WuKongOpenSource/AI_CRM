@@ -307,7 +307,8 @@ export const useChatStore = defineStore('chat', () => {
       role: 'assistant',
       content: '',
       timestamp: new Date(),
-      isStreaming: true
+      isStreaming: true,
+      isThinking: true
     })
 
     const abortController = new AbortController()
