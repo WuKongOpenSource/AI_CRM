@@ -620,7 +620,8 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
     supportsVision = normalizedModel.includes('vision')
   } else if (normalizedProvider === 'moonshot') {
     supportsToolCall = normalizedModel !== '' && !normalizedModel.includes('kimi-thinking-preview')
-    supportsVision = normalizedModel.includes('vision') || normalizedModel.includes('vl')
+    supportsVision = ['kimi-k2.5', 'kimi-k2.6', 'kimi-k2-5', 'kimi-k2-6', 'vision', 'vl']
+      .some((keyword) => normalizedModel.includes(keyword))
   } else {
     if ([
       'gpt-5',
@@ -629,6 +630,8 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
       'vision',
       'omni',
       'qwen3.6-plus',
+      'doubao-seed-2-0',
+      'doubao-seed-2.0',
       '1-8',
       '4.6v',
       '4.5v',

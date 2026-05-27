@@ -391,9 +391,10 @@ public class DynamicChatClientProvider {
 
     OpenAiChatOptions buildChatOptions(String providerCode, String baseUrl, String model,
                                        Double temperature, Integer maxTokens) {
-        Double requestTemperature = resolveRequestTemperature(providerCode, model, temperature);
+        String resolvedModel = AiProviderRegistry.normalizeModelName(providerCode, model);
+        Double requestTemperature = resolveRequestTemperature(providerCode, resolvedModel, temperature);
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
-                .model(model)
+                .model(resolvedModel)
                 .temperature(requestTemperature)
                 .maxCompletionTokens(maxTokens)
                 .streamUsage(true);

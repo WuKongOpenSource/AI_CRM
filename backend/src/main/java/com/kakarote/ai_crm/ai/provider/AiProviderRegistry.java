@@ -81,7 +81,14 @@ public final class AiProviderRegistry {
                 .apiUrlKeywords(List.of("api.moonshot.cn", "moonshot.cn"))
                 .toolCallEnabledKeywords(List.of())
                 .toolCallDisabledKeywords(List.of("kimi-thinking-preview"))
-                .visionEnabledKeywords(List.of("vision", "vl"))
+                .visionEnabledKeywords(List.of(
+                        "kimi-k2.5",
+                        "kimi-k2.6",
+                        "kimi-k2-5",
+                        "kimi-k2-6",
+                        "vision",
+                        "vl"
+                ))
                 .build());
 
         register(AiProviderDescriptor.builder()
@@ -109,17 +116,17 @@ public final class AiProviderRegistry {
                 .completionsPath("/chat/completions")
                 .embeddingsPath("/embeddings")
                 .recommendedModels(List.of(
-                        "doubao-seed-2.0-pro-260215",
-                        "doubao-seed-2.0-lite-260428",
-                        "doubao-seed-2.0-mini-260428"
+                        "doubao-seed-2-0-pro-260215",
+                        "doubao-seed-2-0-lite-260428",
+                        "doubao-seed-2-0-mini-260428"
                 ))
-                .modelHint("填写火山方舟模型 ID 或 Endpoint ID，例如 doubao-seed-2.0-pro-260215。")
+                .modelHint("填写火山方舟模型 ID 或 Endpoint ID，例如 doubao-seed-2-0-pro-260215。")
                 .extraHeadersHint("")
                 .defaultCapabilities(defaultCapabilities())
                 .apiUrlKeywords(List.of("ark.cn-beijing.volces.com", "volces.com"))
                 .toolCallEnabledKeywords(List.of())
                 .toolCallDisabledKeywords(List.of())
-                .visionEnabledKeywords(List.of("vision", "vl", "1-8"))
+                .visionEnabledKeywords(List.of("doubao-seed-2-0", "doubao-seed-2.0", "vision", "vl", "1-8"))
                 .build());
 
         register(AiProviderDescriptor.builder()
@@ -251,6 +258,26 @@ public final class AiProviderRegistry {
      */
     public static List<AiProviderDescriptor> list() {
         return List.copyOf(PROVIDERS.values());
+    }
+
+    /**
+     * 标准化已知模型 ID，兼容历史配置中的展示名。
+     */
+    public static String normalizeModelName(String providerCode, String model) {
+        if (StrUtil.isBlank(model)) {
+            return model;
+        }
+        String normalizedProvider = normalizeProviderCode(providerCode);
+        String trimmedModel = model.trim();
+        if (!"ark".equals(normalizedProvider)) {
+            return trimmedModel;
+        }
+        return switch (trimmedModel) {
+            case "doubao-seed-2.0-pro-260215" -> "doubao-seed-2-0-pro-260215";
+            case "doubao-seed-2.0-lite-260428" -> "doubao-seed-2-0-lite-260428";
+            case "doubao-seed-2.0-mini-260428" -> "doubao-seed-2-0-mini-260428";
+            default -> trimmedModel;
+        };
     }
 
     /**
