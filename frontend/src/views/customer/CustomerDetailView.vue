@@ -1419,52 +1419,6 @@
       @success="handleEditSuccess"
     />
 
-    <el-dialog
-      v-model="showAiReportDialog"
-      title="AI 分析报告"
-      :width="isMobile ? 'calc(100% - 40px)' : '680px'"
-      class="wk-dialog--flush"
-      destroy-on-close
-    >
-      <div
-        class="space-y-4"
-        :class="isMobile ? 'max-h-[calc(100vh-10rem)] overflow-y-auto pb-[env(safe-area-inset-bottom)]' : ''"
-      >
-        <section class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 状态探测</p>
-          <div class="mt-3">
-            <span
-              v-if="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)"
-              class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm"
-              :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.badgeClass"
-            >
-              <span class="size-2 rounded-full mr-1.5" :class="getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.dotClass"></span>
-              {{ getAiStatusMeta(latestAiReport?.aiStatusDetection || customer?.aiStatusDetection)?.label }}
-            </span>
-            <p v-else class="text-sm leading-6 text-slate-700">{{ latestAiReport?.aiStatusDetection || customer?.aiStatusDetection || '暂无 AI 状态探测' }}</p>
-          </div>
-        </section>
-        <section class="rounded-xl border border-slate-200 bg-white px-4 py-4">
-          <p class="text-xs font-bold uppercase tracking-wider text-slate-500">AI 深度分析</p>
-          <ul v-if="aiReportDialogDeepInsightSegments.length" class="mt-2 space-y-1.5">
-            <li
-              v-for="(segment, index) in aiReportDialogDeepInsightSegments"
-              :key="`${segment}-${index}`"
-              class="flex items-start gap-2 text-sm leading-6 text-slate-700"
-            >
-              <span class="mt-2 size-1 shrink-0 rounded-full bg-slate-500"></span>
-              <span class="min-w-0 break-words">{{ segment }}</span>
-            </li>
-          </ul>
-          <p v-else class="mt-2 text-sm leading-6 text-slate-700">暂无 AI 深度分析</p>
-          <div v-if="currentAiNextStep" class="mt-4 border-t border-slate-100 pt-4">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-500">建议下一步行动</p>
-            <p class="mt-2 whitespace-pre-line break-words text-sm leading-6 text-slate-700">{{ currentAiNextStep }}</p>
-          </div>
-        </section>
-      </div>
-    </el-dialog>
-
     <!-- AI Follow-up Drawer -->
     <AiFollowUpDrawer
       v-model="showAiFollowUpDrawer"
@@ -1529,7 +1483,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
-import { compactCustomerAiInsight, getCustomerAiStatusMeta } from '@/utils/customerAi'
+import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
 import type { FollowUpUpsertSubmitPayload } from '@/components/customer/FollowUpUpsertDialog.vue'
@@ -1597,7 +1551,6 @@ const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showBasicInfoDrawer = ref(false)
 const showAiFollowUpDrawer = ref(false)
-const showAiReportDialog = ref(false)
 const showTerminalStageMenu = ref(false)
 const showTransferPopover = ref(false)
 const headerMoreButtonRef = ref<HTMLElement | null>(null)
@@ -1744,10 +1697,6 @@ function getSectionIconStyle(key: SectionIconKey): { backgroundColor: string } {
   return { backgroundColor: sectionIconBgColors[key] }
 }
 
-function getAiStatusMeta(value: string | undefined | null) {
-  return getCustomerAiStatusMeta(value)
-}
-
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
   const value = contact?.isPrimary as boolean | number | string | undefined
   return value === true || value === 1 || value === '1'
@@ -1878,9 +1827,6 @@ const showSchedulesModuleToggle = computed(() => scheduleLoading.value || custom
 const isSchedulesModuleVisible = computed(() => schedulesModuleExpanded.value || !showSchedulesModuleToggle.value)
 const showDocumentsModuleToggle = computed(() => customerKnowledgeLoading.value || customerKnowledgeList.value.length > 0)
 const isDocumentsModuleVisible = computed(() => documentsModuleExpanded.value || !showDocumentsModuleToggle.value)
-const currentAiDeepInsight = computed(() => (latestAiReport.value?.aiDeepInsight || savedAiParseResult.value?.summary || '').trim())
-const currentAiNextStep = computed(() => (latestAiReport.value?.aiNextStep || savedAiParseResult.value?.nextStep || '').trim())
-const aiReportDialogDeepInsightSegments = computed(() => splitAiInsightSegments(currentAiDeepInsight.value))
 const aiAnalysisStatus = computed(() => customer.value?.aiAnalysisStatus || '')
 const isAiAnalysisPending = computed(() => aiAnalysisStatus.value === 'pending' || aiAnalysisStatus.value === 'running')
 const isAiAnalysisFailed = computed(() => aiAnalysisStatus.value === 'failed')
@@ -1904,26 +1850,6 @@ function isSameAsListAiSummary(value?: string | null): boolean {
   const summary = String(value || '').replace(/\s+/g, ' ').trim()
   const listSummary = currentAiInsight.value.replace(/\s+/g, ' ').trim()
   return !!summary && !!listSummary && summary.length <= 90 && summary === listSummary
-}
-
-function splitAiInsightSegments(value?: string | null): string[] {
-  const normalized = String(value || '')
-    .replace(/\\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trim()
-  if (!normalized) return []
-
-  return normalized
-    .split(/\n+/)
-    .flatMap(line => line.match(/[^。！？!?；;\n]+[。！？!?；;]?/g) || [line])
-    .map(cleanAiInsightSegment)
-    .filter(Boolean)
-}
-
-function cleanAiInsightSegment(value: string): string {
-  return value
-    .replace(/^\s*(?:[-*•·]|[0-9]+[.)、]|[一二三四五六七八九十]+[.)、]|（[一二三四五六七八九十]+）)\s*/, '')
-    .trim()
 }
 
 const aiAnalysisStatusDescription = computed(() => {
@@ -2564,7 +2490,6 @@ async function handleGenerateReport() {
     latestAiReport.value = await generateCustomerAiReport(customer.value.customerId)
     await customerStore.fetchCustomerDetail(customer.value.customerId)
     appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
-    showAiReportDialog.value = true
     ElMessage.success('AI 分析报告已生成并保存')
   } catch {
     // Error handled by interceptor
