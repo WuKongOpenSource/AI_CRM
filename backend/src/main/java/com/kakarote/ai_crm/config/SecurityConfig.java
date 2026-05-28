@@ -1,9 +1,11 @@
 package com.kakarote.ai_crm.config;
 
+import com.kakarote.ai_crm.config.security.filter.AccessLogFilter;
 import com.kakarote.ai_crm.config.security.filter.JwtAuthenticationTokenFilter;
 import com.kakarote.ai_crm.config.security.handle.AuthenticationEntryPointImpl;
 import com.kakarote.ai_crm.config.security.handle.LogoutSuccessHandlerImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -53,6 +55,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationTokenFilter authenticationTokenFilter;
 
+    @Autowired
+    private AccessLogFilter accessLogFilter;
+
     /**
      * 跨域过滤器
      */
@@ -96,11 +101,19 @@ public class SecurityConfig {
 
         // 添加 JWT 认证过滤器
         http.addFilterBefore(authenticationTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        http.addFilterAfter(accessLogFilter, JwtAuthenticationTokenFilter.class);
         // 添加 CORS 过滤器（放在 JWT 过滤器之前）
         http.addFilterBefore(corsFilter, JwtAuthenticationTokenFilter.class);
         http.addFilterBefore(corsFilter, LogoutFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<AccessLogFilter> accessLogFilterRegistration(AccessLogFilter filter) {
+        FilterRegistrationBean<AccessLogFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
 

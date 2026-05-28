@@ -1,9 +1,11 @@
 package com.kakarote.ai_crm.common.exception;
 
+import com.kakarote.ai_crm.common.log.AccessLogAttributes;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.common.result.ResultCode;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import io.jsonwebtoken.MalformedJwtException;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -34,8 +36,9 @@ public class ExceptionHandlerAdvice {
      * 生成默认异常。
      */
     @ExceptionHandler(value = Exception.class)
-    public Result<String> defaultException(Exception ex) {
+    public Result<String> defaultException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception", ex);
+        request.setAttribute(AccessLogAttributes.SYSTEM_EXCEPTION, ex);
         if (ex instanceof ResultCode) {
             return Result.error(((ResultCode) ex).getCode(), ((ResultCode) ex).getMsg());
         }
