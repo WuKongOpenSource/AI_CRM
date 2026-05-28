@@ -55,84 +55,72 @@
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">schedule</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">schedule</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">截止时间</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">截止时间</p>
-                <p :class="['text-sm', isOverdue(task) ? 'font-bold text-red-500' : 'text-[#0d0d0d]']">
-                  {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
-                </p>
-                <p v-if="isOverdue(task)" class="mt-1 text-[11px] font-bold text-red-500">(已延期)</p>
-              </div>
+              <p :class="['text-sm', isOverdue(task) ? 'font-bold text-red-500' : 'text-[#0d0d0d]']">
+                {{ task.dueDate ? formatDateTime(task.dueDate) : '未设定' }}
+              </p>
+              <p v-if="isOverdue(task)" class="mt-1 text-[11px] font-bold text-red-500">(已延期)</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">priority_high</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">priority_high</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">优先级</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">优先级</p>
-                <p :class="['text-sm font-bold uppercase', getPriorityColor(task.priority)]">
-                  {{ getPriorityLabel(task.priority) }}
-                </p>
-              </div>
+              <p :class="['text-sm font-bold uppercase', getPriorityColor(task.priority)]">
+                {{ getPriorityLabel(task.priority) }}
+              </p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">person</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">负责人</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">负责人</p>
-                <p class="text-sm text-[#0d0d0d]">{{ task.assignedToName || '未分配' }}</p>
-              </div>
+              <p class="text-sm text-[#0d0d0d]">{{ task.assignedToName || '未分配' }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">task_alt</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">task_alt</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">任务状态</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">任务状态</p>
-                <p class="text-sm font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
-              </div>
+              <p class="text-sm font-bold uppercase text-primary">{{ getStatusLabel(task.status) }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">person</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">创建人</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
-                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
-              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">calendar_clock</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">calendar_clock</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">创建时间</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
-                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
-              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
             </div>
           </div>
         </div>

@@ -1529,10 +1529,12 @@ const emit = defineEmits<{
   (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
 }>()
 
+type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
+
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
   source?: string
-  modules?: Array<'tasks' | 'schedules'>
+  modules?: CustomerDetailRefreshModule[]
 }
 
 const activeCustomerId = computed(() => props.customerId || String(route.params.id || ''))
@@ -2078,10 +2080,18 @@ function emitCustomerActivityRefresh(customerId?: string) {
 
 async function refreshCustomerScopedModules(
   customerId: string,
-  modules: Array<'tasks' | 'schedules'>
+  modules: CustomerDetailRefreshModule[]
 ) {
   const uniqueModules = new Set(modules)
   const requests: Promise<any>[] = []
+
+  if (uniqueModules.has('contacts')) {
+    requests.push(fetchContacts(customerId, true))
+  }
+
+  if (uniqueModules.has('followUps')) {
+    requests.push(fetchFollowUps(customerId, true))
+  }
 
   if (uniqueModules.has('tasks')) {
     requests.push(fetchCustomerTasks(customerId))

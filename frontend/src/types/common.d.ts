@@ -8,6 +8,7 @@ export interface Task {
   priority: TaskPriority
   status: TaskStatus
   dueDate?: string
+  overdue?: boolean
   assignedTo?: string
   assignedToName?: string
   taskType?: string

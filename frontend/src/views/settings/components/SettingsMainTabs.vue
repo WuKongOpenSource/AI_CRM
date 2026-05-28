@@ -45,7 +45,7 @@ const currentTab = computed({
 <style scoped>
 .settings-main-tabs {
   --el-tabs-header-height: auto;
-  --settings-main-tab-color: #137fec;
+  --settings-main-tab-color: #000000;
 }
 
 .settings-main-tabs :deep(.el-tabs__header) {

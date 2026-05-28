@@ -17,7 +17,11 @@
         @click.stop
       >
         <WkIcon v-if="!compact" name="ai" :size="18" class="shrink-0 leading-none text-primary" />
-        <span v-if="currentAiMode === 'gift'" class="min-w-0 truncate tabular-nums" :class="compact ? 'inline text-[10px]' : 'hidden md:inline'">
+        <span
+          v-if="currentAiMode === 'gift'"
+          class="min-w-0 truncate tabular-nums"
+          :class="[compact ? 'inline text-[10px]' : 'hidden md:inline', compact ? compactCreditTextClass : '']"
+        >
           <template v-if="compact">{{ creditRemainingWan }}积分</template>
           <template v-else><span class="hidden md:inline">已使用 </span>{{ creditUsedWan }} / {{ creditTotalWan }}积分<span class="hidden md:inline">，剩余 </span>{{ creditProgressPercent }}%</template>
         </span>
@@ -29,14 +33,32 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import WkIcon from '@/components/common/WkIcon.vue'
 import AiQuotaPanel from '@/components/layout/AiQuotaPanel.vue'
 import { useAiQuota } from '@/composables/useAiQuota'
 
 withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 
-const { loadAiConfig, currentAiMode, creditUsedWan, creditRemainingWan, creditTotalWan, creditProgressPercent } = useAiQuota()
+const {
+  loadAiConfig,
+  currentAiMode,
+  creditUsedWan,
+  creditRemainingWan,
+  creditTotalWan,
+  creditRemaining,
+  creditProgressPercent,
+} = useAiQuota()
+
+const compactCreditTextClass = computed(() => {
+  if (creditRemaining.value <= 0) {
+    return 'text-red-600 dark:text-red-300'
+  }
+  if (creditProgressPercent.value < 20) {
+    return 'text-amber-600 dark:text-amber-300'
+  }
+  return 'text-slate-600 dark:text-slate-200'
+})
 
 onMounted(() => {
   void loadAiConfig()

@@ -295,6 +295,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         }
         task.setPriorityName(getPriorityName(task.getPriority()));
         task.setStatusName(getStatusName(task.getStatus()));
+        task.setOverdue(isOverdueTask(task));
     }
 
     /**
@@ -386,6 +387,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     private Map<String, Long> buildStatusCounts(TaskQueryBO queryBO) {
         TaskQueryBO summaryQuery = BeanUtil.copyProperties(queryBO, TaskQueryBO.class);
         summaryQuery.setStatus(null);
+        if ("overdue".equalsIgnoreCase(summaryQuery.getFilter())) {
+            summaryQuery.setFilter("all");
+        }
 
         List<TaskVO> tasks = baseMapper.queryList(summaryQuery);
         if (tasks == null || tasks.isEmpty()) {
@@ -425,13 +429,24 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         long pendingCount = tasks.stream().filter(task -> "PENDING".equalsIgnoreCase(task.getStatus())).count();
         long inProgressCount = tasks.stream().filter(task -> "IN_PROGRESS".equalsIgnoreCase(task.getStatus())).count();
         long completedCount = tasks.stream().filter(task -> "COMPLETED".equalsIgnoreCase(task.getStatus())).count();
+        long overdueCount = tasks.stream().filter(this::isOverdueTask).count();
 
         Map<String, Long> statusCounts = new LinkedHashMap<>();
         statusCounts.put("all", (long) tasks.size());
         statusCounts.put("PENDING", pendingCount);
         statusCounts.put("IN_PROGRESS", inProgressCount);
         statusCounts.put("COMPLETED", completedCount);
+        statusCounts.put("OVERDUE", overdueCount);
         return statusCounts;
+    }
+
+    /**
+     * 判断任务是否已延期。
+     */
+    private boolean isOverdueTask(TaskVO task) {
+        return task.getDueDate() != null
+            && task.getDueDate().before(new Date())
+            && !"COMPLETED".equalsIgnoreCase(task.getStatus());
     }
 
     /**

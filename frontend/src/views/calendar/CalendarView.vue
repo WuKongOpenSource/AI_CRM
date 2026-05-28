@@ -131,7 +131,7 @@
                     </div>
                   </div>
                   <!-- Tasks -->
-                  <div v-if="getTasksForDate(day.fullDate).length > 0" class="space-y-2 pt-2 border-t border-[var(--wk-border-subtle)]">
+                  <div v-if="getTasksForDate(day.fullDate).length > 0" class="space-y-2">
                     <div
                       v-for="task in getTasksForDate(day.fullDate)"
                       :key="task.taskId"

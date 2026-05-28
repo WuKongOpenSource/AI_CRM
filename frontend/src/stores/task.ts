@@ -16,6 +16,7 @@ type TaskStatusCounts = {
   PENDING: number
   IN_PROGRESS: number
   COMPLETED: number
+  OVERDUE: number
 }
 
 type TaskMutationOptions = {
@@ -37,7 +38,8 @@ export const useTaskStore = defineStore('task', () => {
     all: 0,
     PENDING: 0,
     IN_PROGRESS: 0,
-    COMPLETED: 0
+    COMPLETED: 0,
+    OVERDUE: 0
   })
 
   // Query params
@@ -57,15 +59,21 @@ export const useTaskStore = defineStore('task', () => {
   const inProgressTasks = computed(() => myTasks.value.filter(t => t.status === 'IN_PROGRESS'))
   const overdueTasks = computed(() => {
     const now = new Date()
-    return myTasks.value.filter(t => t.dueDate && new Date(t.dueDate) < now && t.status !== 'COMPLETED')
+    return myTasks.value.filter(t => isTaskOverdue(t, now))
   })
+
+  function isTaskOverdue(task: Task, now = new Date()): boolean {
+    if (typeof task.overdue === 'boolean') return task.overdue
+    return Boolean(task.dueDate && new Date(task.dueDate) < now && task.status !== 'COMPLETED')
+  }
 
   function buildFallbackStatusCounts(tasks: Task[]): TaskStatusCounts {
     return {
       all: tasks.length,
       PENDING: tasks.filter(t => t.status === 'PENDING').length,
       IN_PROGRESS: tasks.filter(t => t.status === 'IN_PROGRESS').length,
-      COMPLETED: tasks.filter(t => t.status === 'COMPLETED').length
+      COMPLETED: tasks.filter(t => t.status === 'COMPLETED').length,
+      OVERDUE: tasks.filter(t => isTaskOverdue(t)).length
     }
   }
 
@@ -76,7 +84,8 @@ export const useTaskStore = defineStore('task', () => {
         all: Number(raw.all ?? fallbackTasks?.length ?? result.totalRow ?? 0),
         PENDING: Number(raw.PENDING ?? 0),
         IN_PROGRESS: Number(raw.IN_PROGRESS ?? 0),
-        COMPLETED: Number(raw.COMPLETED ?? 0)
+        COMPLETED: Number(raw.COMPLETED ?? 0),
+        OVERDUE: Number(raw.OVERDUE ?? 0)
       }
     }
 

@@ -488,7 +488,9 @@ const route = useRoute()
 const router = useRouter()
 const { isMobile } = useResponsive()
 
-const currentStatus = ref('all')
+type TaskStatusFilter = 'all' | TaskStatus | 'OVERDUE'
+
+const currentStatus = ref<TaskStatusFilter>('all')
 const valueFilter = ref<'all' | 'high-impact'>('all')
 const taskViewMode = ref<'list' | 'card'>('list')
 const showAddDialog = ref(false)
@@ -500,13 +502,14 @@ const selectedTask = ref<Task | null>(null)
 const effectiveTaskViewMode = computed(() => taskViewMode.value)
 
 // Computed properties
-const statusTabs = computed(() => {
+const statusTabs = computed<Array<{ value: TaskStatusFilter; label: string; count: number }>>(() => {
   const counts = taskStore.statusCounts
   return [
     { value: 'all', label: '全部', count: counts.all },
     { value: 'PENDING', label: '待处理', count: counts.PENDING },
     { value: 'IN_PROGRESS', label: '进行中', count: counts.IN_PROGRESS },
-    { value: 'COMPLETED', label: '已完成', count: counts.COMPLETED }
+    { value: 'COMPLETED', label: '已完成', count: counts.COMPLETED },
+    // { value: 'OVERDUE', label: '已延期', count: counts.OVERDUE }
   ]
 })
 
@@ -612,10 +615,16 @@ async function handleValueFilter(filter: 'all' | 'high-impact') {
   await taskStore.fetchTaskList(false)
 }
 
-function handleStatusFilter(status: string) {
+function handleStatusFilter(status: TaskStatusFilter) {
   currentStatus.value = status
   taskStore.queryParams.taskId = undefined
-  taskStore.queryParams.status = status === 'all' ? undefined : status as TaskStatus
+  if (status === 'OVERDUE') {
+    taskStore.queryParams.status = undefined
+    taskStore.queryParams.filter = 'overdue'
+  } else {
+    taskStore.queryParams.status = status === 'all' ? undefined : status
+    taskStore.queryParams.filter = 'all'
+  }
   taskStore.queryParams.page = 1
   taskStore.fetchTaskList(false)
 }
@@ -789,6 +798,7 @@ function getTaskOwnerName(task: Task): string {
 
 // Check if task is overdue
 function isOverdue(task: Task): boolean {
+  if (typeof task.overdue === 'boolean') return task.overdue
   if (!task.dueDate || task.status === 'COMPLETED') return false
   return new Date(task.dueDate) < new Date()
 }

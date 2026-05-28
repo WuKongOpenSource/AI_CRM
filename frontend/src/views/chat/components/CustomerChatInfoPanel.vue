@@ -191,9 +191,11 @@ const props = defineProps<{
   customerId: string
 }>()
 
+type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
+
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
-  modules?: Array<'tasks' | 'schedules'>
+  modules?: CustomerDetailRefreshModule[]
 }
 
 const MIN_WIDTH = 320
@@ -290,7 +292,11 @@ async function loadCustomer(options: { schedulePolling?: boolean } = {}) {
 }
 
 function handleCustomerDetailRefresh(payload?: CustomerDetailRefreshPayload) {
-  if (payload?.modules?.length) return
+  if (
+    payload?.modules?.length
+    && !payload.modules.includes('contacts')
+    && !payload.modules.includes('followUps')
+  ) return
   const targetCustomerId = payload?.customerId ? String(payload.customerId) : ''
   if (!props.customerId || (targetCustomerId && targetCustomerId !== String(props.customerId))) return
   void loadCustomer()

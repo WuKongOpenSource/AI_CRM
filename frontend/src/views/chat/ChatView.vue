@@ -906,22 +906,29 @@
                         width="340"
                         :show-arrow="false"
                         :teleported="true"
-                        :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                        :disabled="chatModelPickerDisabled || showAiQuotaEmptyCta"
                         transition="el-zoom-in-bottom"
                         popper-class="wk-chat-model-popper"
                       >
                         <template #reference>
                           <button
                             type="button"
-                            class="inline-flex h-9 max-w-[220px] shrink-0 items-center gap-1.5 rounded-[18px] border border-[#ececec] bg-[#f5f5f5] pl-2 pr-2 text-left text-[13px] text-[#0d0d0d] transition-colors hover:bg-[#ececec] disabled:cursor-not-allowed disabled:opacity-50"
-                            :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                            class="inline-flex h-9 max-w-[260px] shrink-0 items-center gap-1.5 rounded-[18px] border pl-2 pr-2 text-left text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                            :class="chatModelTriggerClass"
+                            :disabled="chatModelPickerDisabled"
                             :title="`当前模型：${chatComposerModelLabel}`"
+                            @click="handleChatModelTriggerClick"
                           >
                             <span
-                              class="relative w-[20px] h-[20px] shrink-0 overflow-hidden rounded-md bg-[#ececec]"
+                              class="relative flex h-[20px] w-[20px] shrink-0 items-center justify-center overflow-hidden rounded-md"
+                              :class="showAiQuotaEmptyCta ? 'bg-red-50' : 'bg-[#ececec]'"
                               aria-hidden="true"
                             >
-                              <template v-if="chatStore.selectedModel">
+                              <span
+                                v-if="showAiQuotaEmptyCta"
+                                class="material-symbols-outlined text-[16px] leading-none text-red-500"
+                              >bolt</span>
+                              <template v-else-if="chatStore.selectedModel">
                                 <img
                                   v-if="chatModelShowImage(chatStore.selectedModel)"
                                   :src="chatModelIconSrc(chatStore.selectedModel)"
@@ -1233,11 +1240,23 @@
                       </button> -->
                     </div>
 
+                    <button
+                      v-if="showAiQuotaEmptyCta"
+                      type="button"
+                      class="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 shadow-sm transition-colors hover:bg-orange-100"
+                      @click="openAiQuotaChoiceDialog()"
+                    >
+                      <span class="material-symbols-outlined shrink-0 text-[17px] leading-none text-red-500">bolt</span>
+                      <span class="min-w-0 truncate">额度已用完，续费/接入模型</span>
+                      <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-orange-500">expand_more</span>
+                    </button>
+
                     <el-select
+                      v-else
                       v-model="chatStore.selectedModelKey"
                       class="min-w-0 flex-1"
                       size="large"
-                      :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading || chatStore.modelOptions.length === 0"
+                      :disabled="chatStore.currentSessionIsStreaming || isUploading || chatStore.modelOptionsLoading"
                       :placeholder="chatStore.modelOptionsLoading ? '加载模型...' : (chatStore.modelOptions.length > 0 ? '选择模型' : '暂无可选模型')"
                       @change="handleChatModelChange"
                     >
@@ -1450,6 +1469,65 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="showAiQuotaChoiceDialog"
+      :width="isMobile ? '92%' : '560px'"
+      class="wk-ai-quota-choice-dialog wk-dialog--flush"
+      align-center
+    >
+      <div class="px-1 pb-1 pt-1">
+        <div class="mb-5 flex items-start gap-3">
+          <span class="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+            <span class="material-symbols-outlined text-[22px] leading-none">bolt</span>
+          </span>
+          <div class="min-w-0">
+            <h3 class="text-[20px] font-black leading-tight text-[#171717]">免费体验额度已用完</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-500">
+              继续使用 AI CRM，可选择购买套餐，或接入自己的大模型 API。
+            </p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <button
+            type="button"
+            class="group flex w-full items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 text-left transition-all hover:border-orange-300 hover:bg-orange-50 hover:shadow-sm"
+            @click="handleAiQuotaChoicePurchase"
+          >
+            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-sm shadow-orange-200">
+              <span class="material-symbols-outlined text-[22px] leading-none">payments</span>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="flex min-w-0 flex-wrap items-center gap-2">
+                <span class="text-sm font-black text-slate-900">购买套餐</span>
+                <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-600">推荐</span>
+              </span>
+              <span class="mt-1 block text-xs leading-5 text-slate-500">购买 AI 算力包，恢复全部模型与 AI 功能。</span>
+            </span>
+            <span class="inline-flex h-9 shrink-0 items-center rounded-xl bg-orange-500 px-3 text-xs font-bold text-white transition-colors group-hover:bg-orange-600">去购买</span>
+          </button>
+
+          <button
+            type="button"
+            class="group flex w-full items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-left transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-sm"
+            @click="handleAiQuotaChoiceConfigure"
+          >
+            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm shadow-emerald-200">
+              <span class="material-symbols-outlined text-[22px] leading-none">construction</span>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="flex min-w-0 flex-wrap items-center gap-2">
+                <span class="text-sm font-black text-slate-900">配置自定义大模型</span>
+                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-600">更灵活</span>
+              </span>
+              <span class="mt-1 block text-xs leading-5 text-slate-500">支持 OpenAI、DeepSeek、Qwen、Kimi 等兼容 API。</span>
+            </span>
+            <span class="inline-flex h-9 shrink-0 items-center rounded-xl bg-emerald-500 px-3 text-xs font-bold text-white transition-colors group-hover:bg-emerald-600">去配置</span>
+          </button>
+        </div>
+      </div>
+    </el-dialog>
+
     <CustomerBasicInfoDrawer
       v-model="showSelectedCustomerBasicInfoDrawer"
       :customer="selectedCustomer"
@@ -1583,7 +1661,18 @@ const agentStore = useAgentStore()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const { isMobile } = useResponsive()
-const { aiConfig, canManageAiConfig, loadAiConfig, ensureAiAvailableForSend, goToAiSettings } = useAiQuota()
+const {
+  aiConfig,
+  canManageAiConfig,
+  creditRemaining,
+  loadAiConfig,
+  ensureAiAvailableForSend,
+  goToAiSettings,
+  openApiKeySetup,
+  openTokenPurchaseDialog,
+  resumeSendAfterApiKeySave,
+  resumeSendAfterTokenPurchase,
+} = useAiQuota()
 const boundCustomerId = computed(() => {
   const customerId = chatStore.currentSession?.customerId
   return customerId ? String(customerId) : ''
@@ -1652,6 +1741,8 @@ watch(chatUploadMenuVisible, (visible) => {
 const chatKnowledgePickerVisible = ref(false)
 const showKnowledgeFollowUpChips = ref(false)
 const chatModelPopoverVisible = ref(false)
+const showAiQuotaChoiceDialog = ref(false)
+const resumeSendAfterAiQuotaChoice = ref(false)
 /** 按图片最终 URL 记录加载失败（含接口 icon 与本地 /model-provider-logos/{provider}.svg） */
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 
@@ -1675,10 +1766,12 @@ let chatCustomerAiPollTimer: ReturnType<typeof setTimeout> | null = null
 let chatCustomerAiPollAttempts = 0
 let offSelectedCustomerDetailRefresh: (() => void) | null = null
 
+type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
+
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
   source?: string
-  modules?: Array<'tasks' | 'schedules'>
+  modules?: CustomerDetailRefreshModule[]
 }
 
 const chatComposerShellStyle = computed(() => (
@@ -1728,10 +1821,24 @@ const chatModelOptionGroups = computed(() => {
 
 const chatComposerModelLabel = computed(() => {
   if (chatStore.modelOptionsLoading) return '加载模型...'
-  if (!chatStore.modelOptions.length) return '暂无可选模型'
+  if (!chatStore.modelOptions.length) return '额度已用完，续费/接入模型'
   const m = chatStore.selectedModel
   return m ? modelOptionLabel(m) : '选择模型'
 })
+
+const showAiQuotaEmptyCta = computed(() =>
+  !chatStore.modelOptionsLoading && chatStore.modelOptions.length === 0
+)
+
+const chatModelPickerDisabled = computed(() =>
+  chatStore.currentSessionIsStreaming || isUploading.value || chatStore.modelOptionsLoading
+)
+
+const chatModelTriggerClass = computed(() =>
+  showAiQuotaEmptyCta.value
+    ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+    : 'border-[#ececec] bg-[#f5f5f5] text-[#0d0d0d] hover:bg-[#ececec]'
+)
 
 function modelOptionLabel(option: ChatModelOption): string {
   return option.displayName || option.modelName
@@ -1811,6 +1918,32 @@ function handleChatModelChange(modelKey: string) {
   focusChatTextarea()
 }
 
+function openAiQuotaChoiceDialog(resumeAfterAction = false) {
+  chatModelPopoverVisible.value = false
+  resumeSendAfterAiQuotaChoice.value = resumeAfterAction
+  showAiQuotaChoiceDialog.value = true
+}
+
+function handleChatModelTriggerClick() {
+  if (showAiQuotaEmptyCta.value) {
+    openAiQuotaChoiceDialog()
+  }
+}
+
+function handleAiQuotaChoicePurchase() {
+  resumeSendAfterTokenPurchase.value = resumeSendAfterAiQuotaChoice.value
+  resumeSendAfterAiQuotaChoice.value = false
+  showAiQuotaChoiceDialog.value = false
+  openTokenPurchaseDialog()
+}
+
+function handleAiQuotaChoiceConfigure() {
+  resumeSendAfterApiKeySave.value = resumeSendAfterAiQuotaChoice.value
+  resumeSendAfterAiQuotaChoice.value = false
+  showAiQuotaChoiceDialog.value = false
+  openApiKeySetup()
+}
+
 function handleOpenMoreModels() {
   chatModelPopoverVisible.value = false
   goToAiSettings()
@@ -1826,7 +1959,13 @@ watch(
 
 let hasSeenInitialAiConfigForModelRefresh = false
 watch(
-  () => [aiConfig.value?.mode, aiConfig.value?.customConfigSaved, aiConfig.value?.updateTime],
+  () => [
+    aiConfig.value?.mode,
+    aiConfig.value?.customConfigSaved,
+    aiConfig.value?.updateTime,
+    aiConfig.value?.creditRemaining,
+    aiConfig.value?.creditAvailable,
+  ],
   () => {
     if (!hasSeenInitialAiConfigForModelRefresh) {
       hasSeenInitialAiConfigForModelRefresh = true
@@ -2540,12 +2679,43 @@ function resolveChatSendAppCode(hasKnowledge: boolean): string {
   return chatStore.selectedAppCode || 'general'
 }
 
+async function refreshAiAvailabilitySnapshot() {
+  const tasks: Promise<unknown>[] = []
+
+  if (!aiConfig.value || creditRemaining.value <= 0) {
+    tasks.push(loadAiConfig(true))
+  }
+
+  if (chatStore.modelOptions.length === 0) {
+    tasks.push(chatStore.fetchModelOptions())
+  }
+
+  if (tasks.length === 0) return
+
+  try {
+    await Promise.all(tasks)
+  } catch (error) {
+    console.error('Refresh AI availability snapshot failed:', error)
+  }
+}
+
+async function ensureChatAiAvailableForSend(): Promise<boolean> {
+  await refreshAiAvailabilitySnapshot()
+
+  if (!chatStore.modelOptions.length || creditRemaining.value <= 0) {
+    openAiQuotaChoiceDialog(true)
+    return false
+  }
+
+  return ensureAiAvailableForSend()
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   const hasKnowledge = selectedKnowledgeItems.value.length > 0
   if ((!text && !hasFiles && !hasKnowledge) || chatStore.currentSessionIsStreaming || isUploading.value) return
-  if (!(await ensureAiAvailableForSend())) return
+  if (!(await ensureChatAiAvailableForSend())) return
 
   isPinnedToBottom.value = true
 
@@ -2655,7 +2825,7 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
   appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
     customerId,
     source: 'chat',
-    modules: ['tasks', 'schedules']
+    modules: ['contacts', 'followUps', 'tasks', 'schedules']
   })
 }
 

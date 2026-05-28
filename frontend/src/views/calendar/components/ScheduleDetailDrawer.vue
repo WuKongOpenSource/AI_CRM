@@ -62,85 +62,72 @@
         <h2 class="mb-8 text-2xl font-bold leading-tight text-slate-900">{{ schedule.title }}</h2>
 
         <div class="mb-8 grid grid-cols-2 gap-4">
-          <!-- 参考 ScheduleDetailDrawer.tsx 216 行起： slate 底卡片 + 主色图标与标题同一行 -->
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">schedule</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">schedule</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">开始时间</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">开始时间</p>
-                <p class="text-sm text-[#0d0d0d]">{{ formatDateTime(schedule.startTime) }}</p>
-              </div>
+              <p class="text-sm text-[#0d0d0d]">{{ formatDateTime(schedule.startTime) }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">schedule</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">schedule</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">结束时间</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">结束时间</p>
-                <p class="text-sm text-[#0d0d0d]">
-                  {{ schedule.endTime ? formatEndDateTime(schedule.startTime, schedule.endTime) : '未填写' }}
-                </p>
-              </div>
+              <p class="text-sm text-[#0d0d0d]">
+                {{ schedule.endTime ? formatEndDateTime(schedule.startTime, schedule.endTime) : '未填写' }}
+              </p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">label</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">label</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">类型</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">类型</p>
-                <p class="break-words text-sm text-[#0d0d0d]">{{ schedule.typeName || '未填写' }}</p>
-              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ schedule.typeName || '未填写' }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">location_on</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">location_on</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">地点</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">地点</p>
-                <p class="break-words text-sm text-[#0d0d0d]">{{ schedule.location || '未填写' }}</p>
-              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ schedule.location || '未填写' }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">person</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">person</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">创建人</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建人</p>
-                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
-              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateUserName }}</p>
             </div>
           </div>
           <div
             class="group rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:border-primary/20"
           >
-            <div class="flex items-center gap-4">
-              <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm transition-colors group-hover:text-primary">
-                <span class="material-symbols-outlined text-xl leading-none">calendar_clock</span>
+            <div class="min-w-0">
+              <div class="mb-2 flex items-center gap-2 text-slate-400 transition-colors group-hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] leading-none">calendar_clock</span>
+                <p class="text-[11px] font-bold uppercase tracking-wider">创建时间</p>
               </div>
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">创建时间</p>
-                <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
-              </div>
+              <p class="break-words text-sm text-[#0d0d0d]">{{ displayCreateTime }}</p>
             </div>
           </div>
         </div>
