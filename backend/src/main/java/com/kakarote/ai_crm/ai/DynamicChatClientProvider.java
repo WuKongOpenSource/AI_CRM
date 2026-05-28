@@ -377,7 +377,8 @@ public class DynamicChatClientProvider {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
         OpenAiChatOptions options = buildChatOptions(providerCode, baseUrl, model, temperature, maxTokens);
         boolean toolCallingEnabled = registerTools && capabilities != null && capabilities.isSupportsToolCall();
-        if (toolCallingEnabled && supportsParallelToolCalls(providerCode, baseUrl)) {
+        Object[] defaultTools = toolCallingEnabled ? resolveDefaultTools(appCode) : new Object[0];
+        if (shouldEnableParallelToolCalls(toolCallingEnabled, defaultTools, providerCode, baseUrl)) {
             options.setParallelToolCalls(Boolean.TRUE);
         }
 
@@ -388,11 +389,8 @@ public class DynamicChatClientProvider {
                 RetryTemplate.builder().build(), obsRegistry);
 
         ChatClient.Builder builder = ChatClient.builder(chatModel);
-        if (toolCallingEnabled) {
-            Object[] tools = resolveDefaultTools(appCode);
-            if (tools.length > 0) {
-                builder.defaultTools(tools);
-            }
+        if (defaultTools.length > 0) {
+            builder.defaultTools(defaultTools);
         }
         return builder.build();
     }
@@ -1047,6 +1045,14 @@ public class DynamicChatClientProvider {
         String resolvedProviderCode = AiProviderRegistry.resolve(providerCode, baseUrl).getCode();
         return "openai".equals(resolvedProviderCode)
                 || "dashscope".equals(resolvedProviderCode);
+    }
+
+    boolean shouldEnableParallelToolCalls(boolean toolCallingEnabled, Object[] defaultTools,
+                                         String providerCode, String baseUrl) {
+        return toolCallingEnabled
+                && defaultTools != null
+                && defaultTools.length > 0
+                && supportsParallelToolCalls(providerCode, baseUrl);
     }
 
     /**

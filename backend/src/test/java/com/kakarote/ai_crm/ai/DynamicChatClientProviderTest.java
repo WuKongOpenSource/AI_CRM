@@ -52,6 +52,27 @@ class DynamicChatClientProviderTest {
                 "openai", "https://api.openai.com", "gpt-5.4", 0.7, 2048);
 
         assertThat(options.getExtraBody()).isNullOrEmpty();
+        assertThat(options.getParallelToolCalls()).isNull();
+    }
+
+    @Test
+    void parallelToolCallsDisabledWhenNoDefaultTools() {
+        boolean enabled = provider.shouldEnableParallelToolCalls(
+                true, new Object[0], "openai", "https://api.openai.com");
+
+        assertThat(enabled).isFalse();
+    }
+
+    @Test
+    void parallelToolCallsEnabledOnlyForSupportedProvidersWithTools() {
+        Object[] defaultTools = new Object[]{new Object()};
+
+        assertThat(provider.shouldEnableParallelToolCalls(
+                true, defaultTools, "openai", "https://api.openai.com")).isTrue();
+        assertThat(provider.shouldEnableParallelToolCalls(
+                false, defaultTools, "openai", "https://api.openai.com")).isFalse();
+        assertThat(provider.shouldEnableParallelToolCalls(
+                true, defaultTools, "deepseek", "https://api.deepseek.com")).isFalse();
     }
 
     @Test
