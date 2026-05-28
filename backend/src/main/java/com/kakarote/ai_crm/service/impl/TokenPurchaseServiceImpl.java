@@ -5,8 +5,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.alipay.easysdk.factory.Factory;
 import com.alipay.easysdk.kernel.Config;
-import com.alipay.easysdk.kernel.util.ResponseChecker;
-import com.alipay.easysdk.payment.facetoface.models.AlipayTradePrecreateResponse;
+import com.alipay.easysdk.payment.page.models.AlipayTradePagePayResponse;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,14 +47,7 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 积分购买服务。
@@ -65,11 +57,13 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapper, TokenPurchaseOrder>
-        implements ITokenPurchaseService {
+    implements ITokenPurchaseService {
 
     private static final String CHANNEL_WECHAT = "wechat";
     private static final String CHANNEL_ALIPAY = "alipay";
+    private static final String ALIPAY_PRODUCT_CODE_FAST_INSTANT_TRADE_PAY = "FAST_INSTANT_TRADE_PAY";
     private static final String PAYMENT_MODE_QR_CODE = "qrcode";
+    private static final String PAYMENT_MODE_PAGE = "page";
 
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_PAID = "PAID";
@@ -138,6 +132,11 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前登录信息失效，请重新登录");
         }
 
+        TokenPurchaseOrder reusableOrder = findReusablePendingOrder(tenantId);
+        if (reusableOrder != null) {
+            return toOrderVO(reusableOrder);
+        }
+
         Plan plan = findPlan(createBO.getPlanId());
         String channel = normalizeChannel(createBO.getPaymentChannel());
         validateChannelReady(channel);
@@ -161,14 +160,33 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     }
 
     /**
+     * 购买额度归属租户；同一租户已有待支付订单时，复用原订单和原二维码，避免重复向支付平台下单。
+     */
+    private TokenPurchaseOrder findReusablePendingOrder(Long tenantId) {
+        List<TokenPurchaseOrder> pendingOrders = lambdaQuery()
+            .eq(TokenPurchaseOrder::getTenantId, tenantId)
+            .eq(TokenPurchaseOrder::getStatus, STATUS_PENDING)
+            .orderByDesc(TokenPurchaseOrder::getCreateTime)
+            .list();
+        for (TokenPurchaseOrder order : pendingOrders) {
+            refreshOrderStatusIfExpired(order);
+            if (STATUS_PENDING.equals(order.getStatus())) {
+                ensurePaymentPayload(order);
+                return order;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 查询单个订单给前端轮询使用。
      * 如果待支付订单缺少支付载荷，这里会兜底补生成一次。
      */
     @Override
     public TokenPurchaseOrderVO getOrder(String orderNo) {
         TokenPurchaseOrder order = lambdaQuery()
-                .eq(TokenPurchaseOrder::getOrderNo, orderNo)
-                .one();
+            .eq(TokenPurchaseOrder::getOrderNo, orderNo)
+            .one();
         if (order == null) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "订单不存在");
         }
@@ -184,9 +202,9 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     public List<TokenPurchaseOrderVO> listRecentOrders(int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 20));
         List<TokenPurchaseOrder> orders = lambdaQuery()
-                .orderByDesc(TokenPurchaseOrder::getCreateTime)
-                .last("LIMIT " + safeLimit)
-                .list();
+            .orderByDesc(TokenPurchaseOrder::getCreateTime)
+            .last("LIMIT " + safeLimit)
+            .list();
         for (TokenPurchaseOrder order : orders) {
             refreshOrderStatusIfExpired(order);
         }
@@ -295,9 +313,9 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private Plan findPlan(String planId) {
         return properties.getResolvedPlans().stream()
-                .filter(plan -> StrUtil.equals(plan.getId(), planId))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "购买套餐不存在"));
+            .filter(plan -> StrUtil.equals(plan.getId(), planId))
+            .findFirst()
+            .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "购买套餐不存在"));
     }
 
     /**
@@ -347,16 +365,16 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
             headers.set("User-Agent", "AI-CRM/TokenPurchase");
 
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    normalizeUrl(properties.getWechat().getGateway(), path),
-                    new HttpEntity<>(body, headers),
-                    String.class
+                normalizeUrl(properties.getWechat().getGateway(), path),
+                new HttpEntity<>(body, headers),
+                String.class
             );
 
             JsonNode responseNode = objectMapper.readTree(response.getBody());
             String codeUrl = responseNode.path("code_url").asText(null);
             if (StrUtil.isBlank(codeUrl)) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                        responseNode.path("message").asText("微信支付下单失败"));
+                    responseNode.path("message").asText("微信支付下单失败"));
             }
             return codeUrl;
         } catch (BusinessException e) {
@@ -367,24 +385,28 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     }
 
     /**
-     * 使用支付宝当面付预创建接口生成二维码内容，前端统一按二维码图片展示。
+     * 使用支付宝 Page Pay 生成一段可直接放进 iframe 的表单页面。
+     * 这样前端无需再自己拼接支付宝网关参数。
      */
     private String createAlipayPayment(TokenPurchaseOrder order) {
         try {
             initAlipayFactory();
-            var faceToFace = Factory.Payment.FaceToFace()
-                    .optional("body", buildOrderBody(order));
+            int qrCodeWidth = properties.getAlipay().getQrcodeWidth() == null
+                ? 200
+                : Math.max(100, properties.getAlipay().getQrcodeWidth());
+            var page = Factory.Payment.Page()
+                .optional("qr_pay_mode", 4)
+                .optional("qrcode_width", qrCodeWidth)
+                .optional("integration_type", "PCWEB")
+                .optional("product_code", ALIPAY_PRODUCT_CODE_FAST_INSTANT_TRADE_PAY)
+                .optional("body", buildOrderBody(order));
             if (StrUtil.isNotBlank(properties.getAlipay().getSellerId())) {
-                faceToFace = faceToFace.optional("seller_id", properties.getAlipay().getSellerId().trim());
+                page = page.optional("seller_id", properties.getAlipay().getSellerId().trim());
             }
-            AlipayTradePrecreateResponse pay = faceToFace
-                    .asyncNotify(resolveNotifyUrl(CHANNEL_ALIPAY))
-                    .preCreate(buildOrderSubject(order), order.getOrderNo(), fenToAmount(order.getAmountFen()).toPlainString());
-            if (!ResponseChecker.success(pay) || StrUtil.isBlank(pay.getQrCode())) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                        StrUtil.blankToDefault(pay.getSubMsg(), "支付宝下单失败"));
-            }
-            return pay.getQrCode();
+            AlipayTradePagePayResponse pay = page
+                .asyncNotify(resolveNotifyUrl(CHANNEL_ALIPAY))
+                .pay(buildOrderSubject(order), order.getOrderNo(), fenToAmount(order.getAmountFen()).toPlainString(), "");
+            return pay.getBody();
         } catch (Exception e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "支付宝下单失败: " + e.getMessage());
         }
@@ -421,8 +443,8 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private String resolveNotifyUrl(String channel) {
         String configured = CHANNEL_WECHAT.equals(channel)
-                ? properties.getWechat().getNotifyUrl()
-                : properties.getAlipay().getNotifyUrl();
+            ? properties.getWechat().getNotifyUrl()
+            : properties.getAlipay().getNotifyUrl();
         if (StrUtil.isNotBlank(configured)) {
             return configured.trim();
         }
@@ -484,16 +506,23 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
 
     /**
      * 将数据库订单转换成前端弹窗需要的展示结构。
-     * 微信和支付宝都走二维码模式，前端统一渲染二维码图片。
+     * 微信走二维码模式，支付宝走 page pay 表单模式。
      */
     private TokenPurchaseOrderVO toOrderVO(TokenPurchaseOrder order) {
         TokenPurchaseOrderVO vo = BeanUtil.copyProperties(order, TokenPurchaseOrderVO.class);
         vo.setAmountDisplay("¥" + fenToAmount(order.getAmountFen()).stripTrailingZeros().toPlainString());
         vo.setPaymentChannelLabel(CHANNEL_WECHAT.equals(order.getPaymentChannel()) ? "微信支付" : "支付宝");
-        vo.setPaymentMode(PAYMENT_MODE_QR_CODE);
-        vo.setQrCodeContent(order.getPaymentQrCode());
-        if (STATUS_PENDING.equals(order.getStatus()) && StrUtil.isNotBlank(order.getPaymentQrCode())) {
-            vo.setQrCodeImage(QrCodeUtil.toDataUri(order.getPaymentQrCode(), 280));
+        if (CHANNEL_WECHAT.equals(order.getPaymentChannel())) {
+            vo.setPaymentMode(PAYMENT_MODE_QR_CODE);
+            vo.setQrCodeContent(order.getPaymentQrCode());
+            if (STATUS_PENDING.equals(order.getStatus()) && StrUtil.isNotBlank(order.getPaymentQrCode())) {
+                vo.setQrCodeImage(QrCodeUtil.toDataUri(order.getPaymentQrCode(), 280));
+            }
+        } else {
+            vo.setPaymentMode(PAYMENT_MODE_PAGE);
+            if (STATUS_PENDING.equals(order.getStatus()) && StrUtil.isNotBlank(order.getPaymentQrCode())) {
+                vo.setPaymentFormHtml(order.getPaymentQrCode());
+            }
         }
         return vo;
     }
@@ -517,30 +546,19 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private String createPaymentPayload(TokenPurchaseOrder order) {
         return CHANNEL_WECHAT.equals(order.getPaymentChannel())
-                ? createWechatPayment(order)
-                : createAlipayPayment(order);
+            ? createWechatPayment(order)
+            : createAlipayPayment(order);
     }
 
     /**
      * 待支付订单如果缺少支付载荷，在查询时补一遍，避免用户刷新后必须重新下单。
      */
     private void ensurePaymentPayload(TokenPurchaseOrder order) {
-        if (order == null || !STATUS_PENDING.equals(order.getStatus())) {
-            return;
-        }
-        if (StrUtil.isNotBlank(order.getPaymentQrCode()) && !isLegacyAlipayPagePayload(order)) {
+        if (order == null || !STATUS_PENDING.equals(order.getStatus()) || StrUtil.isNotBlank(order.getPaymentQrCode())) {
             return;
         }
         order.setPaymentQrCode(createPaymentPayload(order));
         updateById(order);
-    }
-
-    /**
-     * 老版本支付宝订单保存的是 Page Pay 表单，无法稳定控制跨域 iframe 内部布局。
-     */
-    private boolean isLegacyAlipayPagePayload(TokenPurchaseOrder order) {
-        return CHANNEL_ALIPAY.equals(order.getPaymentChannel())
-                && StrUtil.containsAnyIgnoreCase(order.getPaymentQrCode(), "<form", "<html", "alipay.trade.page.pay");
     }
 
     /**
@@ -579,15 +597,15 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String message = method + "\n" + path + "\n" + timestamp + "\n" + nonce + "\n" + body + "\n";
         String sign = Base64.getEncoder().encodeToString(signRsaSha256(
-                loadPrivateKey(resolveWechatPrivateKey()),
-                message.getBytes(StandardCharsets.UTF_8)
+            loadPrivateKey(resolveWechatPrivateKey()),
+            message.getBytes(StandardCharsets.UTF_8)
         ));
         return "WECHATPAY2-SHA256-RSA2048 "
-                + "mchid=\"" + properties.getWechat().getMerchantId() + "\","
-                + "nonce_str=\"" + nonce + "\","
-                + "signature=\"" + sign + "\","
-                + "timestamp=\"" + timestamp + "\","
-                + "serial_no=\"" + properties.getWechat().getMerchantSerialNo() + "\"";
+            + "mchid=\"" + properties.getWechat().getMerchantId() + "\","
+            + "nonce_str=\"" + nonce + "\","
+            + "signature=\"" + sign + "\","
+            + "timestamp=\"" + timestamp + "\","
+            + "serial_no=\"" + properties.getWechat().getMerchantSerialNo() + "\"";
     }
 
     /**
@@ -599,8 +617,8 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
         String ciphertext = resource.path("ciphertext").asText();
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         SecretKeySpec keySpec = new SecretKeySpec(
-                resolveWechatApiV3Key().getBytes(StandardCharsets.UTF_8),
-                "AES"
+            resolveWechatApiV3Key().getBytes(StandardCharsets.UTF_8),
+            "AES"
         );
         cipher.init(Cipher.DECRYPT_MODE, keySpec, new GCMParameterSpec(128, nonce.getBytes(StandardCharsets.UTF_8)));
         cipher.updateAAD(associatedData.getBytes(StandardCharsets.UTF_8));
@@ -624,11 +642,11 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     private boolean isWechatReady() {
         TokenPurchaseProperties.Wechat wechat = properties.getWechat();
         return wechat.isEnabled()
-                && StrUtil.isNotBlank(wechat.getAppId())
-                && StrUtil.isNotBlank(wechat.getMerchantId())
-                && StrUtil.isNotBlank(wechat.getMerchantSerialNo())
-                && isValidWechatApiV3Key(wechat.getApiV3Key())
-                && StrUtil.isNotBlank(resolveWechatPrivateKeyQuietly());
+            && StrUtil.isNotBlank(wechat.getAppId())
+            && StrUtil.isNotBlank(wechat.getMerchantId())
+            && StrUtil.isNotBlank(wechat.getMerchantSerialNo())
+            && isValidWechatApiV3Key(wechat.getApiV3Key())
+            && StrUtil.isNotBlank(resolveWechatPrivateKeyQuietly());
     }
 
     /**
@@ -638,7 +656,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
         String privateKey = resolveWechatPrivateKeyQuietly();
         if (StrUtil.isBlank(privateKey)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
-                    "微信支付私钥未配置");
+                "微信支付私钥未配置");
         }
         return privateKey;
     }
@@ -664,9 +682,9 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private String resolveWechatPrivateKeyQuietly() {
         return resolveWechatPemContent(
-                properties.getWechat().getPrivateKey(),
-                properties.getWechat().getPrivateKeyPath(),
-                List.of("apiclient_key.pem")
+            properties.getWechat().getPrivateKey(),
+            properties.getWechat().getPrivateKeyPath(),
+            List.of("apiclient_key.pem")
         );
     }
 
@@ -676,7 +694,7 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
     private boolean isValidWechatApiV3Key(String apiV3Key) {
         String normalizedKey = normalizeMultiline(apiV3Key);
         return StrUtil.isNotBlank(normalizedKey)
-                && normalizedKey.getBytes(StandardCharsets.UTF_8).length == 32;
+            && normalizedKey.getBytes(StandardCharsets.UTF_8).length == 32;
     }
 
     /**
@@ -731,9 +749,9 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private boolean looksLikePem(String value) {
         return StrUtil.containsAnyIgnoreCase(value,
-                "-----BEGIN PRIVATE KEY-----",
-                "-----BEGIN PUBLIC KEY-----",
-                "-----BEGIN CERTIFICATE-----");
+            "-----BEGIN PRIVATE KEY-----",
+            "-----BEGIN PUBLIC KEY-----",
+            "-----BEGIN CERTIFICATE-----");
     }
 
     /**
@@ -822,13 +840,13 @@ public class TokenPurchaseServiceImpl extends ServiceImpl<TokenPurchaseOrderMapp
      */
     private String normalizePemBody(String pem) {
         return normalizeMultiline(pem)
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replace("-----BEGIN CERTIFICATE-----", "")
-                .replace("-----END CERTIFICATE-----", "")
-                .replaceAll("\\s+", "");
+            .replace("-----BEGIN PRIVATE KEY-----", "")
+            .replace("-----END PRIVATE KEY-----", "")
+            .replace("-----BEGIN PUBLIC KEY-----", "")
+            .replace("-----END PUBLIC KEY-----", "")
+            .replace("-----BEGIN CERTIFICATE-----", "")
+            .replace("-----END CERTIFICATE-----", "")
+            .replaceAll("\\s+", "");
     }
 
     /**

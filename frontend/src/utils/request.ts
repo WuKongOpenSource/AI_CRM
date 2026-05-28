@@ -33,7 +33,7 @@ const ERROR_MESSAGE_DEBOUNCE_MS = 120
 
 const service: AxiosInstance = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 30000,
+  timeout: 120000,
   headers: {
     'Content-Type': 'application/json'
   }

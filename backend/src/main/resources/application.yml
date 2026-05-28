@@ -34,7 +34,7 @@ spring:
       base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
       chat:
         options:
-          model: qwen3.5-plus
+          model: qwen3.6-plus
           temperature: 0.7
           max-tokens: 4096
   flyway:
@@ -46,6 +46,27 @@ spring:
 system-ai:
   openai:
     proxy-base-url: ${SYSTEM_OPENAI_PROXY_BASE_URL:http://52.198.150.151}
+  providers:
+    openai:
+      enabled: true
+      base-url: http://52.198.150.151
+      api-key: ${SYSTEM_OPENAI_API_KEY:${OPENAI_API_KEY:}}
+      model: gpt-5.4
+    ark:
+      enabled: true
+      base-url: https://ark.cn-beijing.volces.com/api/v3
+      api-key: ${SYSTEM_ARK_API_KEY:}
+      model: doubao-seed-2-0-pro-260215
+    deepseek:
+      enabled: true
+      base-url: https://api.deepseek.com
+      api-key: ${SYSTEM_DEEPSEEK_API_KEY:${DEEPSEEK_API_KEY:}}
+      model: deepseek-v4-pro
+    moonshot:
+      enabled: true
+      base-url: https://api.moonshot.cn
+      api-key: ${SYSTEM_KIMI_API_KEY:${KIMI_API_KEY:${MOONSHOT_API_KEY:}}}
+      model: kimi-k2.6
 logging:
   config: classpath:logback-spring.xml
 # token配置
@@ -64,6 +85,15 @@ knife4j:
 # 文件上传配置
 file:
   upload-path: ./uploads
+
+media-analysis:
+  ffmpeg:
+    path: "D:/software/ffmpeg/bin/ffmpeg.exe"
+  ffprobe:
+    path: "D:/software/ffmpeg/bin/ffprobe.exe"
+  video:
+    max-frames: ${MEDIA_ANALYSIS_VIDEO_MAX_FRAMES:5}
+    timeout-seconds: ${MEDIA_ANALYSIS_VIDEO_TIMEOUT_SECONDS:60}
 
 # 云邮件配置
 cloud:
@@ -85,7 +115,7 @@ minio:
   endpoint: http://39.97.38.69:9000
   # 面向浏览器的外部访问地址（presigned URL 用，通过 nginx /s3/ 代理）
   # 如果有域名，改为 http://yourdomain.com/s3
-  public-endpoint: http://39.97.38.69:9000
+  public-endpoint: https://aicrm-saas.5kcrm.cn/s3
   # Access Key
   access-key: minioadmin
   # Secret Key
@@ -118,10 +148,10 @@ token-purchase:
   enabled: ${TOKEN_PURCHASE_ENABLED:true}
   order-expire-minutes: ${TOKEN_PURCHASE_ORDER_EXPIRE_MINUTES:30}
   plans:
-    - id: starter-100w
-      name: 1,000,000 Token 加油包
-      description: 1,000,000 Token
-      token-amount: 1000000
+    - id: starter-5000
+      name: 5,000 积分加油包
+      description: 5,000 积分
+      credit-amount: 5000
       price-fen: 1
       sort: 1
       enabled: true
@@ -158,7 +188,7 @@ weknora:
   # 新租户初始化时自动创建的模型配置
   init-models:
     chat:
-      name: qwen3.5-plus
+      name: qwen3.6-plus
       source: remote
       provider: aliyun
       api-key: ${DASHSCOPE_API_KEY:}

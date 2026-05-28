@@ -383,6 +383,8 @@ async function createOrderForSelectedChannel() {
     })
     if (requestSeq !== orderRequestSeq) return
 
+    selectedPlanId.value = order.planId || selectedPlanId.value
+    selectedChannel.value = order.paymentChannel || selectedChannel.value
     currentOrder.value = order
     if (order.status === 'PENDING') {
       startPolling()
