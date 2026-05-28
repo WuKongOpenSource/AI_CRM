@@ -64,7 +64,13 @@
             aria-hidden="true"
           >
             <span class="size-7 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-transparent">
-              <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+              <img
+                v-if="enterpriseStore.hasLogo"
+                :src="enterpriseStore.logoUrl!"
+                class="h-full w-full object-cover"
+                alt="logo"
+              />
+              <img v-else :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
             </span>
           </span>
           <span

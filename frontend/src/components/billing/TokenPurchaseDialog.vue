@@ -244,11 +244,10 @@ const paymentChannelLogos: Record<PaymentChannel, string> = {
 }
 
 const computeEstimates = [
-  { model: 'Qwen3.6-plus', messages: '约 5000 条消息' },
-  { model: 'DeepSeek V4 Pro', messages: '约 2000 条消息' },
-  { model: 'Claude Sonnet 4.6', messages: '约 400 条消息' },
-  { model: 'Gemini 3.1 Pro', messages: '约 500 条消息' },
-  { model: 'GPT-5.5', messages: '约 200 条消息' }
+  { model: 'Qwen3.6-plus', messages: '约 1200 条消息' },
+  { model: 'DeepSeek V4 Pro', messages: '约 1100 条消息' },
+  { model: 'Kimi K2.6', messages: '约 260 条消息' },
+  { model: 'GPT-5.4', messages: '约 70 条消息' }
 ]
 
 const loadingOptions = ref(false)
@@ -659,8 +658,8 @@ function statusTagType(status: TokenPurchaseOrder['status']) {
 
 .token-payment-code {
   display: block;
-  width: 220px;
-  height: 220px;
+  width: 205px;
+  height: 205px;
 }
 
 .token-payment-iframe {

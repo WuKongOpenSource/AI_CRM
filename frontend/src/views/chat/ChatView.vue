@@ -926,7 +926,7 @@
                             >
                               <span
                                 v-if="showAiQuotaEmptyCta"
-                                class="material-symbols-outlined text-[16px] leading-none text-red-500"
+                                class="material-symbols-outlined text-[16px] leading-none text-[#8d4f34]"
                               >bolt</span>
                               <template v-else-if="chatStore.selectedModel">
                                 <img
@@ -1243,12 +1243,12 @@
                     <button
                       v-if="showAiQuotaEmptyCta"
                       type="button"
-                      class="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-700 shadow-sm transition-colors hover:bg-orange-100"
+                      class="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-[#ead8cc] bg-[#fbf7f4] px-3 py-2 text-sm font-semibold text-[#8d4f34] shadow-sm shadow-slate-100 transition-colors hover:border-[#dec4b5] hover:bg-[#f7eee8]"
                       @click="openAiQuotaChoiceDialog()"
                     >
-                      <span class="material-symbols-outlined shrink-0 text-[17px] leading-none text-red-500">bolt</span>
+                      <span class="material-symbols-outlined shrink-0 text-[17px] leading-none text-[#8d4f34]">bolt</span>
                       <span class="min-w-0 truncate">额度已用完，续费/接入模型</span>
-                      <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-orange-500">expand_more</span>
+                      <span class="material-symbols-outlined shrink-0 text-[16px] leading-none text-[#8d4f34]">expand_more</span>
                     </button>
 
                     <el-select
@@ -1475,9 +1475,9 @@
       class="wk-ai-quota-choice-dialog wk-dialog--flush"
       align-center
     >
-      <div class="px-1 pb-1 pt-1">
+      <div class="px-1 pb-6 pt-1">
         <div class="mb-5 flex items-start gap-3">
-          <span class="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+          <span class="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-[#f4f1ed] text-[#8d4f34]">
             <span class="material-symbols-outlined text-[22px] leading-none">bolt</span>
           </span>
           <div class="min-w-0">
@@ -1489,41 +1489,59 @@
         </div>
 
         <div class="space-y-3">
-          <button
-            type="button"
-            class="group flex w-full items-center gap-4 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 text-left transition-all hover:border-orange-300 hover:bg-orange-50 hover:shadow-sm"
+          <div
+            role="button"
+            tabindex="0"
+            class="group flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-[#ead8cc] bg-[#fbf7f4] p-4 text-left transition-all hover:border-[#dec4b5] hover:bg-[#f7eee8] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ead8cc] focus-visible:ring-offset-2"
             @click="handleAiQuotaChoicePurchase"
+            @keydown.enter.prevent="handleAiQuotaChoicePurchase"
+            @keydown.space.prevent="handleAiQuotaChoicePurchase"
           >
-            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-sm shadow-orange-200">
+            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#f4f1ed] text-[#8d4f34] shadow-sm shadow-slate-100">
               <span class="material-symbols-outlined text-[22px] leading-none">payments</span>
             </span>
             <span class="min-w-0 flex-1">
               <span class="flex min-w-0 flex-wrap items-center gap-2">
                 <span class="text-sm font-black text-slate-900">购买套餐</span>
-                <span class="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-600">推荐</span>
+                <span class="rounded-full bg-[#f4e9e2] px-2 py-0.5 text-[11px] font-bold text-[#8d4f34]">推荐</span>
               </span>
               <span class="mt-1 block text-xs leading-5 text-slate-500">购买 AI 算力包，恢复全部模型与 AI 功能。</span>
             </span>
-            <span class="inline-flex h-9 shrink-0 items-center rounded-xl bg-orange-500 px-3 text-xs font-bold text-white transition-colors group-hover:bg-orange-600">去购买</span>
-          </button>
+            <button
+              type="button"
+              class="inline-flex h-9 shrink-0 items-center rounded-xl bg-[#8d4f34] px-3 text-xs font-bold text-white transition-colors hover:bg-[#7a432c]"
+              @click.stop="handleAiQuotaChoicePurchase"
+            >
+              去购买
+            </button>
+          </div>
 
-          <button
-            type="button"
-            class="group flex w-full items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-left transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-sm"
+          <div
+            role="button"
+            tabindex="0"
+            class="group flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-[#dce5d2] bg-[#f7faf4] p-4 text-left transition-all hover:border-[#cddabc] hover:bg-[#eef4e8] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#dce5d2] focus-visible:ring-offset-2"
             @click="handleAiQuotaChoiceConfigure"
+            @keydown.enter.prevent="handleAiQuotaChoiceConfigure"
+            @keydown.space.prevent="handleAiQuotaChoiceConfigure"
           >
-            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm shadow-emerald-200">
+            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[#eef1ea] text-[#5f704a] shadow-sm shadow-slate-100">
               <span class="material-symbols-outlined text-[22px] leading-none">construction</span>
             </span>
             <span class="min-w-0 flex-1">
               <span class="flex min-w-0 flex-wrap items-center gap-2">
                 <span class="text-sm font-black text-slate-900">配置自定义大模型</span>
-                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-600">更灵活</span>
+                <span class="rounded-full bg-[#e8efdf] px-2 py-0.5 text-[11px] font-bold text-[#5f704a]">更灵活</span>
               </span>
               <span class="mt-1 block text-xs leading-5 text-slate-500">支持 OpenAI、DeepSeek、Qwen、Kimi 等兼容 API。</span>
             </span>
-            <span class="inline-flex h-9 shrink-0 items-center rounded-xl bg-emerald-500 px-3 text-xs font-bold text-white transition-colors group-hover:bg-emerald-600">去配置</span>
-          </button>
+            <button
+              type="button"
+              class="inline-flex h-9 shrink-0 items-center rounded-xl bg-[#5f704a] px-3 text-xs font-bold text-white transition-colors hover:bg-[#536241]"
+              @click.stop="handleAiQuotaChoiceConfigure"
+            >
+              去配置
+            </button>
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -1663,14 +1681,13 @@ const enterpriseStore = useEnterpriseStore()
 const { isMobile } = useResponsive()
 const {
   aiConfig,
+  aiConfigLoaded,
   canManageAiConfig,
   creditRemaining,
   loadAiConfig,
   ensureAiAvailableForSend,
   goToAiSettings,
-  openApiKeySetup,
   openTokenPurchaseDialog,
-  resumeSendAfterApiKeySave,
   resumeSendAfterTokenPurchase,
 } = useAiQuota()
 const boundCustomerId = computed(() => {
@@ -1821,13 +1838,14 @@ const chatModelOptionGroups = computed(() => {
 
 const chatComposerModelLabel = computed(() => {
   if (chatStore.modelOptionsLoading) return '加载模型...'
-  if (!chatStore.modelOptions.length) return '额度已用完，续费/接入模型'
+  if (showAiQuotaEmptyCta.value) return '额度已用完，续费/接入模型'
   const m = chatStore.selectedModel
   return m ? modelOptionLabel(m) : '选择模型'
 })
 
 const showAiQuotaEmptyCta = computed(() =>
-  !chatStore.modelOptionsLoading && chatStore.modelOptions.length === 0
+  !chatStore.modelOptionsLoading
+  && (chatStore.modelOptions.length === 0 || (aiConfigLoaded.value && creditRemaining.value <= 0))
 )
 
 const chatModelPickerDisabled = computed(() =>
@@ -1836,7 +1854,7 @@ const chatModelPickerDisabled = computed(() =>
 
 const chatModelTriggerClass = computed(() =>
   showAiQuotaEmptyCta.value
-    ? 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'
+    ? 'border-[#ead8cc] bg-[#fbf7f4] text-[#8d4f34] hover:border-[#dec4b5] hover:bg-[#f7eee8]'
     : 'border-[#ececec] bg-[#f5f5f5] text-[#0d0d0d] hover:bg-[#ececec]'
 )
 
@@ -1931,17 +1949,17 @@ function handleChatModelTriggerClick() {
 }
 
 function handleAiQuotaChoicePurchase() {
-  resumeSendAfterTokenPurchase.value = resumeSendAfterAiQuotaChoice.value
+  const shouldResumeSend = resumeSendAfterAiQuotaChoice.value
   resumeSendAfterAiQuotaChoice.value = false
-  showAiQuotaChoiceDialog.value = false
   openTokenPurchaseDialog()
+  resumeSendAfterTokenPurchase.value = shouldResumeSend
+  showAiQuotaChoiceDialog.value = false
 }
 
 function handleAiQuotaChoiceConfigure() {
-  resumeSendAfterApiKeySave.value = resumeSendAfterAiQuotaChoice.value
   resumeSendAfterAiQuotaChoice.value = false
   showAiQuotaChoiceDialog.value = false
-  openApiKeySetup()
+  goToAiSettings()
 }
 
 function handleOpenMoreModels() {
@@ -3953,6 +3971,22 @@ void sendQuickMessage
 </style>
 
 <style>
+.wk-ai-quota-choice-dialog .el-dialog__header {
+  height: 40px;
+  padding: 0 !important;
+}
+
+.wk-ai-quota-choice-dialog .el-dialog__headerbtn {
+  top: 4px !important;
+  right: 12px !important;
+  width: 32px;
+  height: 32px;
+}
+
+.wk-ai-quota-choice-dialog .el-dialog__body {
+  padding-top: 1.5rem !important;
+}
+
 /* Popover 挂载到 body，scoped 选不中外层 .wk-chat-upload-menu-popper */
 .wk-chat-upload-menu-popper.el-popper {
   padding: 0 !important;
