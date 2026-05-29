@@ -31,6 +31,17 @@ export interface MailAuthStatus {
   accounts: MailAccount[]
 }
 
+export interface MailSyncResult {
+  accountId: string
+  logId?: string
+  fetchedCount: number
+  savedCount: number
+  skippedCount: number
+  failedCount: number
+  status?: string
+  errorMessage?: string
+}
+
 export interface MailOAuthStart {
   provider: string
   authorizeUrl: string
@@ -168,7 +179,7 @@ export function disconnectMailbox(accountId: string): Promise<void> {
   return post(`/email/accounts/${accountId}/disconnect`)
 }
 
-export function syncMailbox(accountId: string): Promise<void> {
+export function syncMailbox(accountId: string): Promise<MailSyncResult> {
   return post(`/email/accounts/${accountId}/sync`)
 }
 

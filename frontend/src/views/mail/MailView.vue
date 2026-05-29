@@ -1,54 +1,49 @@
 <template>
-  <div class="mail-view flex h-full min-h-0 flex-col bg-[var(--wk-bg-page,#f6f7f9)]">
-    <div class="shrink-0 border-b border-[var(--wk-border-subtle,#e5e7eb)] bg-white px-4 py-3 md:px-6">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div class="min-w-0">
-          <h2 class="text-xl font-semibold text-slate-950">邮箱</h2>
-          <p class="mt-1 text-sm text-slate-500">{{ currentMailboxLabel }}</p>
+  <div class="mail-view flex h-full min-h-0 flex-col">
+    <div class="mail-header shrink-0 px-4 pb-0 pt-5 md:px-6">
+      <div class="mail-hero-row">
+        <div class="mail-hero-copy">
+          <h2>邮箱</h2>
+          <div class="mail-account-line">
+            <span class="mail-account-label">当前邮箱：</span>
+            <el-dropdown v-if="authStatus.authorized" trigger="click" @command="handleAccountCommand">
+              <el-button class="mail-account-button">
+                <span class="material-symbols-outlined text-[18px]">alternate_email</span>
+                <span class="max-w-[220px] truncate">{{ currentAccountEmailLabel }}</span>
+                <el-tag v-if="currentAccountIsDefault" class="mail-default-tag" size="small" type="success">默认</el-tag>
+                <span class="material-symbols-outlined text-[18px]">expand_more</span>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item v-for="account in authStatus.accounts" :key="account.accountId" :command="`default:${account.accountId}`">
+                    <span class="flex min-w-[220px] items-center justify-between gap-3">
+                      <span class="truncate">{{ account.emailAddress }}</span>
+                      <el-tag v-if="account.isDefault" size="small" type="success">默认</el-tag>
+                      <el-tag v-else-if="account.connectionStatus === 'expired'" size="small" type="warning">过期</el-tag>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item divided command="add">添加邮箱</el-dropdown-item>
+                  <el-dropdown-item v-if="authStatus.currentAccount" command="sync">同步当前邮箱</el-dropdown-item>
+                  <el-dropdown-item v-if="authStatus.currentAccount" command="disconnect">取消授权</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <span class="mail-status-dot" :class="accountStatusClass" />
+            <span class="mail-status-text">{{ currentAccountStatusText }}</span>
+          </div>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <el-input
-            v-model="keyword"
-            clearable
-            class="mail-search-input"
-            placeholder="搜索主题、收件人、发件人或正文"
-            :prefix-icon="Search"
-            @clear="loadActiveTab"
-            @keyup.enter="loadActiveTab"
-          />
-          <el-select v-if="activeTab === 'inbox'" v-model="readStatusFilter" class="mail-filter-select" clearable placeholder="阅读状态" @change="loadActiveTab">
-            <el-option label="未读" value="unread" />
-            <el-option label="已读" value="read" />
-          </el-select>
-          <el-select v-if="activeTab === 'templates'" v-model="templateCategoryFilter" class="mail-filter-select" clearable placeholder="模板分类" @change="loadActiveTab">
-            <el-option v-for="item in categoryOptions" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-          <el-button :icon="Refresh" :loading="loading" @click="handleRefresh">刷新</el-button>
-          <el-button v-if="activeTab === 'templates'" @click="openTemplate()">新建模板</el-button>
-          <el-dropdown v-if="authStatus.authorized" trigger="click" @command="handleAccountCommand">
-            <el-button>
-              <span class="material-symbols-outlined mr-1 text-[18px]">alternate_email</span>
-              <span class="max-w-[180px] truncate">{{ authStatus.currentAccount?.emailAddress || '邮箱账号' }}</span>
-              <span class="material-symbols-outlined ml-1 text-[18px]">expand_more</span>
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item v-for="account in authStatus.accounts" :key="account.accountId" :command="`default:${account.accountId}`">
-                  <span class="flex min-w-[220px] items-center justify-between gap-3">
-                    <span class="truncate">{{ account.emailAddress }}</span>
-                    <el-tag v-if="account.isDefault" size="small" type="success">默认</el-tag>
-                    <el-tag v-else-if="account.connectionStatus === 'expired'" size="small" type="warning">过期</el-tag>
-                  </span>
-                </el-dropdown-item>
-                <el-dropdown-item divided command="add">添加邮箱</el-dropdown-item>
-                <el-dropdown-item v-if="authStatus.currentAccount" command="sync">同步当前邮箱</el-dropdown-item>
-                <el-dropdown-item v-if="authStatus.currentAccount" command="disconnect">取消授权</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-          <el-button type="primary" :icon="EditPen" @click="handleCompose">写邮件</el-button>
+        <div v-if="authStatus.authorized" class="mail-hero-actions">
+          <el-button class="mail-compose-action" type="primary" :icon="EditPen" @click="handleCompose">写邮件</el-button>
+          <el-button class="mail-template-action" :icon="Plus" plain @click="openTemplate()">新建模板</el-button>
+          <el-button class="mail-refresh-action" :icon="Refresh" :loading="loading || syncingMailbox" plain @click="handleRefresh">刷新</el-button>
         </div>
       </div>
+      <el-tabs v-if="authStatus.authorized" v-model="activeTab" class="mail-tabs" @tab-change="handleTabChange">
+        <el-tab-pane label="发件箱" name="sent" />
+        <el-tab-pane label="收件箱" name="inbox" />
+        <el-tab-pane label="草稿箱" name="drafts" />
+        <el-tab-pane label="邮件模板" name="templates" />
+      </el-tabs>
     </div>
 
     <div v-if="authLoading" class="flex flex-1 items-center justify-center text-slate-400">
@@ -65,22 +60,40 @@
       </div>
     </div>
 
-    <div v-else class="flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6">
-      <el-tabs v-model="activeTab" class="mail-tabs" @tab-change="handleTabChange">
-        <el-tab-pane label="草稿箱" name="drafts" />
-        <el-tab-pane label="发件箱" name="sent" />
-        <el-tab-pane label="收件箱" name="inbox" />
-        <el-tab-pane label="邮件模板" name="templates" />
-      </el-tabs>
+    <div v-else class="mail-body flex min-h-0 flex-1 flex-col px-4 py-4 md:px-6">
+      <div class="mail-content-card" :class="contentCardClass">
+        <div class="mail-list-toolbar">
+          <div class="mail-list-filters">
+            <el-input
+              v-model="keyword"
+              clearable
+              class="mail-search-input"
+              placeholder="搜索主题、收件人、发件人或正文"
+              :prefix-icon="Search"
+              @clear="loadActiveTab"
+              @keyup.enter="loadActiveTab"
+            />
+            <el-select v-if="activeTab === 'inbox'" v-model="readStatusFilter" class="mail-filter-select" clearable placeholder="阅读状态" @change="loadActiveTab">
+              <el-option label="未读" value="unread" />
+              <el-option label="已读" value="read" />
+            </el-select>
+            <el-select v-if="activeTab === 'templates'" v-model="templateCategoryFilter" class="mail-filter-select" clearable placeholder="模板分类" @change="loadActiveTab">
+              <el-option v-for="item in categoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+          </div>
+          <div class="mail-count-hint">
+            <span class="material-symbols-outlined">schedule</span>
+            {{ currentTotalLabel }}
+          </div>
+        </div>
 
-      <div class="min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--wk-border-subtle,#e5e7eb)] bg-white">
-        <el-table
+        <div :class="listPanelClass">
+          <el-table
           v-if="activeTab === 'drafts'"
           v-loading="loading"
           :data="drafts"
-          height="100%"
+          :height="tableHeight"
           row-key="draftId"
-          empty-text="暂无草稿"
         >
           <el-table-column prop="subject" label="主题" min-width="260" show-overflow-tooltip />
           <el-table-column prop="toAddresses" label="收件人" min-width="220" show-overflow-tooltip />
@@ -100,15 +113,22 @@
               <el-button link type="danger" @click="removeDraft(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty>
+            <div class="mail-empty-state">
+              <span class="material-symbols-outlined">draft</span>
+              <h3>暂无草稿</h3>
+              <p>未发送的邮件会暂存在这里，方便稍后继续编辑。</p>
+              <el-button type="primary" :icon="EditPen" @click="handleCompose">写邮件</el-button>
+            </div>
+          </template>
         </el-table>
 
         <el-table
           v-else-if="activeTab === 'sent'"
           v-loading="loading"
           :data="sentMessages"
-          height="100%"
+          :height="tableHeight"
           row-key="messageId"
-          empty-text="暂无已发送邮件"
           @row-click="openMessage"
         >
           <el-table-column prop="toAddresses" label="收件人" min-width="220" show-overflow-tooltip />
@@ -128,15 +148,22 @@
               <el-button link type="danger" @click.stop="removeMessage(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty>
+            <div class="mail-empty-state">
+              <span class="material-symbols-outlined">outbox</span>
+              <h3>暂无已发送邮件</h3>
+              <p>发送后的客户沟通会沉淀在这里，便于后续追踪。</p>
+              <el-button type="primary" :icon="EditPen" @click="handleCompose">写邮件</el-button>
+            </div>
+          </template>
         </el-table>
 
         <el-table
           v-else-if="activeTab === 'inbox'"
           v-loading="loading"
           :data="inboxMessages"
-          height="100%"
+          :height="tableHeight"
           row-key="messageId"
-          empty-text="暂无收件箱邮件"
           @row-click="openMessage"
         >
           <el-table-column label="" width="56">
@@ -155,7 +182,7 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="标题与摘要" min-width="380" show-overflow-tooltip>
+          <el-table-column label="标题与摘要" min-width="380">
             <template #default="{ row }">
               <div class="min-w-0">
                 <p :class="row.readStatus !== 'read' ? 'font-semibold text-slate-950' : 'text-slate-800'">{{ row.subject || '(无主题)' }}</p>
@@ -179,15 +206,22 @@
               <el-button link type="danger" @click.stop="removeMessage(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty>
+            <div class="mail-empty-state">
+              <span class="material-symbols-outlined">inbox</span>
+              <h3>暂无收件箱邮件</h3>
+              <p>可点击刷新同步最新邮件，也可以先撰写一封新的跟进邮件。</p>
+              <el-button type="primary" :icon="EditPen" @click="handleCompose">写邮件</el-button>
+            </div>
+          </template>
         </el-table>
 
         <el-table
           v-else
           v-loading="loading"
           :data="templates"
-          height="100%"
+          :height="tableHeight"
           row-key="templateId"
-          empty-text="暂无邮件模板"
         >
           <el-table-column prop="name" label="模板名称" min-width="220" show-overflow-tooltip />
           <el-table-column label="分类" width="140">
@@ -210,7 +244,16 @@
               <el-button link type="danger" @click="removeTemplate(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty>
+            <div class="mail-empty-state">
+              <span class="material-symbols-outlined">contract_edit</span>
+              <h3>暂无邮件模板</h3>
+              <p>可创建常用邮件模板，提高邮件发送效率。</p>
+              <el-button class="mail-empty-primary" :icon="Plus" @click="openTemplate()">新建模板</el-button>
+            </div>
+          </template>
         </el-table>
+        </div>
       </div>
 
       <div class="mt-3 flex shrink-0 items-center justify-between text-sm text-slate-500">
@@ -321,8 +364,29 @@
         <el-button class="h-11" @click="handleOAuth('outlook')">Outlook / M365</el-button>
       </div>
       <el-form label-position="top">
+        <el-form-item label="邮箱厂商">
+          <el-select
+            v-model="selectedMailProviderPreset"
+            class="w-full"
+            placeholder="选择常用邮箱厂商"
+            filterable
+            @change="applyMailProviderPreset"
+          >
+            <el-option
+              v-for="preset in mailProviderPresets"
+              :key="preset.value"
+              :label="preset.label"
+              :value="preset.value"
+            >
+              <div class="flex items-center justify-between gap-4">
+                <span>{{ preset.label }}</span>
+                <span v-if="preset.domainHint" class="text-xs text-slate-400">{{ preset.domainHint }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <el-form-item label="邮箱地址"><el-input v-model="imapForm.emailAddress" /></el-form-item>
+          <el-form-item label="邮箱地址"><el-input v-model="imapForm.emailAddress" @blur="syncUsernameFromEmail" /></el-form-item>
           <el-form-item label="显示名称"><el-input v-model="imapForm.displayName" /></el-form-item>
           <el-form-item label="IMAP 主机"><el-input v-model="imapForm.imapHost" placeholder="imap.example.com" /></el-form-item>
           <el-form-item label="IMAP 端口"><el-input-number v-model="imapForm.imapPort" class="w-full" :min="1" :max="65535" /></el-form-item>
@@ -375,7 +439,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { EditPen, MagicStick, Refresh, Search } from '@element-plus/icons-vue'
+import { EditPen, MagicStick, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { useResponsive } from '@/composables/useResponsive'
 import {
   connectImapMailbox,
@@ -405,12 +469,27 @@ import {
   type MailDraftPayload,
   type MailImapConnectPayload,
   type MailMessage,
+  type MailSyncResult,
   type MailTemplate,
   type MailTemplatePayload,
 } from '@/api/mail'
 
 type MailTab = 'drafts' | 'sent' | 'inbox' | 'templates'
 type AutoSaveState = 'idle' | 'saving' | 'saved' | 'failed'
+
+const AUTO_SYNC_INTERVAL_MILLIS = 5 * 60 * 1000
+
+type MailProviderPreset = {
+  value: string
+  label: string
+  domainHint?: string
+  imapHost?: string
+  imapPort?: number
+  imapSsl?: boolean
+  smtpHost?: string
+  smtpPort?: number
+  smtpSsl?: boolean
+}
 
 const { isMobile } = useResponsive()
 
@@ -420,6 +499,7 @@ const readStatusFilter = ref('')
 const templateCategoryFilter = ref('')
 const authLoading = ref(false)
 const loading = ref(false)
+const syncingMailbox = ref(false)
 const connecting = ref(false)
 const savingDraft = ref(false)
 const sending = ref(false)
@@ -438,6 +518,7 @@ const templates = ref<MailTemplate[]>([])
 const totalRow = ref(0)
 const aiIntent = ref('followup')
 const autoSaveState = ref<AutoSaveState>('idle')
+const selectedMailProviderPreset = ref('custom')
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 let suppressAutoSave = false
 
@@ -499,17 +580,136 @@ const categoryOptions = [
   { label: '自定义', value: 'custom' },
 ]
 
+const mailProviderPresets: MailProviderPreset[] = [
+  {
+    value: 'qq',
+    label: 'QQ邮箱',
+    domainHint: '@qq.com',
+    imapHost: 'imap.qq.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.qq.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'netease-163',
+    label: '网易163邮箱',
+    domainHint: '@163.com',
+    imapHost: 'imap.163.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.163.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'netease-126',
+    label: '网易126邮箱',
+    domainHint: '@126.com',
+    imapHost: 'imap.126.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.126.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'netease-yeah',
+    label: '网易Yeah邮箱',
+    domainHint: '@yeah.net',
+    imapHost: 'imap.yeah.net',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.yeah.net',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'tencent-exmail',
+    label: '腾讯企业邮箱',
+    domainHint: '企业域名',
+    imapHost: 'imap.exmail.qq.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.exmail.qq.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'aliyun',
+    label: '阿里邮箱',
+    domainHint: '企业域名',
+    imapHost: 'imap.qiye.aliyun.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.qiye.aliyun.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'sina',
+    label: '新浪邮箱',
+    domainHint: '@sina.com',
+    imapHost: 'imap.sina.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.sina.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  { value: 'custom', label: '自定义', domainHint: '手动填写' },
+]
+
 const variableHints = '{{客户姓名}} {{公司名称}} {{销售姓名}} {{当前日期}}'
 
 const enabledAccounts = computed(() => authStatus.accounts.filter(account => account.enabled))
 
-const currentMailboxLabel = computed(() => {
+const currentAccountEmailLabel = computed(() => authStatus.currentAccount?.emailAddress || '邮箱账号')
+
+const currentAccountIsDefault = computed(() => Boolean(authStatus.currentAccount?.isDefault))
+
+const currentAccountStatusText = computed(() => {
   if (authLoading.value) return '正在检查邮箱授权状态'
   if (!authStatus.authorized) return '尚未连接邮箱账号'
   const account = authStatus.currentAccount
   if (!account) return '请选择邮箱账号'
+  if (syncingMailbox.value) return '正在检查新邮件'
   const status = account.connectionStatus || 'connected'
-  return `${account.emailAddress} · ${accountStatusLabel(status)}`
+  return accountStatusLabel(status)
+})
+
+const accountStatusClass = computed(() => {
+  if (syncingMailbox.value) return 'mail-status-pill--syncing'
+  const status = authStatus.currentAccount?.connectionStatus || (authStatus.authorized ? 'connected' : 'disconnected')
+  if (status === 'connected') return 'mail-status-pill--connected'
+  if (status === 'expired' || status === 'error') return 'mail-status-pill--warning'
+  return 'mail-status-pill--muted'
+})
+
+const activeRows = computed(() => {
+  if (activeTab.value === 'drafts') return drafts.value
+  if (activeTab.value === 'sent') return sentMessages.value
+  if (activeTab.value === 'inbox') return inboxMessages.value
+  return templates.value
+})
+
+const isCurrentListEmpty = computed(() => !loading.value && activeRows.value.length === 0)
+
+const tableHeight = computed(() => (isCurrentListEmpty.value ? undefined : '100%'))
+
+const listPanelClass = computed(() => [
+  'mail-list-panel',
+  isCurrentListEmpty.value ? 'mail-list-panel--empty' : 'mail-list-panel--filled',
+])
+
+const contentCardClass = computed(() => [
+  isCurrentListEmpty.value ? 'mail-content-card--empty' : 'mail-content-card--filled',
+])
+
+const currentTotalLabel = computed(() => {
+  const unit = activeTab.value === 'templates' ? '个模板' : '条邮件'
+  return `共有 ${totalRow.value} ${unit}`
 })
 
 const autoSaveLabel = computed(() => {
@@ -544,6 +744,10 @@ onMounted(async () => {
   await loadAuthStatus()
   if (authStatus.authorized) {
     await loadActiveTab()
+    const synced = await syncMailboxIfStale()
+    if (synced) {
+      await loadActiveTab()
+    }
   }
 })
 
@@ -551,15 +755,15 @@ onBeforeUnmount(() => {
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
 })
 
-async function loadAuthStatus() {
-  authLoading.value = true
+async function loadAuthStatus(showLoading = true) {
+  if (showLoading) authLoading.value = true
   try {
     const status = await getMailAuthStatus()
     authStatus.authorized = status.authorized
     authStatus.currentAccount = status.currentAccount
     authStatus.accounts = status.accounts || []
   } finally {
-    authLoading.value = false
+    if (showLoading) authLoading.value = false
   }
 }
 
@@ -601,9 +805,69 @@ function handleTabChange() {
 
 async function handleRefresh() {
   if (activeTab.value !== 'templates' && authStatus.currentAccount?.accountId) {
-    await syncMailbox(authStatus.currentAccount.accountId)
+    await syncCurrentMailbox({ force: true, notifyNoNew: true })
   }
   await loadActiveTab()
+}
+
+async function syncMailboxIfStale() {
+  return syncCurrentMailbox({ force: false, notifyNoNew: false })
+}
+
+async function syncCurrentMailbox(options: { force: boolean; notifyNoNew: boolean }) {
+  const account = authStatus.currentAccount
+  if (!account?.accountId || syncingMailbox.value) return false
+  if (!options.force && !shouldAutoSyncMailbox(account.lastSyncTime)) return false
+
+  syncingMailbox.value = true
+  const checkingMessage = options.force
+    ? undefined
+    : ElMessage({ message: '正在检查新邮件...', type: 'info', duration: 0 })
+  try {
+    const result = await syncMailbox(account.accountId)
+    checkingMessage?.close()
+    showMailboxSyncResult(result, options.notifyNoNew)
+    await loadAuthStatus(false)
+    return true
+  } catch (error) {
+    checkingMessage?.close()
+    ElMessage.error('邮箱同步失败，请稍后重试')
+    return false
+  } finally {
+    syncingMailbox.value = false
+  }
+}
+
+function shouldAutoSyncMailbox(lastSyncTime?: string) {
+  if (!lastSyncTime) return true
+  const lastSyncAt = parseDateTime(lastSyncTime)
+  if (!lastSyncAt) return true
+  return Date.now() - lastSyncAt >= AUTO_SYNC_INTERVAL_MILLIS
+}
+
+function parseDateTime(value: string) {
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T')
+  const timestamp = new Date(normalized).getTime()
+  return Number.isNaN(timestamp) ? null : timestamp
+}
+
+function showMailboxSyncResult(result: MailSyncResult, notifyNoNew: boolean) {
+  if (result.status === 'failed') {
+    ElMessage.error(result.errorMessage || '邮箱同步失败，请稍后重试')
+    return
+  }
+  if (result.savedCount > 0) {
+    const suffix = result.failedCount > 0 ? '，部分邮件同步失败' : ''
+    ElMessage.success(`已同步 ${result.savedCount} 封新邮件${suffix}`)
+    return
+  }
+  if (result.failedCount > 0) {
+    ElMessage.warning('部分邮件同步失败，请稍后刷新重试')
+    return
+  }
+  if (notifyNoNew) {
+    ElMessage.info('暂无新邮件')
+  }
 }
 
 function handleCompose() {
@@ -815,6 +1079,26 @@ async function handleOAuth(provider: 'gmail' | 'outlook') {
   ElMessage.info('授权完成后请回到本页面刷新邮箱状态')
 }
 
+function applyMailProviderPreset(value: string) {
+  const preset = mailProviderPresets.find(item => item.value === value)
+  if (!preset || preset.value === 'custom') return
+
+  imapForm.imapHost = preset.imapHost || ''
+  imapForm.imapPort = preset.imapPort || 993
+  imapForm.imapSsl = preset.imapSsl ?? true
+  imapForm.smtpHost = preset.smtpHost || ''
+  imapForm.smtpPort = preset.smtpPort || 465
+  imapForm.smtpSsl = preset.smtpSsl ?? true
+  syncUsernameFromEmail()
+}
+
+function syncUsernameFromEmail() {
+  const email = imapForm.emailAddress.trim()
+  if (email && !imapForm.username?.trim()) {
+    imapForm.username = email
+  }
+}
+
 async function connectImap() {
   if (!imapForm.emailAddress || !imapForm.imapHost || !imapForm.smtpHost || !imapForm.password) {
     ElMessage.warning('请填写邮箱地址、IMAP/SMTP 主机和授权码')
@@ -838,7 +1122,7 @@ async function handleAccountCommand(command: string) {
     return
   }
   if (command === 'sync' && authStatus.currentAccount?.accountId) {
-    await syncMailbox(authStatus.currentAccount.accountId)
+    await syncCurrentMailbox({ force: true, notifyNoNew: true })
     await loadActiveTab()
     return
   }
@@ -990,16 +1274,344 @@ function escapeHtml(value: string) {
 </script>
 
 <style scoped>
+.mail-view {
+  background: #fbfaf8;
+  color: #1f2933;
+}
+
+.mail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: #fbfaf8;
+}
+
+.mail-hero-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.mail-hero-copy {
+  min-width: 0;
+}
+
+.mail-hero-copy h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.mail-account-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.mail-account-label {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mail-account-button {
+  max-width: min(340px, 100%);
+  height: 42px;
+  border-color: #d8d2c8;
+  border-radius: 7px;
+  background: #fffdfa;
+  color: #222222;
+  font-size: 15px;
+  box-shadow: 0 1px 0 rgb(17 24 39 / 0.03);
+}
+
+.mail-account-button :deep(.el-button__content) {
+  min-width: 0;
+  gap: 8px;
+}
+
+.mail-default-tag {
+  border: 0;
+  background: #dff6df;
+  color: #26913b;
+  font-weight: 700;
+}
+
+.mail-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.mail-status-pill--connected {
+  background: #52c75a;
+}
+
+.mail-status-pill--syncing {
+  background: #3b82f6;
+}
+
+.mail-status-pill--warning {
+  background: #f59e0b;
+}
+
+.mail-status-pill--muted {
+  background: #94a3b8;
+}
+
+.mail-status-text {
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mail-hero-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-bottom: 1px;
+}
+
+.mail-hero-actions :deep(.el-button) {
+  height: 44px;
+  min-width: 112px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mail-compose-action {
+  border-color: #171717 !important;
+  background: #171717 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.14);
+}
+
+.mail-template-action,
+.mail-refresh-action {
+  border-color: #d8d2c8 !important;
+  background: #fffdfa !important;
+  color: #1f2933 !important;
+}
+
+.mail-refresh-action {
+  min-width: 104px !important;
+}
+
 .mail-search-input {
-  width: min(360px, 100%);
+  width: min(460px, 100%);
 }
 
 .mail-filter-select {
-  width: 132px;
+  width: 190px;
 }
 
 .mail-tabs :deep(.el-tabs__header) {
-  margin-bottom: 12px;
+  margin: 0;
+}
+
+.mail-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 1px;
+  background: #ddd7ce;
+}
+
+.mail-tabs :deep(.el-tabs__nav-scroll) {
+  overflow-x: auto;
+}
+
+.mail-tabs :deep(.el-tabs__nav) {
+  gap: 38px;
+}
+
+.mail-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+.mail-tabs :deep(.el-tabs__item) {
+  position: relative;
+  height: 48px;
+  padding: 0 2px;
+  border: 0;
+  color: #4b5563;
+  font-size: 15px;
+  font-weight: 700;
+  transition: color 0.15s ease;
+}
+
+.mail-tabs :deep(.el-tabs__item:hover) {
+  color: #0f172a;
+}
+
+.mail-tabs :deep(.el-tabs__item.is-active) {
+  color: #111827;
+}
+
+.mail-tabs :deep(.el-tabs__item.is-active::after) {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 4px;
+  border-radius: 999px 999px 0 0;
+  background: #111111;
+  content: '';
+}
+
+.mail-body {
+  background: #fbfaf8;
+}
+
+.mail-content-card {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid #ded8ce;
+  border-radius: 7px;
+  background: #fffdfa;
+}
+
+.mail-content-card--filled {
+  min-height: 0;
+  flex: 1;
+}
+
+.mail-content-card--empty {
+  flex: 0 0 auto;
+}
+
+.mail-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 18px;
+  border-bottom: 1px solid #ebe6dd;
+}
+
+.mail-list-filters {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+}
+
+.mail-count-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mail-count-hint .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.mail-content-card :deep(.el-input__wrapper),
+.mail-content-card :deep(.el-select__wrapper) {
+  min-height: 42px;
+  border-radius: 7px;
+  background: #fffdfa;
+  box-shadow: 0 0 0 1px #ddd7ce inset;
+}
+
+.mail-content-card :deep(.el-input__wrapper:hover),
+.mail-content-card :deep(.el-select__wrapper:hover) {
+  box-shadow: 0 0 0 1px #c9c1b6 inset;
+}
+
+.mail-list-panel {
+  overflow: hidden;
+  background: #fffdfa;
+}
+
+.mail-list-panel :deep(.el-table) {
+  --el-table-bg-color: #fffdfa;
+  --el-table-tr-bg-color: #fffdfa;
+  --el-table-header-bg-color: #fffdfa;
+  --el-table-header-text-color: #50483e;
+  --el-table-text-color: #1f2933;
+  --el-table-border-color: #ebe6dd;
+}
+
+.mail-list-panel :deep(th.el-table__cell) {
+  height: 50px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mail-list-panel :deep(td.el-table__cell) {
+  height: 54px;
+  font-size: 14px;
+}
+
+.mail-list-panel--filled {
+  min-height: 0;
+  flex: 1;
+}
+
+.mail-list-panel--empty {
+  flex: 0 0 auto;
+}
+
+.mail-empty-state {
+  display: flex;
+  min-height: 350px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 16px 46px;
+  text-align: center;
+  color: #64748b;
+}
+
+.mail-empty-state .material-symbols-outlined {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 72px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f0ede7, #e3ded5);
+  color: #9a9287;
+  font-size: 42px;
+}
+
+.mail-empty-state h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.mail-empty-state p {
+  max-width: 360px;
+  margin: 10px 0 22px;
+  color: #5f6673;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.mail-empty-primary {
+  border-color: #171717 !important;
+  background: #171717 !important;
+  color: #ffffff !important;
+}
+
+.mail-list-panel--empty :deep(.el-table__empty-block) {
+  min-height: 370px;
 }
 
 .mail-icon-button,

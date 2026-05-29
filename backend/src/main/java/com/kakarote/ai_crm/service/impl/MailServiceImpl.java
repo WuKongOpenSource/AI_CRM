@@ -105,7 +105,13 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -125,6 +131,12 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private static final String ATTACHMENT_SYNC_AUTO = "auto";
     private static final String ATTACHMENT_SYNC_FULL = "full";
     private static final String OAUTH_STATE_PREFIX = "mail:oauth:state:";
+    private static final String MAIL_CREDENTIAL_KEY_REQUIRED_MESSAGE =
+            "邮箱凭据加密密钥未配置，请设置 mail.integration.encryption-key 或 MAIL_CREDENTIAL_ENCRYPTION_KEY（至少16位）";
+    private static final String MAIL_CREDENTIAL_ENCRYPT_FAILED_MESSAGE = "邮箱凭据加密失败，请检查邮箱加密密钥配置";
+    private static final String MAIL_CREDENTIAL_DECRYPT_FAILED_MESSAGE =
+            "邮箱凭据解密失败，请确认邮箱加密密钥与绑定邮箱时使用的密钥一致";
+    private static final int IMAP_FETCH_BATCH_SIZE = 20;
     private static final List<String> DEFAULT_IMAP_FOLDERS = List.of("INBOX", "Sent");
     private static final List<String> DEFAULT_GMAIL_FOLDERS = List.of("INBOX", "SENT");
     private static final List<String> DEFAULT_GRAPH_FOLDERS = List.of("inbox", "sentitems");
@@ -180,6 +192,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ConcurrentHashMap<Long, ReentrantLock> accountSyncLocks = new ConcurrentHashMap<>();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -409,7 +422,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     @Override
     public MailSyncResultVO syncAccount(Long accountId) {
         MailAccount account = loadUserAccount(accountId);
-        return syncAccountInternal(account);
+        return syncAccountWithLock(account);
     }
 
     @Override
@@ -425,18 +438,76 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                         .or()
                         .lt(MailAccount::getLastSyncTime, threshold))
                 .last("LIMIT 20"));
-        for (MailAccount account : accounts) {
-            TenantContextHolder.setTenantId(account.getTenantId());
-            AiContextHolder.bindThreadContext(account.getUserId(), account.getTenantId());
-            try {
-                syncAccountInternal(account);
-            } catch (Exception e) {
-                log.warn("自动同步邮箱失败: accountId={}, error={}", account.getAccountId(), e.getMessage());
-            } finally {
-                AiContextHolder.clearThreadContext();
-                TenantContextHolder.clear();
+        if (accounts.isEmpty()) {
+            return;
+        }
+        syncAccountsWithVirtualThreads(accounts);
+    }
+
+    private void syncAccountsWithVirtualThreads(List<MailAccount> accounts) {
+        Semaphore semaphore = new Semaphore(resolveMaxConcurrentSync());
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<?>> futures = new ArrayList<>();
+            for (MailAccount account : accounts) {
+                futures.add(executor.submit(() -> syncAccountWithPermit(account, semaphore)));
+            }
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                } catch (Exception e) {
+                    log.warn("自动同步邮箱虚拟线程执行失败: {}", e.getMessage());
+                }
             }
         }
+    }
+
+    private void syncAccountWithPermit(MailAccount account, Semaphore semaphore) {
+        boolean acquired = false;
+        try {
+            semaphore.acquire();
+            acquired = true;
+            syncScheduledAccount(account);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            if (acquired) {
+                semaphore.release();
+            }
+        }
+    }
+
+    private void syncScheduledAccount(MailAccount account) {
+        TenantContextHolder.setTenantId(account.getTenantId());
+        AiContextHolder.bindThreadContext(account.getUserId(), account.getTenantId());
+        try {
+            syncAccountWithLock(account);
+        } catch (Exception e) {
+            log.warn("自动同步邮箱失败: accountId={}, error={}", account.getAccountId(), e.getMessage());
+        } finally {
+            AiContextHolder.clearThreadContext();
+            TenantContextHolder.clear();
+        }
+    }
+
+    private MailSyncResultVO syncAccountWithLock(MailAccount account) {
+        ReentrantLock lock = accountSyncLocks.computeIfAbsent(account.getAccountId(), ignored -> new ReentrantLock());
+        lock.lock();
+        try {
+            return syncAccountInternal(account);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private int resolveMaxConcurrentSync() {
+        int configured = properties.getMaxConcurrentSync();
+        if (configured <= 0) {
+            return 1;
+        }
+        return Math.min(configured, 50);
     }
 
     @Override
@@ -1014,30 +1085,28 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         MailSyncLog syncLog = startSyncLog(account, "mailbox");
         result.setLogId(syncLog.getLogId());
         try {
-            List<SyncedMail> messages = switch (account.getProvider()) {
-                case PROVIDER_IMAP -> fetchImapMessages(account, decryptCredentials(account));
-                case PROVIDER_GMAIL -> fetchGmailMessages(account, decryptCredentials(account));
-                case PROVIDER_OUTLOOK -> fetchGraphMessages(account, decryptCredentials(account));
-                default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的邮箱服务商");
-            };
-            result.setFetchedCount(messages.size());
-            for (SyncedMail syncedMail : messages) {
-                try {
-                    if (saveSyncedMail(account, syncedMail)) {
-                        result.setSavedCount(result.getSavedCount() + 1);
-                    } else {
-                        result.setSkippedCount(result.getSkippedCount() + 1);
-                    }
-                } catch (Exception e) {
-                    result.setFailedCount(result.getFailedCount() + 1);
-                    log.warn("保存同步邮件失败: accountId={}, providerMessageId={}, error={}",
-                            account.getAccountId(), syncedMail.providerMessageId(), e.getMessage());
+            logSyncStage(syncLog, account, "credentials.decrypt", "Decrypting mailbox credentials");
+            Map<String, Object> credentials = decryptCredentials(account);
+            logSyncStage(syncLog, account, "credentials.decrypted", "Mailbox credentials decrypted");
+            switch (account.getProvider()) {
+                case PROVIDER_IMAP -> syncImapMessages(account, credentials, syncLog, result);
+                case PROVIDER_GMAIL -> {
+                    List<SyncedMail> messages = fetchGmailMessages(account, credentials, syncLog);
+                    processFetchedMessages(account, syncLog, result, messages);
                 }
+                case PROVIDER_OUTLOOK -> {
+                    List<SyncedMail> messages = fetchGraphMessages(account, credentials, syncLog);
+                    processFetchedMessages(account, syncLog, result, messages);
+                }
+                default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的邮箱服务商");
             }
+            logSyncStage(syncLog, account, "fetch.done", "Fetched messages=" + result.getFetchedCount());
             account.setLastSyncTime(new Date());
             account.setLastSyncStatus(result.getFailedCount() > 0 ? "partial" : "success");
             account.setLastSyncError(null);
             result.setStatus(account.getLastSyncStatus());
+            logSyncStage(syncLog, account, "account.update",
+                    "Updating account sync status=" + account.getLastSyncStatus());
             updateById(account);
             finishSyncLog(syncLog, result);
             return result;
@@ -1048,9 +1117,46 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             updateById(account);
             result.setStatus("failed");
             result.setErrorMessage(e.getMessage());
+            logSyncStage(syncLog, account, "sync.failed", StrUtil.maxLength(e.getMessage(), 500));
             finishSyncLog(syncLog, result);
             return result;
         }
+    }
+
+    private void processFetchedMessages(MailAccount account, MailSyncLog syncLog, MailSyncResultVO result,
+                                        List<SyncedMail> messages) {
+        result.setFetchedCount(messages.size());
+        int processedCount = 0;
+        for (SyncedMail syncedMail : messages) {
+            processedCount++;
+            processSyncedMail(account, syncLog, result, syncedMail, processedCount, messages.size());
+        }
+    }
+
+    private boolean processSyncedMail(MailAccount account, MailSyncLog syncLog, MailSyncResultVO result,
+                                      SyncedMail syncedMail, int processedCount, int totalCount) {
+        boolean processed = true;
+        try {
+            if (saveSyncedMail(account, syncedMail)) {
+                result.setSavedCount(result.getSavedCount() + 1);
+            } else {
+                result.setSkippedCount(result.getSkippedCount() + 1);
+            }
+        } catch (Exception e) {
+            result.setFailedCount(result.getFailedCount() + 1);
+            log.warn("保存同步邮件失败: accountId={}, providerMessageId={}, error={}",
+                    account.getAccountId(), syncedMail.providerMessageId(), e.getMessage());
+            processed = false;
+        }
+        if (processedCount == 1 || processedCount % IMAP_FETCH_BATCH_SIZE == 0 || processedCount == totalCount) {
+            logSyncStage(syncLog, account, "save.progress",
+                    "Processed messages=" + processedCount + "/" + totalCount
+                            + ", fetched=" + result.getFetchedCount()
+                            + ", saved=" + result.getSavedCount()
+                            + ", skipped=" + result.getSkippedCount()
+                            + ", failed=" + result.getFailedCount());
+        }
+        return processed;
     }
 
     private boolean saveSyncedMail(MailAccount account, SyncedMail syncedMail) {
@@ -1165,49 +1271,105 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         }
     }
 
-    private List<SyncedMail> fetchImapMessages(MailAccount account, Map<String, Object> credentials) throws Exception {
+    private void syncImapMessages(MailAccount account, Map<String, Object> credentials,
+                                  MailSyncLog syncLog, MailSyncResultVO result) throws Exception {
         String password = asString(credentials.get("password"));
         List<String> folders = normalizeFolders(splitFolders(account.getFolders()), DEFAULT_IMAP_FOLDERS);
-        List<SyncedMail> result = new ArrayList<>();
         Properties props = new Properties();
         props.put("mail.store.protocol", "imap");
         props.put("mail.imap.ssl.enable", String.valueOf(Boolean.TRUE.equals(account.getImapSsl())));
         props.put("mail.imap.connectiontimeout", "15000");
         props.put("mail.imap.timeout", "30000");
         Session session = Session.getInstance(props);
+        logSyncStage(syncLog, account, "imap.connect",
+                "Connecting host=" + account.getImapHost() + ", port=" + account.getImapPort()
+                        + ", ssl=" + Boolean.TRUE.equals(account.getImapSsl()) + ", folders=" + folders);
         try (Store store = session.getStore("imap")) {
             store.connect(account.getImapHost(), account.getImapPort(), account.getUsername(), password);
+            logSyncStage(syncLog, account, "imap.connected", "IMAP store connected");
             for (String folderName : folders) {
+                logSyncStage(syncLog, account, "imap.folder.lookup", "Looking up folder=" + folderName);
                 Folder folder = store.getFolder(folderName);
                 if (folder == null || !folder.exists()) {
+                    logSyncStage(syncLog, account, "imap.folder.missing", "Folder not found=" + folderName);
                     continue;
                 }
+                logSyncStage(syncLog, account, "imap.folder.open", "Opening folder=" + folderName);
                 folder.open(Folder.READ_ONLY);
                 try {
+                    logSyncStage(syncLog, account, "imap.folder.candidates", "Resolving candidates for folder=" + folderName);
                     Message[] messages = resolveImapCandidates(account, folder, folderName);
+                    logSyncStage(syncLog, account, "imap.folder.candidates.done",
+                            "Folder=" + folderName + ", candidates=" + messages.length);
                     FetchProfile profile = new FetchProfile();
                     profile.add(FetchProfile.Item.ENVELOPE);
                     profile.add(FetchProfile.Item.CONTENT_INFO);
-                    folder.fetch(messages, profile);
                     long maxUid = 0L;
                     UIDFolder uidFolder = folder instanceof UIDFolder value ? value : null;
-                    for (Message message : messages) {
-                        if (!(message instanceof MimeMessage mimeMessage)) {
-                            continue;
+                    int parsedCount = 0;
+                    boolean folderHadFailure = false;
+                    int totalBatches = (messages.length + IMAP_FETCH_BATCH_SIZE - 1) / IMAP_FETCH_BATCH_SIZE;
+                    for (int start = 0; start < messages.length; start += IMAP_FETCH_BATCH_SIZE) {
+                        int end = Math.min(start + IMAP_FETCH_BATCH_SIZE, messages.length);
+                        Message[] batch = new Message[end - start];
+                        System.arraycopy(messages, start, batch, 0, batch.length);
+                        int batchNumber = start / IMAP_FETCH_BATCH_SIZE + 1;
+                        logSyncStage(syncLog, account, "imap.batch.fetch_profile",
+                                "Fetching envelope/profile folder=" + folderName
+                                        + ", batch=" + batchNumber + "/" + totalBatches
+                                        + ", range=" + (start + 1) + "-" + end + "/" + messages.length
+                                        + ", batchSize=" + batch.length);
+                        folder.fetch(batch, profile);
+                        logSyncStage(syncLog, account, "imap.batch.fetch_profile.done",
+                                "Fetched envelope/profile folder=" + folderName
+                                        + ", batch=" + batchNumber + "/" + totalBatches);
+                        for (int i = 0; i < batch.length; i++) {
+                            Message message = batch[i];
+                            if (!(message instanceof MimeMessage mimeMessage)) {
+                                continue;
+                            }
+                            long uid = uidFolder == null ? message.getMessageNumber() : uidFolder.getUID(message);
+                            maxUid = Math.max(maxUid, uid);
+                            parsedCount++;
+                            if (parsedCount == 1 || parsedCount % IMAP_FETCH_BATCH_SIZE == 0 || parsedCount == messages.length) {
+                                logSyncStage(syncLog, account, "imap.message.parse",
+                                        "Parsing folder=" + folderName + ", index=" + parsedCount + "/" + messages.length
+                                                + ", uid=" + uid);
+                            }
+                            try {
+                                SyncedMail syncedMail = toSyncedMail(folderName, uid, mimeMessage);
+                                result.setFetchedCount(result.getFetchedCount() + 1);
+                                if (!processSyncedMail(account, syncLog, result, syncedMail, parsedCount, messages.length)) {
+                                    folderHadFailure = true;
+                                }
+                            } catch (Exception e) {
+                                folderHadFailure = true;
+                                result.setFailedCount(result.getFailedCount() + 1);
+                                log.warn("解析同步邮件失败: accountId={}, folder={}, uid={}, error={}",
+                                        account.getAccountId(), folderName, uid, e.getMessage());
+                                logSyncStage(syncLog, account, "imap.message.parse.failed",
+                                        "Parse failed folder=" + folderName + ", uid=" + uid + ", error=" + e.getMessage());
+                            }
                         }
-                        long uid = uidFolder == null ? message.getMessageNumber() : uidFolder.getUID(message);
-                        maxUid = Math.max(maxUid, uid);
-                        result.add(toSyncedMail(folderName, uid, mimeMessage));
                     }
-                    if (maxUid > 0) {
+                    if (maxUid > 0 && !folderHadFailure) {
+                        logSyncStage(syncLog, account, "imap.cursor.update",
+                                "Updating cursor folder=" + folderName + ", maxUid=" + maxUid);
                         upsertCursor(account, folderName, "imap_uid", String.valueOf(maxUid), maxUid, null, null);
+                    } else if (folderHadFailure) {
+                        logSyncStage(syncLog, account, "imap.cursor.skip",
+                                "Skip cursor update because folder had failed messages, folder=" + folderName
+                                        + ", maxUid=" + maxUid);
                     }
+                    logSyncStage(syncLog, account, "imap.folder.done",
+                            "Folder=" + folderName + " done, parsed=" + parsedCount + ", totalFetched=" + result.getFetchedCount());
                 } finally {
+                    logSyncStage(syncLog, account, "imap.folder.close", "Closing folder=" + folderName);
                     folder.close(false);
                 }
             }
         }
-        return result;
+        logSyncStage(syncLog, account, "imap.done", "IMAP fetch done, messages=" + result.getFetchedCount());
     }
 
     private Message[] resolveImapCandidates(MailAccount account, Folder folder, String folderName) throws Exception {
@@ -1254,10 +1416,13 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         );
     }
 
-    private List<SyncedMail> fetchGmailMessages(MailAccount account, Map<String, Object> credentials) throws Exception {
+    private List<SyncedMail> fetchGmailMessages(MailAccount account, Map<String, Object> credentials,
+                                                MailSyncLog syncLog) throws Exception {
+        logSyncStage(syncLog, account, "gmail.token", "Refreshing or reusing Gmail access token");
         String accessToken = refreshOAuthIfNeeded(account, credentials);
         List<String> folders = normalizeFolders(splitFolders(account.getFolders()), DEFAULT_GMAIL_FOLDERS);
         List<SyncedMail> messages = new ArrayList<>();
+        logSyncStage(syncLog, account, "gmail.prepare", "Gmail labels=" + folders);
         for (String folder : folders) {
             String label = "SENT".equalsIgnoreCase(folder) ? "SENT" : "INBOX";
             String url = UriComponentsBuilder.fromUriString("https://gmail.googleapis.com/gmail/v1/users/me/messages")
@@ -1266,16 +1431,28 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .queryParam("q", "newer_than:" + resolveSyncDays(account.getSyncDays()) + "d")
                     .build()
                     .toUriString();
+            logSyncStage(syncLog, account, "gmail.label.list", "Listing Gmail label=" + label);
             JsonNode listNode = getJson(url, accessToken);
             JsonNode messageNodes = listNode.path("messages");
             if (!messageNodes.isArray()) {
+                logSyncStage(syncLog, account, "gmail.label.empty", "No Gmail messages for label=" + label);
                 continue;
             }
+            logSyncStage(syncLog, account, "gmail.label.list.done",
+                    "Label=" + label + ", candidates=" + messageNodes.size());
+            int fetchedCount = 0;
             for (JsonNode messageNode : messageNodes) {
                 String messageId = messageNode.path("id").asText();
+                fetchedCount++;
+                if (fetchedCount == 1 || fetchedCount % 20 == 0 || fetchedCount == messageNodes.size()) {
+                    logSyncStage(syncLog, account, "gmail.message.fetch",
+                            "Fetching Gmail message label=" + label + ", index=" + fetchedCount + "/" + messageNodes.size()
+                                    + ", messageId=" + messageId);
+                }
                 JsonNode detail = getJson("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId + "?format=raw", accessToken);
                 String raw = detail.path("raw").asText();
                 if (StrUtil.isBlank(raw)) {
+                    logSyncStage(syncLog, account, "gmail.message.skip", "Gmail message has empty raw body, messageId=" + messageId);
                     continue;
                 }
                 byte[] rawBytes = Base64.getUrlDecoder().decode(raw);
@@ -1306,14 +1483,20 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     upsertCursor(account, label, "gmail_history", historyId, null, historyId, null);
                 }
             }
+            logSyncStage(syncLog, account, "gmail.label.done",
+                    "Label=" + label + " done, fetched=" + fetchedCount + ", totalFetched=" + messages.size());
         }
+        logSyncStage(syncLog, account, "gmail.done", "Gmail fetch done, messages=" + messages.size());
         return messages;
     }
 
-    private List<SyncedMail> fetchGraphMessages(MailAccount account, Map<String, Object> credentials) throws Exception {
+    private List<SyncedMail> fetchGraphMessages(MailAccount account, Map<String, Object> credentials,
+                                                MailSyncLog syncLog) throws Exception {
+        logSyncStage(syncLog, account, "graph.token", "Refreshing or reusing Graph access token");
         String accessToken = refreshOAuthIfNeeded(account, credentials);
         List<String> folders = normalizeFolders(splitFolders(account.getFolders()), DEFAULT_GRAPH_FOLDERS);
         List<SyncedMail> messages = new ArrayList<>();
+        logSyncStage(syncLog, account, "graph.prepare", "Graph folders=" + folders);
         for (String folder : folders) {
             String url = UriComponentsBuilder.fromUriString("https://graph.microsoft.com/v1.0/me/mailFolders/" + folder + "/messages")
                     .queryParam("$top", Math.min(resolveSyncLimit(account.getSyncLimit()), 100))
@@ -1321,16 +1504,27 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .queryParam("$select", "id,internetMessageId,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,body,hasAttachments")
                     .build()
                     .toUriString();
+            logSyncStage(syncLog, account, "graph.folder.list", "Listing Graph folder=" + folder);
             JsonNode root = getJson(url, accessToken);
             JsonNode values = root.path("value");
             if (!values.isArray()) {
+                logSyncStage(syncLog, account, "graph.folder.empty", "No Graph messages for folder=" + folder);
                 continue;
             }
+            logSyncStage(syncLog, account, "graph.folder.list.done",
+                    "Folder=" + folder + ", candidates=" + values.size());
+            int fetchedCount = 0;
             for (JsonNode node : values) {
                 String bodyContent = node.path("body").path("content").asText(null);
                 String bodyType = node.path("body").path("contentType").asText("");
                 String bodyText = "html".equalsIgnoreCase(bodyType) ? htmlToText(bodyContent) : bodyContent;
                 String messageId = node.path("id").asText();
+                fetchedCount++;
+                if (fetchedCount == 1 || fetchedCount % 20 == 0 || fetchedCount == values.size()) {
+                    logSyncStage(syncLog, account, "graph.message.fetch",
+                            "Fetching Graph message folder=" + folder + ", index=" + fetchedCount + "/" + values.size()
+                                    + ", messageId=" + messageId);
+                }
                 messages.add(new SyncedMail(
                         messageId,
                         node.path("internetMessageId").asText(null),
@@ -1353,7 +1547,10 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             if (nextLink != null) {
                 upsertCursor(account, folder, "graph_delta", nextLink, null, null, nextLink);
             }
+            logSyncStage(syncLog, account, "graph.folder.done",
+                    "Folder=" + folder + " done, fetched=" + fetchedCount + ", totalFetched=" + messages.size());
         }
+        logSyncStage(syncLog, account, "graph.done", "Graph fetch done, messages=" + messages.size());
         return messages;
     }
 
@@ -1654,17 +1851,42 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private String encryptCredentials(Map<String, ?> values) {
         try {
             return secretTextCipher.encrypt(objectMapper.writeValueAsString(values));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (IllegalStateException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, resolveCredentialCipherMessage(e, true));
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize mail credentials", e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮箱凭据序列化失败");
         }
     }
 
     private Map<String, Object> decryptCredentials(MailAccount account) throws Exception {
-        String json = secretTextCipher.decrypt(account.getCredentialJson());
-        if (StrUtil.isBlank(json)) {
-            return new HashMap<>();
+        try {
+            String json = secretTextCipher.decrypt(account.getCredentialJson());
+            if (StrUtil.isBlank(json)) {
+                return new HashMap<>();
+            }
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (IllegalStateException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, resolveCredentialCipherMessage(e, false));
         }
-        return objectMapper.readValue(json, new TypeReference<>() {});
+    }
+
+    private String resolveCredentialCipherMessage(Throwable throwable, boolean encrypting) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (containsIgnoreCase(message, "mail.integration.encryption-key")
+                    || containsIgnoreCase(message, "MAIL_CREDENTIAL_ENCRYPTION_KEY")) {
+                return MAIL_CREDENTIAL_KEY_REQUIRED_MESSAGE;
+            }
+            current = current.getCause();
+        }
+        return encrypting ? MAIL_CREDENTIAL_ENCRYPT_FAILED_MESSAGE : MAIL_CREDENTIAL_DECRYPT_FAILED_MESSAGE;
+    }
+
+    private boolean containsIgnoreCase(String value, String keyword) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
     }
 
     private MailAccountVO toAccountVO(MailAccount account) {
@@ -1785,6 +2007,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         syncLog.setFailedCount(0);
         syncLog.setStartedAt(new Date());
         syncLogMapper.insert(syncLog);
+        logSyncStage(syncLog, account, "sync.start", "Sync log created, syncType=" + syncType);
         return syncLog;
     }
 
@@ -1797,6 +2020,23 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         syncLog.setFinishedAt(new Date());
         syncLog.setErrorMessage(StrUtil.maxLength(result.getErrorMessage(), 1000));
         syncLogMapper.updateById(syncLog);
+        log.info("mail sync finished: logId={}, accountId={}, status={}, fetched={}, saved={}, skipped={}, failed={}, error={}",
+                syncLog.getLogId(), syncLog.getAccountId(), result.getStatus(), result.getFetchedCount(),
+                result.getSavedCount(), result.getSkippedCount(), result.getFailedCount(),
+                StrUtil.maxLength(result.getErrorMessage(), 500));
+    }
+
+    private void logSyncStage(MailSyncLog syncLog, MailAccount account, String stage, String detail) {
+        Date startedAt = syncLog == null ? null : syncLog.getStartedAt();
+        Long elapsedMs = startedAt == null ? null : Math.max(0L, System.currentTimeMillis() - startedAt.getTime());
+        log.info("mail sync stage: logId={}, accountId={}, email={}, provider={}, stage={}, elapsedMs={}, detail={}",
+                syncLog == null ? null : syncLog.getLogId(),
+                account == null ? null : account.getAccountId(),
+                account == null ? null : account.getEmailAddress(),
+                account == null ? null : account.getProvider(),
+                stage,
+                elapsedMs,
+                StrUtil.maxLength(StrUtil.blankToDefault(detail, ""), 500));
     }
 
     private MailExtraction extractMail(SyncedMail mail, boolean extractActions) {

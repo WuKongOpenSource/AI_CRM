@@ -13,6 +13,8 @@ public class MailIntegrationProperties {
 
     private long schedulerFixedDelayMillis = 600000;
 
+    private int maxConcurrentSync = 10;
+
     private int defaultSyncDays = 90;
 
     private int defaultSyncLimit = 500;
