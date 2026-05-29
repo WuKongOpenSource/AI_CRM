@@ -52,28 +52,11 @@ import type { ChatSession } from '@/types/common'
 /** 在 popperOffsets 之后把气泡整体向右移（margin 对 Popper 的 transform 定位无效） */
 const MENU_SHIFT_X_PX = 100
 
-const sessionMenuPopperOptions = {
-  strategy: 'fixed' as const,
-  modifiers: [
-    {
-      name: 'wkChatSessionMenuShiftX',
-      enabled: true,
-      phase: 'main',
-      requires: ['popperOffsets'],
-      fn({ state }: { state: { modifiersData: Record<string, { x?: number; y?: number } | undefined> } }) {
-        const po = state.modifiersData.popperOffsets
-        if (po && typeof po.x === 'number') {
-          po.x += MENU_SHIFT_X_PX
-        }
-      },
-    },
-    { name: 'flip', enabled: false },
-  ],
-}
-
 const props = defineProps<{
   session: ChatSession
   active: boolean
+  alwaysVisible?: boolean
+  menuShiftX?: number
 }>()
 
 const emit = defineEmits<{
@@ -86,8 +69,29 @@ const menuVisible = ref(false)
 
 const displayTitle = computed(() => props.session.title || '新对话')
 
+const menuShiftX = computed(() => props.menuShiftX ?? MENU_SHIFT_X_PX)
+
+const sessionMenuPopperOptions = computed(() => ({
+  strategy: 'fixed' as const,
+  modifiers: [
+    {
+      name: 'wkChatSessionMenuShiftX',
+      enabled: true,
+      phase: 'main',
+      requires: ['popperOffsets'],
+      fn({ state }: { state: { modifiersData: Record<string, { x?: number; y?: number } | undefined> } }) {
+        const po = state.modifiersData.popperOffsets
+        if (po && typeof po.x === 'number') {
+          po.x += menuShiftX.value
+        }
+      },
+    },
+    { name: 'flip', enabled: false },
+  ],
+}))
+
 const visibilityClass = computed(() =>
-  props.active
+  props.alwaysVisible || props.active
     ? 'pointer-events-auto opacity-100'
     : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100'
 )

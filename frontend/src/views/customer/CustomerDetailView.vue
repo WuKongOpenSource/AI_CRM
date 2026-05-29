@@ -594,7 +594,7 @@
                   </span>
                 </button>
                 <button
-                  v-if="isEmbeddedMobileLayout && canCreateFollowUps"
+                  v-if="isEmbeddedMobileLayout && canCreateFollowUps && !hideEmbeddedFollowUpAction"
                   type="button"
                   class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
                   @click="handleAiFollowUp"
@@ -1564,10 +1564,12 @@ const props = withDefaults(defineProps<{
   customerId?: string
   embedded?: boolean
   forceMobile?: boolean
+  hideEmbeddedFollowUpAction?: boolean
 }>(), {
   customerId: '',
   embedded: false,
-  forceMobile: false
+  forceMobile: false,
+  hideEmbeddedFollowUpAction: false
 })
 
 const emit = defineEmits<{
@@ -1583,6 +1585,7 @@ const activeCustomerId = computed(() => props.customerId || String(route.params.
 const embedded = computed(() => props.embedded)
 const isMobile = computed(() => props.forceMobile || responsiveIsMobile.value)
 const isEmbeddedMobileLayout = computed(() => props.embedded && props.forceMobile)
+const hideEmbeddedFollowUpAction = computed(() => props.hideEmbeddedFollowUpAction)
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -2542,6 +2545,10 @@ function handleAiFollowUp() {
   if (!canCreateFollowUps.value) return
   showAiFollowUpDrawer.value = true
 }
+
+defineExpose({
+  openAiFollowUp: handleAiFollowUp
+})
 
 async function handleAiFollowUpSaved() {
   if (!customer.value) return

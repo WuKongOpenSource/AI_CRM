@@ -639,10 +639,16 @@
         aria-hidden="true"
       />
       <Transition name="drawer-overlay">
-        <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="drawerVisible = false"></div>
+        <div v-if="isMobile && drawerVisible" class="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm" @click="closeMobileDrawer"></div>
       </Transition>
       <Transition name="drawer-panel">
-        <aside v-if="isMobile && drawerVisible" class="fixed bottom-0 left-0 top-0 z-[101] flex w-[calc(100vw-56px)] max-w-[380px] flex-col bg-white shadow-2xl">
+        <aside
+          v-if="isMobile && drawerVisible"
+          class="fixed inset-y-0 left-0 right-0 z-[101] flex w-screen max-w-none touch-pan-y flex-col bg-white shadow-2xl"
+          @touchstart.passive="handleMobileDrawerTouchStart"
+          @touchend.passive="handleMobileDrawerTouchEnd"
+          @touchcancel.passive="resetMobileDrawerSwipe"
+        >
           <div class="flex items-center justify-between gap-4 px-4 pb-4 pt-8">
             <div class="flex min-w-0 flex-1 items-center gap-3">
               <div v-if="enterpriseStore.hasLogo" class="size-9 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-transparent">
@@ -740,17 +746,50 @@
                   v-for="session in mobileRecentChatSessions"
                   :key="session.sessionId"
                   type="button"
-                  class="group flex w-full min-w-0 items-center rounded-xl px-3 py-[6px] text-left transition-colors"
+                  class="mobileRecentChatSessionRow group flex w-full min-w-0 select-none items-center rounded-xl px-3 py-[6px] text-left transition-colors"
                   :class="isSessionActive(session.sessionId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
-                  @click="handleMobileSelectSession(session.sessionId)"
+                  @click="handleMobileRecentSessionClick(session.sessionId)"
+                  @touchstart.passive="handleMobileSessionTouchStart(session, $event)"
+                  @touchmove.passive="handleMobileSessionTouchMove"
+                  @touchend.passive="handleMobileSessionTouchEnd"
+                  @touchcancel.passive="handleMobileSessionTouchEnd"
+                  @contextmenu.prevent="handleMobileSessionContextMenu(session, $event)"
                 >
-                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ session.title || '新对话' }}</span>
+                  <ChatSessionActionsPopover
+                    :session="session"
+                    :active="isSessionActive(session.sessionId)"
+                    always-visible
+                    :menu-shift-x="0"
+                    @pin="handlePinChatSession"
+                    @share="handleShareChatSession"
+                    @delete="handleDeleteSession"
+                  />
                 </button>
               </template>
             </div>
 
             <div v-if="showSidebarCustomers" class="pt-2">
-              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
+              <div class="flex items-center gap-2 px-3 pb-2">
+                <p class="min-w-0 flex-1 text-[14px] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端新建客户"
+                  title="新建客户"
+                  @click.stop="handleMobileCreateCustomer"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">person_add</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端查看客户列表"
+                  title="查看客户列表"
+                  @click.stop="mobileNavigate('/customer')"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">format_list_bulleted</span>
+                </button>
+              </div>
               <div v-if="sidebarCustomersLoading && sidebarCustomers.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
               </div>
@@ -809,6 +848,49 @@
             </template>
           </nav>
 
+          <Transition name="mobile-session-menu-backdrop">
+            <div
+              v-if="mobileSessionActionMenuSession"
+              class="fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-[1px]"
+              @click="closeMobileSessionActionMenu"
+              @touchstart.stop
+              @touchmove.stop
+              @touchend.stop
+            />
+          </Transition>
+          <Transition name="mobile-session-action-menu">
+            <div
+              v-if="mobileSessionActionMenuSession"
+              class="fixed z-40 w-[180px] rounded-[22px] bg-white/95 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.22),0_1px_2px_rgba(15,23,42,0.18)] backdrop-blur-xl"
+              :style="mobileSessionActionMenuStyle"
+              role="menu"
+              @click.stop
+              @touchstart.stop
+              @touchmove.stop
+              @touchend.stop
+            >
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[16px] font-medium text-[#0d0d0d] transition-colors active:bg-[#f3f3f3]"
+                role="menuitem"
+                @click="handleMobileSessionPin"
+              >
+                <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[24px] leading-none">vertical_align_top</span>
+                <span class="min-w-0 flex-1">置顶</span>
+              </button>
+              <div class="mx-2 my-1 h-px bg-slate-200/80" role="separator" />
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[16px] font-medium text-[#c2403f] transition-colors active:bg-[#ffe1e0]"
+                role="menuitem"
+                @click="handleMobileSessionDelete"
+              >
+                <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[24px] leading-none">delete</span>
+                <span class="min-w-0 flex-1">删除</span>
+              </button>
+            </div>
+          </Transition>
+
           <div class="border-t border-slate-200 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <button
             v-if="false"
@@ -837,7 +919,7 @@
           <Transition name="profile-drawer">
             <div
               v-if="isMobile && drawerVisible && showUserMenu"
-              class="absolute inset-0 z-20 flex flex-col overflow-hidden bg-[#f4f4f7]"
+              class="absolute bottom-0 left-0 right-0 z-20 flex h-[80%] w-full flex-col overflow-hidden bg-[#f4f4f7]"
             >
               <div class="relative flex h-16 shrink-0 items-center justify-center px-4 pt-2">
                 <h2 class="text-[18px] font-bold text-[#0d0d0d]">设置</h2>
@@ -1229,6 +1311,8 @@ import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
+import { shouldCloseMobileDrawerFromSwipe, type SwipePoint } from '@/utils/mobileDrawerSwipe'
+import { getMobileSessionMenuPosition, type MobileSessionMenuPosition } from '@/utils/mobileSessionActions'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
 
@@ -1289,6 +1373,12 @@ function runLayoutNarrowProgrammatic(fn: () => void) {
 }
 
 const drawerVisible = ref(false)
+const mobileDrawerTouchStart = ref<SwipePoint | null>(null)
+const mobileSessionActionMenuSession = ref<ChatSession | null>(null)
+const mobileSessionActionMenuPosition = ref<MobileSessionMenuPosition>({ left: 12, top: 12 })
+const mobileSessionLongPressStart = ref<SwipePoint | null>(null)
+const mobileSessionLongPressConsumed = ref(false)
+let mobileSessionLongPressTimer: ReturnType<typeof setTimeout> | null = null
 /** PC：一级侧栏收起为图标栏 */
 const primarySidebarCollapsed = ref(false)
 const primarySidebarContentCollapsed = ref(false)
@@ -1296,6 +1386,10 @@ const primarySidebarTransitioning = ref(false)
 let primarySidebarTransitionTimer: ReturnType<typeof setTimeout> | null = null
 /** 一级侧栏收起时：鼠标在整块 aside 内则顶栏 logo 区显示为折叠图标 */
 const collapsedSidebarAsideHovered = ref(false)
+const MOBILE_SESSION_LONG_PRESS_MS = 520
+const MOBILE_SESSION_LONG_PRESS_MOVE_CANCEL_PX = 12
+const MOBILE_SESSION_MENU_WIDTH_PX = 180
+const MOBILE_SESSION_MENU_HEIGHT_PX = 116
 
 function onCollapsedPrimarySidebarEnter() {
   if (primarySidebarCollapsed.value) collapsedSidebarAsideHovered.value = true
@@ -1303,6 +1397,129 @@ function onCollapsedPrimarySidebarEnter() {
 
 function onCollapsedPrimarySidebarLeave() {
   collapsedSidebarAsideHovered.value = false
+}
+
+function closeMobileDrawer() {
+  drawerVisible.value = false
+  showUserMenu.value = false
+  closeMobileSessionActionMenu()
+  clearMobileSessionLongPressTimer()
+  resetMobileDrawerSwipe()
+}
+
+function getTouchPoint(touch: Touch | undefined): SwipePoint | null {
+  if (!touch) return null
+  return {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+  }
+}
+
+function resetMobileDrawerSwipe() {
+  mobileDrawerTouchStart.value = null
+}
+
+function handleMobileDrawerTouchStart(event: TouchEvent) {
+  mobileDrawerTouchStart.value = getTouchPoint(event.touches[0])
+}
+
+function handleMobileDrawerTouchEnd(event: TouchEvent) {
+  const start = mobileDrawerTouchStart.value
+  const end = getTouchPoint(event.changedTouches[0])
+  resetMobileDrawerSwipe()
+  if (!start || !end) return
+
+  if (shouldCloseMobileDrawerFromSwipe({ start, end })) {
+    closeMobileDrawer()
+  }
+}
+
+const mobileSessionActionMenuStyle = computed(() => ({
+  left: `${mobileSessionActionMenuPosition.value.left}px`,
+  top: `${mobileSessionActionMenuPosition.value.top}px`,
+}))
+
+function clearMobileSessionLongPressTimer() {
+  if (mobileSessionLongPressTimer) {
+    clearTimeout(mobileSessionLongPressTimer)
+    mobileSessionLongPressTimer = null
+  }
+  mobileSessionLongPressStart.value = null
+}
+
+function closeMobileSessionActionMenu() {
+  mobileSessionActionMenuSession.value = null
+  mobileSessionLongPressConsumed.value = false
+}
+
+function openMobileSessionActionMenu(session: ChatSession, point: SwipePoint) {
+  clearMobileSessionLongPressTimer()
+  showUserMenu.value = false
+  mobileSessionLongPressConsumed.value = true
+  mobileSessionActionMenuPosition.value = getMobileSessionMenuPosition({
+    clientX: point.clientX,
+    clientY: point.clientY,
+    viewportWidth: window.innerWidth || document.documentElement.clientWidth,
+    viewportHeight: window.innerHeight || document.documentElement.clientHeight,
+    menuWidth: MOBILE_SESSION_MENU_WIDTH_PX,
+    menuHeight: MOBILE_SESSION_MENU_HEIGHT_PX,
+  })
+  mobileSessionActionMenuSession.value = session
+}
+
+function handleMobileSessionTouchStart(session: ChatSession, event: TouchEvent) {
+  const point = getTouchPoint(event.touches[0])
+  if (!point) return
+  clearMobileSessionLongPressTimer()
+  mobileSessionLongPressStart.value = point
+  mobileSessionLongPressTimer = setTimeout(() => {
+    openMobileSessionActionMenu(session, point)
+  }, MOBILE_SESSION_LONG_PRESS_MS)
+}
+
+function handleMobileSessionTouchMove(event: TouchEvent) {
+  const start = mobileSessionLongPressStart.value
+  const point = getTouchPoint(event.touches[0])
+  if (!start || !point) return
+  const deltaX = point.clientX - start.clientX
+  const deltaY = point.clientY - start.clientY
+  if (Math.hypot(deltaX, deltaY) > MOBILE_SESSION_LONG_PRESS_MOVE_CANCEL_PX) {
+    clearMobileSessionLongPressTimer()
+  }
+}
+
+function handleMobileSessionTouchEnd() {
+  clearMobileSessionLongPressTimer()
+}
+
+function handleMobileSessionContextMenu(session: ChatSession, event: MouseEvent) {
+  openMobileSessionActionMenu(session, {
+    clientX: event.clientX,
+    clientY: event.clientY,
+  })
+}
+
+function handleMobileRecentSessionClick(sessionId: string) {
+  if (mobileSessionLongPressConsumed.value) {
+    mobileSessionLongPressConsumed.value = false
+    return
+  }
+  closeMobileSessionActionMenu()
+  void handleMobileSelectSession(sessionId)
+}
+
+function handleMobileSessionPin() {
+  const session = mobileSessionActionMenuSession.value
+  if (!session) return
+  closeMobileSessionActionMenu()
+  handlePinChatSession(session)
+}
+
+function handleMobileSessionDelete() {
+  const session = mobileSessionActionMenuSession.value
+  if (!session) return
+  closeMobileSessionActionMenu()
+  void handleDeleteSession(session.sessionId)
 }
 
 const primaryNavRef = ref<HTMLElement | null>(null)
@@ -1623,6 +1840,7 @@ watch(
   () => route.fullPath,
   () => {
     showUserMenu.value = false
+    closeMobileSessionActionMenu()
     closeGlobalSearchDropdown()
     if (selectedPrimaryKey.value && !selectedPrimaryItem.value) {
       selectedPrimaryKey.value = ''
@@ -1640,6 +1858,9 @@ watch(
   isOpen => {
     if (!isOpen) {
       showUserMenu.value = false
+      closeMobileSessionActionMenu()
+      clearMobileSessionLongPressTimer()
+      mobileSessionLongPressConsumed.value = false
     }
   }
 )
@@ -1803,6 +2024,7 @@ onBeforeUnmount(() => {
     clearTimeout(primarySidebarTransitionTimer)
     primarySidebarTransitionTimer = null
   }
+  clearMobileSessionLongPressTimer()
   if (globalSearchTimer) {
     clearTimeout(globalSearchTimer)
     globalSearchTimer = null
@@ -2239,6 +2461,12 @@ function mobileNavigate(path: string, query?: Record<string, string>) {
   showUserMenu.value = false
 }
 
+function handleMobileCreateCustomer() {
+  drawerVisible.value = false
+  showUserMenu.value = false
+  showCreateCustomer.value = true
+}
+
 function mobileProfileNavigate(path: string, query?: Record<string, string>) {
   mobileNavigate(path, query)
 }
@@ -2500,6 +2728,27 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 .drawer-panel-enter-from,
 .drawer-panel-leave-to {
   transform: translateX(-100%);
+}
+
+.mobile-session-menu-backdrop-enter-active,
+.mobile-session-menu-backdrop-leave-active {
+  transition: opacity 0.16s ease;
+}
+
+.mobile-session-menu-backdrop-enter-from,
+.mobile-session-menu-backdrop-leave-to {
+  opacity: 0;
+}
+
+.mobile-session-action-menu-enter-active,
+.mobile-session-action-menu-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.mobile-session-action-menu-enter-from,
+.mobile-session-action-menu-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
 }
 
 .dropdown-enter-active,

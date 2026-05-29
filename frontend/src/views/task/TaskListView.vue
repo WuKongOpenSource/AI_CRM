@@ -7,18 +7,29 @@
         :class="effectiveTaskViewMode === 'list' ? 'w-full' : 'mx-auto max-w-4xl'"
       >
         <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl md:text-[22px] font-bold text-slate-900">AI 优先行动中心</h2>
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div class="min-w-0">
+            <div class="flex items-center justify-between gap-3 md:block">
+              <h2 class="min-w-0 text-xl font-bold text-slate-900 md:text-[22px]">AI 优先行动中心</h2>
+              <button
+                class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90 md:hidden"
+                type="button"
+                aria-label="新建任务"
+                @click="handleAddTask"
+              >
+                <span class="material-symbols-outlined wk-plus-button-icon">add</span>
+              </button>
+            </div>
             <p class="text-[13px] text-slate-500 mt-1">基于客户价值与成交概率，AI 已为您自动排序今日任务。</p>
           </div>
           <!-- Add task button -->
           <button
-            class="flex items-center gap-1.5 self-start px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 md:self-auto"
+            class="hidden items-center gap-1.5 self-start rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary/90 md:flex md:self-auto"
+            type="button"
             @click="handleAddTask"
           >
             <span class="material-symbols-outlined wk-plus-button-icon">add</span>
-            <span>{{ isMobile ? '新建' : '新建任务' }}</span>
+            <span>新建任务</span>
           </button>
         </div>
 

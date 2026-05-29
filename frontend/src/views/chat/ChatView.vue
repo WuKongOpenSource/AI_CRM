@@ -163,6 +163,7 @@
             </button>
 
             <button
+              v-if="!showMobileChatTopActions"
               type="button"
               class="h-9 px-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-1.5"
               @click="handleNewSession"
@@ -170,6 +171,28 @@
               <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">add</span>
               开启新对话
             </button>
+            <div v-else class="wk-mobile-chat-actions" :class="{ 'wk-mobile-chat-actions--single': !showMobileCustomerSummaryAction }">
+              <button
+                type="button"
+                class="wk-mobile-chat-actions__btn"
+                aria-label="新建会话"
+                title="新建会话"
+                @click="handleNewSession"
+              >
+                <span class="material-symbols-outlined text-[23px] leading-none">edit_square</span>
+              </button>
+              <span v-if="showMobileCustomerSummaryAction" class="wk-mobile-chat-actions__divider" aria-hidden="true"></span>
+              <button
+                v-if="showMobileCustomerSummaryAction"
+                type="button"
+                class="wk-mobile-chat-actions__btn"
+                aria-label="展开客户摘要"
+                title="展开客户摘要"
+                @click="openMobileCustomerSummary"
+              >
+                <span class="material-symbols-outlined text-[25px] leading-none">more_horiz</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1070,11 +1093,12 @@
                       v-model:visible="chatUploadMenuVisible"
                       trigger="click"
                       placement="top-start"
-                      width="240"
+                      width="calc(100vw - 32px)"
                       :show-arrow="false"
                       :disabled="isUploading"
                       :teleported="true"
-                      popper-class="wk-chat-upload-menu-popper"
+                      transition="wk-chat-mobile-sheet"
+                      popper-class="wk-chat-upload-menu-popper wk-chat-upload-menu-popper--mobile"
                     >
                       <template #reference>
                         <button
@@ -1086,10 +1110,11 @@
                         </button>
                       </template>
                       <div
-                        class="wk-chat-upload-menu"
+                        class="wk-chat-upload-menu wk-chat-upload-menu--mobile"
                         @mouseenter="clearChatUploadMenuLeaveTimer"
                         @mouseleave="handleChatUploadMenuMouseLeave"
                       >
+                        <div class="wk-chat-upload-menu__mobile-handle" aria-hidden="true"></div>
                         <button
                           type="button"
                           class="wk-chat-upload-menu__item"
@@ -1108,69 +1133,42 @@
                           <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span>
                           <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                         </button>
-                        <el-popover
-                          :trigger="isMobile ? 'click' : 'hover'"
-                          placement="right-end"
-                          :show-arrow="false"
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item"
                           :disabled="isUploading"
-                          :teleported="true"
-                          :offset="8"
-                          :hide-after="isMobile ? 0 : 220"
-                          width="200"
-                          popper-class="wk-chat-upload-menu-popper wk-chat-upload-submenu-popper"
+                          @click="handleChatUploadMenuSelectApp('crm')"
                         >
-                          <template #reference>
-                            <div
-                              class="wk-chat-upload-menu__apps-ref"
-                              role="button"
-                              tabindex="0"
-                            >
-                              <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span>
-                              <span class="wk-chat-upload-menu__label">悟空技能</span>
-                              <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
-                            </div>
-                          </template>
-                          <div
-                            class="wk-chat-upload-submenu"
-                            @mouseenter="clearChatUploadMenuLeaveTimer"
-                            @mouseleave="handleChatUploadMenuMouseLeave"
-                          >
-                            <button
-                              type="button"
-                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              @click="handleChatUploadMenuSelectApp('crm')"
-                            >
-                              <WkIcon
-                                name="customer"
-                                :size="18"
-                                class="shrink-0"
-                                :class="chatStore.selectedAppCode === 'crm' ? 'text-primary' : ''"
-                              />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">CRM管理</span>
-                              <span
-                                v-if="chatStore.selectedAppCode === 'crm'"
-                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
-                              >check</span>
-                            </button>
-                            <button
-                              type="button"
-                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
-                              @click="handleChatUploadMenuSelectApp('knowledge')"
-                            >
-                              <WkIcon
-                                name="knowledge-1"
-                                :size="18"
-                                class="shrink-0"
-                                :class="chatStore.selectedAppCode === 'knowledge' ? 'text-primary' : ''"
-                              />
-                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">知识库检索</span>
-                              <span
-                                v-if="chatStore.selectedAppCode === 'knowledge'"
-                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
-                              >check</span>
-                            </button>
-                          </div>
-                        </el-popover>
+                          <WkIcon
+                            name="customer"
+                            :size="18"
+                            class="shrink-0"
+                            :class="chatStore.selectedAppCode === 'crm' ? '!text-[var(--wk-text-primary)]' : ''"
+                          />
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-menu__label--grow" :class="chatStore.selectedAppCode === 'crm' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">CRM管理</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'crm'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="wk-chat-upload-menu__item"
+                          :disabled="isUploading"
+                          @click="handleChatUploadMenuSelectApp('knowledge')"
+                        >
+                          <WkIcon
+                            name="knowledge-1"
+                            :size="18"
+                            class="shrink-0"
+                            :class="chatStore.selectedAppCode === 'knowledge' ? '!text-[var(--wk-text-primary)]' : ''"
+                          />
+                          <span class="wk-chat-upload-menu__label wk-chat-upload-menu__label--grow" :class="chatStore.selectedAppCode === 'knowledge' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">知识库检索</span>
+                          <span
+                            v-if="chatStore.selectedAppCode === 'knowledge'"
+                            class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                          >check</span>
+                        </button>
                       </div>
                     </el-popover>
                     <textarea
@@ -1466,6 +1464,88 @@
       @success="handleSelectedCustomerEditSuccess"
     />
 
+    <Transition name="wk-mobile-customer-summary-fade">
+      <div
+        v-if="mobileCustomerSummaryVisible && isMobile && isCustomerContextChat"
+        class="wk-mobile-customer-summary"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wk-mobile-customer-summary-title"
+      >
+        <button
+          type="button"
+          class="wk-mobile-customer-summary__backdrop"
+          aria-label="关闭客户摘要"
+          @click="closeMobileCustomerSummary"
+        ></button>
+        <section
+          class="wk-mobile-customer-summary__sheet"
+          :class="{
+            'is-dragging': customerSummarySheetDragging,
+            'has-voice-action': showMobileSummaryVoiceAction
+          }"
+          :style="{ height: `${customerSummarySheetHeight}vh` }"
+        >
+          <header
+            class="wk-mobile-customer-summary__header"
+            @pointerdown="handleCustomerSummaryDragStart"
+          >
+            <span class="wk-mobile-customer-summary__handle" aria-hidden="true"></span>
+            <div class="wk-mobile-customer-summary__title-row">
+              <div class="min-w-0 flex-1">
+                <p id="wk-mobile-customer-summary-title" class="wk-mobile-customer-summary__title">
+                  {{ mobileCustomerSummaryName }}
+                </p>
+                <p class="wk-mobile-customer-summary__subtitle">客户摘要</p>
+              </div>
+              <button
+                type="button"
+                class="wk-mobile-customer-summary__close"
+                aria-label="关闭客户摘要"
+                @pointerdown.stop
+                @click.stop="closeMobileCustomerSummary"
+              >
+                <span class="material-symbols-outlined text-[24px] leading-none">close</span>
+              </button>
+            </div>
+          </header>
+          <div class="wk-mobile-customer-summary__body">
+            <div v-if="selectedCustomerLoading" class="flex h-full items-center justify-center">
+              <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+            </div>
+            <div v-else-if="!selectedCustomer" class="flex h-full flex-col items-center justify-center px-6 text-center">
+              <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
+                <WkIcon name="customer" :size="24" />
+              </div>
+              <p class="text-sm font-semibold text-slate-700">暂无客户摘要</p>
+              <p class="mt-1 text-xs leading-relaxed text-slate-400">客户资料加载后会在这里展示。</p>
+            </div>
+            <CustomerDetailView
+              v-else
+              ref="customerSummaryDetailRef"
+              embedded
+              force-mobile
+              hide-embedded-follow-up-action
+              :customer-id="selectedCustomer.customerId"
+              @quote-attachment="handleQuoteCustomerAttachment"
+            />
+          </div>
+          <Transition name="wk-mobile-summary-voice">
+            <button
+              v-if="showMobileSummaryVoiceAction"
+              type="button"
+              class="wk-mobile-customer-summary__voice"
+              aria-label="语音录入"
+              @click="openMobileSummaryVoiceInput"
+            >
+              <span class="material-symbols-outlined text-[20px] leading-none">keyboard_voice</span>
+              <span>语音录入</span>
+            </button>
+          </Transition>
+        </section>
+      </div>
+    </Transition>
+
     <button
       v-if="showCustomerPanelShell && !customerPanelVisible"
       type="button"
@@ -1649,6 +1729,7 @@ watch(chatUploadMenuVisible, (visible) => {
     }
   }
 })
+
 const chatKnowledgePickerVisible = ref(false)
 const showKnowledgeFollowUpChips = ref(false)
 const chatModelPopoverVisible = ref(false)
@@ -1658,6 +1739,10 @@ const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
+const mobileCustomerSummaryVisible = ref(false)
+const customerSummaryDetailRef = ref<InstanceType<typeof CustomerDetailView> | null>(null)
+const customerSummarySheetHeight = ref(58)
+const customerSummarySheetDragging = ref(false)
 const showSelectedCustomerTagDialog = ref(false)
 const showSelectedCustomerBasicInfoDrawer = ref(false)
 const showSelectedCustomerEditDialog = ref(false)
@@ -1671,9 +1756,13 @@ const CUSTOMER_PANEL_MAX_WIDTH_RATIO = 0.5
 const CHAT_COMPOSER_MIN_WIDTH_PX = 468
 const CHAT_CUSTOMER_AI_POLL_INTERVAL_MS = 2500
 const CHAT_CUSTOMER_AI_POLL_MAX_ATTEMPTS = 24
+const CUSTOMER_SUMMARY_SHEET_LEVELS = [58, 78, 94] as const
+const CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT = CUSTOMER_SUMMARY_SHEET_LEVELS[CUSTOMER_SUMMARY_SHEET_LEVELS.length - 1]
 let chatCustomerAiPollTimer: ReturnType<typeof setTimeout> | null = null
 let chatCustomerAiPollAttempts = 0
 let offSelectedCustomerDetailRefresh: (() => void) | null = null
+let customerSummaryDragStartY = 0
+let customerSummaryDragStartHeight = 58
 
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
@@ -2085,10 +2174,35 @@ const userAvatarLoadFailed = ref(false)
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
 const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
+const showMobileChatTopActions = computed(() =>
+  isMobile.value
+    && currentView.value === 'chat'
+    && mobilePanel.value === 'chat'
+    && chatStore.messages.length > 0
+)
+const showMobileCustomerSummaryAction = computed(() => showMobileChatTopActions.value && isCustomerContextChat.value)
+const mobileCustomerSummaryName = computed(() =>
+  selectedCustomer.value?.companyName || boundCustomerName.value || '客户'
+)
+const showMobileSummaryVoiceAction = computed(() =>
+  mobileCustomerSummaryVisible.value
+    && isMobile.value
+    && isCustomerContextChat.value
+    && customerSummarySheetHeight.value >= CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT - 1
+)
 const chatMessagesAreaClass = computed(() => {
   if (!isChatEmpty.value) return 'wk-chat-messages--scrollable flex-1 overflow-y-auto pb-4 pt-6 md:pt-8'
   return isCustomerContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
 })
+
+watch(
+  () => [isMobile.value, isCustomerContextChat.value, currentSessionCustomerId.value, selectedCustomerId.value] as const,
+  ([mobile, hasCustomer]) => {
+    if (!mobile || !hasCustomer) {
+      closeMobileCustomerSummary()
+    }
+  }
+)
 
 const SCROLL_TO_BOTTOM_THRESHOLD_PX = 100
 /** When true, new content / streaming keeps the viewport pinned to the bottom. */
@@ -2181,6 +2295,70 @@ function focusChatTextarea() {
   void nextTick(() => {
     requestAnimationFrame(() => tryFocus(0))
   })
+}
+
+function clampCustomerSummaryHeight(value: number) {
+  return Math.min(CUSTOMER_SUMMARY_SHEET_MAX_HEIGHT, Math.max(CUSTOMER_SUMMARY_SHEET_LEVELS[0], value))
+}
+
+function snapCustomerSummaryHeight(value: number) {
+  return CUSTOMER_SUMMARY_SHEET_LEVELS.reduce((best, level) => (
+    Math.abs(level - value) < Math.abs(best - value) ? level : best
+  ), CUSTOMER_SUMMARY_SHEET_LEVELS[0])
+}
+
+function openMobileCustomerSummary() {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId) return
+  customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
+  mobileCustomerSummaryVisible.value = true
+  void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
+}
+
+function closeMobileCustomerSummary() {
+  mobileCustomerSummaryVisible.value = false
+  customerSummarySheetDragging.value = false
+  window.removeEventListener('pointermove', handleCustomerSummaryDragMove)
+  window.removeEventListener('pointerup', handleCustomerSummaryDragEnd)
+  window.removeEventListener('pointercancel', handleCustomerSummaryDragEnd)
+}
+
+function handleCustomerSummaryDragStart(event: PointerEvent) {
+  if (!mobileCustomerSummaryVisible.value) return
+  customerSummarySheetDragging.value = true
+  customerSummaryDragStartY = event.clientY
+  customerSummaryDragStartHeight = customerSummarySheetHeight.value
+  window.addEventListener('pointermove', handleCustomerSummaryDragMove)
+  window.addEventListener('pointerup', handleCustomerSummaryDragEnd)
+  window.addEventListener('pointercancel', handleCustomerSummaryDragEnd)
+}
+
+function handleCustomerSummaryDragMove(event: PointerEvent) {
+  if (!customerSummarySheetDragging.value) return
+  event.preventDefault()
+  const viewportHeight = Math.max(1, window.innerHeight)
+  const deltaY = customerSummaryDragStartY - event.clientY
+  const nextHeight = customerSummaryDragStartHeight + (deltaY / viewportHeight) * 100
+  customerSummarySheetHeight.value = clampCustomerSummaryHeight(nextHeight)
+}
+
+function handleCustomerSummaryDragEnd() {
+  if (!customerSummarySheetDragging.value) return
+  customerSummarySheetDragging.value = false
+  customerSummarySheetHeight.value = snapCustomerSummaryHeight(customerSummarySheetHeight.value)
+  window.removeEventListener('pointermove', handleCustomerSummaryDragMove)
+  window.removeEventListener('pointerup', handleCustomerSummaryDragEnd)
+  window.removeEventListener('pointercancel', handleCustomerSummaryDragEnd)
+}
+
+function openMobileSummaryVoiceInput() {
+  customerSummaryDetailRef.value?.openAiFollowUp?.()
+}
+
+function handleMobileSummaryTouchMove(event: TouchEvent) {
+  if (customerSummarySheetDragging.value) {
+    event.preventDefault()
+  }
 }
 
 watch(composerFocusNonce, () => {
@@ -2431,6 +2609,7 @@ onMounted(async () => {
     chatMessagesResizeObserver = new ResizeObserver(updateMessagesScrollbarOffset)
     chatMessagesResizeObserver.observe(messagesContainer.value)
   }
+  document.addEventListener('touchmove', handleMobileSummaryTouchMove, { passive: false })
   emitChatComposerNarrowState(true)
   resizeChatTextarea()
   await Promise.all([
@@ -2462,6 +2641,8 @@ onBeforeUnmount(() => {
   }
   abortChatVoiceRecording()
   transcriptionToken += 1
+  closeMobileCustomerSummary()
+  document.removeEventListener('touchmove', handleMobileSummaryTouchMove)
   unregisterAiQuotaResumeSendHandler()
   customerPanelResizeObserver?.disconnect()
   customerPanelResizeObserver = null
@@ -3155,6 +3336,7 @@ function applyKnowledgeDocPrompt(text: string) {
 
 async function handleNewSession() {
   isPinnedToBottom.value = true
+  closeMobileCustomerSummary()
   if (route.query.customerId || route.query.sessionId) {
     await router.replace({ path: '/chat' })
   }
@@ -3169,6 +3351,7 @@ async function handleNewSession() {
 async function handleSelectSession(sessionId: string) {
   // if (chatStore.currentSessionId === sessionId && currentView.value === 'chat') return
   isPinnedToBottom.value = true
+  closeMobileCustomerSummary()
   currentView.value = 'chat'
   await chatStore.selectSession(sessionId)
   if (isMobile.value) {
@@ -3441,6 +3624,213 @@ void sendQuickMessage
     0 0 0 1px rgba(31, 30, 28, 0.04);
 }
 
+.wk-mobile-chat-actions {
+  display: inline-flex;
+  height: 48px;
+  min-width: 116px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.75);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.88);
+  box-shadow:
+    0 18px 50px rgb(15 23 42 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.9);
+  backdrop-filter: blur(18px);
+}
+
+.wk-mobile-chat-actions--single {
+  min-width: 58px;
+}
+
+.wk-mobile-chat-actions__btn {
+  display: inline-flex;
+  width: 56px;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-chat-actions__btn:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-chat-actions__btn:hover {
+  background: rgb(13 13 13 / 0.05);
+}
+
+.wk-mobile-chat-actions__divider {
+  width: 1px;
+  height: 22px;
+  background: rgb(13 13 13 / 0.08);
+}
+
+.wk-mobile-customer-summary {
+  position: fixed;
+  inset: 0;
+  z-index: 3400;
+  pointer-events: auto;
+}
+
+.wk-mobile-customer-summary__backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgb(0 0 0 / 0.18);
+  backdrop-filter: blur(1px);
+}
+
+.wk-mobile-customer-summary__sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 28px 28px 0 0;
+  background: var(--wk-bg-surface);
+  box-shadow: 0 -18px 55px rgb(15 23 42 / 0.18);
+  transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wk-mobile-customer-summary__sheet.is-dragging {
+  transition: none;
+}
+
+.wk-mobile-customer-summary__header {
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 96%, transparent);
+  touch-action: none;
+  user-select: none;
+}
+
+.wk-mobile-customer-summary__handle {
+  display: block;
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 9999px;
+  background: #d1d5db;
+}
+
+.wk-mobile-customer-summary__title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.wk-mobile-customer-summary__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--wk-text-primary);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wk-mobile-customer-summary__subtitle {
+  margin-top: 2px;
+  color: var(--wk-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.wk-mobile-customer-summary__close {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #f1f1f1;
+  color: #0d0d0d;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.wk-mobile-customer-summary__close:active {
+  transform: scale(0.94);
+}
+
+.wk-mobile-customer-summary__body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.wk-mobile-customer-summary__sheet.has-voice-action .wk-mobile-customer-summary__body {
+  padding-bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
+}
+
+.wk-mobile-customer-summary__voice {
+  position: absolute;
+  right: 18px;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: inline-flex;
+  height: 52px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.92);
+  padding: 0 18px;
+  color: #0d0d0d;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 16px 42px rgb(15 23 42 / 0.18);
+  backdrop-filter: blur(14px);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.wk-mobile-customer-summary__voice:active {
+  transform: scale(0.96);
+}
+
+.wk-mobile-customer-summary-fade-enter-active,
+.wk-mobile-customer-summary-fade-leave-active {
+  transition: opacity 180ms ease;
+}
+
+.wk-mobile-customer-summary-fade-enter-from,
+.wk-mobile-customer-summary-fade-leave-to {
+  opacity: 0;
+}
+
+.wk-mobile-customer-summary-fade-enter-active .wk-mobile-customer-summary__sheet,
+.wk-mobile-customer-summary-fade-leave-active .wk-mobile-customer-summary__sheet {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wk-mobile-customer-summary-fade-enter-from .wk-mobile-customer-summary__sheet,
+.wk-mobile-customer-summary-fade-leave-to .wk-mobile-customer-summary__sheet {
+  transform: translateY(100%);
+}
+
+.wk-mobile-summary-voice-enter-active,
+.wk-mobile-summary-voice-leave-active {
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.wk-mobile-summary-voice-enter-from,
+.wk-mobile-summary-voice-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+}
+
 .wk-recording-indicator {
   position: relative;
   display: inline-flex;
@@ -3706,6 +4096,18 @@ void sendQuickMessage
   padding: 10px;
 }
 
+.wk-chat-upload-menu--mobile {
+  padding: 12px 8px max(12px, env(safe-area-inset-bottom));
+}
+
+.wk-chat-upload-menu__mobile-handle {
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 999px;
+  background: #d1d5db;
+}
+
 .wk-chat-upload-menu__item {
   width: 100%;
   display: flex;
@@ -3727,16 +4129,38 @@ void sendQuickMessage
   cursor: not-allowed;
 }
 
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__item {
+  height: 52px;
+  gap: 14px;
+  padding: 8px 12px;
+  border-radius: 14px;
+}
+
 .wk-chat-upload-menu__icon {
   font-size: 18px;
   line-height: 1;
   color: var(--wk-text-primary);
 }
 
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__icon {
+  font-size: 22px;
+}
+
 .wk-chat-upload-menu__label {
   font-size: 14px;
   line-height: 1.2;
   font-weight: 400;
+}
+
+.wk-chat-upload-menu--mobile .wk-chat-upload-menu__label {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wk-chat-upload-menu__label--grow {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
 }
 
 .wk-chat-upload-menu__apps-ref {
@@ -3801,6 +4225,39 @@ void sendQuickMessage
 .wk-chat-upload-menu-popper.el-popper:not(.wk-chat-upload-submenu-popper) {
   z-index: 3000 !important;
   overflow: visible !important;
+}
+
+.wk-chat-upload-menu-popper--mobile.el-popper {
+  position: fixed !important;
+  left: 16px !important;
+  right: 16px !important;
+  bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  top: auto !important;
+  width: auto !important;
+  max-width: none !important;
+  transform: none !important;
+  border-radius: 24px !important;
+  box-shadow: 0 18px 48px rgb(var(--wk-shadow-color) / 0.32) !important;
+}
+
+.wk-chat-mobile-sheet-enter-active,
+.wk-chat-mobile-sheet-leave-active {
+  transform-origin: center bottom;
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease;
+}
+
+.wk-chat-mobile-sheet-enter-from,
+.wk-chat-mobile-sheet-leave-to {
+  opacity: 0;
+  transform: translateY(calc(100% + 24px)) !important;
+}
+
+.wk-chat-mobile-sheet-enter-to,
+.wk-chat-mobile-sheet-leave-from {
+  opacity: 1;
+  transform: translateY(0) !important;
 }
 
 .wk-chat-upload-menu-popper .el-popper__arrow,

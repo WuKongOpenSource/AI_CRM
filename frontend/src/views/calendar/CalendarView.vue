@@ -7,7 +7,17 @@
         <div class="shrink-0 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
           <div class="flex min-w-0 flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:gap-6">
             <div class="min-w-0">
-              <h2 class="text-xl font-bold text-slate-900 sm:text-2xl">智能日程安排</h2>
+              <div class="flex items-center justify-between gap-3 md:block">
+                <h2 class="min-w-0 text-xl font-bold text-slate-900 sm:text-2xl">智能日程安排</h2>
+                <button
+                  type="button"
+                  aria-label="新增日程"
+                  @click="openCreateScheduleDialog"
+                  class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm transition-colors hover:bg-primary/90 md:hidden"
+                >
+                  <span class="material-symbols-outlined wk-plus-button-icon">add</span>
+                </button>
+              </div>
               <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500 sm:text-sm">{{ currentDateStr }} • 今天有 {{ todayScheduleCount }} 场会议和 {{ todayTaskCount }} 个待办任务</p>
             </div>
           </div>
@@ -52,7 +62,7 @@
             <button
               type="button"
               @click="openCreateScheduleDialog"
-              class="col-span-2 flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 sm:col-auto sm:gap-2 sm:px-6 sm:py-2.5"
+              class="hidden h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary/90 md:flex"
             >
               <span class="material-symbols-outlined wk-plus-button-icon">add</span>
               新增日程
