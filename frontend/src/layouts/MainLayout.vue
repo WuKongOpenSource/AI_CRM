@@ -1262,9 +1262,35 @@ const PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX = 256
 const PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX = 52
 const PRIMARY_SIDEBAR_WIDTH_DELTA_PX = PRIMARY_SIDEBAR_WIDTH_EXPANDED_PX - PRIMARY_SIDEBAR_WIDTH_COLLAPSED_PX
 const PRIMARY_SIDEBAR_TRANSITION_MS = 200
+const SIDEBAR_STORAGE_KEYS = {
+  primaryCollapsed: 'wk_ai_crm:main_layout:primary_sidebar_collapsed:v1',
+  recentChatExpanded: 'wk_ai_crm:main_layout:recent_chat_sessions_expanded:v1',
+  sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1'
+} as const
 
 function mainContentWidthAsIfSidebarExpanded(sidebarCollapsed: boolean, mainColumnWidth: number) {
   return sidebarCollapsed ? mainColumnWidth - PRIMARY_SIDEBAR_WIDTH_DELTA_PX : mainColumnWidth
+}
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (raw === '1') return true
+    if (raw === '0') return false
+  } catch {
+    // Ignore storage failures.
+  }
+  return fallback
+}
+
+function writeStoredBoolean(key: string, value: boolean) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, value ? '1' : '0')
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 const mainContentColumnRef = ref<HTMLElement | null>(null)
@@ -1296,8 +1322,8 @@ function runLayoutNarrowProgrammatic(fn: () => void) {
 
 const drawerVisible = ref(false)
 /** PC：一级侧栏收起为图标栏 */
-const primarySidebarCollapsed = ref(false)
-const primarySidebarContentCollapsed = ref(false)
+const primarySidebarCollapsed = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.primaryCollapsed, false))
+const primarySidebarContentCollapsed = ref(primarySidebarCollapsed.value)
 const primarySidebarTransitioning = ref(false)
 let primarySidebarTransitionTimer: ReturnType<typeof setTimeout> | null = null
 /** 一级侧栏收起时：鼠标在整块 aside 内则顶栏 logo 区显示为折叠图标 */
@@ -1339,9 +1365,9 @@ async function restorePrimaryNavScrollTop(scrollTop: number) {
   el.scrollTop = Math.min(scrollTop, maxScrollTop)
 }
 /** PC 侧栏「最近」对话列表折叠 */
-const recentChatSessionsExpanded = ref(true)
+const recentChatSessionsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, true))
 const recentHistoryKeyword = ref('')
-const sidebarCustomersExpanded = ref(true)
+const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
 const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
@@ -1653,8 +1679,23 @@ watch(
 
 watch(showUserMenu, open => {
   if (open && !isMobile.value && primarySidebarCollapsed.value) {
-    primarySidebarCollapsed.value = false
+    runLayoutNarrowProgrammatic(() => {
+      primarySidebarCollapsed.value = false
+    })
   }
+})
+
+watch(primarySidebarCollapsed, collapsed => {
+  if (layoutNarrowProgrammatic.value) return
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.primaryCollapsed, collapsed)
+})
+
+watch(recentChatSessionsExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, expanded)
+})
+
+watch(sidebarCustomersExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
 })
 
 watch(primarySidebarCollapsed, collapsed => {
