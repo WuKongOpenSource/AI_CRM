@@ -15,7 +15,7 @@ import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.VO.LoginResponseVO;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
-import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.AuthSessionService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
 import com.kakarote.ai_crm.service.RegistrationService;
@@ -65,7 +65,7 @@ public class AuthController {
     private RegistrationService registrationService;
 
     @Autowired
-    private FileStorageService fileStorageService;
+    private AuthSessionService authSessionService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -150,7 +150,7 @@ public class AuthController {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前企业下存在重复账号，请联系管理员处理");
         }
 
-        return Result.ok(buildLoginSuccessResponse(
+        return Result.ok(authSessionService.createLoginResponse(
                 enabledUsers.get(0),
                 LoginTypeEnum.resolve(loginUserBO.getLoginType()),
                 request,
@@ -233,54 +233,5 @@ public class AuthController {
      */
     private boolean isEnabled(ManagerUser user) {
         return user != null && Integer.valueOf(1).equals(user.getStatus());
-    }
-
-    /**
-     * 构建LoginSuccess响应。
-     */
-    private LoginResponseVO buildLoginSuccessResponse(ManagerUser user,
-                                                      LoginTypeEnum loginType,
-                                                      HttpServletRequest request,
-                                                      HttpServletResponse response) {
-        LoginUser loginUser = new LoginUser();
-        loginUser.setUser(user);
-        loginUser.setLoginType(LoginTypeEnum.resolve(loginType));
-
-        String token = tokenService.createToken(loginUser, tokenService.resolveLoginIp(request));
-        String sessionId = oidcService.createSession(loginUser);
-        ResponseCookie sessionCookie = ResponseCookie.from(oidcConfig.getSessionCookie(), sessionId)
-                .httpOnly(true)
-                .path("/")
-                .maxAge(oidcConfig.getTokenExpiry())
-                .sameSite("Lax")
-                .build();
-        response.addHeader(HttpHeaders.SET_COOKIE, sessionCookie.toString());
-
-        LoginResponseVO result = new LoginResponseVO();
-        result.setToken(token);
-        result.setUserInfo(buildUserInfo(user));
-        result.setRequiresTenantSelection(Boolean.FALSE);
-        return result;
-    }
-
-    /**
-     * 构建用户信息。
-     */
-    private ManageUserVO buildUserInfo(ManagerUser user) {
-        ManageUserVO userVO = new ManageUserVO();
-        userVO.setUserId(user.getUserId());
-        userVO.setUsername(user.getUsername());
-        userVO.setRealname(user.getRealname());
-        userVO.setImg(user.getImg());
-        userVO.setTenantId(user.getTenantId());
-        if (StrUtil.isNotBlank(user.getImg())) {
-            try {
-                userVO.setImgUrl(fileStorageService.getUrl(user.getImg()));
-            } catch (Exception ignored) {
-            }
-        }
-        userVO.setMobile(user.getMobile());
-        userVO.setEmail(user.getEmail());
-        return userVO;
     }
 }

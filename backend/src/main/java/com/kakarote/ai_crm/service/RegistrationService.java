@@ -2,6 +2,9 @@ package com.kakarote.ai_crm.service;
 
 import com.kakarote.ai_crm.entity.BO.RegisterBO;
 import com.kakarote.ai_crm.entity.BO.ResetPasswordBO;
+import com.kakarote.ai_crm.entity.BO.ExternalTenantMemberRegisterBO;
+import com.kakarote.ai_crm.entity.BO.ExternalTenantRegisterBO;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 
 public interface RegistrationService {
 
@@ -10,6 +13,10 @@ public interface RegistrationService {
      * @param registerBO 注册信息
      */
     void register(RegisterBO registerBO);
+
+    ManagerUser registerExternalTenant(ExternalTenantRegisterBO registerBO);
+
+    ManagerUser registerExternalTenantMember(ExternalTenantMemberRegisterBO registerBO);
 
 
     /**

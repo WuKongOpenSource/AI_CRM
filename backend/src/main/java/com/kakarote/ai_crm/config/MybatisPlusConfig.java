@@ -32,7 +32,9 @@ public class MybatisPlusConfig {
             "crm_ai_model_pricing",
             "crm_ai_billing_config",
             "crm_access_log",
-            "crm_error_log"
+            "crm_error_log",
+            "crm_external_auth_identity",
+            "crm_external_tenant_binding"
     );
 
     @Bean

@@ -41,6 +41,42 @@ export interface LoginResult {
   tenantOptions?: LoginTenantOption[]
 }
 
+export type ExternalAuthProviderCode = 'google' | 'wechat' | 'wecom'
+
+export interface ExternalAuthProvider {
+  provider: ExternalAuthProviderCode
+  name: string
+  enabled: boolean
+}
+
+export interface ExternalAuthAuthorizeResult {
+  provider: ExternalAuthProviderCode
+  authorizeUrl: string
+}
+
+export interface ExternalAuthTicketLoginParams {
+  ticket: string
+  loginType?: LoginType
+}
+
+export interface ExternalAuthRegisterParams {
+  ticket: string
+  companyName?: string
+  realname?: string
+  email?: string
+  verificationCode?: string
+  loginType?: LoginType
+}
+
+export interface ExternalAuthBinding {
+  provider: ExternalAuthProviderCode
+  providerName: string
+  bound: boolean
+  displayName?: string
+  email?: string
+  bindTime?: string
+}
+
 export interface UserInfo {
   userId: string
   username: string

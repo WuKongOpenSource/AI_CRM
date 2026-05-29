@@ -42,6 +42,11 @@ export const useUserStore = defineStore('user', () => {
       return result
     }
 
+    await applyLoginResult(result)
+    return result
+  }
+
+  async function applyLoginResult(result: LoginResult): Promise<void> {
     if (!result.token || !result.userInfo) {
       throw new Error('Invalid login response')
     }
@@ -51,7 +56,6 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = result.userInfo
     permissions.value = await apiGetUserAuth() || {}
     permissionsLoaded.value = true
-    return result
   }
 
   async function logout(): Promise<void> {
@@ -115,6 +119,7 @@ export const useUserStore = defineStore('user', () => {
     userId,
     avatar,
     login,
+    applyLoginResult,
     logout,
     fetchUserInfo,
     setUserInfo,

@@ -84,6 +84,8 @@ public class SecurityConfig {
                         // 允许异步 dispatch（流式响应需要）
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers("/login", "/auth/login", "/auth/register", "/auth/reset-password").anonymous() // 允许匿名访问
+                        .requestMatchers("/auth/external/providers", "/auth/external/*/authorize", "/auth/external/*/callback").anonymous()
+                        .requestMatchers("/auth/external/login-ticket", "/auth/external/register").anonymous()
                         .requestMatchers("/", "/index", "/static/**", "/assets/**").anonymous()
                         .requestMatchers("/index.html", "/doc.html", "/swagger-resources/**", "/webjars/**", "/v3/api-docs/**", "/instrument/callback").anonymous()
                         .requestMatchers("/tokenPurchase/notify/**").permitAll()

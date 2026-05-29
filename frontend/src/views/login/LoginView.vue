@@ -176,6 +176,29 @@
                         </button>
                       </el-form-item>
                     </el-form>
+
+                    <div v-if="enabledExternalProviders.length" class="external-auth-panel">
+                      <div class="external-auth-divider">
+                        <span>External login</span>
+                      </div>
+                      <div class="external-auth-grid">
+                        <button
+                          v-for="provider in enabledExternalProviders"
+                          :key="provider.provider"
+                          type="button"
+                          class="external-auth-btn"
+                          :disabled="externalLoadingProvider === provider.provider"
+                          @click="startExternalLogin(provider.provider)"
+                        >
+                          <span class="external-auth-btn__mark">{{ providerMark(provider.provider) }}</span>
+                          <span>{{ provider.name }}</span>
+                          <span
+                            v-if="externalLoadingProvider === provider.provider"
+                            class="ml-auto size-4 animate-spin rounded-full border-2 border-slate-300 border-t-primary"
+                          />
+                        </button>
+                      </div>
+                    </div>
                   </template>
 
                   <div v-else class="tenant-selection">
@@ -526,6 +549,63 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="showExternalRegisterDialog"
+      title="Complete external login"
+      width="480px"
+      destroy-on-close
+      align-center
+      @closed="handleExternalRegisterDialogClosed"
+    >
+      <div class="space-y-5">
+        <el-form
+          ref="externalRegisterFormRef"
+          :model="externalRegisterForm"
+          :rules="externalRegisterRules"
+          label-position="top"
+          hide-required-asterisk
+          @submit.prevent="handleExternalRegister"
+        >
+          <el-form-item prop="companyName" label="鍏徃鍚嶇О">
+            <el-input v-model="externalRegisterForm.companyName" size="large" />
+          </el-form-item>
+          <el-form-item prop="realname" label="濮撳悕">
+            <el-input v-model="externalRegisterForm.realname" size="large" />
+          </el-form-item>
+          <el-form-item prop="email" label="閭">
+            <el-input v-model="externalRegisterForm.email" size="large" />
+          </el-form-item>
+          <el-form-item prop="verificationCode" label="Verification code">
+            <div class="flex w-full gap-3">
+              <el-input
+                v-model="externalRegisterForm.verificationCode"
+                size="large"
+                class="flex-1"
+                @keyup.enter="handleExternalRegister"
+              />
+              <button
+                type="button"
+                class="auth-send-code-btn shrink-0 px-4 text-sm font-medium text-slate-700 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                :disabled="externalSendingCode || externalCountdown > 0"
+                @click="handleExternalSendCode"
+              >
+                {{ externalSendCodeText }}
+              </button>
+            </div>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <el-button @click="showExternalRegisterDialog = false">鍙栨秷</el-button>
+          <el-button type="primary" :loading="externalRegisterLoading" @click="handleExternalRegister">
+            瀹屾垚鐧诲綍
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <SliderCaptchaDialog v-model="showCaptchaDialog" @verified="handleCaptchaVerified" />
   </div>
 </template>
@@ -546,39 +626,57 @@ import {
 import { ElMessage, FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import logoImg from '@/assets/images/logo.png'
-import { getOidcSessionToken, register, resetPassword, sendEmailCode } from '@/api/auth'
+import {
+  completeExternalRegister,
+  exchangeExternalLoginTicket,
+  getExternalAuthAuthorizeUrl,
+  getExternalAuthProviders,
+  getOidcSessionToken,
+  register,
+  resetPassword,
+  sendEmailCode
+} from '@/api/auth'
 import SliderCaptchaDialog from '@/components/auth/SliderCaptchaDialog.vue'
-import type { LoginTenantOption, LoginType } from '@/types/api'
+import type { ExternalAuthProvider, ExternalAuthProviderCode, LoginTenantOption, LoginType } from '@/types/api'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
 const isLogin = ref(true)
-type EmailCodeScene = 'register' | 'reset-password'
+type EmailCodeScene = 'register' | 'reset-password' | 'external-register'
 
 const loginFormRef = ref<FormInstance>()
 const registerFormRef = ref<FormInstance>()
 const forgotPasswordFormRef = ref<FormInstance>()
+const externalRegisterFormRef = ref<FormInstance>()
 const loading = ref(false)
 const registerLoading = ref(false)
 const forgotPasswordLoading = ref(false)
+const externalRegisterLoading = ref(false)
 const sendingCode = ref(false)
 const forgotSendingCode = ref(false)
+const externalSendingCode = ref(false)
 const showCaptchaDialog = ref(false)
 const showForgotPasswordDialog = ref(false)
+const showExternalRegisterDialog = ref(false)
 const formScrollRef = ref<HTMLElement>()
 const stageRef = ref<HTMLElement>()
 const loginLayerRef = ref<HTMLElement>()
 const registerLayerRef = ref<HTMLElement>()
 const countdown = ref(0)
 const forgotCountdown = ref(0)
+const externalCountdown = ref(0)
 const tenantOptions = ref<LoginTenantOption[]>([])
+const externalProviders = ref<ExternalAuthProvider[]>([])
 const loginStep = ref<'credentials' | 'tenant-selection'>('credentials')
 const pendingTenantId = ref('')
 const pendingEmailCodeScene = ref<EmailCodeScene | ''>('')
+const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
+const externalRegisterTicket = ref('')
 let countdownTimer: number | undefined
 let forgotCountdownTimer: number | undefined
+let externalCountdownTimer: number | undefined
 
 const reduceMotion =
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -652,12 +750,21 @@ const registerForm = reactive({
   verificationCode: ''
 })
 
+const externalRegisterForm = reactive({
+  companyName: '',
+  realname: '',
+  email: '',
+  verificationCode: ''
+})
+
 const forgotPasswordForm = reactive({
   email: '',
   password: '',
   confirmPassword: '',
   verificationCode: ''
 })
+
+const enabledExternalProviders = computed(() => externalProviders.value.filter((provider) => provider.enabled))
 
 const loginRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -716,6 +823,11 @@ const forgotPasswordRules: FormRules = {
   verificationCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
 }
 
+const externalRegisterRules: FormRules = {
+  companyName: [{ required: true, message: 'Please enter company name', trigger: 'blur' }],
+  email: [{ type: 'email', message: 'Please enter a valid email', trigger: 'blur' }]
+}
+
 const sendCodeText = computed(() => {
   if (sendingCode.value) return '发送中...'
   if (countdown.value > 0) return `${countdown.value}s 后重试`
@@ -726,6 +838,12 @@ const forgotSendCodeText = computed(() => {
   if (forgotSendingCode.value) return '发送中...'
   if (forgotCountdown.value > 0) return `${forgotCountdown.value}s 后重试`
   return '发送验证码'
+})
+
+const externalSendCodeText = computed(() => {
+  if (externalSendingCode.value) return 'Sending...'
+  if (externalCountdown.value > 0) return `${externalCountdown.value}s`
+  return 'Send code'
 })
 
 function resetTenantSelection(clearOptions = true) {
@@ -761,6 +879,138 @@ watch(
     resetTenantSelection()
   }
 )
+
+function providerMark(provider: ExternalAuthProviderCode): string {
+  if (provider === 'google') return 'G'
+  if (provider === 'wechat') return '微'
+  return '企'
+}
+
+async function loadExternalProviders() {
+  try {
+    externalProviders.value = await getExternalAuthProviders()
+  } catch (error) {
+    console.error('Load external auth providers failed:', error)
+    externalProviders.value = []
+  }
+}
+
+function buildExternalAuthRedirect(): string {
+  const query: Record<string, string> = {}
+  if (typeof route.query.redirect === 'string') {
+    query.redirect = route.query.redirect
+  }
+  const resolved = router.resolve({ name: 'Login', query })
+  return `${window.location.origin}${window.location.pathname}${window.location.search}${resolved.href}`
+}
+
+async function startExternalLogin(provider: ExternalAuthProviderCode) {
+  externalLoadingProvider.value = provider
+  try {
+    const { authorizeUrl } = await getExternalAuthAuthorizeUrl(provider, buildExternalAuthRedirect())
+    window.location.href = authorizeUrl
+  } catch (error) {
+    console.error('Start external login failed:', error)
+  } finally {
+    externalLoadingProvider.value = ''
+  }
+}
+
+async function handleExternalAuthQuery() {
+  const externalError = typeof route.query.externalAuthError === 'string' ? route.query.externalAuthError : ''
+  if (externalError) {
+    ElMessage.error('External login failed')
+    clearExternalAuthQuery()
+    return
+  }
+
+  const loginTicket = typeof route.query.externalLoginTicket === 'string' ? route.query.externalLoginTicket : ''
+  if (loginTicket) {
+    loading.value = true
+    try {
+      const result = await exchangeExternalLoginTicket({
+        ticket: loginTicket,
+        loginType: resolveLoginType()
+      })
+      await userStore.applyLoginResult(result)
+      clearExternalAuthQuery()
+      await completeLoginRedirect()
+    } catch (error) {
+      console.error('External login ticket exchange failed:', error)
+    } finally {
+      loading.value = false
+    }
+    return
+  }
+
+  const registerTicket = typeof route.query.externalRegisterTicket === 'string' ? route.query.externalRegisterTicket : ''
+  if (registerTicket) {
+    externalRegisterTicket.value = registerTicket
+    Object.assign(externalRegisterForm, {
+      companyName: '',
+      realname: '',
+      email: '',
+      verificationCode: ''
+    })
+    showExternalRegisterDialog.value = true
+    clearExternalAuthQuery()
+  }
+}
+
+function clearExternalAuthQuery() {
+  const query = { ...route.query }
+  delete query.externalAuthError
+  delete query.externalLoginTicket
+  delete query.externalRegisterTicket
+  delete query.provider
+  router.replace({ name: route.name || 'Login', query })
+}
+
+function handleExternalRegisterDialogClosed() {
+  externalRegisterTicket.value = ''
+  Object.assign(externalRegisterForm, {
+    companyName: '',
+    realname: '',
+    email: '',
+    verificationCode: ''
+  })
+  externalRegisterFormRef.value?.clearValidate()
+}
+
+async function handleExternalRegister() {
+  if (!externalRegisterFormRef.value || !externalRegisterTicket.value) return
+
+  try {
+    await externalRegisterFormRef.value.validate()
+    externalRegisterLoading.value = true
+    const result = await completeExternalRegister({
+      ticket: externalRegisterTicket.value,
+      companyName: externalRegisterForm.companyName.trim(),
+      realname: externalRegisterForm.realname.trim() || undefined,
+      email: externalRegisterForm.email.trim() || undefined,
+      verificationCode: externalRegisterForm.verificationCode.trim() || undefined,
+      loginType: resolveLoginType()
+    })
+    await userStore.applyLoginResult(result)
+    showExternalRegisterDialog.value = false
+    await completeLoginRedirect()
+  } catch (error) {
+    console.error('External register failed:', error)
+  } finally {
+    externalRegisterLoading.value = false
+  }
+}
+
+async function handleExternalSendCode() {
+  if (externalSendingCode.value || externalCountdown.value > 0) return
+  const email = externalRegisterForm.email.trim()
+  if (!email) {
+    ElMessage.warning('Please enter email')
+    return
+  }
+  pendingEmailCodeScene.value = 'external-register'
+  showCaptchaDialog.value = true
+}
 
 function toggleMode() {
   resetTenantSelection()
@@ -946,6 +1196,22 @@ async function handleCaptchaVerified(captchaVerification: string) {
   const currentScene = pendingEmailCodeScene.value
   pendingEmailCodeScene.value = ''
 
+  if (currentScene === 'external-register') {
+    externalSendingCode.value = true
+    try {
+      await sendEmailCode({
+        email: externalRegisterForm.email.trim(),
+        type: 1,
+        captchaVerification
+      })
+      ElMessage.success('Verification code sent')
+      startCountdown('external-register')
+    } finally {
+      externalSendingCode.value = false
+    }
+    return
+  }
+
   if (currentScene === 'reset-password') {
     forgotSendingCode.value = true
     try {
@@ -1002,12 +1268,15 @@ async function handleForgotPasswordReset() {
 }
 
 function startCountdown(scene: EmailCodeScene) {
-  const isRegisterScene = scene === 'register'
-  const countdownRef = isRegisterScene ? countdown : forgotCountdown
+  const countdownRef = scene === 'reset-password'
+    ? forgotCountdown
+    : scene === 'external-register'
+      ? externalCountdown
+      : countdown
 
   countdownRef.value = 60
 
-  if (isRegisterScene) {
+  if (scene === 'register') {
     if (countdownTimer) {
       window.clearInterval(countdownTimer)
     }
@@ -1016,6 +1285,20 @@ function startCountdown(scene: EmailCodeScene) {
       if (countdownRef.value <= 0 && countdownTimer) {
         window.clearInterval(countdownTimer)
         countdownTimer = undefined
+      }
+    }, 1000)
+    return
+  }
+
+  if (scene === 'external-register') {
+    if (externalCountdownTimer) {
+      window.clearInterval(externalCountdownTimer)
+    }
+    externalCountdownTimer = window.setInterval(() => {
+      countdownRef.value -= 1
+      if (countdownRef.value <= 0 && externalCountdownTimer) {
+        window.clearInterval(externalCountdownTimer)
+        externalCountdownTimer = undefined
       }
     }, 1000)
     return
@@ -1034,6 +1317,8 @@ function startCountdown(scene: EmailCodeScene) {
 }
 
 onMounted(async () => {
+  await loadExternalProviders()
+  await handleExternalAuthQuery()
   await syncStageHeight(false)
   window.addEventListener('resize', snapStageHeightForResize)
 })
@@ -1045,6 +1330,9 @@ onBeforeUnmount(() => {
   }
   if (forgotCountdownTimer) {
     window.clearInterval(forgotCountdownTimer)
+  }
+  if (externalCountdownTimer) {
+    window.clearInterval(externalCountdownTimer)
   }
 })
 </script>
@@ -1432,6 +1720,77 @@ onBeforeUnmount(() => {
 
 .auth-send-code-btn:hover:not(:disabled) {
   background-color: #f8fafc;
+}
+
+.external-auth-panel {
+  margin-top: 1.25rem;
+}
+
+.external-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.external-auth-divider::before,
+.external-auth-divider::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.external-auth-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.external-auth-btn {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
+}
+
+.external-auth-btn:hover:not(:disabled) {
+  border-color: rgba(19, 127, 236, 0.45);
+  color: #137fec;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.external-auth-btn:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.external-auth-btn__mark {
+  display: inline-flex;
+  width: 1.45rem;
+  height: 1.45rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #137fec;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 @media (min-width: 1024px) {

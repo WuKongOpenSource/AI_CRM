@@ -1,5 +1,14 @@
-import { post, get } from '@/utils/request'
-import type { LoginParams, LoginResult, UserInfo } from '@/types/api'
+import { post, get, del } from '@/utils/request'
+import type {
+  ExternalAuthAuthorizeResult,
+  ExternalAuthBinding,
+  ExternalAuthProvider,
+  ExternalAuthRegisterParams,
+  ExternalAuthTicketLoginParams,
+  LoginParams,
+  LoginResult,
+  UserInfo
+} from '@/types/api'
 
 /**
  * Login
@@ -184,4 +193,36 @@ export function getUserAuth(): Promise<Record<string, any>> {
  */
 export function getOidcSessionToken(): Promise<{ sessionToken: string }> {
   return get('/auth/oidc-session')
+}
+
+export function getExternalAuthProviders(): Promise<ExternalAuthProvider[]> {
+  return get('/auth/external/providers')
+}
+
+export function getExternalAuthAuthorizeUrl(provider: string, redirect: string): Promise<ExternalAuthAuthorizeResult> {
+  return get(`/auth/external/${provider}/authorize`, {
+    params: { redirect }
+  })
+}
+
+export function exchangeExternalLoginTicket(params: ExternalAuthTicketLoginParams): Promise<LoginResult> {
+  return post('/auth/external/login-ticket', params)
+}
+
+export function completeExternalRegister(params: ExternalAuthRegisterParams): Promise<LoginResult> {
+  return post('/auth/external/register', params)
+}
+
+export function getExternalAuthBindings(): Promise<ExternalAuthBinding[]> {
+  return get('/auth/external/bindings')
+}
+
+export function getExternalBindAuthorizeUrl(provider: string, redirect: string): Promise<ExternalAuthAuthorizeResult> {
+  return get(`/auth/external/${provider}/bind/authorize`, {
+    params: { redirect }
+  })
+}
+
+export function unbindExternalAuth(provider: string): Promise<void> {
+  return del(`/auth/external/${provider}/binding`)
 }

@@ -1,9 +1,17 @@
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { changePassword, getLoginUserDetail, updateProfile } from '@/api/auth'
+import {
+  changePassword,
+  getExternalAuthBindings,
+  getExternalBindAuthorizeUrl,
+  getLoginUserDetail,
+  unbindExternalAuth,
+  updateProfile
+} from '@/api/auth'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import type { ExternalAuthBinding, ExternalAuthProviderCode } from '@/types/api'
 
 export function useAccountSettings() {
   const userStore = useUserStore()
@@ -13,6 +21,9 @@ export function useAccountSettings() {
   const avatarInputRef = ref<HTMLInputElement | null>(null)
   const avatarPreviewUrl = ref('')
   const submittingPassword = ref(false)
+  const externalBindings = ref<ExternalAuthBinding[]>([])
+  const externalBindingsLoading = ref(false)
+  const externalBindingProvider = ref<ExternalAuthProviderCode | ''>('')
 
   const profileForm = reactive({
     img: '',
@@ -49,6 +60,18 @@ export function useAccountSettings() {
     }
   }
 
+  async function loadExternalBindings() {
+    externalBindingsLoading.value = true
+    try {
+      externalBindings.value = await getExternalAuthBindings()
+    } catch (error) {
+      console.error('Load external auth bindings failed:', error)
+      externalBindings.value = []
+    } finally {
+      externalBindingsLoading.value = false
+    }
+  }
+
   function resetProfileForm() {
     applyProfileData(userStore.userInfo as any)
     avatarPreviewUrl.value = ''
@@ -68,6 +91,7 @@ export function useAccountSettings() {
   function resetAll() {
     resetProfileForm()
     resetPasswordForm()
+    externalBindingProvider.value = ''
   }
 
   async function handleAvatarChange(event: Event) {
@@ -152,6 +176,38 @@ export function useAccountSettings() {
     }
   }
 
+  async function handleBindExternal(provider: ExternalAuthProviderCode) {
+    externalBindingProvider.value = provider
+    try {
+      const { authorizeUrl } = await getExternalBindAuthorizeUrl(provider, window.location.href)
+      window.location.href = authorizeUrl
+    } catch (error) {
+      console.error('Start external auth bind failed:', error)
+    } finally {
+      externalBindingProvider.value = ''
+    }
+  }
+
+  async function handleUnbindExternal(provider: ExternalAuthProviderCode) {
+    try {
+      await ElMessageBox.confirm('Confirm unbind this external login?', 'Unbind external login', {
+        confirmButtonText: 'Unbind',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      })
+      externalBindingProvider.value = provider
+      await unbindExternalAuth(provider)
+      ElMessage.success('External login unbound')
+      await loadExternalBindings()
+    } catch (error) {
+      if (error !== 'cancel' && error !== 'close') {
+        console.error('Unbind external auth failed:', error)
+      }
+    } finally {
+      externalBindingProvider.value = ''
+    }
+  }
+
   return {
     userStore,
     savingProfile,
@@ -159,14 +215,20 @@ export function useAccountSettings() {
     avatarInputRef,
     avatarPreviewUrl,
     submittingPassword,
+    externalBindings,
+    externalBindingsLoading,
+    externalBindingProvider,
     profileForm,
     passwordForm,
     loadProfile,
+    loadExternalBindings,
     resetProfileForm,
     resetPasswordForm,
     resetAll,
     handleAvatarChange,
     handleSaveProfile,
-    handleChangePassword
+    handleChangePassword,
+    handleBindExternal,
+    handleUnbindExternal
   }
 }
