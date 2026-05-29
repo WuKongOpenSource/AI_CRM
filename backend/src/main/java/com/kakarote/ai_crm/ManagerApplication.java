@@ -2,6 +2,7 @@ package com.kakarote.ai_crm;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * AI-CRM 后台启动类
@@ -16,6 +17,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
         "org.springframework.ai.model.openai.autoconfigure.OpenAiAudioSpeechAutoConfiguration",
         "org.springframework.ai.model.openai.autoconfigure.OpenAiAudioTranscriptionAutoConfiguration"
 })
+@EnableScheduling
 public class ManagerApplication {
     /**
      * 启动后端应用。

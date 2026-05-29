@@ -205,14 +205,19 @@
                   </button>
                 </template>
               </div>
-            </div>
+          </div>
 
           <div v-if="showSidebarCustomers" class="space-y-1 pt-1">
-            <div class="group/customer-header flex w-full items-center gap-2">
+            <div
+              class="wk-customer-header-row group/customer-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :style="{ backgroundColor: customerHeaderHovered ? '#f9f9f9' : 'transparent' }"
+              :title="sidebarCustomersExpanded ? '收起客户列表' : '展开客户列表'"
+              @mouseenter="customerHeaderHovered = true"
+              @mouseleave="customerHeaderHovered = false"
+            >
               <button
                 type="button"
-                class="group flex min-w-0 shrink items-center gap-1 rounded-lg pb-0 pl-3 pr-1 text-left transition-colors mt-[12px] mb-[0px]"
-                :title="sidebarCustomersExpanded ? '收起客户列表' : '展开客户列表'"
+                class="wk-customer-header-toggle group flex min-w-0 flex-1 items-center gap-1 text-left"
                 :aria-expanded="sidebarCustomersExpanded"
                 aria-controls="sidebar-customers-panel"
                 @click="sidebarCustomersExpanded = !sidebarCustomersExpanded"
@@ -220,7 +225,7 @@
                 <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">客户列表</span>
                 <span
                   class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150"
-                  :class="sidebarCustomersExpanded ? 'opacity-0 group-hover/customer-header:opacity-100' : 'opacity-100'"
+                  :class="sidebarCustomersExpanded ? 'opacity-100' : 'opacity-100'"
                   aria-hidden="true"
                 >
                   <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
@@ -228,10 +233,10 @@
                   </span>
                 </span>
               </button>
-              <div class="ml-auto mt-[12px] mb-[0px] flex shrink-0 items-center justify-end gap-1 pr-1">
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
                 <button
                   type="button"
-                  class="group/customer-action relative flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                  class="wk-customer-header-action group/customer-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
                   aria-label="新建客户"
                   @click.stop="showCreateCustomer = true"
                 >
@@ -245,7 +250,7 @@
                 </button>
                 <button
                   type="button"
-                  class="group/customer-action relative flex size-7 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#efefef] hover:text-[#0d0d0d]"
+                  class="wk-customer-header-action group/customer-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
                   aria-label="查看客户列表"
                   @click.stop="navigateTo('/customer')"
                 >
@@ -271,24 +276,26 @@
                   v-for="customer in sidebarCustomers"
                   :key="customer.customerId"
                   type="button"
-                  class="group flex w-full min-w-0 items-center gap-2 rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
                   :class="isCustomerActive(customer.customerId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
                   @click="handleSelectCustomerChat(customer)"
                 >
-                  <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
-                    <img
-                      v-if="customer.logoUrl"
-                      :src="customer.logoUrl"
-                      :alt="customer.companyName || 'company logo'"
-                      class="size-full object-contain"
-                    />
-                    <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
-                      {{ customer.companyName?.charAt(0) || '?' }}
+                  <div class="flex min-w-0 w-full items-center gap-2" style="height: 24px !important">
+                    <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
+                      <img
+                        v-if="customer.logoUrl"
+                        :src="customer.logoUrl"
+                        :alt="customer.companyName || 'company logo'"
+                        class="size-full object-contain"
+                      />
+                      <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
+                        {{ customer.companyName?.charAt(0) || '?' }}
+                      </span>
+                    </div>
+                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="customer.companyName">
+                      {{ customer.companyName }}
                     </span>
                   </div>
-                  <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="customer.companyName">
-                    {{ customer.companyName }}
-                  </span>
                 </button>
                 <div v-if="sidebarCustomersLoading" class="flex justify-center py-3">
                   <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-slate-300">progress_activity</span>
@@ -453,7 +460,7 @@
               <div class="mx-3 my-1 h-px bg-slate-100" />
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-0.5 text-left text-slate-700 transition-colors hover:bg-slate-50"
+                class="group flex h-9 w-full items-center gap-3 rounded-[8px] px-3 text-left text-slate-700 transition-colors hover:bg-slate-50"
                 @click="handleOpenAccountSettings"
               >
                 <WkIcon name="set" :size="24" class="text-slate-400 transition-colors group-hover:text-primary" />
@@ -463,7 +470,7 @@
               <button
                 v-for="item in configNavItems"
                 :key="item.route"
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-0.5 text-left transition-colors"
+                class="group flex h-9 w-full items-center gap-3 rounded-[8px] px-3 text-left transition-colors"
                 :class="isActive(item.route, item.query) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'"
                 @click="navigateTo(item.route, item.query)"
               >
@@ -477,10 +484,10 @@
               </button>
 
               <button
-                class="group flex w-full items-center gap-3 rounded-xl px-3 py-0.5 text-left text-rose-600 transition-colors hover:bg-rose-50"
+                class="group flex h-9 w-full items-center gap-3 rounded-[8px] px-3 text-left text-rose-600 transition-colors hover:bg-slate-50"
                 @click="handleLogout"
               >
-                <span class="material-symbols-outlined text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
+                <span class="material-symbols-outlined inline-flex size-6 shrink-0 items-center justify-center text-[24px] leading-none text-rose-400 transition-colors group-hover:text-rose-600">logout</span>
                 <span class="text-sm font-medium">退出登录</span>
               </button>
             </div>
@@ -1024,7 +1031,7 @@
     >
       <header
         v-if="showDesktopHeader"
-        class="relative z-[100] flex h-16 shrink-0 items-center bg-white px-[10px] md:px-8"
+        class="relative z-[100] flex h-[45px] shrink-0 items-center bg-white px-[10px] md:pl-8 md:pr-[24px]"
         :class="showDesktopHeader ? 'justify-between border-b border-slate-200' : 'border-b-0'"
       >
         <template v-if="showDesktopHeader">
@@ -1093,7 +1100,7 @@
           </button>
           <button
             @click="showCreateCustomer = true"
-            class="hidden md:flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
+            class="hidden md:flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
           >
             <span class="material-symbols-outlined wk-plus-button-icon">add</span>
             新增客户
@@ -1543,6 +1550,7 @@ async function restorePrimaryNavScrollTop(scrollTop: number) {
 const recentChatSessionsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.recentChatExpanded, true))
 const recentHistoryKeyword = ref('')
 const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
+const customerHeaderHovered = ref(false)
 const sidebarCustomerKeyword = ref('')
 const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
@@ -1582,6 +1590,7 @@ let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 let removeMobileMainMenuOpenListener: (() => void) | null = null
+let removeCustomerSidebarRefreshListener: (() => void) | null = null
 
 type ChatComposerNarrowPayload = {
   narrow?: boolean
@@ -1591,6 +1600,10 @@ type ChatComposerNarrowPayload = {
 
 type CustomerListRefreshPayload = {
   preserveScroll?: boolean
+}
+
+function refreshSidebarCustomersFromEvent(payload?: CustomerListRefreshPayload) {
+  void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
 
 const chatComposerNarrow = ref(false)
@@ -1699,6 +1712,7 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'customer-search', icon: 'search', label: '搜索客户', route: '', permission: 'customer:view', action: 'customerSearch' },
   { key: 'task', icon: 'task-1', label: '任务', route: '/task', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
+  { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
@@ -1994,10 +2008,14 @@ onMounted(() => {
     APP_EVENT.CHAT_COMPOSER_NARROW_CHANGE,
     handleChatComposerNarrowChange
   )
-  removeCustomerListRefreshListener = appEvents.on<CustomerListRefreshPayload>(APP_EVENT.CUSTOMER_LIST_REFRESH, (payload) => {
-    void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
-  })
-  removeMobileMainMenuOpenListener = appEvents.on(APP_EVENT.MOBILE_MAIN_MENU_OPEN, openMobileMainMenuFromChat)
+  removeCustomerListRefreshListener = appEvents.on<CustomerListRefreshPayload>(
+    APP_EVENT.CUSTOMER_LIST_REFRESH,
+    refreshSidebarCustomersFromEvent
+  )
+  removeCustomerSidebarRefreshListener = appEvents.on<CustomerListRefreshPayload>(
+    APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
+    refreshSidebarCustomersFromEvent
+  )
 
   if (typeof ResizeObserver !== 'undefined') {
     primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
@@ -2032,8 +2050,8 @@ onBeforeUnmount(() => {
   removeChatComposerNarrowListener = null
   removeCustomerListRefreshListener?.()
   removeCustomerListRefreshListener = null
-  removeMobileMainMenuOpenListener?.()
-  removeMobileMainMenuOpenListener = null
+  removeCustomerSidebarRefreshListener?.()
+  removeCustomerSidebarRefreshListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null
@@ -2742,6 +2760,23 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
 
 .wk-primary-sidebar :deep(button:hover) {
   background-color: var(--wk-bg-surface-hover) !important;
+}
+
+.wk-primary-sidebar .wk-customer-header-row:hover {
+  background: #f9f9f9 !important;
+}
+
+.wk-primary-sidebar .wk-customer-header-row :deep(button:hover) {
+  background: transparent !important;
+}
+
+.wk-primary-sidebar .wk-customer-header-row .wk-customer-header-toggle:hover,
+.wk-primary-sidebar .wk-customer-header-row .wk-customer-header-action:hover {
+  background: transparent !important;
+}
+
+.wk-primary-sidebar :deep(.wk-customer-header-toggle:hover) {
+  background: transparent !important;
 }
 
 .wk-primary-sidebar :deep(.bg-\[\#f3f3f3\]) {

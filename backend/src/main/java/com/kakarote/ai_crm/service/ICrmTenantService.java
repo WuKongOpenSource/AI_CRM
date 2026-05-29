@@ -60,10 +60,21 @@ public interface ICrmTenantService extends IService<CrmTenant> {
     /**
      * 消耗积分。
      */
-    void consumeCredits(Long tenantId, long consumeCredits);
+    CreditConsumeResult consumeCredits(Long tenantId, long consumeCredits);
 
     /**
      * 新增PurchasedCredits。
      */
     void addPurchasedCredits(Long tenantId, long creditAmount);
+
+    record CreditConsumeResult(long creditsUsed,
+                               long giftCreditsUsed,
+                               long purchasedCreditsUsed,
+                               long balanceBefore,
+                               long balanceAfter) {
+
+        public static CreditConsumeResult zero(long balance) {
+            return new CreditConsumeResult(0L, 0L, 0L, balance, balance);
+        }
+    }
 }

@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.ai.tools.CrmNoopTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
+import com.kakarote.ai_crm.ai.tools.MailTools;
 import com.kakarote.ai_crm.ai.tools.ScheduleTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -99,6 +100,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private ScheduleTools scheduleTools;
+
+    @Autowired
+    private MailTools mailTools;
 
     @Autowired
     private CrmNoopTools crmNoopTools;
@@ -570,7 +574,7 @@ public class DynamicChatClientProvider {
             return new Object[]{knowledgeTools};
         }
         if (ChatApplicationCodes.CRM.equals(normalizedAppCode)) {
-            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, crmNoopTools};
+            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, mailTools, crmNoopTools};
         }
         return new Object[0];
     }

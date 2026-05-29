@@ -23,11 +23,17 @@
         :loading-members="loadingMembers"
         :member-search="memberSearch"
         :member-role-id="memberRoleId"
+        :member-page="memberPage"
+        :member-page-size="memberPageSize"
+        :member-total="memberTotal"
+        :member-total-pages="memberTotalPages"
+        :visible-member-pages="visibleMemberPages"
         :all-role-options="allRoleOptions"
         :dept-count="deptCount"
         :get-avatar-color="getAvatarColor"
         @update:member-search="memberSearch = $event"
         @update:member-role-id="memberRoleId = $event"
+        @page-change="handleMemberPageChange"
         @open-dept-drawer="showDeptDrawer = true"
         @add-member="handleAddMember"
         @row-click="handleMemberRowClick"
@@ -115,7 +121,12 @@ const {
   showDeptDrawer,
   memberSearch,
   memberRoleId,
+  memberPage,
+  memberPageSize,
+  memberTotal,
   filteredMembers,
+  memberTotalPages,
+  visibleMemberPages,
   deptCount,
   showDeptDialog,
   submittingDept,
@@ -136,6 +147,7 @@ const {
   detailMember,
   getAvatarColor,
   handleDeptClick,
+  handleMemberPageChange,
   handleDeptCommand,
   handleAddDept,
   handleSaveDept,

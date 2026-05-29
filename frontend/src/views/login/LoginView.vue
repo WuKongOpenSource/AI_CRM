@@ -121,7 +121,6 @@
                           size="large"
                           placeholder="请输入用户名"
                           class="auth-el-input"
-                          @keyup.enter="handleLogin"
                         >
                           <template #prefix>
                             <el-icon class="text-slate-400"><User /></el-icon>
@@ -140,7 +139,6 @@
                           placeholder="••••••••"
                           show-password
                           class="auth-el-input"
-                          @keyup.enter="handleLogin"
                         >
                           <template #prefix>
                             <el-icon class="text-slate-400"><Lock /></el-icon>
@@ -160,10 +158,9 @@
 
                       <el-form-item class="!mb-0">
                         <button
-                          type="button"
+                          type="submit"
                           class="group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                           :disabled="loading"
-                          @click="handleLogin"
                         >
                           <span
                             v-if="loading"
@@ -775,6 +772,7 @@ function toggleMode() {
 }
 
 async function handleLogin() {
+  if (loading.value || !isLogin.value || loginStep.value !== 'credentials') return
   if (!loginFormRef.value) return
 
   try {

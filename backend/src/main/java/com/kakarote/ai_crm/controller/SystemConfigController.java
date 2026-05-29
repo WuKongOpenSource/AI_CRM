@@ -1,8 +1,10 @@
 package com.kakarote.ai_crm.controller;
 
+import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.config.OidcConfig;
+import com.kakarote.ai_crm.entity.BO.AiCreditRecordQueryBO;
 import com.kakarote.ai_crm.entity.BO.AiProviderActivateBO;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
@@ -10,9 +12,11 @@ import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.VO.AiBillingConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.AiCreditRecordVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.impl.AiCreditRecordService;
 import com.kakarote.ai_crm.utils.RequestContextUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +37,9 @@ public class SystemConfigController {
 
     @Autowired
     private ISystemConfigService systemConfigService;
+
+    @Autowired
+    private AiCreditRecordService aiCreditRecordService;
 
     @Autowired
     private OidcService oidcService;
@@ -111,6 +118,13 @@ public class SystemConfigController {
     @RequirePermission("config:ai")
     public Result<AiBillingConfigVO> getAiBillingConfig() {
         return Result.ok(systemConfigService.getAiBillingConfig());
+    }
+
+    @PostMapping("/ai/creditRecords/queryPageList")
+    @Operation(summary = "Query AI credit records")
+    @RequirePermission("config:ai")
+    public Result<BasePage<AiCreditRecordVO>> queryAiCreditRecords(@RequestBody(required = false) AiCreditRecordQueryBO queryBO) {
+        return Result.ok(aiCreditRecordService.queryPageList(queryBO));
     }
 
     /**

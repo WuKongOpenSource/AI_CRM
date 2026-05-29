@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.AiMode;
+import com.kakarote.ai_crm.ai.AiModelSource;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
@@ -334,7 +335,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         result.setProvider(descriptor.getCode());
 
         try {
-            String quotaFailureMessage = aiQuotaService.resolveQuotaFailureMessage("system_ai_test");
+            String quotaFailureMessage = aiQuotaService.resolveQuotaFailureMessage(
+                UserUtil.getTenantId(), "system_ai_test", 32, null, AiModelSource.CUSTOM);
             if (quotaFailureMessage != null) {
                 result.setSuccess(false);
                 result.setMessage(quotaFailureMessage);
@@ -362,8 +364,15 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
             String response = chatResponse.getResult().getOutput().getText();
             aiQuotaService.consumeResolvedTokens(
+                UserUtil.getTenantId(),
                 "system_ai_test",
-                aiQuotaService.resolveTokenUsage(chatResponse, null, null, "请只回复 OK", response)
+                aiQuotaService.resolveTokenUsage(chatResponse, null, null, "请只回复 OK", response),
+                null,
+                AiModelSource.CUSTOM,
+                descriptor.getCode(),
+                configBO.getModel(),
+                null,
+                null
             );
 
             result.setSuccess(true);

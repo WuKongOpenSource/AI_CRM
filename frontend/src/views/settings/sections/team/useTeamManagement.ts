@@ -11,6 +11,7 @@ import { TEAM_AVATAR_COLORS } from './constants'
 
 // Keep in sync with com.kakarote.ai_crm.common.Const.AUTH_DATA_RECURSION_NUM
 const AUTH_DATA_RECURSION_NUM = 20
+const MEMBER_PAGE_SIZE = 10
 
 interface DeptOption {
   label: string
@@ -31,6 +32,9 @@ export function useTeamManagement() {
   const showDeptDrawer = ref(false)
   const memberSearch = ref('')
   const memberRoleId = ref('0')
+  const memberPage = ref(1)
+  const memberPageSize = ref(MEMBER_PAGE_SIZE)
+  const memberTotal = ref(0)
   const showDeptDialog = ref(false)
   const submittingDept = ref(false)
   const editingDept = ref<DeptVO | null>(null)
@@ -71,13 +75,22 @@ export function useTeamManagement() {
   })
 
   const filteredMembers = computed(() => {
-    const list = memberList.value || []
-    const keyword = memberSearch.value.trim().toLowerCase()
-    return list.filter((member: any) => {
-      return !keyword || [member.realname, member.username, member.email, member.mobile]
-        .filter(Boolean)
-        .some((value: string) => String(value).toLowerCase().includes(keyword))
-    })
+    return memberList.value || []
+  })
+
+  const memberTotalPages = computed(() => Math.max(1, Math.ceil(memberTotal.value / memberPageSize.value)))
+
+  const visibleMemberPages = computed(() => {
+    const total = memberTotalPages.value
+    const current = memberPage.value
+    const maxVisible = 5
+    const start = Math.max(1, Math.min(current - Math.floor(maxVisible / 2), total - maxVisible + 1))
+    const end = Math.min(total, start + maxVisible - 1)
+    const pages: number[] = []
+    for (let i = start; i <= end; i++) {
+      pages.push(i)
+    }
+    return pages
   })
 
   const deptCount = computed(() => countDepts(deptTree.value))
@@ -106,6 +119,14 @@ export function useTeamManagement() {
 
   watch(memberRoleId, () => {
     if (selectedDept.value) {
+      memberPage.value = 1
+      loadMembers()
+    }
+  })
+
+  watch(memberSearch, () => {
+    if (selectedDept.value) {
+      memberPage.value = 1
       loadMembers()
     }
   })
@@ -203,6 +224,7 @@ export function useTeamManagement() {
     if (!selectedDept.value) {
       deptMemberList.value = []
       memberList.value = []
+      memberTotal.value = 0
       return
     }
 
@@ -210,27 +232,45 @@ export function useTeamManagement() {
     loadingMembers.value = true
 
     try {
-      const query = { deptId: selectedDept.value.deptId, limit: 200 }
+      const deptQuery = { deptId: selectedDept.value.deptId, limit: 500 }
+      const listQuery: Parameters<typeof queryUserList>[0] = {
+        deptId: selectedDept.value.deptId,
+        page: memberPage.value,
+        limit: memberPageSize.value
+      }
+      const keyword = memberSearch.value.trim()
       const roleId = String(memberRoleId.value || '0')
-      const deptMembersPromise = queryUserList(query)
-      const roleMembersPromise = roleId === '0' ? null : queryUserList({ ...query, roleId })
-      const deptRes = await deptMembersPromise
+      if (keyword) {
+        listQuery.search = keyword
+      }
+      if (roleId !== '0') {
+        listQuery.roleId = roleId
+      }
 
+      const [deptRes, listRes] = await Promise.all([
+        queryUserList(deptQuery),
+        queryUserList(listQuery)
+      ])
       if (memberListRequestId !== requestId) return
 
       deptMemberList.value = deptRes?.list || deptRes?.records || deptRes || []
+      const nextMembers = listRes?.list || listRes?.records || (Array.isArray(listRes) ? listRes : [])
+      const nextTotal = Number(listRes?.totalRow ?? listRes?.total ?? nextMembers.length)
+      const nextTotalPages = Math.max(1, Math.ceil(nextTotal / memberPageSize.value))
 
-      if (roleMembersPromise) {
-        const roleRes = await roleMembersPromise
-        if (memberListRequestId !== requestId) return
-        memberList.value = roleRes?.list || roleRes?.records || roleRes || []
-      } else {
-        memberList.value = deptMemberList.value
+      if (nextTotal > 0 && memberPage.value > nextTotalPages) {
+        memberPage.value = nextTotalPages
+        await loadMembers()
+        return
       }
+
+      memberList.value = nextMembers
+      memberTotal.value = nextTotal
     } catch {
       if (memberListRequestId === requestId) {
         deptMemberList.value = []
         memberList.value = []
+        memberTotal.value = 0
       }
     } finally {
       if (memberListRequestId === requestId) {
@@ -241,6 +281,14 @@ export function useTeamManagement() {
 
   function handleDeptClick(dept: DeptVO) {
     selectedDept.value = dept
+    memberPage.value = 1
+    loadMembers()
+  }
+
+  function handleMemberPageChange(page: number) {
+    if (page < 1 || page > memberTotalPages.value) return
+    if (memberPage.value === page) return
+    memberPage.value = page
     loadMembers()
   }
 
@@ -544,7 +592,12 @@ export function useTeamManagement() {
     showDeptDrawer,
     memberSearch,
     memberRoleId,
+    memberPage,
+    memberPageSize,
+    memberTotal,
     filteredMembers,
+    memberTotalPages,
+    visibleMemberPages,
     deptCount,
     showDeptDialog,
     submittingDept,
@@ -566,6 +619,7 @@ export function useTeamManagement() {
     getAvatarColor,
     loadMembers,
     handleDeptClick,
+    handleMemberPageChange,
     handleDeptCommand,
     handleAddDept,
     handleSaveDept,

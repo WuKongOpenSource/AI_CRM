@@ -106,7 +106,7 @@
         <!-- 视图切换：侧栏 + 表格/卡片/阶段 -->
         <div v-if="!isMobile" class="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
           <button
-            v-if="!isMobile"
+            v-if="!isMobile && false"
             type="button"
             class="flex items-center justify-center size-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
             :class="{ 'border-primary text-primary bg-primary/5 ring-1 ring-primary/25 shadow-sm': showListInsightSidebar }"
@@ -350,12 +350,12 @@
                     <template v-else-if="field.fieldName === 'stage'">
                       <div v-if="row.stage" class="wk-cell-status-badges">
                         <span
-                          class="inline-flex shrink-0 items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                          class="inline-flex min-w-0 max-w-full items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
                           :class="getStageBadgeClass(row.stage)"
                           :title="getConfiguredStageLabel(field, row.stage)"
                         >
                           <span class="size-1.5 shrink-0 rounded-full mr-1.5" :class="getStageDotClass(row.stage)"></span>
-                          {{ getConfiguredStageLabel(field, row.stage) }}
+                          <span class="min-w-0 truncate">{{ getConfiguredStageLabel(field, row.stage) }}</span>
                         </span>
                       </div>
                       <span v-else class="text-slate-300">-</span>
@@ -1116,6 +1116,7 @@ function handleAiFollowUp(customer: CustomerListVO) {
 
 function handleAiFollowUpSaved() {
   customerStore.fetchCustomerList(false)
+  appEvents.emit(APP_EVENT.CUSTOMER_SIDEBAR_REFRESH)
 }
 
 // Owner transfer
@@ -1294,6 +1295,9 @@ async function handleInlineCustomerFieldSave(row: CustomerListVO, field: CustomF
       fieldSource: field.fieldSource,
       value
     })
+  }
+  if (field.fieldName === 'companyName') {
+    appEvents.emit(APP_EVENT.CUSTOMER_SIDEBAR_REFRESH)
   }
   ElMessage.success('保存成功')
 }
@@ -1703,14 +1707,12 @@ async function handleImportSuccess(_result: CustomerImportResult) {
   min-height: 220px;
 }
 
-/* 状态 / 级别 / AI 状态徽章：单行不换行；列极窄时横向微滚动，避免字内断行 */
+/* 状态 / 级别 / AI 状态徽章：单行不换行；列极窄时隐藏溢出，避免单元格出现横向滚动条 */
 .wk-cell-status-badges {
   box-sizing: border-box;
   max-width: 100%;
   white-space: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .wk-ai-insight-text {

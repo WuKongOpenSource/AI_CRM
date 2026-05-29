@@ -1531,7 +1531,7 @@ const emit = defineEmits<{
   (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
 }>()
 
-type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
+type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules'
 
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
@@ -1924,7 +1924,6 @@ function scheduleAiAnalysisPolling(customerId?: string, resetAttempts = false) {
     aiAnalysisPollAttempts += 1
     try {
       await customerStore.fetchCustomerDetail(customerId)
-      appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
     } catch (error) {
       console.error('Failed to poll customer ai analysis status:', error)
     }
@@ -1991,6 +1990,14 @@ watch(showAddFollowUpDialog, (visible) => {
     editingFollowUpForDialog.value = null
   }
 })
+
+async function refreshCustomerAiAnalysis(customerId: string) {
+  try {
+    await customerStore.fetchCustomerDetail(customerId)
+  } catch (err) {
+    console.error('Failed to fetch customer ai analysis:', err)
+  }
+}
 
 async function refreshCustomerDetailModules(
   customerId: string,
@@ -2088,6 +2095,10 @@ async function refreshCustomerScopedModules(
 ) {
   const uniqueModules = new Set(modules)
   const requests: Promise<any>[] = []
+
+  if (uniqueModules.has('aiAnalysis')) {
+    requests.push(refreshCustomerAiAnalysis(customerId))
+  }
 
   if (uniqueModules.has('contacts')) {
     requests.push(fetchContacts(customerId, true))
@@ -2511,6 +2522,7 @@ async function handleDeleteCustomer() {
   if (!customer.value) return
   try {
     await customerStore.removeCustomer(customer.value.customerId)
+    appEvents.emit(APP_EVENT.CUSTOMER_SIDEBAR_REFRESH)
     ElMessage.success('客户已删除')
     handleBackToCustomerList()
   } catch {

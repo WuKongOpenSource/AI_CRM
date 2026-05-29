@@ -64,6 +64,7 @@ import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SignalType;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -239,6 +240,49 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName, UserUtil.getTenantId());
         }
 
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
+        return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long archiveText(String fileName, String contentText, String type, Long customerId, String summary) {
+        String normalizedText = normalizeSearchableContent(contentText);
+        if (StrUtil.isBlank(normalizedText)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识正文不能为空");
+        }
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+            }
+        }
+
+        String normalizedFileName = StrUtil.blankToDefault(fileName, "mail-" + IdUtil.fastSimpleUUID() + ".txt");
+        if (!normalizedFileName.toLowerCase(Locale.ROOT).endsWith(".txt")) {
+            normalizedFileName = normalizedFileName + ".txt";
+        }
+        byte[] bytes = normalizedText.getBytes(StandardCharsets.UTF_8);
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String relativePath = datePath + "/" + IdUtil.fastSimpleUUID() + ".txt";
+        fileStorageService.upload(new ByteArrayInputStream(bytes), bytes.length, relativePath, "text/plain;charset=UTF-8");
+
+        Knowledge knowledge = new Knowledge();
+        knowledge.setName(normalizedFileName);
+        knowledge.setType(StrUtil.blankToDefault(type, "email"));
+        knowledge.setCustomerId(customerId);
+        knowledge.setFilePath(relativePath);
+        knowledge.setFileSize((long) bytes.length);
+        knowledge.setMimeType("text/plain");
+        knowledge.setSummary(normalizeUserFacingSummary(summary));
+        knowledge.setContentText(normalizedText);
+        knowledge.setUploadUserId(UserUtil.getUserId());
+        knowledge.setWeKnoraParseStatus("pending");
+        save(knowledge);
+
+        if (weKnoraClient.isEnabled()) {
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, normalizedFileName, UserUtil.getTenantId());
+        }
         globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
         return knowledge.getKnowledgeId();
     }

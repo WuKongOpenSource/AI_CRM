@@ -86,6 +86,12 @@ knife4j:
 file:
   upload-path: ./uploads
 
+mail:
+  integration:
+    # Stable secret used to encrypt mailbox passwords and OAuth tokens stored in crm_mail_account.
+    encryption-key: ${MAIL_CREDENTIAL_ENCRYPTION_KEY:Gr73nKSHNpwKsD9367}
+    max-concurrent-sync: ${MAIL_MAX_CONCURRENT_SYNC:20}
+
 media-analysis:
   ffmpeg:
     path: "D:/software/ffmpeg/bin/ffmpeg.exe"

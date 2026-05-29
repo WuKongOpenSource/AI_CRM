@@ -16,7 +16,11 @@
         @click="$emit('toggle-user', user.userId)"
       >
         <div class="flex items-center gap-2">
-          <el-checkbox :model-value="selectedUserIds.includes(String(user.userId))" @click.stop />
+          <el-checkbox
+            :model-value="selectedUserIds.includes(String(user.userId))"
+            @click.stop
+            @change="$emit('toggle-user', user.userId)"
+          />
           <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium" :class="getAvatarColor(user.realname || user.username)">
             {{ (user.realname || user.username || '?').charAt(0) }}
           </div>

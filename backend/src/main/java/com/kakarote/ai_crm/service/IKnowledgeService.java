@@ -29,6 +29,11 @@ public interface IKnowledgeService extends IService<Knowledge> {
     Long archiveExistingFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary);
 
     /**
+     * Archive generated text as a knowledge document.
+     */
+    Long archiveText(String fileName, String contentText, String type, Long customerId, String summary);
+
+    /**
      * 删除知识库文件
      */
     void deleteKnowledge(Long knowledgeId);

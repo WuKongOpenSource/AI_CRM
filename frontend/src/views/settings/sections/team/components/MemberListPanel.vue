@@ -1,9 +1,8 @@
 <template>
   <div
-    class="min-h-0 md:flex-1 md:overflow-hidden max-md:flex-none max-md:overflow-visible"
-    :class="isMobile ? 'p-4' : 'p-8'"
+    class="min-h-0 md:flex-1 md:overflow-hidden max-md:flex-none max-md:overflow-visible px-4 py-6 md:px-6"
   >
-    <div class="max-w-6xl mx-auto w-full min-h-0 flex flex-col gap-6 md:h-full max-md:h-auto">
+    <div class="w-full min-h-0 flex flex-col gap-6 md:h-full max-md:h-auto">
       <div v-if="isMobile" class="flex items-center gap-2 p-4 border border-slate-100 bg-white rounded-2xl">
         <button
           class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm max-w-[200px]"
@@ -140,9 +139,17 @@
                 </template>
               </el-table-column>
 
-              <el-table-column label="部门" min-width="160" show-overflow-tooltip>
+              <el-table-column label="部门" min-width="160">
                 <template #default>
-                  <span class="text-sm text-slate-700">{{ selectedDept?.deptName || '-' }}</span>
+                  <el-tooltip
+                    :content="selectedDept?.deptName || '-'"
+                    effect="dark"
+                    placement="top"
+                    popper-class="wk-sidebar-like-tooltip"
+                    :show-arrow="false"
+                  >
+                    <span class="block text-sm text-slate-700 truncate">{{ selectedDept?.deptName || '-' }}</span>
+                  </el-tooltip>
                 </template>
               </el-table-column>
 
@@ -331,6 +338,41 @@
               </div>
             </div>
           </div>
+
+          <div
+            v-if="memberTotal > 0"
+            class="shrink-0 flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-4 py-4 md:px-6"
+          >
+            <span class="text-sm text-slate-500">
+              共 {{ memberTotal }} 条<span class="hidden md:inline">员工数据</span>
+            </span>
+            <div class="flex items-center gap-1">
+              <button
+                class="size-8 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50"
+                :disabled="memberPage <= 1"
+                @click="$emit('page-change', memberPage - 1)"
+              >
+                <span class="material-symbols-outlined text-lg">chevron_left</span>
+              </button>
+              <button
+                v-for="pageNum in visibleMemberPages"
+                :key="pageNum"
+                class="size-8 flex items-center justify-center rounded border text-xs font-bold"
+                :class="pageNum === memberPage
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'"
+                @click="$emit('page-change', pageNum)"
+              >{{ pageNum }}</button>
+              <span v-if="memberTotalPages > 5" class="px-1 text-slate-400 text-xs">...</span>
+              <button
+                class="size-8 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 disabled:opacity-50"
+                :disabled="memberPage >= memberTotalPages"
+                @click="$emit('page-change', memberPage + 1)"
+              >
+                <span class="material-symbols-outlined text-lg">chevron_right</span>
+              </button>
+            </div>
+          </div>
         </template>
       </div>
     </div>
@@ -350,6 +392,11 @@ const props = defineProps<{
   loadingMembers: boolean
   memberSearch: string
   memberRoleId: string
+  memberPage: number
+  memberPageSize: number
+  memberTotal: number
+  memberTotalPages: number
+  visibleMemberPages: number[]
   allRoleOptions: RoleVO[]
   deptCount: number
   getAvatarColor: (name: string) => string
@@ -358,6 +405,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:memberSearch', value: string): void
   (e: 'update:memberRoleId', value: string): void
+  (e: 'page-change', page: number): void
   (e: 'open-dept-drawer'): void
   (e: 'add-member'): void
   (e: 'row-click', member: any): void

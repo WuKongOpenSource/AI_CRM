@@ -62,6 +62,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '日程安排', icon: 'calendar_today', permission: 'schedule' }
       },
       {
+        path: 'mail',
+        name: 'Mail',
+        component: () => import('@/views/mail/MailView.vue'),
+        meta: { title: '邮箱', icon: 'mail', permission: 'mail:view' }
+      },
+      {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/KnowledgeView.vue'),

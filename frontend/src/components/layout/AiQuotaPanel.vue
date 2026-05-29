@@ -27,6 +27,7 @@
 
       <div class="flex gap-2">
         <button
+          v-if="canManageAiConfig"
           type="button"
           class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           @click="goToAiSettings"
@@ -95,6 +96,7 @@
 
     <div class="flex min-w-0 w-full gap-2">
       <button
+        v-if="canManageAiConfig"
         type="button"
         class="inline-flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50/80 px-2 py-2 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700/80"
         @click="goToAiSettings"

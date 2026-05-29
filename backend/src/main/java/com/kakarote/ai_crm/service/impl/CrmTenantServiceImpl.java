@@ -2,6 +2,8 @@ package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.PO.CrmTenant;
 import com.kakarote.ai_crm.mapper.CrmTenantMapper;
 import com.kakarote.ai_crm.service.ICrmTenantService;
@@ -121,14 +123,14 @@ public class CrmTenantServiceImpl extends ServiceImpl<CrmTenantMapper, CrmTenant
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void consumeCredits(Long tenantId, long consumeCredits) {
+    public CreditConsumeResult consumeCredits(Long tenantId, long consumeCredits) {
         if (tenantId == null || consumeCredits <= 0) {
-            return;
+            return CreditConsumeResult.zero(getTotalCreditRemaining(tenantId));
         }
 
         CrmTenant tenant = baseMapper.selectByIdForUpdate(tenantId);
         if (tenant == null) {
-            return;
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tenant does not exist");
         }
 
         long giftTotal = ObjectUtil.defaultIfNull(tenant.getGiftCreditTotal(), DEFAULT_GIFT_CREDIT_TOTAL);
@@ -141,14 +143,23 @@ public class CrmTenantServiceImpl extends ServiceImpl<CrmTenantMapper, CrmTenant
 
         long consumeGift = Math.min(giftRemaining, consumeCredits);
         long consumePurchased = Math.min(purchasedRemaining, Math.max(consumeCredits - consumeGift, 0L));
+        long balanceBefore = giftRemaining + purchasedRemaining;
+        long actualCreditsUsed = consumeGift + consumePurchased;
 
-        if (consumeGift <= 0 && consumePurchased <= 0) {
-            return;
+        if (actualCreditsUsed < consumeCredits) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "AI credits are insufficient");
         }
 
         tenant.setGiftCreditUsed(giftUsed + consumeGift);
         tenant.setPurchasedCreditUsed(purchasedUsed + consumePurchased);
         updateById(tenant);
+        return new CreditConsumeResult(
+            actualCreditsUsed,
+            consumeGift,
+            consumePurchased,
+            balanceBefore,
+            Math.max(balanceBefore - actualCreditsUsed, 0L)
+        );
     }
 
     /**

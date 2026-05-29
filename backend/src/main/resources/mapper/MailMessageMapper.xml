@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.MailMessageMapper">
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.MailMessageVO">
+        SELECT
+            m.message_id,
+            m.account_id,
+            m.provider,
+            m.provider_message_id,
+            m.internet_message_id,
+            m.thread_id,
+            m.folder,
+            m.direction,
+            m.subject,
+            m.from_name,
+            m.from_address,
+            m.to_addresses,
+            m.cc_addresses,
+            m.sent_time,
+            m.received_time,
+            m.body_sync_mode,
+            m.body_sync_status,
+            m.summary,
+            m.keywords,
+            m.intent,
+            m.action_items_json,
+            m.reply_deadline_time,
+            m.extraction_status,
+            LEFT(COALESCE(m.body_text, ''), 1200) AS body_text,
+            m.has_attachments,
+            m.read_status,
+            m.starred,
+            m.deleted,
+            m.customer_id,
+            c.company_name AS customer_name,
+            m.contact_id,
+            ct.name AS contact_name,
+            m.knowledge_id,
+            m.create_time
+        FROM crm_mail_message m
+        LEFT JOIN crm_customer c ON m.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON m.contact_id = ct.contact_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.user_id = #{userId}
+          AND COALESCE(m.deleted, FALSE) = FALSE
+        <if test="query.accountId != null">
+            AND m.account_id = #{query.accountId}
+        </if>
+        <if test="query.customerId != null">
+            AND m.customer_id = #{query.customerId}
+        </if>
+        <if test="query.folder != null and query.folder != ''">
+            AND LOWER(m.folder) = LOWER(#{query.folder})
+        </if>
+        <if test="query.direction != null and query.direction != ''">
+            AND LOWER(m.direction) = LOWER(#{query.direction})
+        </if>
+        <if test="query.readStatus != null and query.readStatus != ''">
+            AND LOWER(m.read_status) = LOWER(#{query.readStatus})
+        </if>
+        <if test="query.starred != null">
+            AND COALESCE(m.starred, FALSE) = #{query.starred}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                m.subject ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR m.from_address ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR m.to_addresses ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR m.body_text ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR m.summary ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR m.keywords ILIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.startTime != null">
+            AND COALESCE(m.received_time, m.sent_time, m.create_time) &gt;= #{query.startTime}
+        </if>
+        <if test="query.endTime != null">
+            AND COALESCE(m.received_time, m.sent_time, m.create_time) &lt;= #{query.endTime}
+        </if>
+        ORDER BY COALESCE(m.received_time, m.sent_time, m.create_time) DESC
+    </select>
+
+    <select id="selectDetail" resultType="com.kakarote.ai_crm.entity.VO.MailMessageVO">
+        SELECT
+            m.message_id,
+            m.account_id,
+            m.provider,
+            m.provider_message_id,
+            m.internet_message_id,
+            m.thread_id,
+            m.folder,
+            m.direction,
+            m.subject,
+            m.from_name,
+            m.from_address,
+            m.to_addresses,
+            m.cc_addresses,
+            m.sent_time,
+            m.received_time,
+            m.body_sync_mode,
+            m.body_sync_status,
+            m.summary,
+            m.keywords,
+            m.intent,
+            m.action_items_json,
+            m.reply_deadline_time,
+            m.extraction_status,
+            m.body_text,
+            m.body_html,
+            m.has_attachments,
+            m.read_status,
+            m.starred,
+            m.deleted,
+            m.customer_id,
+            c.company_name AS customer_name,
+            m.contact_id,
+            ct.name AS contact_name,
+            m.knowledge_id,
+            m.create_time
+        FROM crm_mail_message m
+        LEFT JOIN crm_customer c ON m.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON m.contact_id = ct.contact_id
+        WHERE m.message_id = #{messageId}
+          AND m.tenant_id = #{tenantId}
+          AND m.user_id = #{userId}
+          AND COALESCE(m.deleted, FALSE) = FALSE
+    </select>
+
+    <select id="selectThread" resultType="com.kakarote.ai_crm.entity.VO.MailMessageVO">
+        SELECT
+            m.message_id,
+            m.account_id,
+            m.provider,
+            m.provider_message_id,
+            m.internet_message_id,
+            m.thread_id,
+            m.folder,
+            m.direction,
+            m.subject,
+            m.from_name,
+            m.from_address,
+            m.to_addresses,
+            m.cc_addresses,
+            m.sent_time,
+            m.received_time,
+            m.body_sync_mode,
+            m.body_sync_status,
+            m.summary,
+            m.keywords,
+            m.intent,
+            m.action_items_json,
+            m.reply_deadline_time,
+            m.extraction_status,
+            LEFT(COALESCE(m.body_text, ''), 2000) AS body_text,
+            m.has_attachments,
+            m.read_status,
+            m.starred,
+            m.deleted,
+            m.customer_id,
+            c.company_name AS customer_name,
+            m.contact_id,
+            ct.name AS contact_name,
+            m.knowledge_id,
+            m.create_time
+        FROM crm_mail_message m
+        LEFT JOIN crm_customer c ON m.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON m.contact_id = ct.contact_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.user_id = #{userId}
+          AND m.account_id = #{accountId}
+          AND COALESCE(m.deleted, FALSE) = FALSE
+        <choose>
+            <when test="threadId != null and threadId != ''">
+                AND m.thread_id = #{threadId}
+            </when>
+            <otherwise>
+                AND m.message_id = #{fallbackMessageId}
+            </otherwise>
+        </choose>
+        ORDER BY COALESCE(m.received_time, m.sent_time, m.create_time) ASC
+    </select>
+
+    <select id="selectCustomerTimeline" resultType="com.kakarote.ai_crm.entity.VO.MailMessageVO">
+        SELECT
+            m.message_id,
+            m.account_id,
+            m.provider,
+            m.provider_message_id,
+            m.internet_message_id,
+            m.thread_id,
+            m.folder,
+            m.direction,
+            m.subject,
+            m.from_name,
+            m.from_address,
+            m.to_addresses,
+            m.cc_addresses,
+            m.sent_time,
+            m.received_time,
+            m.body_sync_mode,
+            m.body_sync_status,
+            m.summary,
+            m.keywords,
+            m.intent,
+            m.action_items_json,
+            m.reply_deadline_time,
+            m.extraction_status,
+            LEFT(COALESCE(m.body_text, ''), 1200) AS body_text,
+            m.has_attachments,
+            m.read_status,
+            m.starred,
+            m.deleted,
+            m.customer_id,
+            c.company_name AS customer_name,
+            m.contact_id,
+            ct.name AS contact_name,
+            m.knowledge_id,
+            m.create_time
+        FROM crm_mail_message m
+        LEFT JOIN crm_customer c ON m.customer_id = c.customer_id
+        LEFT JOIN crm_contact ct ON m.contact_id = ct.contact_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.user_id = #{userId}
+          AND m.customer_id = #{customerId}
+          AND COALESCE(m.deleted, FALSE) = FALSE
+        ORDER BY COALESCE(m.received_time, m.sent_time, m.create_time) DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

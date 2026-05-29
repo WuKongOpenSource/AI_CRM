@@ -575,7 +575,7 @@ public class ChatServiceImpl implements IChatService {
 
         String quotaTip = aiQuotaService.resolveQuotaFailureMessage(
             currentTenantId, "chat", enhancedSystemPrompt, history, enhancedContent,
-            billingContext.pricing().creditMultiplier()
+            billingContext.pricing().creditMultiplier(), billingContext.modelSource()
         );
         if (quotaTip != null) {
             saveMessage(sessionId, "assistant", quotaTip);
@@ -618,15 +618,16 @@ public class ChatServiceImpl implements IChatService {
             String responseText = resolveToolAwareResponse(sessionId, fullResponse.toString(), application.code());
             log.debug("AI 对话完成，响应长度: {}, tokens: prompt={}, completion={}, total={}",
                 fullResponse.length(), usage.promptTokens(), usage.completionTokens(), usage.totalTokens());
-            long creditsUsed = aiQuotaService.resolveCredits(
-                usage.totalTokens(), billingContext.pricing().creditMultiplier());
-            saveMessage(sessionId, "assistant", responseText,
+            long creditsUsed = resolveChatCreditsUsed(usage, billingContext);
+            Long assistantMessageId = saveMessage(sessionId, "assistant", responseText,
                 usage.promptTokens(), usage.completionTokens(),
                 usage.totalTokens(), StrUtil.blankToDefault(modelNameRef.get(), billingContext.runtimeConfig().model()),
                 creditsUsed, billingContext.pricing().creditMultiplier(),
                 billingContext.runtimeConfig().providerCode(), billingContext.runtimeConfig().model());
             aiQuotaService.consumeResolvedTokens(
-                currentTenantId, "chat", usage, billingContext.pricing().creditMultiplier());
+                currentTenantId, "chat", usage, billingContext.pricing().creditMultiplier(),
+                billingContext.modelSource(), billingContext.runtimeConfig().providerCode(),
+                billingContext.runtimeConfig().model(), "chat_message", assistantMessageId);
             updateSessionTime(sessionId);
         };
 
@@ -794,7 +795,7 @@ public class ChatServiceImpl implements IChatService {
 
         String quotaTip = aiQuotaService.resolveQuotaFailureMessage(
             currentTenantId, "chat", enhancedSystemPrompt, history, enhancedContent,
-            billingContext.pricing().creditMultiplier()
+            billingContext.pricing().creditMultiplier(), billingContext.modelSource()
         );
         if (quotaTip != null) {
             saveMessage(sessionId, "assistant", quotaTip);
@@ -837,15 +838,16 @@ public class ChatServiceImpl implements IChatService {
                 response
             );
 
-            long creditsUsed = aiQuotaService.resolveCredits(
-                usageSnapshot.totalTokens(), billingContext.pricing().creditMultiplier());
-            saveMessage(sessionId, "assistant", response,
+            long creditsUsed = resolveChatCreditsUsed(usageSnapshot, billingContext);
+            Long assistantMessageId = saveMessage(sessionId, "assistant", response,
                 usageSnapshot.promptTokens(), usageSnapshot.completionTokens(), usageSnapshot.totalTokens(),
                 StrUtil.blankToDefault(modelName, billingContext.runtimeConfig().model()),
                 creditsUsed, billingContext.pricing().creditMultiplier(),
                 billingContext.runtimeConfig().providerCode(), billingContext.runtimeConfig().model());
             aiQuotaService.consumeResolvedTokens(
-                currentTenantId, "chat", usageSnapshot, billingContext.pricing().creditMultiplier());
+                currentTenantId, "chat", usageSnapshot, billingContext.pricing().creditMultiplier(),
+                billingContext.modelSource(), billingContext.runtimeConfig().providerCode(),
+                billingContext.runtimeConfig().model(), "chat_message", assistantMessageId);
             updateSessionTime(sessionId);
 
             return response;
@@ -864,6 +866,14 @@ public class ChatServiceImpl implements IChatService {
             aiToolExecutionRecorder.finish(sessionId);
             AiContextHolder.clear();
         }
+    }
+
+    private long resolveChatCreditsUsed(AiQuotaService.TokenUsageSnapshot usageSnapshot,
+                                        ChatBillingContext billingContext) {
+        if (usageSnapshot == null || billingContext == null || AiModelSource.isCustom(billingContext.modelSource())) {
+            return 0L;
+        }
+        return aiQuotaService.resolveCredits(usageSnapshot.totalTokens(), billingContext.pricing().creditMultiplier());
     }
 
     private void captureRawTokenUsage(Usage usage,
