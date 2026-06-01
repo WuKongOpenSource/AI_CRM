@@ -136,7 +136,7 @@
       <template v-if="currentView === 'chat'">
         <!-- Mobile top bar (chat detail) -->
         <div
-          v-if="isMobile"
+          v-if="showMobileFloatingBar"
           class="wk-mobile-chat-floating-bar pointer-events-none absolute inset-x-0 z-30 px-4 py-3"
           :style="{ top: mobileChatFloatingBarTop }"
         >
@@ -181,28 +181,47 @@
             :class="isCenteredEmptyChat && !isMobile ? 'justify-center -translate-y-[100px]' : ''"
           >
           <div
-            v-if="selectedCustomer"
+            v-if="selectedCustomer || (isMobile && isCustomerContextChat)"
             class="wk-chat-customer-header relative shrink-0 border-b py-2"
-            :class="isMobile ? 'pl-16 pr-16' : 'pl-4 pr-1 md:pl-8'"
+            :class="isMobile ? 'px-3' : 'pl-4 pr-1 md:pl-8'"
           >
-            <div class="mx-auto flex h-9 w-full items-center justify-between gap-3" :class="isMobile ? '' : 'pr-20'">
+            <div class="mx-auto flex h-9 w-full items-center justify-between gap-2" :class="isMobile ? '' : 'pr-20'">
+              <button
+                v-if="isMobile"
+                type="button"
+                class="wk-mobile-customer-header-menu flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
+                aria-label="打开菜单"
+                title="打开菜单"
+                @click="openMobileMainMenu"
+              >
+                <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
+              </button>
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
-                    v-if="selectedCustomer.logoUrl"
+                    v-if="selectedCustomer?.logoUrl"
                     :src="selectedCustomer.logoUrl"
-                    :alt="selectedCustomer.companyName || 'company logo'"
+                    :alt="mobileCustomerHeaderName || 'company logo'"
                     class="size-full bg-white object-contain"
                   />
                   <span v-else class="text-xs font-bold text-slate-400">
-                    {{ selectedCustomer.companyName?.charAt(0) || '?' }}
+                    {{ mobileCustomerHeaderName.charAt(0) || '?' }}
                   </span>
                 </div>
-                <h2 class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
-                  {{ selectedCustomer.companyName }}
+                <button
+                  v-if="isMobile"
+                  type="button"
+                  class="min-w-[80px] max-w-[190px] truncate text-left text-[15px] font-semibold leading-5 text-[#0d0d0d]"
+                  :title="mobileCustomerHeaderName"
+                  @click="openSelectedCustomerBasicInfo"
+                >
+                  {{ mobileCustomerHeaderName }}
+                </button>
+                <h2 v-else class="min-w-[80px] max-w-[190px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
+                  {{ selectedCustomer?.companyName }}
                 </h2>
                 <div
-                  v-if="!isMobile && (selectedCustomer.tags?.length || canEditSelectedCustomerTags)"
+                  v-if="selectedCustomer && !isMobile && (selectedCustomer.tags?.length || canEditSelectedCustomerTags)"
                   class="flex min-w-0 shrink items-center gap-1.5 overflow-hidden"
                 >
                   <span
@@ -270,7 +289,17 @@
                   </button>
                 </div>
               </div>
-              <div v-if="!isMobile" class="flex shrink-0 items-center gap-2">
+              <button
+                v-if="isMobile"
+                type="button"
+                class="wk-mobile-customer-header-detail flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
+                aria-label="客户详情"
+                title="客户详情"
+                @click="openMobileCustomerSummary"
+              >
+                <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
+              </button>
+              <div v-else-if="selectedCustomer" class="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 text-[12px] font-semibold text-white shadow-sm shadow-primary/20 transition-colors hover:bg-primary/90"
@@ -1160,6 +1189,18 @@
                       </div>
                     </el-popover>
 
+                    <textarea
+                      ref="mobileChatInputRef"
+                      v-model="inputText"
+                      rows="1"
+                      class="wk-mobile-composer-textarea min-w-0 flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-1 py-2 text-[#0d0d0d] text-[16px] leading-[24px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto"
+                      :placeholder="chatInputPlaceholder"
+                      :disabled="isUploading"
+                      @input="resizeChatTextarea"
+                      @keydown.enter.exact.prevent="handleSend"
+                      @paste="handlePaste"
+                    />
+
                     <el-popover
                       v-model:visible="chatModelPopoverVisible"
                       trigger="click"
@@ -1285,18 +1326,6 @@
                         </template>
                       </div>
                     </el-popover>
-
-                    <textarea
-                      ref="mobileChatInputRef"
-                      v-model="inputText"
-                      rows="1"
-                      class="wk-mobile-composer-textarea min-w-0 flex-1 bg-transparent border-none focus:ring-0 focus:outline-none px-1 py-2 text-[#0d0d0d] text-[16px] leading-[24px] placeholder:text-[#0d0d0d] placeholder:text-[16px] resize-none overflow-x-hidden overflow-y-auto"
-                      :placeholder="chatInputPlaceholder"
-                      :disabled="isUploading"
-                      @input="resizeChatTextarea"
-                      @keydown.enter.exact.prevent="handleSend"
-                      @paste="handlePaste"
-                    />
 
                     <button
                       type="button"
@@ -1781,6 +1810,12 @@ import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { shouldShowMobileCustomerSummaryAction } from '@/utils/chatMobileActions'
+import {
+  canCaptureMobileAudioFile,
+  captureMobileAudioFile,
+  hasMobileAudioInputSupport,
+  requestMobileAudioStream
+} from '@/utils/mobileAudioRecording'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
 import { wkIconNames } from '@/components/common/wkIcon'
@@ -2378,6 +2413,12 @@ const isChatEmpty = computed(() => chatStore.messages.length === 0)
 const isCustomerContextChat = computed(() => Boolean(selectedCustomerId.value || currentSessionCustomerId.value))
 const isCenteredEmptyChat = computed(() => isChatEmpty.value && !isCustomerContextChat.value)
 const mobileChatFloatingBarTop = computed(() => '0px')
+const showMobileFloatingBar = computed(() =>
+  isMobile.value
+    && currentView.value === 'chat'
+    && mobilePanel.value === 'chat'
+    && !isCustomerContextChat.value
+)
 const showMobileCustomerSummaryAction = computed(() =>
   shouldShowMobileCustomerSummaryAction({
     isMobile: isMobile.value,
@@ -2390,6 +2431,7 @@ const showMobileNewSessionAction = computed(() =>
   isMobile.value
     && currentView.value === 'chat'
     && mobilePanel.value === 'chat'
+    && !isCustomerContextChat.value
     && Boolean(chatStore.currentSessionId)
     && !chatStore.isNewSessionPending
 )
@@ -2400,6 +2442,9 @@ const mobileChatFloatingActionCount = computed(() =>
 const showMobileChatFloatingActions = computed(() => mobileChatFloatingActionCount.value > 0)
 const mobileCustomerSummaryName = computed(() =>
   selectedCustomer.value?.companyName || boundCustomerName.value || '客户'
+)
+const mobileCustomerHeaderName = computed(() =>
+  selectedCustomer.value?.companyName || boundCustomerName.value || chatStore.currentSession?.title || '客户'
 )
 const showMobileSummaryVoiceAction = computed(() =>
   mobileCustomerSummaryVisible.value
@@ -2530,6 +2575,13 @@ function openMobileCustomerSummary() {
   if (!customerId) return
   customerSummarySheetHeight.value = CUSTOMER_SUMMARY_SHEET_LEVELS[0]
   mobileCustomerSummaryVisible.value = true
+  void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
+}
+
+function openSelectedCustomerBasicInfo() {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId) return
+  showSelectedCustomerBasicInfoDrawer.value = true
   void ensureSelectedCustomerDetail(customerId, { silent: Boolean(selectedCustomer.value) })
 }
 
@@ -3221,8 +3273,25 @@ async function handleChatRecordedAudioStop() {
 
 async function handleStartChatAudioRecording() {
   if (isRecording.value || isTranscribing.value) return
+  const useMobileAudioApi = isMobile.value
+  const hasAudioInput = useMobileAudioApi
+    ? hasMobileAudioInputSupport()
+    : Boolean(navigator.mediaDevices?.getUserMedia)
+  const useMobileAudioFileCapture = useMobileAudioApi
+    && canCaptureMobileAudioFile()
+    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+
+  if (useMobileAudioFileCapture) {
+    speechInputBase = inputText.value.trim()
+    const capturedFile = await captureMobileAudioFile()
+    if (!capturedFile) return
+    if (!(await ensureChatAudioTranscriptionSupported())) return
+    await transcribeChatRecordedAudio(capturedFile)
+    return
+  }
+
   if (!(await ensureChatAudioTranscriptionSupported())) return
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
     ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }
@@ -3230,7 +3299,9 @@ async function handleStartChatAudioRecording() {
     speechInputBase = inputText.value.trim()
     skipNextTranscription = false
     recordedChunks = []
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaStream = useMobileAudioApi
+      ? await requestMobileAudioStream({ audio: true })
+      : await navigator.mediaDevices.getUserMedia({ audio: true })
     const mimeType = resolveChatRecordingMimeType()
     mediaRecorder = mimeType
       ? new MediaRecorder(mediaStream, { mimeType })
@@ -4493,7 +4564,7 @@ void sendQuickMessage
 }
 
 .wk-chat-upload-menu--mobile .wk-chat-upload-menu__label {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 

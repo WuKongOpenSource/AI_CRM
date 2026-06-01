@@ -292,7 +292,7 @@
                         {{ customer.companyName?.charAt(0) || '?' }}
                       </span>
                     </div>
-                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="customer.companyName">
+                    <span class="block min-w-0 flex-1 truncate text-[1rem] leading-5 text-[#0d0d0d]" :title="customer.companyName">
                       {{ customer.companyName }}
                     </span>
                   </div>
@@ -692,7 +692,7 @@
                     {{ item.materialIcon }}
                   </span>
                   <WkIcon v-else :name="item.icon" :box-size="20" class="shrink-0" />
-                  <span class="truncate text-[14px] h-[20px] font-semibold">{{ item.label }}</span>
+                  <span class="truncate text-[1rem] h-[20px] font-semibold">{{ item.label }}</span>
                   <span
                     v-if="item.children?.length"
                     class="material-symbols-outlined ml-auto shrink-0 text-base transition-transform"
@@ -727,7 +727,7 @@
             </template>
 
             <div class="pt-2">
-              <p class="px-3 pb-2 text-[14px] font-bold leading-7 text-[#0d0d0d]">最近</p>
+              <p class="px-3 pb-2 text-[1rem] font-bold leading-7 text-[#0d0d0d]">最近</p>
               <div v-if="chatStore.sessionsLoading && mobileRecentChatSessions.length === 0" class="flex justify-center py-6">
                 <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
               </div>
@@ -763,7 +763,7 @@
 
             <div v-if="showSidebarCustomers" class="pt-2">
               <div class="flex items-center gap-2 px-3 pb-2">
-                <p class="min-w-0 flex-1 text-[14px] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
+                <p class="min-w-0 flex-1 text-[1rem] font-bold leading-7 text-[#0d0d0d]">客户列表</p>
                 <button
                   type="button"
                   class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
@@ -809,7 +809,7 @@
                       {{ customer.companyName?.charAt(0) || '?' }}
                     </span>
                   </div>
-                  <span class="block min-w-0 flex-1 truncate text-[14px] leading-6">{{ customer.companyName }}</span>
+                  <span class="block min-w-0 flex-1 truncate text-[1rem] leading-6">{{ customer.companyName }}</span>
                 </button>
                 <button
                   v-if="sidebarCustomersHasMore"
@@ -931,7 +931,7 @@
                       @click="mobileNavigate(item.route, item.query)"
                     >
                       <WkIcon :name="item.icon" :box-size="20" class="shrink-0" />
-                      <span class="min-w-0 flex-1 truncate text-[14px] font-medium">{{ item.label }}</span>
+                      <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">{{ item.label }}</span>
                       <span class="material-symbols-outlined shrink-0 text-[20px] leading-none text-[#c7c7cc]">chevron_right</span>
                     </button>
 
@@ -941,7 +941,7 @@
                       @click="handleLogout"
                     >
                       <span class="material-symbols-outlined inline-flex size-5 shrink-0 items-center justify-center text-[20px] leading-none">logout</span>
-                      <span class="min-w-0 flex-1 truncate text-[14px] font-medium">退出登录</span>
+                      <span class="min-w-0 flex-1 truncate text-[1rem] font-medium">退出登录</span>
                     </button>
                   </div>
                 </section>
@@ -2016,6 +2016,10 @@ onMounted(() => {
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
   )
+  removeMobileMainMenuOpenListener = appEvents.on(
+    APP_EVENT.MOBILE_MAIN_MENU_OPEN,
+    openMobileMainMenuFromChat
+  )
 
   if (typeof ResizeObserver !== 'undefined') {
     primaryNavResizeObserver = new ResizeObserver(() => updatePrimaryNavScrollbar())
@@ -2052,6 +2056,8 @@ onBeforeUnmount(() => {
   removeCustomerListRefreshListener = null
   removeCustomerSidebarRefreshListener?.()
   removeCustomerSidebarRefreshListener = null
+  removeMobileMainMenuOpenListener?.()
+  removeMobileMainMenuOpenListener = null
   if (mainContentColumnResizeObserver) {
     mainContentColumnResizeObserver.disconnect()
     mainContentColumnResizeObserver = null

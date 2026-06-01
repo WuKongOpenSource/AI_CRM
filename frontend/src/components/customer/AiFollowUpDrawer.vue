@@ -365,6 +365,12 @@ import type { AiFollowUpParseVO } from '@/api/followup'
 import type { Customer } from '@/types/customer'
 import type { ChatAttachmentDTO } from '@/types/common'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import {
+  canCaptureMobileAudioFile,
+  captureMobileAudioFile,
+  hasMobileAudioInputSupport,
+  requestMobileAudioStream
+} from '@/utils/mobileAudioRecording'
 
 const props = defineProps<{
   modelValue: boolean
@@ -850,9 +856,26 @@ async function handleRecordedAudioStop() {
 
 async function handleStartAudioRecording() {
   if (isRecording.value || isTranscribing.value) return
-  if (!(await ensureAudioTranscriptionSupported())) return
 
-  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+  const useMobileAudioApi = isMobile.value
+  const hasAudioInput = useMobileAudioApi
+    ? hasMobileAudioInputSupport()
+    : Boolean(navigator.mediaDevices?.getUserMedia)
+  const useMobileAudioFileCapture = useMobileAudioApi
+    && canCaptureMobileAudioFile()
+    && (!hasAudioInput || typeof MediaRecorder === 'undefined')
+
+  if (useMobileAudioFileCapture) {
+    speechInputBase = textInput.value.trim()
+    const capturedFile = await captureMobileAudioFile()
+    if (!capturedFile) return
+    if (!(await ensureAudioTranscriptionSupported())) return
+    await transcribeRecordedAudio(capturedFile)
+    return
+  }
+
+  if (!(await ensureAudioTranscriptionSupported())) return
+  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
     ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
     return
   }
@@ -862,7 +885,9 @@ async function handleStartAudioRecording() {
     skipNextTranscription = false
     recordedChunks = []
 
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaStream = useMobileAudioApi
+      ? await requestMobileAudioStream({ audio: true })
+      : await navigator.mediaDevices.getUserMedia({ audio: true })
     const mimeType = resolveRecordingMimeType()
     mediaRecorder = mimeType
       ? new MediaRecorder(mediaStream, { mimeType })

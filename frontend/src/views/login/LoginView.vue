@@ -82,7 +82,7 @@
                   alt="悟空AI CRM"
                   class="size-10 rounded-xl bg-white object-contain p-1 shadow-lg shadow-slate-300/40 ring-1 ring-slate-200/80"
                 />
-                <span class="text-lg font-bold text-slate-900">悟空AI CRM</span>
+                <span class="text-[1.5rem] font-bold text-slate-900">悟空AI CRM</span>
               </div>
 
               <!-- 双层叠放 + 高度过渡；WebKit 上高度改为瞬时更新，避免布局动画卡顿 -->
@@ -149,7 +149,7 @@
                       <div class="flex justify-end">
                         <button
                           type="button"
-                          class="text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                          class="text-[1rem] font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
                           @click="openForgotPasswordDialog"
                         >
                           忘记密码？
@@ -159,12 +159,12 @@
                       <el-form-item class="!mb-0">
                         <button
                           type="submit"
-                          class="group flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-4 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                          class="group flex min-h-10 w-full items-center justify-center gap-2 rounded-2xl bg-primary py-2 text-[1rem] font-bold text-white transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                           :disabled="loading"
                         >
                           <span
                             v-if="loading"
-                            class="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                            class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
                           />
                           <template v-else>
                             立即登录
@@ -395,7 +395,7 @@
                     返回登录
                   </button>
                 </p>
-                <p v-else class="text-sm text-slate-500">
+                <p v-else class="text-[1rem] text-slate-500">
                   {{ isLogin ? '还没有账号？' : '已经有账号了？' }}
                   <button
                     type="button"
@@ -1178,7 +1178,7 @@ onBeforeUnmount(() => {
 }
 
 .label-upper {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
