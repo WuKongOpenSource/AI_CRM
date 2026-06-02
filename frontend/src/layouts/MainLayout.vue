@@ -1531,6 +1531,11 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
 ]
 
+allMainNavItems.push(
+  { key: 'scrm', icon: 'event', materialIcon: 'forum', label: '企业微信', route: '/scrm', permission: 'wecomCustomerSession:view' },
+  { key: 'wecom-customers', icon: 'customer', materialIcon: 'groups', label: '企微客户', route: '/wecom-customers', permission: 'wecomCustomer:view' }
+)
+
 const allConfigNavItems: ConfigNavItem[] = [
   // 暂时隐藏数据同步入口，功能页面与路由先保留便于后续恢复。
   // { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
@@ -1591,6 +1596,8 @@ const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 
 const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
+  if (path.startsWith('/scrm')) return '/scrm'
+  if (path.startsWith('/wecom-customers')) return '/wecom-customers'
   if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path

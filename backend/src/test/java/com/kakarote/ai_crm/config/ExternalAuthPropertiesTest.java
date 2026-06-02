@@ -40,6 +40,9 @@ class ExternalAuthPropertiesTest {
         assertThat(wecom.isUsable("wecom")).isFalse();
 
         wecom.setCorpId("corp-id");
+        assertThat(wecom.isUsable("wecom")).isFalse();
+
+        wecom.setAgentId("1000002");
         assertThat(wecom.isUsable("wecom")).isTrue();
         assertThat(wecom.resolveClientId("wecom")).isEqualTo("corp-id");
     }

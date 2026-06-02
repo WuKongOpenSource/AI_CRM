@@ -119,6 +119,12 @@ external-auth:
     client-secret: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_SECRET:${MAIL_OUTLOOK_CLIENT_SECRET:}}
     tenant: ${EXTERNAL_AUTH_OUTLOOK_TENANT:${MAIL_OUTLOOK_TENANT:common}}
     redirect-uri: ${EXTERNAL_AUTH_OUTLOOK_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/outlook/callback}
+  wecom:
+    enabled: ${EXTERNAL_AUTH_WECOM_ENABLED:false}
+    corp-id: ${EXTERNAL_AUTH_WECOM_CORP_ID:}
+    agent-id: ${EXTERNAL_AUTH_WECOM_AGENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_WECOM_SECRET:}
+    redirect-uri: ${EXTERNAL_AUTH_WECOM_REDIRECT_URI:https://aicrm-saas.5kcrm.cn/crmapi/auth/external/wecom/callback}
 
 media-analysis:
   ffmpeg:

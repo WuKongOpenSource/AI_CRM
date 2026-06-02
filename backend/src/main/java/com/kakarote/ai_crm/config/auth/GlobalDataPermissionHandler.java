@@ -22,12 +22,15 @@ import java.util.stream.Collectors;
 @Component
 public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
 
-    private static final Map<String, String> MODULE_BY_MAPPER = Map.of(
-            "CustomerMapper", "customer",
-            "ContactMapper", "contact",
-            "TaskMapper", "task",
-            "FollowUpMapper", "followup",
-            "KnowledgeMapper", "knowledge"
+    private static final Map<String, String> MODULE_BY_MAPPER = Map.ofEntries(
+            Map.entry("CustomerMapper", "customer"),
+            Map.entry("ContactMapper", "contact"),
+            Map.entry("TaskMapper", "task"),
+            Map.entry("FollowUpMapper", "followup"),
+            Map.entry("KnowledgeMapper", "knowledge"),
+            Map.entry("WecomEmployeeMapper", "wecomEmployeeSession"),
+            Map.entry("WecomExternalCustomerMapper", "wecomCustomer"),
+            Map.entry("WecomCustomerBindingMapper", "wecomCustomer")
     );
 
     @Autowired
@@ -114,6 +117,15 @@ public class GlobalDataPermissionHandler implements MultiDataPermissionHandler {
                     + " OR (" + qualifiedColumn(table, "customer_id") + " IS NULL AND "
                     + qualifiedColumn(table, "upload_user_id") + " IN (" + inClause + ")))"
                     : null;
+            case "wecomEmployeeSession" -> "crm_wecom_employee".equals(tableName)
+                    ? qualifiedColumn(table, "crm_user_id") + " IN (" + inClause + ")"
+                    : null;
+            case "wecomCustomer" -> switch (tableName) {
+                case "crm_wecom_external_customer", "crm_wecom_customer_binding" ->
+                        qualifiedColumn(table, "customer_id")
+                                + " IN (SELECT customer_id FROM crm_customer WHERE owner_id IN (" + inClause + "))";
+                default -> null;
+            };
             default -> null;
         };
     }

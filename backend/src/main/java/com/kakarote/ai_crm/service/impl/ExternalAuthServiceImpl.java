@@ -191,6 +191,12 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             return appendQuery(authState.getRedirect(), "externalLoginTicket", ticket, "provider", normalizedProvider);
         }
 
+        if ("wecom".equals(normalizedProvider) && StrUtil.isNotBlank(profile.getExternalTenantKey())) {
+            ExternalAuthIdentity provisionedIdentity = autoProvisionWecomIdentity(profile);
+            String ticket = createLoginTicket(provisionedIdentity);
+            return appendQuery(authState.getRedirect(), "externalLoginTicket", ticket, "provider", normalizedProvider);
+        }
+
         String ticket = createRegisterTicket(profile);
         return appendQuery(authState.getRedirect(), "externalRegisterTicket", ticket, "provider", normalizedProvider);
     }
@@ -564,17 +570,80 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
         );
         JSONObject userInfo = JSON.parseObject(userInfoJson);
         String userId = StrUtil.blankToDefault(userInfo.getString("userid"), userInfo.getString("openid"));
+        JSONObject userDetail = new JSONObject();
+        if (StrUtil.isNotBlank(userInfo.getString("userid"))) {
+            String userDetailJson = restTemplate.getForObject(
+                    UriComponentsBuilder.fromHttpUrl("https://qyapi.weixin.qq.com/cgi-bin/user/get")
+                            .queryParam("access_token", accessToken)
+                            .queryParam("userid", userInfo.getString("userid"))
+                            .build()
+                            .toUriString(),
+                    String.class
+            );
+            userDetail = JSON.parseObject(userDetailJson);
+        }
+
+        JSONObject rawProfile = new JSONObject();
+        rawProfile.put("userinfo", userInfo);
+        if (!userDetail.isEmpty()) {
+            rawProfile.put("userDetail", userDetail);
+        }
+        String displayName = firstNotBlank(userDetail.getString("name"), userDetail.getString("english_name"), userId);
+        String email = normalizeEmail(firstNotBlank(
+                userDetail.getString("email"),
+                userDetail.getString("biz_mail"),
+                syntheticWecomEmail(config.getCorpId(), userId)
+        ));
 
         ExternalProfile profile = new ExternalProfile();
         profile.setProvider("wecom");
         profile.setSubject(config.getCorpId() + ":" + userId);
-        profile.setDisplayName(userId);
+        profile.setEmail(email);
+        profile.setDisplayName(displayName);
+        profile.setAvatarUrl(userDetail.getString("avatar"));
         profile.setExternalTenantKey(config.getCorpId());
         profile.setExternalTenantName(config.getCorpId());
         profile.setEmailVerified(Boolean.FALSE);
-        profile.setRawJson(userInfo.toJSONString());
+        profile.setRawJson(rawProfile.toJSONString());
         validateProfile(profile);
         return profile;
+    }
+
+    private ExternalAuthIdentity autoProvisionWecomIdentity(ExternalProfile profile) {
+        String email = resolveRegistrationEmail(profile);
+        String realname = StrUtil.blankToDefault(StrUtil.trim(profile.getDisplayName()), email);
+        String password = generateExternalPassword();
+        String companyName = StrUtil.blankToDefault(profile.getExternalTenantName(), profile.getExternalTenantKey());
+
+        ManagerUser user;
+        ExternalTenantBinding binding = findTenantBinding(profile.getProvider(), profile.getExternalTenantKey());
+        if (binding == null) {
+            ExternalTenantRegisterBO tenantRegisterBO = new ExternalTenantRegisterBO();
+            tenantRegisterBO.setEmail(email);
+            tenantRegisterBO.setPassword(password);
+            tenantRegisterBO.setCompanyName(companyName);
+            tenantRegisterBO.setRealname(realname);
+            tenantRegisterBO.setEmailVerificationRequired(Boolean.FALSE);
+            user = registrationService.registerExternalTenant(tenantRegisterBO);
+            saveTenantBinding(profile, user.getTenantId(), companyName);
+        } else {
+            user = manageUserService.queryUsersByUsername(email)
+                    .stream()
+                    .filter(item -> Objects.equals(item.getTenantId(), binding.getTenantId()))
+                    .findFirst()
+                    .orElse(null);
+            if (user == null) {
+                ExternalTenantMemberRegisterBO memberRegisterBO = new ExternalTenantMemberRegisterBO();
+                memberRegisterBO.setTenantId(binding.getTenantId());
+                memberRegisterBO.setEmail(email);
+                memberRegisterBO.setPassword(password);
+                memberRegisterBO.setRealname(realname);
+                user = registrationService.registerExternalTenantMember(memberRegisterBO);
+            }
+        }
+
+        saveIdentity(profile, user.getTenantId(), user.getUserId());
+        return findIdentity(profile.getProvider(), profile.getSubject());
     }
 
     private void bindIdentity(AuthState state, ExternalProfile profile) {
@@ -670,8 +739,14 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
     private String resolveRegistrationEmail(ExternalProfile profile) {
         String email = normalizeEmail(profile.getEmail());
         if (StrUtil.isBlank(email)) {
+            if ("wecom".equals(profile.getProvider())) {
+                email = syntheticWecomEmail(profile.getExternalTenantKey(), profile.getSubject());
+            }
+        }
+        if (StrUtil.isBlank(email)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "External account email is required");
         }
+        profile.setEmail(email);
         return email;
     }
 
@@ -696,7 +771,7 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             case "google" -> "Google";
             case "outlook" -> "Outlook";
             case "wechat" -> "WeChat";
-            case "wecom" -> "WeCom";
+            case "wecom" -> "企业微信";
             default -> provider;
         };
     }
@@ -856,6 +931,21 @@ public class ExternalAuthServiceImpl implements ExternalAuthService {
             }
         }
         return null;
+    }
+
+    private String syntheticWecomEmail(String corpId, String userId) {
+        String safeCorp = sanitizeEmailPart(StrUtil.blankToDefault(corpId, "corp"));
+        String safeUser = sanitizeEmailPart(StrUtil.blankToDefault(userId, "user"));
+        return "wecom." + safeUser + "." + safeCorp + "@external.wecom.local";
+    }
+
+    private String sanitizeEmailPart(String value) {
+        String sanitized = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "_");
+        return StrUtil.blankToDefault(sanitized, "unknown");
+    }
+
+    private String generateExternalPassword() {
+        return "Wecom" + IdUtil.fastSimpleUUID().substring(0, 12);
     }
 
     private void validateProfile(ExternalProfile profile) {

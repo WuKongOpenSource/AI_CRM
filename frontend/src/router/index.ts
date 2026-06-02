@@ -68,6 +68,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '邮箱', icon: 'mail', permission: 'mail:view' }
       },
       {
+        path: 'scrm',
+        name: 'WecomScrm',
+        component: () => import('@/views/wecom/WecomScrmView.vue'),
+        meta: { title: '企业微信', icon: 'forum', permission: 'wecomCustomerSession:view' }
+      },
+      {
+        path: 'wecom-customers',
+        name: 'WecomCustomers',
+        component: () => import('@/views/wecom/WecomCustomersView.vue'),
+        meta: { title: '企微客户', icon: 'groups', permission: 'wecomCustomer:view' }
+      },
+      {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/KnowledgeView.vue'),

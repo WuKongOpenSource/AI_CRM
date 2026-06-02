@@ -324,8 +324,35 @@
             </button>
           </div>
 
+          <div v-if="selectedCustomer" class="wk-chat-customer-tabs">
+            <button
+              type="button"
+              class="wk-chat-customer-tabs__item"
+              :class="{ 'is-active': activeCustomerConversationTab === 'ai' }"
+              @click="handleCustomerConversationTabClick('ai')"
+            >
+              <span class="material-symbols-outlined">smart_toy</span>
+              <span>AI 对话</span>
+            </button>
+            <button
+              v-for="tab in customerWecomTabs"
+              :key="tab.tabKey"
+              type="button"
+              class="wk-chat-customer-tabs__item"
+              :class="{ 'is-active': activeCustomerConversationTab === tab.tabKey }"
+              @click="handleCustomerConversationTabClick(tab.tabKey)"
+            >
+              <span class="material-symbols-outlined">forum</span>
+              <span>{{ tab.employeeName || tab.employeeUserId || tab.title }}</span>
+            </button>
+            <span v-if="customerWecomTabsLoading" class="wk-chat-customer-tabs__loading">
+              <span class="material-symbols-outlined animate-spin">progress_activity</span>
+            </span>
+          </div>
+
           <!-- Messages Area -->
           <div
+            v-if="activeCustomerConversationTab === 'ai'"
             ref="messagesContainer"
             class="wk-chat-messages"
             :class="chatMessagesAreaClass"
@@ -527,9 +554,21 @@
             </div>
           </div>
 
+          <div v-else class="wk-chat-wecom-pane">
+            <div class="wk-chat-wecom-pane__notice">
+              <span class="material-symbols-outlined">visibility</span>
+              <span>仅支持查看</span>
+            </div>
+            <WecomMessageList
+              class="wk-chat-wecom-pane__messages"
+              :messages="customerWecomMessages"
+              :loading="customerWecomMessagesLoading"
+            />
+          </div>
+
           <Transition name="scroll-to-bottom">
             <button
-              v-if="showScrollToBottomButton"
+              v-if="showScrollToBottomButton && activeCustomerConversationTab === 'ai'"
               type="button"
               class="absolute left-1/2 -translate-x-1/2 bottom-[140px] md:bottom-[220px] z-20 size-8 rounded-full border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-slate-600 transition-all flex items-center justify-center hover:bg-slate-50 hover:text-slate-900"
               aria-label="回到底部"
@@ -541,6 +580,7 @@
 
           <!-- Input Area -->
           <div
+            v-if="activeCustomerConversationTab === 'ai'"
             class="wk-chat-composer-wrap shrink-0 pb-2 md:pb-2 px-2"
             :class="isCenteredEmptyChat ? 'bg-transparent pt-0' : ''"
           >
@@ -1631,9 +1671,11 @@ import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
+import { getCustomerWecomConversationMessages, getCustomerWecomConversationTabs } from '@/api/wecom'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import WecomMessageList from '@/views/wecom/components/WecomMessageList.vue'
 import {
   registerAiQuotaResumeSendHandler,
   unregisterAiQuotaResumeSendHandler,
@@ -1658,6 +1700,7 @@ import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFil
 import { appEvents, APP_EVENT } from '@/utils/events'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
+import type { WecomConversationTabVO, WecomMessageVO } from '@/types/wecom'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
@@ -1766,6 +1809,11 @@ const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
 const selectedCustomerId = ref<string | null>(null)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
+const activeCustomerConversationTab = ref('ai')
+const customerWecomTabs = ref<WecomConversationTabVO[]>([])
+const customerWecomMessages = ref<WecomMessageVO[]>([])
+const customerWecomTabsLoading = ref(false)
+const customerWecomMessagesLoading = ref(false)
 const showSelectedCustomerTagDialog = ref(false)
 const showSelectedCustomerBasicInfoDrawer = ref(false)
 const showSelectedCustomerEditDialog = ref(false)
@@ -2428,6 +2476,7 @@ async function ensureSelectedCustomerDetail(customerId: string, options: { silen
     const detail = await getCustomerDetail(requestCustomerId)
     if (selectedCustomerId.value && selectedCustomerId.value !== requestCustomerId) return
     selectedCustomer.value = detail
+    void loadCustomerWecomTabs(requestCustomerId)
   } catch (err) {
     console.error('Load selected customer detail failed:', err)
     if (!isRequestErrorHandled(err)) {
@@ -2437,6 +2486,45 @@ async function ensureSelectedCustomerDetail(customerId: string, options: { silen
     if (!silent && (!selectedCustomerId.value || selectedCustomerId.value === requestCustomerId)) {
       selectedCustomerLoading.value = false
     }
+  }
+}
+
+async function loadCustomerWecomTabs(customerId: string) {
+  customerWecomTabsLoading.value = true
+  try {
+    const tabs = await getCustomerWecomConversationTabs(customerId)
+    if (currentSessionCustomerId.value && currentSessionCustomerId.value !== customerId) return
+    customerWecomTabs.value = tabs || []
+    if (activeCustomerConversationTab.value !== 'ai') {
+      const activeExists = customerWecomTabs.value.some(tab => tab.tabKey === activeCustomerConversationTab.value)
+      if (!activeExists) {
+        activeCustomerConversationTab.value = 'ai'
+        customerWecomMessages.value = []
+      }
+    }
+  } catch (err) {
+    console.error('Load customer WeCom tabs failed:', err)
+    customerWecomTabs.value = []
+  } finally {
+    customerWecomTabsLoading.value = false
+  }
+}
+
+async function handleCustomerConversationTabClick(tabKey: string) {
+  activeCustomerConversationTab.value = tabKey
+  if (tabKey === 'ai') {
+    customerWecomMessages.value = []
+    return
+  }
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  const tab = customerWecomTabs.value.find(item => item.tabKey === tabKey)
+  if (!customerId || !tab) return
+  customerWecomMessagesLoading.value = true
+  try {
+    const data = await getCustomerWecomConversationMessages(customerId, tab.conversationId, 1, 100)
+    customerWecomMessages.value = data.list || []
+  } finally {
+    customerWecomMessagesLoading.value = false
   }
 }
 
@@ -3419,12 +3507,17 @@ watch(
       selectedCustomerId.value = null
       selectedCustomer.value = null
       selectedCustomerLoading.value = false
+      activeCustomerConversationTab.value = 'ai'
+      customerWecomTabs.value = []
+      customerWecomMessages.value = []
       return
     }
 
     clearChatCustomerAiPolling()
     if (selectedCustomerId.value === customerId && selectedCustomer.value) return
     selectedCustomerId.value = customerId
+    activeCustomerConversationTab.value = 'ai'
+    customerWecomMessages.value = []
     void ensureSelectedCustomerDetail(customerId)
   },
   { immediate: true }
@@ -3615,6 +3708,90 @@ void sendQuickMessage
   border-color: var(--wk-border-subtle);
   background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
   backdrop-filter: blur(14px);
+}
+
+.wk-chat-customer-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: #ffffff;
+  padding: 8px 16px;
+}
+
+.wk-chat-customer-tabs__item {
+  display: inline-flex;
+  height: 32px;
+  max-width: 180px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0 10px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.wk-chat-customer-tabs__item span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wk-chat-customer-tabs__item .material-symbols-outlined {
+  flex: 0 0 auto;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.wk-chat-customer-tabs__item:hover,
+.wk-chat-customer-tabs__item.is-active {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.wk-chat-customer-tabs__loading {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: #94a3b8;
+}
+
+.wk-chat-wecom-pane {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  background: #f8fafc;
+}
+
+.wk-chat-wecom-pane__notice {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 8px 12px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wk-chat-wecom-pane__notice .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.wk-chat-wecom-pane__messages {
+  flex: 1;
 }
 
 .wk-chat-composer-wrap {

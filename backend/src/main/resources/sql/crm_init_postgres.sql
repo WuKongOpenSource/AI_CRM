@@ -573,6 +573,234 @@ INSERT INTO crm_chat_session (session_id, user_id, agent_id, customer_id, title,
 (6002, 1, 3, 1001, '北京科技客户分析', 1, NOW());
 
 -- 插入示例聊天消息
+-- WeCom/SCRM schema
+CREATE TABLE IF NOT EXISTS crm_wecom_corp_config (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    corp_name VARCHAR(255),
+    agent_id VARCHAR(64),
+    app_secret_encrypted TEXT,
+    contact_secret_encrypted TEXT,
+    archive_secret_encrypted TEXT,
+    archive_private_key_encrypted TEXT,
+    archive_public_key_version VARCHAR(128),
+    archive_enabled BOOLEAN DEFAULT FALSE,
+    customer_contact_enabled BOOLEAN DEFAULT TRUE,
+    sync_enabled BOOLEAN DEFAULT TRUE,
+    last_sync_time TIMESTAMP(3),
+    last_sync_status VARCHAR(32),
+    last_sync_error TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_employee (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    crm_user_id BIGINT,
+    name VARCHAR(255),
+    alias VARCHAR(255),
+    department_list TEXT,
+    mobile VARCHAR(64),
+    email VARCHAR(255),
+    avatar VARCHAR(500),
+    qr_code VARCHAR(500),
+    position VARCHAR(255),
+    status INTEGER DEFAULT 1,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_external_customer (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    external_user_id VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    avatar VARCHAR(500),
+    type INTEGER,
+    gender INTEGER,
+    union_id VARCHAR(255),
+    position VARCHAR(255),
+    corp_name VARCHAR(255),
+    corp_full_name VARCHAR(500),
+    external_profile TEXT,
+    bind_status VARCHAR(32) DEFAULT 'UNBOUND',
+    customer_id BIGINT,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_external_customer_follow (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    external_customer_id BIGINT NOT NULL,
+    external_user_id VARCHAR(255) NOT NULL,
+    employee_id BIGINT,
+    employee_user_id VARCHAR(255) NOT NULL,
+    remark VARCHAR(500),
+    description TEXT,
+    add_way INTEGER,
+    state VARCHAR(255),
+    tags_json TEXT,
+    relation_create_time TIMESTAMP(3),
+    status INTEGER DEFAULT 1,
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_group_chat (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    chat_id VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    owner_user_id VARCHAR(255),
+    member_list TEXT,
+    customer_list TEXT,
+    status INTEGER DEFAULT 1,
+    notice TEXT,
+    external_create_time TIMESTAMP(3),
+    synced_at TIMESTAMP(3),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_conversation (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    conversation_type VARCHAR(32) NOT NULL,
+    employee_id BIGINT,
+    employee_user_id VARCHAR(255),
+    external_customer_id BIGINT,
+    external_user_id VARCHAR(255),
+    group_chat_id BIGINT,
+    chat_id VARCHAR(255),
+    title VARCHAR(500),
+    peer_name VARCHAR(255),
+    peer_avatar VARCHAR(500),
+    customer_id BIGINT,
+    owner_user_id BIGINT,
+    last_msg_id VARCHAR(255),
+    last_msg_time TIMESTAMP(3),
+    last_msg_preview TEXT,
+    message_count INTEGER DEFAULT 0,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_message (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    conversation_id BIGINT NOT NULL,
+    corp_id VARCHAR(128),
+    msg_id VARCHAR(255) NOT NULL,
+    seq BIGINT,
+    action VARCHAR(32),
+    msg_type VARCHAR(64),
+    sender_id VARCHAR(255),
+    sender_type VARCHAR(32),
+    receiver_list TEXT,
+    msg_time TIMESTAMP(3),
+    content_text TEXT,
+    content_json TEXT,
+    media_id BIGINT,
+    sdk_file_id VARCHAR(500),
+    file_name VARCHAR(500),
+    file_size BIGINT,
+    file_url VARCHAR(500),
+    recalled BOOLEAN DEFAULT FALSE,
+    raw_json TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_media (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128),
+    msg_id VARCHAR(255),
+    sdk_file_id VARCHAR(500),
+    media_type VARCHAR(64),
+    file_name VARCHAR(500),
+    content_type VARCHAR(255),
+    file_size BIGINT,
+    file_path VARCHAR(500),
+    download_status VARCHAR(32) DEFAULT 'pending',
+    download_error TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_customer_binding (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    customer_id BIGINT NOT NULL,
+    external_customer_id BIGINT NOT NULL,
+    external_user_id VARCHAR(255),
+    corp_id VARCHAR(128),
+    bind_user_id BIGINT,
+    bind_time TIMESTAMP(3),
+    unbind_time TIMESTAMP(3),
+    status INTEGER DEFAULT 1,
+    remark VARCHAR(500),
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_sync_cursor (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128) NOT NULL,
+    cursor_type VARCHAR(64) NOT NULL,
+    cursor_key VARCHAR(255) NOT NULL,
+    cursor_value TEXT,
+    seq BIGINT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS crm_wecom_sync_log (
+    id BIGINT NOT NULL PRIMARY KEY,
+    tenant_id BIGINT NOT NULL,
+    corp_id VARCHAR(128),
+    sync_type VARCHAR(64) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    fetched_count INTEGER DEFAULT 0,
+    saved_count INTEGER DEFAULT 0,
+    failed_count INTEGER DEFAULT 0,
+    started_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    finished_at TIMESTAMP(3),
+    error_message TEXT,
+    create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO manager_menu (menu_id, parent_id, realm, realm_name, type)
+VALUES
+    (2400, 0, 'wecomEmployeeSession', '企微员工会话', 3),
+    (2401, 2400, 'wecomEmployeeSession:view', '查看列表', 5),
+    (2402, 2400, 'wecomEmployeeSession:detail', '查看详情', 5),
+    (2410, 0, 'wecomCustomerSession', '企微客户会话', 3),
+    (2411, 2410, 'wecomCustomerSession:view', '查看列表', 5),
+    (2412, 2410, 'wecomCustomerSession:detail', '查看详情', 5),
+    (2420, 0, 'wecomGroupSession', '企微信群会话', 3),
+    (2421, 2420, 'wecomGroupSession:view', '查看列表', 5),
+    (2422, 2420, 'wecomGroupSession:detail', '查看详情', 5),
+    (2430, 0, 'wecomCustomer', '企微客户', 3),
+    (2431, 2430, 'wecomCustomer:view', '查看列表', 5),
+    (2432, 2430, 'wecomCustomer:detail', '查看详情', 5),
+    (2433, 2430, 'wecomCustomer:bind', '绑定客户', 5),
+    (2434, 2430, 'wecomCustomer:unbind', '解绑客户', 5)
+ON CONFLICT (menu_id) DO NOTHING;
+
 INSERT INTO crm_chat_message (message_id, session_id, role, content, tokens_used, model_name, create_time) VALUES
 (7001, 6001, 'user', '我想创建一个新客户', 10, NULL, NOW()),
 (7002, 6001, 'assistant', '好的，我来帮您创建新客户。请告诉我以下信息：

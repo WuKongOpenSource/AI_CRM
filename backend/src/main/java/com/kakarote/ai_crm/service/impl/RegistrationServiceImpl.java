@@ -65,7 +65,16 @@ public class RegistrationServiceImpl implements RegistrationService {
             "user", "dept", "role", "config", "customField", "agent"
     );
     private static final Set<String> DATA_SCOPE_MODULES = Set.of(
-            "customer", "contact", "task", "followup", "schedule", "knowledge"
+            "customer",
+            "contact",
+            "task",
+            "followup",
+            "schedule",
+            "knowledge",
+            "wecomEmployeeSession",
+            "wecomCustomerSession",
+            "wecomGroupSession",
+            "wecomCustomer"
     );
 
     @Autowired

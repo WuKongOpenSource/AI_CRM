@@ -51,7 +51,9 @@ public class ExternalAuthProperties {
                 return false;
             }
             if ("wecom".equals(provider)) {
-                return StrUtil.isNotBlank(corpId) && StrUtil.isNotBlank(clientSecret);
+                return StrUtil.isNotBlank(corpId)
+                        && StrUtil.isNotBlank(agentId)
+                        && StrUtil.isNotBlank(clientSecret);
             }
             return StrUtil.isNotBlank(clientId) && StrUtil.isNotBlank(clientSecret);
         }

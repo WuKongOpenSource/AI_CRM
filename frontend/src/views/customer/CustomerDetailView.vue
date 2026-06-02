@@ -763,6 +763,59 @@
               <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-tighter">{{ visibleRelatedModuleCount }}个模块</span>
             </div>
 
+            <section class="group/wecom-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
+              <div class="mb-4 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span :class="sectionIconBoxClass" :style="{ background: '#dcfce7', color: '#166534' }">
+                    <span :class="sectionMaterialIconClass">forum</span>
+                  </span>
+                  企业微信关联
+                </h4>
+                <button
+                  type="button"
+                  class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
+                  aria-label="关联企微客户"
+                  @click="openWecomCustomerBindingPage"
+                >
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add_link</span>
+                  <span
+                    class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                    role="tooltip"
+                  >
+                    关联企微客户
+                  </span>
+                </button>
+              </div>
+              <div v-if="wecomBindingsLoading" class="space-y-2">
+                <div v-for="index in 2" :key="`wecom-binding-skeleton-${index}`" class="h-12 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+              <div v-else-if="wecomBindings.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <span class="material-symbols-outlined text-2xl leading-none text-slate-400">link_off</span>
+                <p class="mt-2 text-xs font-medium text-slate-400">暂无企微关联</p>
+              </div>
+              <div v-else class="space-y-2">
+                <div
+                  v-for="binding in wecomBindings"
+                  :key="binding.id"
+                  class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2"
+                >
+                  <img
+                    v-if="binding.externalCustomerAvatar"
+                    :src="binding.externalCustomerAvatar"
+                    alt=""
+                    class="size-8 shrink-0 rounded-lg object-cover"
+                  />
+                  <span v-else class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-xs font-bold text-emerald-700">
+                    {{ (binding.externalCustomerName || binding.externalUserId || '?').slice(0, 1) }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold text-slate-800">{{ binding.externalCustomerName || binding.externalUserId }}</p>
+                    <p class="truncate text-xs text-slate-400">{{ binding.bindTime ? formatDateTime(binding.bindTime) : '已关联' }}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <!-- Contacts Module -->
             <section v-if="canViewContacts" class="wk-related-contacts group/contacts-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
@@ -1472,6 +1525,7 @@ import { useTaskStore } from '@/stores/task'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
+import { getCustomerWecomBindings } from '@/api/wecom'
 import { queryTaskList } from '@/api/task'
 import { queryScheduleList, type ScheduleVO } from '@/api/schedule'
 import type { CustomerAiParseVO } from '@/api/customer'
@@ -1483,6 +1537,7 @@ import { downloadKnowledge, queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
+import type { WecomCustomerBindingVO } from '@/types/wecom'
 import type { CustomField } from '@/types/customField'
 import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -1586,6 +1641,8 @@ const schedulePage = ref(1)
 const schedulePageSize = computed(() => CUSTOMER_DETAIL_REQUEST_LIMIT)
 const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
+const wecomBindings = ref<WecomCustomerBindingVO[]>([])
+const wecomBindingsLoading = ref(false)
 
 function parsePositivePageQuery(value: unknown): number | null {
   if (typeof value !== 'string') return null
@@ -2033,6 +2090,8 @@ async function refreshCustomerDetailModules(
     customerKnowledgeList.value = []
   }
 
+  fetchTasks.push(fetchWecomBindings(customerId))
+
   if (canViewSchedules.value) {
     fetchTasks.push(fetchCustomerSchedules(customerId, resetRelatedPages))
   } else {
@@ -2307,6 +2366,26 @@ async function fetchCustomerKnowledge(customerId: string) {
   } finally {
     customerKnowledgeLoading.value = false
   }
+}
+
+async function fetchWecomBindings(customerId: string) {
+  wecomBindingsLoading.value = true
+  try {
+    wecomBindings.value = await getCustomerWecomBindings(customerId)
+  } catch (error) {
+    console.error('Failed to fetch WeCom bindings:', error)
+    wecomBindings.value = []
+  } finally {
+    wecomBindingsLoading.value = false
+  }
+}
+
+function openWecomCustomerBindingPage() {
+  if (!customer.value) return
+  router.push({
+    path: '/wecom-customers',
+    query: { customerId: customer.value.customerId }
+  })
 }
 
 function openCustomerKnowledgeUpload() {

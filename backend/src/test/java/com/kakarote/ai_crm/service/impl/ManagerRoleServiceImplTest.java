@@ -93,6 +93,38 @@ class ManagerRoleServiceImplTest {
         assertThat(view.isHasScopeOption()).isTrue();
     }
 
+    @Test
+    void queryRolePermissionsShouldExposeWecomScopeOptionsForViewAndBindActions() {
+        ManagerRoleServiceImpl service = new ManagerRoleServiceImpl();
+        IManagerMenuService menuService = mock(IManagerMenuService.class);
+        IManagerRoleMenuService roleMenuService = mock(IManagerRoleMenuService.class);
+
+        ReflectionTestUtils.setField(service, "menuService", menuService);
+        ReflectionTestUtils.setField(service, "roleMenuService", roleMenuService);
+
+        Long roleId = 7L;
+        ManagerMenu sessionModule = menu(300L, 0L, "wecomCustomerSession", 3);
+        ManagerMenu sessionView = menu(301L, 300L, "wecomCustomerSession:view", 5);
+        ManagerMenu customerModule = menu(310L, 0L, "wecomCustomer", 3);
+        ManagerMenu customerBind = menu(311L, 310L, "wecomCustomer:bind", 5);
+        when(menuService.list()).thenReturn(List.of(sessionModule, sessionView, customerModule, customerBind));
+        when(roleMenuService.queryRoleMenuWithScopeByRoleId(roleId)).thenReturn(List.of());
+
+        List<RolePermissionVO> permissions = service.queryRolePermissions(roleId);
+
+        RolePermissionVO customerSession = permissions.stream()
+                .filter(vo -> "wecomCustomerSession".equals(vo.getModule()))
+                .findFirst()
+                .orElseThrow();
+        RolePermissionVO wecomCustomer = permissions.stream()
+                .filter(vo -> "wecomCustomer".equals(vo.getModule()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(customerSession.getActions().getFirst().isHasScopeOption()).isTrue();
+        assertThat(wecomCustomer.getActions().getFirst().isHasScopeOption()).isTrue();
+    }
+
     private ManagerMenu menu(Long menuId, Long parentId, String realm, Integer type) {
         ManagerMenu menu = new ManagerMenu();
         menu.setMenuId(menuId);

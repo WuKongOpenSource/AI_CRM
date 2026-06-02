@@ -56,6 +56,32 @@ knife4j:
 file:
   upload-path: ./uploads
 
+mail:
+  integration:
+    encryption-key: ${MAIL_CREDENTIAL_ENCRYPTION_KEY:}
+
+external-auth:
+  proxy:
+    enabled: ${EXTERNAL_AUTH_PROXY_ENABLED:false}
+    url: ${EXTERNAL_AUTH_PROXY_URL:}
+  google:
+    enabled: ${EXTERNAL_AUTH_GOOGLE_ENABLED:false}
+    client-id: ${EXTERNAL_AUTH_GOOGLE_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${EXTERNAL_AUTH_GOOGLE_REDIRECT_URI:}
+  outlook:
+    enabled: ${EXTERNAL_AUTH_OUTLOOK_ENABLED:false}
+    client-id: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_SECRET:}
+    tenant: ${EXTERNAL_AUTH_OUTLOOK_TENANT:common}
+    redirect-uri: ${EXTERNAL_AUTH_OUTLOOK_REDIRECT_URI:}
+  wecom:
+    enabled: ${EXTERNAL_AUTH_WECOM_ENABLED:false}
+    corp-id: ${EXTERNAL_AUTH_WECOM_CORP_ID:}
+    agent-id: ${EXTERNAL_AUTH_WECOM_AGENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_WECOM_SECRET:}
+    redirect-uri: ${EXTERNAL_AUTH_WECOM_REDIRECT_URI:}
+
 # MinIO 对象存储配置 (S3 兼容，同时支持 RustFS)
 minio:
   # 是否启用 MinIO（设为 false 使用本地文件存储）
