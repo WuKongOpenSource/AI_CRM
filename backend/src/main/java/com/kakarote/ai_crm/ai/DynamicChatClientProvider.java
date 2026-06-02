@@ -17,6 +17,7 @@ import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.MailTools;
 import com.kakarote.ai_crm.ai.tools.ScheduleTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
+import com.kakarote.ai_crm.ai.tools.TencentMeetingTools;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.SystemAiModelProperties;
@@ -103,6 +104,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private MailTools mailTools;
+
+    @Autowired
+    private TencentMeetingTools tencentMeetingTools;
 
     @Autowired
     private CrmNoopTools crmNoopTools;
@@ -574,7 +578,7 @@ public class DynamicChatClientProvider {
             return new Object[]{knowledgeTools};
         }
         if (ChatApplicationCodes.CRM.equals(normalizedAppCode)) {
-            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, mailTools, crmNoopTools};
+            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, mailTools, tencentMeetingTools, crmNoopTools};
         }
         return new Object[0];
     }

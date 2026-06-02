@@ -1491,6 +1491,51 @@
     />
 
     <el-dialog
+      v-model="tencentMeetingPromptVisible"
+      title="关联腾讯会议"
+      :width="isMobile ? '92%' : '560px'"
+      class="wk-dialog--flush"
+      align-center
+    >
+      <div class="px-1 pb-3">
+        <p class="mb-4 text-sm leading-6 text-slate-500">
+          检测到你提到了会议，可先把已有腾讯会议记录关联到当前客户，AI 随后就能读取会议摘要和转写。
+        </p>
+        <div v-if="tencentMeetingCandidatesLoading" class="space-y-2">
+          <div v-for="index in 3" :key="`tm-candidate-${index}`" class="h-16 animate-pulse rounded-xl bg-slate-100" />
+        </div>
+        <el-radio-group v-else v-model="selectedTencentMeetingCandidateId" class="wk-tm-candidate-list">
+          <label
+            v-for="candidate in tencentMeetingCandidates"
+            :key="candidate.id"
+            class="wk-tm-candidate"
+            :class="{ 'is-selected': selectedTencentMeetingCandidateId === candidate.id }"
+          >
+            <el-radio :value="candidate.id" />
+            <span class="min-w-0 flex-1">
+              <strong class="truncate">{{ candidate.subject || '腾讯会议' }}</strong>
+              <small class="truncate">{{ formatChatDate(candidate.startTime) || '未记录时间' }} · {{ candidate.matchReason || '候选会议' }}</small>
+              <span v-if="candidate.summary" class="line-clamp-2">{{ candidate.summary }}</span>
+            </span>
+          </label>
+        </el-radio-group>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <el-button @click="skipTencentMeetingPromptAndSend">跳过并发送</el-button>
+          <el-button
+            type="primary"
+            :loading="tencentMeetingBinding"
+            :disabled="!selectedTencentMeetingCandidateId"
+            @click="bindTencentMeetingCandidateAndSend"
+          >
+            关联并发送
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="showSelectedCustomerTagDialog"
       title="添加标签"
       width="400px"
@@ -1672,6 +1717,7 @@ import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import { getCustomerWecomConversationMessages, getCustomerWecomConversationTabs } from '@/api/wecom'
+import { bindTencentMeeting, getCustomerTencentMeetingCandidates } from '@/api/tencentMeeting'
 import CustomerDetailView from '@/views/customer/CustomerDetailView.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
@@ -1701,6 +1747,7 @@ import { appEvents, APP_EVENT } from '@/utils/events'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge, ChatModelOption } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAttachment } from '@/types/customer'
 import type { WecomConversationTabVO, WecomMessageVO } from '@/types/wecom'
+import type { TencentMeetingCandidateVO } from '@/types/tencentMeeting'
 import { wkIconNames } from '@/components/common/wkIcon'
 import type { WkIconName } from '@/components/common/wkIcon'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
@@ -1742,6 +1789,13 @@ const boundCustomerName = computed(() =>
 )
 
 const inputText = ref('')
+const tencentMeetingPromptVisible = ref(false)
+const tencentMeetingCandidatesLoading = ref(false)
+const tencentMeetingBinding = ref(false)
+const tencentMeetingCandidates = ref<TencentMeetingCandidateVO[]>([])
+const selectedTencentMeetingCandidateId = ref('')
+const pendingTencentMeetingPromptText = ref('')
+const tencentMeetingPromptBypassText = ref('')
 const chatViewRef = ref<HTMLElement | null>(null)
 const chatMainAreaRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -2826,11 +2880,89 @@ async function ensureChatAiAvailableForSend(): Promise<boolean> {
   return ensureAiAvailableForSend()
 }
 
+function shouldDetectTencentMeetingIntent(text: string) {
+  if (!text || !userStore.hasPermission('tencentMeeting:view')) return false
+  if (!isCustomerContextChat.value) return false
+  return ['开会', '会议', '腾讯会议', '会议纪要', '录音', '参会', '转写'].some(keyword => text.includes(keyword))
+}
+
+async function maybeOpenTencentMeetingPrompt(text: string): Promise<boolean> {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId || !shouldDetectTencentMeetingIntent(text)) return false
+  if (tencentMeetingPromptBypassText.value === text) return false
+
+  tencentMeetingCandidatesLoading.value = true
+  pendingTencentMeetingPromptText.value = text
+  tencentMeetingPromptVisible.value = true
+  try {
+    const candidates = await getCustomerTencentMeetingCandidates(customerId, {
+      inputText: text,
+      limit: 8
+    })
+    tencentMeetingCandidates.value = candidates
+    selectedTencentMeetingCandidateId.value = candidates[0]?.id || ''
+    if (candidates.length === 0) {
+      tencentMeetingPromptVisible.value = false
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('Load Tencent Meeting candidates failed:', error)
+    tencentMeetingPromptVisible.value = false
+    return false
+  } finally {
+    tencentMeetingCandidatesLoading.value = false
+  }
+}
+
+function skipTencentMeetingPromptAndSend() {
+  tencentMeetingPromptBypassText.value = pendingTencentMeetingPromptText.value
+  tencentMeetingPromptVisible.value = false
+  void handleSend()
+}
+
+async function bindTencentMeetingCandidateAndSend() {
+  const customerId = currentSessionCustomerId.value || selectedCustomerId.value
+  if (!customerId || !selectedTencentMeetingCandidateId.value) return
+  tencentMeetingBinding.value = true
+  try {
+    await bindTencentMeeting({
+      customerId,
+      meetingId: selectedTencentMeetingCandidateId.value
+    })
+    ElMessage.success('腾讯会议已关联')
+    appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
+      customerId,
+      source: 'chat',
+      modules: ['tencentMeetings']
+    })
+    tencentMeetingPromptBypassText.value = pendingTencentMeetingPromptText.value
+    tencentMeetingPromptVisible.value = false
+    void handleSend()
+  } finally {
+    tencentMeetingBinding.value = false
+  }
+}
+
+function formatChatDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
   const hasKnowledge = selectedKnowledgeItems.value.length > 0
   if ((!text && !hasFiles && !hasKnowledge) || chatStore.currentSessionIsStreaming || isUploading.value) return
+  if (text && await maybeOpenTencentMeetingPrompt(text)) return
   if (!(await ensureChatAiAvailableForSend())) return
 
   isPinnedToBottom.value = true
@@ -2941,7 +3073,7 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
   appEvents.emit(APP_EVENT.CUSTOMER_DETAIL_REFRESH, {
     customerId,
     source: 'chat',
-    modules: ['contacts', 'followUps', 'tasks', 'schedules']
+    modules: ['contacts', 'followUps', 'tasks', 'schedules', 'tencentMeetings']
   })
 }
 
@@ -4153,6 +4285,55 @@ void sendQuickMessage
   margin-left: auto;
   font-size: 18px;
   line-height: 1;
+}
+
+.wk-tm-candidate-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.wk-tm-candidate {
+  width: 100%;
+  min-height: 64px;
+  align-items: flex-start;
+  margin-right: 0;
+  border: 1px solid var(--wk-border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--wk-bg-surface);
+  transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.wk-tm-candidate:hover,
+.wk-tm-candidate.is-selected {
+  border-color: color-mix(in srgb, var(--wk-primary) 45%, var(--wk-border-subtle));
+  background: color-mix(in srgb, var(--wk-primary) 5%, var(--wk-bg-surface));
+}
+
+.wk-tm-candidate :deep(.el-radio__label) {
+  flex: 1;
+  min-width: 0;
+  color: var(--wk-text-primary);
+}
+
+.wk-tm-candidate strong,
+.wk-tm-candidate small {
+  display: block;
+  min-width: 0;
+}
+
+.wk-tm-candidate strong {
+  color: var(--wk-text-primary);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.wk-tm-candidate small {
+  margin-top: 3px;
+  color: var(--wk-text-muted);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 </style>

@@ -74,7 +74,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             "wecomEmployeeSession",
             "wecomCustomerSession",
             "wecomGroupSession",
-            "wecomCustomer"
+            "wecomCustomer",
+            "tencentMeeting"
     );
 
     @Autowired

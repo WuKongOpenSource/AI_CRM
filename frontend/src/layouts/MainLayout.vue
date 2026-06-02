@@ -1533,7 +1533,8 @@ const allMainNavItems: MainNavItem[] = [
 
 allMainNavItems.push(
   { key: 'scrm', icon: 'event', materialIcon: 'forum', label: '企业微信', route: '/scrm', permission: 'wecomCustomerSession:view' },
-  { key: 'wecom-customers', icon: 'customer', materialIcon: 'groups', label: '企微客户', route: '/wecom-customers', permission: 'wecomCustomer:view' }
+  { key: 'wecom-customers', icon: 'customer', materialIcon: 'groups', label: '企微客户', route: '/wecom-customers', permission: 'wecomCustomer:view' },
+  { key: 'tencent-meetings', icon: 'event', materialIcon: 'video_camera_front', label: '腾讯会议', route: '/tencent-meetings', permission: 'tencentMeeting:view' }
 )
 
 const allConfigNavItems: ConfigNavItem[] = [
@@ -1598,6 +1599,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/customer')) return '/customer'
   if (path.startsWith('/scrm')) return '/scrm'
   if (path.startsWith('/wecom-customers')) return '/wecom-customers'
+  if (path.startsWith('/tencent-meetings')) return '/tencent-meetings'
   if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path

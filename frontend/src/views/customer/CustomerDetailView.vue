@@ -816,6 +816,56 @@
               </div>
             </section>
 
+            <section v-if="canViewTencentMeetings" class="group/tencent-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
+              <div class="mb-4 flex items-center justify-between">
+                <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span :class="sectionIconBoxClass" :style="{ background: '#e0f2fe', color: '#075985' }">
+                    <span :class="sectionMaterialIconClass">video_camera_front</span>
+                  </span>
+                  会议记录
+                </h4>
+                <button
+                  type="button"
+                  class="group/module-action relative flex size-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-primary/30 hover:bg-[#efefef] hover:text-primary"
+                  aria-label="关联腾讯会议"
+                  @click="openTencentMeetingBindingPage"
+                >
+                  <span class="material-symbols-outlined wk-plus-button-icon wk-plus-button-icon--compact">add_link</span>
+                  <span
+                    class="pointer-events-none absolute right-full top-1/2 z-[200] mr-2 -translate-y-1/2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/module-action:opacity-100"
+                    role="tooltip"
+                  >
+                    关联会议
+                  </span>
+                </button>
+              </div>
+              <div v-if="tencentMeetingsLoading" class="space-y-2">
+                <div v-for="index in 2" :key="`tencent-meeting-skeleton-${index}`" class="h-14 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+              <div v-else-if="customerTencentMeetings.length === 0" class="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 py-4 text-center">
+                <span class="material-symbols-outlined text-2xl leading-none text-slate-400">videocam_off</span>
+                <p class="mt-2 text-xs font-medium text-slate-400">暂无会议记录</p>
+              </div>
+              <div v-else class="space-y-2">
+                <button
+                  v-for="meeting in customerTencentMeetings.slice(0, 5)"
+                  :key="meeting.id"
+                  type="button"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left transition-colors hover:bg-slate-50"
+                  @click="openTencentMeetingDetail(meeting.id)"
+                >
+                  <div class="flex min-w-0 items-start gap-2">
+                    <span class="material-symbols-outlined mt-0.5 text-[18px] text-sky-600">videocam</span>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-sm font-semibold text-slate-800">{{ meeting.subject || '腾讯会议' }}</p>
+                      <p class="mt-1 truncate text-xs text-slate-400">{{ formatDateTime(meeting.startTime) || '未记录时间' }} · {{ formatMeetingDuration(meeting.durationSeconds) }}</p>
+                      <p v-if="meeting.summary" class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ meeting.summary }}</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </section>
+
             <!-- Contacts Module -->
             <section v-if="canViewContacts" class="wk-related-contacts group/contacts-module bg-white shadow-sm" :class="[isEmbeddedMobileLayout ? 'mt-5 border-t border-slate-100 pt-5' : 'border border-slate-200 rounded-2xl p-4']">
               <div class="mb-4 flex items-center justify-between">
@@ -1526,6 +1576,7 @@ import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
 import { addCustomerTag, generateCustomerAiReport, removeCustomerTag, transferCustomer, updateCustomerStage } from '@/api/customer'
 import { getCustomerWecomBindings } from '@/api/wecom'
+import { getCustomerTencentMeetings } from '@/api/tencentMeeting'
 import { queryTaskList } from '@/api/task'
 import { queryScheduleList, type ScheduleVO } from '@/api/schedule'
 import type { CustomerAiParseVO } from '@/api/customer'
@@ -1538,6 +1589,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { WecomCustomerBindingVO } from '@/types/wecom'
+import type { TencentMeetingVO } from '@/types/tencentMeeting'
 import type { CustomField } from '@/types/customField'
 import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
@@ -1584,7 +1636,7 @@ const emit = defineEmits<{
   (e: 'quote-attachment', value: { followUp: FollowUp; attachment: FollowUpAttachment }): void
 }>()
 
-type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules'
+type CustomerDetailRefreshModule = 'aiAnalysis' | 'contacts' | 'followUps' | 'tasks' | 'schedules' | 'tencentMeetings'
 
 type CustomerDetailRefreshPayload = {
   customerId?: string | number
@@ -1643,6 +1695,8 @@ const scheduleLoading = ref(false)
 const customerKnowledgeList = ref<Knowledge[]>([])
 const wecomBindings = ref<WecomCustomerBindingVO[]>([])
 const wecomBindingsLoading = ref(false)
+const customerTencentMeetings = ref<TencentMeetingVO[]>([])
+const tencentMeetingsLoading = ref(false)
 
 function parsePositivePageQuery(value: unknown): number | null {
   if (typeof value !== 'string') return null
@@ -2023,7 +2077,9 @@ const canEditSchedules = computed(() => userStore.hasPermission('schedule:edit')
 const canDeleteSchedules = computed(() => userStore.hasPermission('schedule:delete'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
 const canUploadKnowledge = computed(() => userStore.hasPermission('knowledge:upload'))
+const canViewTencentMeetings = computed(() => userStore.hasPermission('tencentMeeting:view'))
 const visibleRelatedModuleCount = computed(() => [
+  canViewTencentMeetings.value,
   canViewContacts.value,
   canViewTasks.value,
   canViewSchedules.value,
@@ -2091,6 +2147,12 @@ async function refreshCustomerDetailModules(
   }
 
   fetchTasks.push(fetchWecomBindings(customerId))
+
+  if (canViewTencentMeetings.value) {
+    fetchTasks.push(fetchCustomerTencentMeetings(customerId))
+  } else {
+    customerTencentMeetings.value = []
+  }
 
   if (canViewSchedules.value) {
     fetchTasks.push(fetchCustomerSchedules(customerId, resetRelatedPages))
@@ -2170,6 +2232,10 @@ async function refreshCustomerScopedModules(
 
   if (uniqueModules.has('schedules')) {
     requests.push(fetchCustomerSchedules(customerId, true))
+  }
+
+  if (uniqueModules.has('tencentMeetings')) {
+    requests.push(fetchCustomerTencentMeetings(customerId))
   }
 
   await Promise.all(requests)
@@ -2380,12 +2446,55 @@ async function fetchWecomBindings(customerId: string) {
   }
 }
 
+async function fetchCustomerTencentMeetings(customerId: string) {
+  if (!canViewTencentMeetings.value) {
+    customerTencentMeetings.value = []
+    return
+  }
+  tencentMeetingsLoading.value = true
+  try {
+    customerTencentMeetings.value = await getCustomerTencentMeetings(customerId)
+  } catch (error) {
+    console.error('Failed to fetch Tencent meetings:', error)
+    customerTencentMeetings.value = []
+  } finally {
+    tencentMeetingsLoading.value = false
+  }
+}
+
 function openWecomCustomerBindingPage() {
   if (!customer.value) return
   router.push({
     path: '/wecom-customers',
     query: { customerId: customer.value.customerId }
   })
+}
+
+function openTencentMeetingBindingPage() {
+  if (!customer.value) return
+  router.push({
+    path: '/tencent-meetings',
+    query: { customerId: customer.value.customerId }
+  })
+}
+
+function openTencentMeetingDetail(meetingId: string | number) {
+  router.push({
+    path: '/tencent-meetings',
+    query: {
+      customerId: customer.value?.customerId || '',
+      meetingId: String(meetingId)
+    }
+  })
+}
+
+function formatMeetingDuration(seconds?: number) {
+  if (!seconds) return '未记录时长'
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours > 0) return `${hours}小时${rest}分`
+  return `${Math.max(minutes, 1)}分钟`
 }
 
 function openCustomerKnowledgeUpload() {

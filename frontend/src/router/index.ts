@@ -80,6 +80,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '企微客户', icon: 'groups', permission: 'wecomCustomer:view' }
       },
       {
+        path: 'tencent-meetings',
+        name: 'TencentMeetings',
+        component: () => import('@/views/tencentMeeting/TencentMeetingView.vue'),
+        meta: { title: '腾讯会议', icon: 'video_camera_front', permission: 'tencentMeeting:view' }
+      },
+      {
         path: 'knowledge',
         name: 'Knowledge',
         component: () => import('@/views/knowledge/KnowledgeView.vue'),
