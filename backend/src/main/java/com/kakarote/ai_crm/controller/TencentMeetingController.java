@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingBindBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCandidateQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingConfigSaveBO;
+import com.kakarote.ai_crm.entity.BO.TencentMeetingCreateBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingUnbindBO;
@@ -92,6 +93,13 @@ public class TencentMeetingController {
     @RequirePermission("tencentMeeting:view")
     public Result<BasePage<TencentMeetingVO>> queryPageList(@RequestBody(required = false) TencentMeetingQueryBO queryBO) {
         return Result.ok(meetingService.queryPageList(queryBO));
+    }
+
+    @PostMapping("/create")
+    @Operation(summary = "创建腾讯会议")
+    @RequirePermission("tencentMeeting:sync")
+    public Result<TencentMeetingVO> create(@RequestBody TencentMeetingCreateBO createBO) {
+        return Result.ok(meetingService.createMeeting(createBO));
     }
 
     @GetMapping("/{id}")

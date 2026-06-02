@@ -2,6 +2,8 @@ package com.kakarote.ai_crm.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.kakarote.ai_crm.common.BasePage;
@@ -11,6 +13,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingBindBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingCandidateQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingConfigSaveBO;
+import com.kakarote.ai_crm.entity.BO.TencentMeetingCreateBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingQueryBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingUnbindBO;
@@ -22,6 +25,7 @@ import com.kakarote.ai_crm.entity.PO.TencentMeetingParticipant;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingRecording;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingSyncLog;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCandidateVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingConfigVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingCustomerBindingVO;
@@ -39,8 +43,10 @@ import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingSyncLogMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingTranscriptSegmentMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingUserMappingMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
+import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,6 +78,9 @@ public class TencentMeetingServiceImpl {
 
     @Autowired
     private TencentMeetingSyncLogMapper syncLogMapper;
+
+    @Autowired
+    private TencentMeetingUserMappingMapper userMappingMapper;
 
     @Autowired
     private CustomerMapper customerMapper;
@@ -253,6 +262,45 @@ public class TencentMeetingServiceImpl {
         syncService.refreshMeetingByExternalId("manual.refresh", meeting.getMeetingId());
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public TencentMeetingVO createMeeting(TencentMeetingCreateBO createBO) {
+        TencentMeetingCreateBO actual = createBO == null ? new TencentMeetingCreateBO() : createBO;
+        if (StrUtil.isBlank(actual.getSubject())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Meeting subject is required");
+        }
+        if (actual.getStartTime() == null || actual.getEndTime() == null || !actual.getEndTime().after(actual.getStartTime())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Meeting start and end time are required");
+        }
+
+        TencentMeetingCorpConfig config = requireConfig();
+        TencentMeetingUserMapping mapping = resolveCreatorMapping(config, actual.getCreatorUserId());
+        JSONObject requestBody = buildCreateMeetingBody(config, mapping, actual);
+        JSONObject rawMeeting = syncService.createMeeting(config, requestBody);
+
+        TencentMeeting meeting = new TencentMeeting();
+        meeting.setAppId(config.getAppId());
+        meeting.setMeetingId(firstText(rawMeeting, "meeting_id", "meetingId", "meeting_uuid"));
+        meeting.setMeetingCode(firstText(rawMeeting, "meeting_code", "meetingCode"));
+        meeting.setSubject(StrUtil.blankToDefault(firstText(rawMeeting, "subject", "meeting_subject", "title"), actual.getSubject()));
+        meeting.setStatus("not_started");
+        meeting.setCreatorUserId(mapping.getMeetingUserId());
+        meeting.setCreatorName(StrUtil.blankToDefault(mapping.getUserName(), mapping.getMeetingUserId()));
+        meeting.setCrmCreatorUserId(mapping.getCrmUserId());
+        meeting.setStartTime(actual.getStartTime());
+        meeting.setEndTime(actual.getEndTime());
+        meeting.setDurationSeconds(Math.max(0L, (actual.getEndTime().getTime() - actual.getStartTime().getTime()) / 1000L));
+        meeting.setParticipantCount(actual.getInviteeUserIds() == null ? 0 : actual.getInviteeUserIds().size());
+        meeting.setParticipantNames(actual.getInviteeUserIds() == null ? null : String.join(",", actual.getInviteeUserIds()));
+        meeting.setBindStatus("UNBOUND");
+        meeting.setRawJson(rawMeeting.toJSONString());
+        meeting.setSyncedAt(new Date());
+        if (StrUtil.isBlank(meeting.getMeetingId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent Meeting create response has no meeting_id");
+        }
+        meetingMapper.insert(meeting);
+        return toMeetingVO(meeting);
+    }
+
     public List<TencentMeetingCustomerBindingVO> getCustomerBindings(Long customerId) {
         if (customerId == null) {
             return List.of();
@@ -322,6 +370,69 @@ public class TencentMeetingServiceImpl {
         return config;
     }
 
+    private TencentMeetingUserMapping resolveCreatorMapping(TencentMeetingCorpConfig config, String requestedCreatorUserId) {
+        String meetingUserId = StrUtil.blankToDefault(requestedCreatorUserId, config.getOperatorUserId());
+        TencentMeetingUserMapping mapping = null;
+        if (StrUtil.isNotBlank(meetingUserId)) {
+            mapping = userMappingMapper.selectOne(Wrappers.<TencentMeetingUserMapping>lambdaQuery()
+                    .eq(TencentMeetingUserMapping::getAppId, config.getAppId())
+                    .eq(TencentMeetingUserMapping::getMeetingUserId, meetingUserId)
+                    .eq(TencentMeetingUserMapping::getStatus, 1)
+                    .last("LIMIT 1"));
+        }
+        if (mapping == null) {
+            mapping = new TencentMeetingUserMapping();
+            mapping.setAppId(config.getAppId());
+            mapping.setMeetingUserId(meetingUserId);
+            mapping.setUserName(meetingUserId);
+            mapping.setCrmUserId(UserUtil.getUserIdOrNull());
+            mapping.setStatus(1);
+        }
+        if (StrUtil.isBlank(mapping.getMeetingUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent Meeting operator user is not configured");
+        }
+        if (mapping.getCrmUserId() == null) {
+            mapping.setCrmUserId(UserUtil.getUserIdOrNull());
+        }
+        return mapping;
+    }
+
+    private JSONObject buildCreateMeetingBody(TencentMeetingCorpConfig config, TencentMeetingUserMapping mapping, TencentMeetingCreateBO createBO) {
+        JSONObject body = new JSONObject();
+        body.put("userid", mapping.getMeetingUserId());
+        body.put("instanceid", 1);
+        body.put("subject", createBO.getSubject().trim());
+        body.put("type", 0);
+        body.put("start_time", String.valueOf(createBO.getStartTime().getTime() / 1000L));
+        body.put("end_time", String.valueOf(createBO.getEndTime().getTime() / 1000L));
+        if (StrUtil.isNotBlank(createBO.getPassword())) {
+            body.put("password", createBO.getPassword().trim());
+        }
+        JSONArray hosts = new JSONArray();
+        JSONObject host = new JSONObject();
+        host.put("userid", mapping.getMeetingUserId());
+        hosts.add(host);
+        body.put("hosts", hosts);
+        JSONArray invitees = new JSONArray();
+        if (createBO.getInviteeUserIds() != null) {
+            for (String inviteeUserId : createBO.getInviteeUserIds()) {
+                if (StrUtil.isBlank(inviteeUserId)) {
+                    continue;
+                }
+                JSONObject invitee = new JSONObject();
+                invitee.put("userid", inviteeUserId.trim());
+                invitees.add(invitee);
+            }
+        }
+        if (!invitees.isEmpty()) {
+            body.put("invitees", invitees);
+        }
+        if (StrUtil.isNotBlank(config.getSdkId())) {
+            body.put("sdk_id", config.getSdkId());
+        }
+        return body;
+    }
+
     private TencentMeetingConfigVO toConfigVO(TencentMeetingCorpConfig config) {
         TencentMeetingConfigVO vo = new TencentMeetingConfigVO();
         if (config == null) {
@@ -332,10 +443,37 @@ public class TencentMeetingServiceImpl {
         return vo;
     }
 
+    private String firstText(JSONObject raw, String... keys) {
+        if (raw == null) {
+            return null;
+        }
+        for (String key : keys) {
+            String value = raw.getString(key);
+            if (StrUtil.isNotBlank(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     private TencentMeetingVO toMeetingVO(TencentMeeting meeting) {
         TencentMeetingVO vo = new TencentMeetingVO();
         BeanUtil.copyProperties(meeting, vo);
+        JSONObject raw = parseRawJson(meeting.getRawJson());
+        vo.setJoinUrl(firstText(raw, "join_url", "joinUrl", "meeting_url", "meetingUrl", "participant_join_url"));
+        vo.setHostJoinUrl(firstText(raw, "host_join_url", "hostJoinUrl", "host_join_url_wx", "hostMeetingUrl"));
         return vo;
+    }
+
+    private JSONObject parseRawJson(String rawJson) {
+        if (StrUtil.isBlank(rawJson)) {
+            return null;
+        }
+        try {
+            return JSONObject.parseObject(rawJson);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private TencentMeetingTranscriptSegmentVO toTranscriptSegmentVO(TencentMeetingTranscriptSegment segment) {

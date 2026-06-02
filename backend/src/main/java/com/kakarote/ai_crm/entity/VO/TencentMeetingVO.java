@@ -13,6 +13,10 @@ public class TencentMeetingVO {
 
     private String meetingCode;
 
+    private String joinUrl;
+
+    private String hostJoinUrl;
+
     private String subject;
 
     private String status;

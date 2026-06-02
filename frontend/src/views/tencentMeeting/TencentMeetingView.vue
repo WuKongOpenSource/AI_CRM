@@ -1,11 +1,21 @@
 <template>
   <div class="tm-view">
     <header class="tm-view__header">
-      <div class="min-w-0">
-        <h2>腾讯会议</h2>
-        <p>{{ total }} 场会议 · {{ syncStatusLabel }}</p>
+      <div class="tm-view__title min-w-0">
+        <div class="tm-view__title-row">
+          <span class="tm-view__title-icon material-symbols-outlined">video_camera_front</span>
+          <h2>腾讯会议</h2>
+          <span class="tm-view__sync-chip" :class="{ 'is-success': syncStatus === 'success', 'is-failed': syncStatus === 'failed' }">
+            {{ syncStatusLabel }}
+          </span>
+        </div>
+        <p>{{ total }} 场会议 · {{ activeFilterSummary }}</p>
       </div>
       <div class="tm-view__actions">
+        <el-button type="primary" @click="openCreateDialog">
+          <span class="material-symbols-outlined mr-1 text-[18px]">add</span>
+          创建会议
+        </el-button>
         <el-button :loading="syncing" @click="handleSync">
           <span class="material-symbols-outlined mr-1 text-[18px]">sync</span>
           同步
@@ -30,12 +40,12 @@
           <span class="material-symbols-outlined text-[18px] text-slate-400">search</span>
         </template>
       </el-input>
-      <el-select v-model="status" clearable placeholder="会议状态" @change="loadMeetings">
+      <el-select v-model="status" clearable class="tm-filter-select" placeholder="会议状态" @change="loadMeetings">
         <el-option label="未开始" value="not_started" />
         <el-option label="已结束" value="ended" />
         <el-option label="已取消" value="cancelled" />
       </el-select>
-      <el-select v-model="bindStatus" clearable placeholder="关联状态" @change="loadMeetings">
+      <el-select v-model="bindStatus" clearable class="tm-filter-select" placeholder="关联状态" @change="loadMeetings">
         <el-option label="已关联客户" value="BOUND" />
         <el-option label="未关联客户" value="UNBOUND" />
       </el-select>
@@ -58,6 +68,13 @@
         row-key="id"
         @row-click="openDetail"
       >
+        <template #empty>
+          <div class="tm-empty">
+            <span class="material-symbols-outlined">event_busy</span>
+            <strong>暂无会议</strong>
+            <p>同步腾讯会议后，会议会显示在这里。</p>
+          </div>
+        </template>
         <el-table-column label="会议" min-width="280">
           <template #default="{ row }">
             <div class="tm-view__meeting">
@@ -83,20 +100,41 @@
         </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" effect="plain">{{ statusLabel(row.status) }}</el-tag>
+            <span class="tm-status" :class="`is-${statusClass(row.status)}`">{{ statusLabel(row.status) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="关联客户" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
-            <span v-if="row.customerName" class="font-medium text-slate-800">{{ row.customerName }}</span>
-            <span v-else class="text-slate-400">未关联</span>
+            <span v-if="row.customerName" class="tm-customer is-bound">{{ row.customerName }}</span>
+            <span v-else class="tm-customer">未关联</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right" align="right">
+        <el-table-column label="操作" width="292" fixed="right" align="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click.stop="openDetail(row)">详情</el-button>
-            <el-button v-if="row.bindStatus !== 'BOUND'" link type="primary" @click.stop="openBindDialog(row)">关联</el-button>
-            <el-button v-else link type="danger" @click.stop="handleUnbind(row)">解绑</el-button>
+            <div class="tm-row-actions">
+              <button
+                v-if="canCopyMeetingLink(row)"
+                type="button"
+                class="tm-row-action is-copy"
+                title="复制会议链接"
+                @click.stop="copyRowMeetingLink(row)"
+              >
+                <span class="material-symbols-outlined">content_copy</span>
+                复制链接
+              </button>
+              <button type="button" class="tm-row-action" @click.stop="openDetail(row)">
+                <span class="material-symbols-outlined">open_in_new</span>
+                详情
+              </button>
+              <button v-if="row.bindStatus !== 'BOUND'" type="button" class="tm-row-action is-primary" @click.stop="openBindDialog(row)">
+                <span class="material-symbols-outlined">link</span>
+                关联
+              </button>
+              <button v-else type="button" class="tm-row-action is-danger" @click.stop="handleUnbind(row)">
+                <span class="material-symbols-outlined">link_off</span>
+                解绑
+              </button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -175,6 +213,45 @@
       </div>
     </el-drawer>
 
+    <el-dialog v-model="createDialogVisible" title="创建腾讯会议" width="560px" class="tm-create-dialog">
+      <el-form label-width="92px">
+        <el-form-item label="会议主题" required>
+          <el-input v-model="createForm.subject" maxlength="80" placeholder="请输入会议主题" />
+        </el-form-item>
+        <el-form-item label="会议时间" required>
+          <el-date-picker
+            v-model="createMeetingRange"
+            type="datetimerange"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            class="w-full"
+          />
+        </el-form-item>
+        <el-form-item label="主持人">
+          <el-input v-model="createForm.creatorUserId" clearable placeholder="默认使用腾讯会议配置中的用户ID" />
+        </el-form-item>
+        <el-form-item label="会议密码">
+          <el-input v-model="createForm.password" clearable maxlength="6" placeholder="可选，最多6位" />
+        </el-form-item>
+        <el-form-item label="邀请人">
+          <el-input
+            v-model="createForm.inviteeUserIdsText"
+            type="textarea"
+            :rows="3"
+            placeholder="可选，多个腾讯会议 userid 用逗号或换行分隔"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="tm-bind-dialog__footer">
+          <el-button @click="createDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="creating" @click="handleCreateMeeting">创建</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="bindDialogVisible" title="关联系统客户" width="760px" class="tm-bind-dialog">
       <div class="tm-bind-dialog__toolbar">
         <el-input
@@ -211,6 +288,44 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="createdMeetingVisible" title="会议创建成功" width="620px" class="tm-created-dialog">
+      <div v-if="createdMeeting" class="tm-created">
+        <div class="tm-created__hero">
+          <span class="material-symbols-outlined">video_camera_front</span>
+          <div class="min-w-0">
+            <strong class="truncate">{{ createdMeeting.subject || '腾讯会议' }}</strong>
+            <p>{{ formatMeetingTimeRange(createdMeeting) }}</p>
+          </div>
+        </div>
+        <dl class="tm-created__meta">
+          <div>
+            <dt>会议号</dt>
+            <dd>{{ createdMeeting.meetingCode || createdMeeting.meetingId || '-' }}</dd>
+          </div>
+          <div>
+            <dt>主持人</dt>
+            <dd>{{ createdMeeting.creatorName || createdMeeting.creatorUserId || '-' }}</dd>
+          </div>
+          <div>
+            <dt>时长</dt>
+            <dd>{{ formatDuration(createdMeeting.durationSeconds) }}</dd>
+          </div>
+        </dl>
+        <div class="tm-created__link">
+          <span class="material-symbols-outlined">link</span>
+          <a v-if="meetingJoinUrl" :href="meetingJoinUrl" target="_blank" rel="noreferrer">{{ meetingJoinUrl }}</a>
+          <span v-else>腾讯会议未返回入会链接，可使用会议号入会</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="tm-bind-dialog__footer">
+          <el-button :disabled="!meetingJoinUrl" @click="copyMeetingLink">复制链接</el-button>
+          <el-button @click="copyMeetingInfo">复制会议信息</el-button>
+          <el-button type="primary" @click="createdMeetingVisible = false">完成</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -221,6 +336,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { queryCustomerList } from '@/api/customer'
 import {
   bindTencentMeeting,
+  createTencentMeeting,
   getTencentMeetingDetail,
   getTencentMeetingSyncStatus,
   queryTencentMeetings,
@@ -228,7 +344,7 @@ import {
   unbindTencentMeeting
 } from '@/api/tencentMeeting'
 import type { CustomerListVO } from '@/types/customer'
-import type { TencentMeetingDetailVO, TencentMeetingVO } from '@/types/tencentMeeting'
+import type { TencentMeetingCreatePayload, TencentMeetingDetailVO, TencentMeetingVO } from '@/types/tencentMeeting'
 
 const route = useRoute()
 const keyword = ref('')
@@ -243,6 +359,18 @@ const syncing = ref(false)
 const meetings = ref<TencentMeetingVO[]>([])
 const syncStatus = ref('')
 const syncError = ref('')
+
+const createDialogVisible = ref(false)
+const createdMeetingVisible = ref(false)
+const creating = ref(false)
+const createdMeeting = ref<TencentMeetingVO | null>(null)
+const createMeetingRange = ref<[string, string] | null>(null)
+const createForm = ref({
+  subject: '',
+  creatorUserId: '',
+  password: '',
+  inviteeUserIdsText: ''
+})
 
 const detailVisible = ref(false)
 const detailLoading = ref(false)
@@ -261,11 +389,22 @@ const preferredCustomerId = computed(() => {
   return typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] || '' : ''
 })
 
+const meetingJoinUrl = computed(() => createdMeeting.value?.joinUrl || createdMeeting.value?.hostJoinUrl || '')
+
 const syncStatusLabel = computed(() => {
   if (!syncStatus.value) return '尚未同步'
   if (syncStatus.value === 'success') return '最近同步成功'
   if (syncStatus.value === 'failed') return `同步失败${syncError.value ? `：${syncError.value}` : ''}`
   return syncStatus.value
+})
+
+const activeFilterSummary = computed(() => {
+  const filters: string[] = []
+  if (keyword.value.trim()) filters.push('关键词')
+  if (status.value) filters.push(statusLabel(status.value))
+  if (bindStatus.value) filters.push(bindStatus.value === 'BOUND' ? '已关联' : '未关联')
+  if (dateRange.value?.length) filters.push('时间范围')
+  return filters.length ? `已筛选 ${filters.join(' / ')}` : '全部会议'
 })
 
 onMounted(() => {
@@ -313,6 +452,84 @@ async function handleSync() {
     await loadMeetings()
   } finally {
     syncing.value = false
+  }
+}
+
+function openCreateDialog() {
+  const now = new Date()
+  const start = new Date(now.getTime() + 30 * 60 * 1000)
+  start.setSeconds(0, 0)
+  const end = new Date(start.getTime() + 60 * 60 * 1000)
+  createForm.value = {
+    subject: '',
+    creatorUserId: '',
+    password: '',
+    inviteeUserIdsText: ''
+  }
+  createMeetingRange.value = [formatDateTimeInput(start), formatDateTimeInput(end)]
+  createDialogVisible.value = true
+}
+
+async function handleCreateMeeting() {
+  const subject = createForm.value.subject.trim()
+  if (!subject) {
+    ElMessage.warning('请输入会议主题')
+    return
+  }
+  if (!createMeetingRange.value?.[0] || !createMeetingRange.value?.[1]) {
+    ElMessage.warning('请选择会议时间')
+    return
+  }
+  const payload: TencentMeetingCreatePayload = {
+    subject,
+    startTime: createMeetingRange.value[0],
+    endTime: createMeetingRange.value[1],
+    creatorUserId: createForm.value.creatorUserId.trim() || undefined,
+    password: createForm.value.password.trim() || undefined,
+    inviteeUserIds: splitInviteeUserIds(createForm.value.inviteeUserIdsText)
+  }
+  creating.value = true
+  try {
+    createdMeeting.value = await createTencentMeeting(payload)
+    ElMessage.success('腾讯会议创建成功')
+    createDialogVisible.value = false
+    createdMeetingVisible.value = true
+    await loadMeetings()
+  } finally {
+    creating.value = false
+  }
+}
+
+async function copyMeetingLink() {
+  if (!meetingJoinUrl.value) return
+  await copyText(meetingJoinUrl.value, '会议链接已复制')
+}
+
+async function copyRowMeetingLink(meeting: TencentMeetingVO) {
+  const link = getMeetingJoinUrl(meeting)
+  if (!link) return
+  await copyText(link, '会议链接已复制')
+}
+
+async function copyMeetingInfo() {
+  if (!createdMeeting.value) return
+  const meeting = createdMeeting.value
+  const lines = [
+    `腾讯会议：${meeting.subject || '-'}`,
+    `会议号：${meeting.meetingCode || meeting.meetingId || '-'}`,
+    `时间：${formatMeetingTimeRange(meeting)}`,
+    meetingJoinUrl.value ? `链接：${meetingJoinUrl.value}` : ''
+  ].filter(Boolean)
+  await copyText(lines.join('\n'), '会议信息已复制')
+}
+
+async function copyText(text: string, successMessage: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(successMessage)
+  } catch (err) {
+    console.error('Copy Tencent Meeting text failed:', err)
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 
@@ -381,10 +598,38 @@ function statusLabel(value?: string) {
   return value || '-'
 }
 
-function statusTagType(value?: string) {
-  if (value === 'ended') return 'success'
-  if (value === 'cancelled') return 'danger'
-  return 'info'
+function statusClass(value?: string) {
+  if (value === 'ended') return 'ended'
+  if (value === 'cancelled') return 'cancelled'
+  if (value === 'not_started') return 'scheduled'
+  return 'default'
+}
+
+function canCopyMeetingLink(meeting: TencentMeetingVO) {
+  return meeting.status === 'not_started' && Boolean(getMeetingJoinUrl(meeting))
+}
+
+function getMeetingJoinUrl(meeting: TencentMeetingVO) {
+  return meeting.joinUrl || meeting.hostJoinUrl || ''
+}
+
+function splitInviteeUserIds(value: string) {
+  return value
+    .split(/[\n,，]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function formatDateTimeInput(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`
+}
+
+function formatMeetingTimeRange(meeting: TencentMeetingVO) {
+  const start = formatDate(meeting.startTime)
+  const end = formatDate(meeting.endTime)
+  if (start && end) return `${start} - ${end}`
+  return start || end || '-'
 }
 
 function formatDate(value?: string) {
@@ -416,8 +661,8 @@ function formatDuration(seconds?: number) {
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  background: #f8fafc;
-  padding: 20px 24px;
+  background: #f6f8fb;
+  padding: 18px 24px;
 }
 
 .tm-view__header,
@@ -431,44 +676,178 @@ function formatDuration(seconds?: number) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.tm-view__title {
+  display: grid;
+  gap: 5px;
+}
+
+.tm-view__title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.tm-view__title-icon {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #e8f0ff;
+  color: #2854c5;
+  font-size: 20px;
 }
 
 .tm-view__header h2 {
   margin: 0;
-  color: #0f172a;
-  font-size: 22px;
-  font-weight: 800;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: 0;
 }
 
 .tm-view__header p {
-  margin: 4px 0 0;
-  color: #64748b;
+  margin: 0 0 0 44px;
+  color: #6b7280;
   font-size: 13px;
 }
 
-.tm-view__actions,
-.tm-view__filters {
+.tm-view__sync-chip {
+  max-width: min(48vw, 520px);
+  overflow: hidden;
+  border: 1px solid #d7dde8;
+  border-radius: 999px;
+  background: #fff;
+  padding: 4px 9px;
+  color: #5b6472;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-view__sync-chip.is-success {
+  border-color: #b7dfbd;
+  background: #f1fbf3;
+  color: #1f7a36;
+}
+
+.tm-view__sync-chip.is-failed {
+  border-color: #f1b8b8;
+  background: #fff5f5;
+  color: #bd2c2c;
+}
+
+.tm-view__actions {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
+.tm-view__actions :deep(.el-button) {
+  height: 36px;
+  border-radius: 8px;
+  padding: 0 13px;
+  font-weight: 650;
+}
+
+.tm-view__actions :deep(.el-button--primary) {
+  border-color: #1f2937;
+  background: #111827;
+  color: #fff;
+}
+
 .tm-view__filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) 150px 160px minmax(300px, 420px);
+  align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
 .tm-view__search {
-  width: min(420px, 100%);
+  width: 100%;
+}
+
+.tm-filter-select {
+  width: 100%;
+}
+
+.tm-view__filters :deep(.el-input__wrapper),
+.tm-view__filters :deep(.el-select__wrapper) {
+  min-height: 36px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #d9e1ec inset;
+}
+
+.tm-view__filters :deep(.el-input__wrapper:hover),
+.tm-view__filters :deep(.el-select__wrapper:hover) {
+  box-shadow: 0 0 0 1px #9fb4d8 inset;
+}
+
+.tm-view__filters :deep(.el-date-editor) {
+  width: 100%;
 }
 
 .tm-view__body {
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
   background: #fff;
+  box-shadow: 0 8px 24px rgba(29, 39, 57, 0.06);
+}
+
+.tm-view__body :deep(.el-table) {
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-header-text-color: #4b5563;
+  --el-table-row-hover-bg-color: #f5f8ff;
+  color: #334155;
+}
+
+.tm-view__body :deep(.el-table__cell) {
+  padding: 12px 0;
+}
+
+.tm-view__body :deep(.el-table__header th) {
+  height: 46px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.tm-view__body :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.tm-empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 54px 12px;
+  color: #94a3b8;
+}
+
+.tm-empty .material-symbols-outlined {
+  font-size: 34px;
+}
+
+.tm-empty strong {
+  color: #475569;
+  font-size: 14px;
+}
+
+.tm-empty p {
+  margin: 0;
+  font-size: 13px;
 }
 
 .tm-view__meeting {
@@ -480,13 +859,14 @@ function formatDuration(seconds?: number) {
 
 .tm-view__meeting strong {
   display: block;
-  color: #0f172a;
+  color: #111827;
   font-size: 14px;
+  font-weight: 750;
 }
 
 .tm-view__meeting p {
   margin: 3px 0 0;
-  color: #94a3b8;
+  color: #8b98aa;
   font-size: 12px;
 }
 
@@ -498,9 +878,116 @@ function formatDuration(seconds?: number) {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: #eef6ff;
-  color: #2563eb;
+  background: #eef4ff;
+  color: #2854c5;
   font-size: 20px;
+}
+
+.tm-status,
+.tm-customer {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tm-status.is-scheduled {
+  border: 1px solid #c8d4e6;
+  background: #f6f8fb;
+  color: #526073;
+}
+
+.tm-status.is-ended {
+  border: 1px solid #b7dfbd;
+  background: #f1fbf3;
+  color: #1f7a36;
+}
+
+.tm-status.is-cancelled {
+  border: 1px solid #f1b8b8;
+  background: #fff5f5;
+  color: #bd2c2c;
+}
+
+.tm-status.is-default {
+  border: 1px solid #d7dde8;
+  background: #fff;
+  color: #5b6472;
+}
+
+.tm-customer {
+  border: 1px solid #d7dde8;
+  background: #fff;
+  color: #8b98aa;
+}
+
+.tm-customer.is-bound {
+  border-color: #c7d2fe;
+  background: #f1f4ff;
+  color: #2d4eb1;
+}
+
+.tm-row-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tm-row-action {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 8px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.tm-row-action .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.tm-row-action:hover {
+  border-color: #9fb4d8;
+  background: #f5f8ff;
+  color: #2854c5;
+}
+
+.tm-row-action.is-primary {
+  border-color: #c7d2fe;
+  color: #2854c5;
+}
+
+.tm-row-action.is-copy {
+  border-color: #b7dfbd;
+  color: #1f7a36;
+}
+
+.tm-row-action.is-copy:hover {
+  border-color: #8ccd96;
+  background: #f1fbf3;
+  color: #16672c;
+}
+
+.tm-row-action.is-danger {
+  border-color: #ffd4d4;
+  color: #d64545;
+}
+
+.tm-row-action.is-danger:hover {
+  border-color: #f3a6a6;
+  background: #fff5f5;
+  color: #bd2c2c;
 }
 
 .tm-view__pager {
@@ -641,6 +1128,98 @@ function formatDuration(seconds?: number) {
   gap: 8px;
 }
 
+.tm-created {
+  display: grid;
+  gap: 14px;
+}
+
+.tm-created__hero {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 14px;
+}
+
+.tm-created__hero > .material-symbols-outlined {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 22px;
+}
+
+.tm-created__hero strong {
+  display: block;
+  color: #0f172a;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.tm-created__hero p {
+  margin: 3px 0 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.tm-created__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.tm-created__meta div,
+.tm-created__link {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.tm-created__meta dt {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.tm-created__meta dd {
+  margin: 4px 0 0;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tm-created__link {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.tm-created__link .material-symbols-outlined {
+  color: #2563eb;
+  font-size: 18px;
+}
+
+.tm-created__link a {
+  min-width: 0;
+  overflow: hidden;
+  color: #2563eb;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .tm-view {
     padding: 14px;
@@ -651,10 +1230,42 @@ function formatDuration(seconds?: number) {
     flex-direction: column;
   }
 
+  .tm-view__header p {
+    margin-left: 0;
+  }
+
+  .tm-view__title-row {
+    flex-wrap: wrap;
+  }
+
   .tm-view__search,
   .tm-view__filters :deep(.el-select),
   .tm-view__filters :deep(.el-date-editor) {
     width: 100%;
+  }
+
+  .tm-created__meta {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1180px) {
+  .tm-view__filters {
+    grid-template-columns: minmax(260px, 1fr) minmax(150px, 180px);
+  }
+
+  .tm-view__filters :deep(.el-date-editor) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .tm-view__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .tm-view__filters :deep(.el-date-editor) {
+    grid-column: auto;
   }
 }
 </style>

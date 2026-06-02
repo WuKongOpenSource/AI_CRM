@@ -3,6 +3,8 @@ package com.kakarote.ai_crm.service.impl;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
@@ -56,7 +58,7 @@ class TencentMeetingSyncServiceTest {
         when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
         when(apiGateway.listEndedMeetings(config, mapping, 30)).thenReturn(List.of(meetingJson()));
         when(apiGateway.getMeetingParticipants(config, "meeting-1", "host-1")).thenReturn(List.of(participantJson()));
-        when(apiGateway.listRecordings(config, "host-1")).thenReturn(List.of(recordingJson()));
+        when(apiGateway.listRecordings(config, "host-1", 30)).thenReturn(List.of(recordingJson()));
         when(apiGateway.getTranscriptSegments(config, "meeting-1", "record-1", "host-1")).thenReturn(List.of(segmentJson()));
         when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doAnswer(invocation -> {
@@ -92,6 +94,49 @@ class TencentMeetingSyncServiceTest {
         ArgumentCaptor<TencentMeetingSyncLog> logCaptor = ArgumentCaptor.forClass(TencentMeetingSyncLog.class);
         verify(syncLogMapper).updateById(logCaptor.capture());
         assertThat(logCaptor.getValue().getStatus()).isEqualTo("success");
+    }
+
+    @Test
+    void runSyncShouldKeepMeetingWhenParticipantDetailHasNoPermission() {
+        TencentMeetingSyncServiceImpl service = newService();
+        TencentMeetingApiGateway apiGateway = mapper(service, "apiGateway");
+        TencentMeetingUserMappingMapper userMappingMapper = mapper(service, "userMappingMapper");
+        TencentMeetingMapper meetingMapper = mapper(service, "meetingMapper");
+        TencentMeetingSyncLogMapper syncLogMapper = mapper(service, "syncLogMapper");
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setId(1L);
+        config.setAppId("app-1");
+
+        TencentMeetingUserMapping mapping = new TencentMeetingUserMapping();
+        mapping.setMeetingUserId("host-1");
+        mapping.setCrmUserId(9L);
+        when(userMappingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(mapping));
+        when(apiGateway.listEndedMeetings(config, mapping, 30)).thenReturn(List.of(meetingJson()));
+        when(apiGateway.getMeetingParticipants(config, "meeting-1", "host-1"))
+                .thenThrow(new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Tencent Meeting API participants failed: 9042 无权限操作"));
+        when(meetingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            TencentMeeting meeting = invocation.getArgument(0);
+            meeting.setId(300L);
+            return 1;
+        }).when(meetingMapper).insert(any(TencentMeeting.class));
+
+        TencentMeetingSyncRunBO runBO = new TencentMeetingSyncRunBO();
+        runBO.setSyncDays(30);
+        runBO.setSyncRecordings(false);
+        TencentMeetingSyncStatusVO status = service.runSync(config, runBO);
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("success");
+        assertThat(status.getFetchedCount()).isEqualTo(1);
+        assertThat(status.getSavedCount()).isEqualTo(1);
+        assertThat(status.getFailedCount()).isEqualTo(1);
+        verify(meetingMapper).insert(any(TencentMeeting.class));
+
+        ArgumentCaptor<TencentMeetingSyncLog> logCaptor = ArgumentCaptor.forClass(TencentMeetingSyncLog.class);
+        verify(syncLogMapper).updateById(logCaptor.capture());
+        assertThat(logCaptor.getValue().getStatus()).isEqualTo("success");
+        assertThat(logCaptor.getValue().getFailedCount()).isEqualTo(1);
     }
 
     @SuppressWarnings("unchecked")

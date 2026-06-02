@@ -4,6 +4,7 @@ import type {
   TencentMeetingCandidateQuery,
   TencentMeetingCandidateVO,
   TencentMeetingConfigVO,
+  TencentMeetingCreatePayload,
   TencentMeetingDetailVO,
   TencentMeetingPage,
   TencentMeetingQuery,
@@ -30,6 +31,10 @@ export function getTencentMeetingSyncStatus(): Promise<TencentMeetingSyncStatusV
 
 export function queryTencentMeetings(query: TencentMeetingQuery): Promise<TencentMeetingPage> {
   return post('/tencent-meeting/queryPageList', query)
+}
+
+export function createTencentMeeting(data: TencentMeetingCreatePayload): Promise<TencentMeetingVO> {
+  return post('/tencent-meeting/create', data)
 }
 
 export function getTencentMeetingDetail(id: string): Promise<TencentMeetingDetailVO> {

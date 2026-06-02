@@ -82,36 +82,57 @@ public class TencentMeetingSyncServiceImpl {
                 for (JSONObject rawMeeting : meetings) {
                     TencentMeeting meeting = upsertMeeting(config, mapping, rawMeeting);
                     saved++;
-                    List<JSONObject> participants = apiGateway.getMeetingParticipants(config, meeting.getMeetingId(), mapping.getMeetingUserId());
-                    for (JSONObject rawParticipant : participants) {
-                        saveParticipant(config, meeting, rawParticipant);
-                        saved++;
+                    String detailUserId = StrUtil.blankToDefault(meeting.getCreatorUserId(), mapping.getMeetingUserId());
+                    try {
+                        List<JSONObject> participants = apiGateway.getMeetingParticipants(config, meeting.getMeetingId(), detailUserId);
+                        for (JSONObject rawParticipant : participants) {
+                            saveParticipant(config, meeting, rawParticipant);
+                            saved++;
+                        }
+                    } catch (Exception detailException) {
+                        failed++;
+                        log.warn("Tencent Meeting participant sync skipped: meetingId={}, userId={}, error={}",
+                                meeting.getMeetingId(), detailUserId, detailException.getMessage());
                     }
                     if (syncRecordings) {
-                        List<JSONObject> recordings = apiGateway.listRecordings(config, mapping.getMeetingUserId());
-                        for (JSONObject rawRecording : recordings) {
-                            if (!matchesMeeting(meeting, rawRecording)) {
-                                continue;
-                            }
-                            TencentMeetingRecording recording = saveRecording(config, meeting, rawRecording);
-                            saved++;
-                            List<JSONObject> segments = syncTranscripts && Boolean.TRUE.equals(config.getTranscriptEnabled())
-                                    ? apiGateway.getTranscriptSegments(config, meeting.getMeetingId(), recording.getRecordFileId(), mapping.getMeetingUserId())
-                                    : List.of();
-                            List<String> texts = new ArrayList<>();
-                            for (JSONObject rawSegment : segments) {
-                                TencentMeetingTranscriptSegment segment = saveTranscriptSegment(recording, meeting, rawSegment);
-                                if (StrUtil.isNotBlank(segment.getText())) {
-                                    texts.add(formatTranscriptLine(segment));
+                        try {
+                            List<JSONObject> recordings = apiGateway.listRecordings(config, mapping.getMeetingUserId(), syncDays);
+                            for (JSONObject rawRecording : recordings) {
+                                if (!matchesMeeting(meeting, rawRecording)) {
+                                    continue;
                                 }
+                                TencentMeetingRecording recording = saveRecording(config, meeting, rawRecording);
                                 saved++;
+                                List<JSONObject> segments;
+                                try {
+                                    segments = syncTranscripts && Boolean.TRUE.equals(config.getTranscriptEnabled())
+                                            ? apiGateway.getTranscriptSegments(config, meeting.getMeetingId(), recording.getRecordFileId(), detailUserId)
+                                            : List.of();
+                                } catch (Exception transcriptException) {
+                                    failed++;
+                                    log.warn("Tencent Meeting transcript sync skipped: meetingId={}, recordFileId={}, userId={}, error={}",
+                                            meeting.getMeetingId(), recording.getRecordFileId(), detailUserId, transcriptException.getMessage());
+                                    segments = List.of();
+                                }
+                                List<String> texts = new ArrayList<>();
+                                for (JSONObject rawSegment : segments) {
+                                    TencentMeetingTranscriptSegment segment = saveTranscriptSegment(recording, meeting, rawSegment);
+                                    if (StrUtil.isNotBlank(segment.getText())) {
+                                        texts.add(formatTranscriptLine(segment));
+                                    }
+                                    saved++;
+                                }
+                                if (!texts.isEmpty() || StrUtil.isNotBlank(recording.getSummary()) || StrUtil.isNotBlank(recording.getTodoText())) {
+                                    meeting.setSummary(StrUtil.blankToDefault(meeting.getSummary(), recording.getSummary()));
+                                    meeting.setTodoText(StrUtil.blankToDefault(meeting.getTodoText(), recording.getTodoText()));
+                                    meeting.setTranscriptText(String.join("\n", texts));
+                                    meetingMapper.updateById(meeting);
+                                }
                             }
-                            if (!texts.isEmpty() || StrUtil.isNotBlank(recording.getSummary()) || StrUtil.isNotBlank(recording.getTodoText())) {
-                                meeting.setSummary(StrUtil.blankToDefault(meeting.getSummary(), recording.getSummary()));
-                                meeting.setTodoText(StrUtil.blankToDefault(meeting.getTodoText(), recording.getTodoText()));
-                                meeting.setTranscriptText(String.join("\n", texts));
-                                meetingMapper.updateById(meeting);
-                            }
+                        } catch (Exception recordingException) {
+                            failed++;
+                            log.warn("Tencent Meeting recording sync skipped: meetingId={}, userId={}, error={}",
+                                    meeting.getMeetingId(), mapping.getMeetingUserId(), recordingException.getMessage());
                         }
                     }
                 }
@@ -144,6 +165,10 @@ public class TencentMeetingSyncServiceImpl {
 
     public void refreshMeetingByExternalId(String eventName, String meetingId) {
         log.info("Tencent Meeting webhook refresh requested: event={}, meetingId={}", eventName, meetingId);
+    }
+
+    public JSONObject createMeeting(TencentMeetingCorpConfig config, JSONObject requestBody) {
+        return apiGateway.createMeeting(config, requestBody);
     }
 
     private List<TencentMeetingUserMapping> loadMappings(TencentMeetingCorpConfig config, TencentMeetingSyncRunBO runBO) {
@@ -224,10 +249,16 @@ public class TencentMeetingSyncServiceImpl {
         recording.setMeetingId(meeting.getMeetingId());
         recording.setRecordFileId(firstText(raw, "record_file_id", "recordFileId", "file_id"));
         recording.setFileName(firstText(raw, "record_file_name", "file_name", "name"));
-        recording.setDownloadUrl(firstText(raw, "download_url", "downloadUrl"));
-        recording.setPlayUrl(firstText(raw, "play_url", "playUrl"));
-        recording.setFileSize(toLong(raw.get("file_size")));
-        recording.setDurationSeconds(toLong(raw.get("duration")));
+        recording.setDownloadUrl(firstText(raw, "download_url", "downloadUrl", "download_address"));
+        recording.setPlayUrl(firstText(raw, "play_url", "playUrl", "view_address", "sharing_url"));
+        recording.setFileSize(toLong(firstValue(raw, "file_size", "record_size")));
+        Long duration = toLong(raw.get("duration"));
+        Long recordStart = toLong(raw.get("record_start_time"));
+        Long recordEnd = toLong(raw.get("record_end_time"));
+        if (duration == null && recordStart != null && recordEnd != null) {
+            duration = Math.max(0L, (recordEnd - recordStart) / 1000L);
+        }
+        recording.setDurationSeconds(duration);
         recording.setTranscriptStatus(firstText(raw, "transcript_status", "transcripts_status"));
         recording.setSummary(firstText(raw, "meeting_summary", "summary"));
         recording.setTodoText(firstText(raw, "todo_text", "todo"));
@@ -280,9 +311,14 @@ public class TencentMeetingSyncServiceImpl {
     }
 
     private String firstText(JSONObject raw, String... keys) {
+        Object value = firstValue(raw, keys);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private Object firstValue(JSONObject raw, String... keys) {
         for (String key : keys) {
-            String value = raw.getString(key);
-            if (StrUtil.isNotBlank(value)) {
+            Object value = raw.get(key);
+            if (value != null && StrUtil.isNotBlank(String.valueOf(value))) {
                 return value;
             }
         }

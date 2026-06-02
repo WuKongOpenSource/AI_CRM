@@ -33,6 +33,8 @@ export interface TencentMeetingVO {
   id: string
   meetingId?: string
   meetingCode?: string
+  joinUrl?: string
+  hostJoinUrl?: string
   subject?: string
   status?: TencentMeetingStatus
   creatorUserId?: string
@@ -131,6 +133,15 @@ export interface TencentMeetingBindPayload {
 
 export interface TencentMeetingUnbindPayload {
   meetingId: string
+}
+
+export interface TencentMeetingCreatePayload {
+  subject: string
+  startTime: string
+  endTime: string
+  creatorUserId?: string
+  password?: string
+  inviteeUserIds?: string[]
 }
 
 export interface TencentMeetingCandidateQuery {

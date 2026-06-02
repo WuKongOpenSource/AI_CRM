@@ -12,7 +12,9 @@ public interface TencentMeetingApiGateway {
 
     List<JSONObject> getMeetingParticipants(TencentMeetingCorpConfig config, String meetingId, String operatorUserId);
 
-    List<JSONObject> listRecordings(TencentMeetingCorpConfig config, String operatorUserId);
+    List<JSONObject> listRecordings(TencentMeetingCorpConfig config, String operatorUserId, int syncDays);
 
     List<JSONObject> getTranscriptSegments(TencentMeetingCorpConfig config, String meetingId, String recordFileId, String operatorUserId);
+
+    JSONObject createMeeting(TencentMeetingCorpConfig config, JSONObject requestBody);
 }
