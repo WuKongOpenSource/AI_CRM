@@ -2789,6 +2789,8 @@ async function handleMobileSelectProjectBoard(projectId: string) {
 async function handleMobileStartProjectConversation(projectId: string) {
   drawerVisible.value = false
   await handleStartProjectConversation(projectId)
+}
+
 function isEmployeeActive(employeeId: string): boolean {
   const raw = route.query.employeeId
   const current = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
