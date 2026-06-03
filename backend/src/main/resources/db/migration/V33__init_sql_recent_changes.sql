@@ -1,8 +1,71 @@
--- Local development bootstrap for legacy manager/RBAC tables.
--- Flyway V1 is only a baseline marker, so a fresh local database needs these
--- pre-existing tables before V2+ migrations can run.
+-- Consolidated SQL moved out of PostgreSQL initialization scripts.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+ALTER TABLE crm_customer
+    ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
+
+CREATE INDEX IF NOT EXISTS idx_customer_search_text_trgm
+    ON crm_customer USING GIN (search_text gin_trgm_ops);
+
+CREATE TABLE IF NOT EXISTS crm_relation (
+    relation_id BIGINT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    avatar VARCHAR(500),
+    phone VARCHAR(50),
+    wechat VARCHAR(100),
+    email VARCHAR(100),
+    relation_type VARCHAR(50) DEFAULT 'other',
+    company VARCHAR(255),
+    remark TEXT,
+    source VARCHAR(50) NOT NULL DEFAULT 'manual',
+    source_customer_id BIGINT,
+    source_contact_id BIGINT,
+    status SMALLINT DEFAULT 1,
+    create_user_id BIGINT,
+    update_user_id BIGINT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    tenant_id BIGINT,
+    PRIMARY KEY (relation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_relation_owner
+    ON crm_relation (tenant_id, create_user_id, status);
+CREATE INDEX IF NOT EXISTS idx_relation_source_contact
+    ON crm_relation (tenant_id, source_contact_id, create_user_id);
+CREATE INDEX IF NOT EXISTS idx_relation_name
+    ON crm_relation (tenant_id, name);
+
+DROP TRIGGER IF EXISTS trg_relation_update_time ON crm_relation;
+CREATE TRIGGER trg_relation_update_time
+    BEFORE UPDATE ON crm_relation
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+COMMENT ON TABLE crm_relation IS '关系人表';
+COMMENT ON COLUMN crm_relation.relation_type IS '关系类型: friend, family, relative, partner, customer_contact, supplier, investor, other';
+COMMENT ON COLUMN crm_relation.source IS '来源: manual, customer_contact';
+
+ALTER TABLE crm_follow_up
+    ALTER COLUMN customer_id DROP NOT NULL,
+    ADD COLUMN IF NOT EXISTS relation_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_follow_up_relation_id
+    ON crm_follow_up (relation_id);
+
+ALTER TABLE crm_knowledge
+    ADD COLUMN IF NOT EXISTS relation_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_knowledge_relation_id
+    ON crm_knowledge (relation_id);
+
+ALTER TABLE crm_task
+    ADD COLUMN IF NOT EXISTS relation_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_task_relation_id
+    ON crm_task (relation_id);
+
+ALTER TABLE crm_chat_session
+    ADD COLUMN IF NOT EXISTS relation_id BIGINT;
+CREATE INDEX IF NOT EXISTS idx_chat_session_relation_id
+    ON crm_chat_session (relation_id);
 
 CREATE TABLE IF NOT EXISTS crm_tenant (
     tenant_id BIGINT PRIMARY KEY,
@@ -24,6 +87,10 @@ CREATE TABLE IF NOT EXISTS crm_tenant (
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE crm_tenant
+    ADD COLUMN IF NOT EXISTS weknora_api_key VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS weknora_knowledge_base_id VARCHAR(255);
+
 CREATE TABLE IF NOT EXISTS manager_user (
     user_id BIGINT PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
@@ -43,14 +110,20 @@ CREATE TABLE IF NOT EXISTS manager_user (
     tenant_id BIGINT
 );
 
+ALTER TABLE manager_user
+    ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
+
 CREATE TABLE IF NOT EXISTS manager_dept (
     dept_id BIGINT PRIMARY KEY,
     dept_name VARCHAR(100) NOT NULL,
     parent_id BIGINT DEFAULT 0,
     sort_order INTEGER DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tenant_id BIGINT DEFAULT 2036380627891470338
+    tenant_id BIGINT
 );
+
+ALTER TABLE manager_dept
+    ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 
 CREATE TABLE IF NOT EXISTS manager_role (
     role_id BIGINT PRIMARY KEY,
@@ -65,6 +138,9 @@ CREATE TABLE IF NOT EXISTS manager_role (
     tenant_id BIGINT
 );
 
+ALTER TABLE manager_role
+    ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
+
 CREATE TABLE IF NOT EXISTS manager_user_role (
     id BIGINT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -75,6 +151,9 @@ CREATE TABLE IF NOT EXISTS manager_user_role (
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     tenant_id BIGINT
 );
+
+ALTER TABLE manager_user_role
+    ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 
 CREATE TABLE IF NOT EXISTS manager_menu (
     menu_id BIGINT PRIMARY KEY,
@@ -95,6 +174,9 @@ CREATE TABLE IF NOT EXISTS manager_role_menu (
     data_scope INTEGER
 );
 
+ALTER TABLE manager_role_menu
+    ADD COLUMN IF NOT EXISTS data_scope INTEGER;
+
 CREATE INDEX IF NOT EXISTS idx_manager_user_username ON manager_user(username);
 CREATE INDEX IF NOT EXISTS idx_manager_user_tenant ON manager_user(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_manager_role_tenant ON manager_role(tenant_id);
@@ -102,76 +184,6 @@ CREATE INDEX IF NOT EXISTS idx_manager_user_role_user ON manager_user_role(user_
 CREATE INDEX IF NOT EXISTS idx_manager_user_role_tenant ON manager_user_role(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_manager_dept_tenant ON manager_dept(tenant_id);
 
-INSERT INTO crm_tenant (
-    tenant_id, tenant_name, contact_name, contact_email, status, max_users,
-    gift_credit_total, gift_credit_used, purchased_credit_total, purchased_credit_used,
-    create_time, update_time
-) VALUES (
-    2036380627891470338, '小猴科技', '本地管理员', 'admin@local.dev', 1, 50,
-    300, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-) ON CONFLICT (tenant_id) DO UPDATE SET
-    tenant_name = EXCLUDED.tenant_name,
-    status = EXCLUDED.status,
-    update_time = CURRENT_TIMESTAMP;
-
-INSERT INTO manager_role (
-    role_id, role_name, realm, description, data_type,
-    create_user_id, update_user_id, create_time, update_time, tenant_id
-) VALUES (
-    2036380628088602625, '超级管理员', 'super_admin', '本地开发超级管理员', 5,
-    2036380628482867202, 2036380628482867202, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
-    2036380627891470338
-) ON CONFLICT (role_id) DO UPDATE SET
-    role_name = EXCLUDED.role_name,
-    realm = EXCLUDED.realm,
-    data_type = EXCLUDED.data_type,
-    update_time = CURRENT_TIMESTAMP,
-    tenant_id = EXCLUDED.tenant_id;
-
-INSERT INTO manager_user (
-    user_id, username, password, realname, mobile, email, sex, dept_id, post,
-    status, parent_id, tenant_id, create_time
-) VALUES
-    (
-        1, 'admin',
-        '$2a$10$EdQ37s/q.pADWeDAZEPDXeKFRVjLstY3mM3G.ceYlCFbyxpGzPJ6S',
-        '本地管理员', '13800000000', 'admin@local.dev', 0, NULL, '管理员',
-        1, 0, 2036380627891470338, CURRENT_TIMESTAMP
-    ),
-    (
-        2036380628482867202, '1074362868@qq.com',
-        '$2a$10$EdQ37s/q.pADWeDAZEPDXeKFRVjLstY3mM3G.ceYlCFbyxpGzPJ6S',
-        '晏妙', '13800000001', '1074362868@qq.com', 0, NULL, '管理员',
-        1, 0, 2036380627891470338, CURRENT_TIMESTAMP
-    )
-ON CONFLICT (user_id) DO UPDATE SET
-    username = EXCLUDED.username,
-    password = EXCLUDED.password,
-    realname = EXCLUDED.realname,
-    email = EXCLUDED.email,
-    status = EXCLUDED.status,
-    tenant_id = EXCLUDED.tenant_id;
-
-INSERT INTO manager_user_role (
-    id, user_id, role_id, create_user_id, update_user_id, create_time, update_time, tenant_id
-) VALUES
-    (
-        2036380628482867203, 2036380628482867202, 2036380628088602625,
-        2036380628482867202, 2036380628482867202, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
-        2036380627891470338
-    ),
-    (
-        2036380628482867204, 1, 2036380628088602625,
-        2036380628482867202, 2036380628482867202, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
-        2036380627891470338
-    )
-ON CONFLICT (id) DO UPDATE SET
-    user_id = EXCLUDED.user_id,
-    role_id = EXCLUDED.role_id,
-    update_time = CURRENT_TIMESTAMP,
-    tenant_id = EXCLUDED.tenant_id;
-
--- Keep existing demo CRM rows visible for the local development tenant.
 ALTER TABLE IF EXISTS crm_customer ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE IF EXISTS crm_contact ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE IF EXISTS crm_follow_up ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
@@ -188,23 +200,6 @@ ALTER TABLE IF EXISTS crm_ai_agent ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE IF EXISTS crm_system_config ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE IF EXISTS crm_operation_log ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE IF EXISTS crm_custom_field ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
-
-UPDATE crm_customer SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_contact SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_follow_up SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_task SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_knowledge SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_customer_tag SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_contact_tag SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_knowledge_tag SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_customer_team SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_chat_session SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_chat_message SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_chat_attachment SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_ai_agent SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_system_config SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_operation_log SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
-UPDATE crm_custom_field SET tenant_id = 2036380627891470338 WHERE tenant_id IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_customer_tenant ON crm_customer(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_contact_tenant ON crm_contact(tenant_id);

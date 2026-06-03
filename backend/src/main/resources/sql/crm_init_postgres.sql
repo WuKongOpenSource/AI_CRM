@@ -34,7 +34,6 @@ CREATE TABLE crm_customer (
     last_contact_time TIMESTAMP,
     next_follow_time TIMESTAMP,
     remark TEXT,
-    search_text TEXT NOT NULL DEFAULT '',
     status SMALLINT DEFAULT 1,
     create_user_id BIGINT,
     update_user_id BIGINT,
@@ -47,7 +46,6 @@ CREATE INDEX idx_customer_owner_id ON crm_customer (owner_id);
 CREATE INDEX idx_customer_stage ON crm_customer (stage);
 CREATE INDEX idx_customer_level ON crm_customer (level);
 CREATE INDEX idx_customer_create_time ON crm_customer (create_time);
-CREATE INDEX idx_customer_search_text_trgm ON crm_customer USING GIN (search_text gin_trgm_ops);
 
 CREATE TRIGGER trg_customer_update_time
     BEFORE UPDATE ON crm_customer
@@ -151,51 +149,12 @@ CREATE INDEX idx_contact_tag_contact_id ON crm_contact_tag (contact_id);
 COMMENT ON TABLE crm_contact_tag IS '联系人标签表';
 
 -- ============================================
--- 6. 关系人表 (crm_relation)
--- ============================================
-DROP TABLE IF EXISTS crm_relation CASCADE;
-CREATE TABLE crm_relation (
-    relation_id BIGINT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    avatar VARCHAR(500),
-    phone VARCHAR(50),
-    wechat VARCHAR(100),
-    email VARCHAR(100),
-    relation_type VARCHAR(50) DEFAULT 'other',
-    company VARCHAR(255),
-    remark TEXT,
-    source VARCHAR(50) NOT NULL DEFAULT 'manual',
-    source_customer_id BIGINT,
-    source_contact_id BIGINT,
-    status SMALLINT DEFAULT 1,
-    create_user_id BIGINT,
-    update_user_id BIGINT,
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    tenant_id BIGINT,
-    PRIMARY KEY (relation_id)
-);
-
-CREATE INDEX idx_relation_owner ON crm_relation (tenant_id, create_user_id, status);
-CREATE INDEX idx_relation_source_contact ON crm_relation (tenant_id, source_contact_id, create_user_id);
-CREATE INDEX idx_relation_name ON crm_relation (tenant_id, name);
-
-CREATE TRIGGER trg_relation_update_time
-    BEFORE UPDATE ON crm_relation
-    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
-
-COMMENT ON TABLE crm_relation IS '关系人表';
-COMMENT ON COLUMN crm_relation.relation_type IS '关系类型: friend, family, relative, partner, customer_contact, supplier, investor, other';
-COMMENT ON COLUMN crm_relation.source IS '来源: manual, customer_contact';
-
--- ============================================
--- 7. 跟进记录表 (crm_follow_up)
+-- 6. 跟进记录表 (crm_follow_up)
 -- ============================================
 DROP TABLE IF EXISTS crm_follow_up CASCADE;
 CREATE TABLE crm_follow_up (
     follow_up_id BIGINT NOT NULL,
-    customer_id BIGINT,
-    relation_id BIGINT,
+    customer_id BIGINT NOT NULL,
     contact_id BIGINT,
     type VARCHAR(50) NOT NULL,
     content TEXT NOT NULL,
@@ -207,14 +166,13 @@ CREATE TABLE crm_follow_up (
 );
 
 CREATE INDEX idx_follow_up_customer_id ON crm_follow_up (customer_id);
-CREATE INDEX idx_follow_up_relation_id ON crm_follow_up (relation_id);
 CREATE INDEX idx_follow_up_follow_time ON crm_follow_up (follow_time);
 
 COMMENT ON TABLE crm_follow_up IS '跟进记录表';
 COMMENT ON COLUMN crm_follow_up.type IS '类型: call, meeting, email, visit';
 
 -- ============================================
--- 8. 知识库项目表 (crm_knowledge)
+-- 7. 知识库项目表 (crm_knowledge)
 -- ============================================
 DROP TABLE IF EXISTS crm_knowledge CASCADE;
 CREATE TABLE crm_knowledge (
@@ -226,7 +184,6 @@ CREATE TABLE crm_knowledge (
     mime_type VARCHAR(100),
     customer_id BIGINT,
     employee_id BIGINT,
-    relation_id BIGINT,
     summary TEXT,
     content_text TEXT,
     status SMALLINT DEFAULT 1,
@@ -240,7 +197,6 @@ CREATE TABLE crm_knowledge (
 
 CREATE INDEX idx_knowledge_customer_id ON crm_knowledge (customer_id);
 CREATE INDEX idx_knowledge_employee_id ON crm_knowledge (employee_id);
-CREATE INDEX idx_knowledge_relation_id ON crm_knowledge (relation_id);
 CREATE INDEX idx_knowledge_type ON crm_knowledge (type);
 CREATE INDEX idx_knowledge_upload_user_id ON crm_knowledge (upload_user_id);
 
@@ -267,7 +223,7 @@ COMMENT ON COLUMN crm_knowledge.weknora_parse_status IS 'WeKnora解析状态: pe
 -- );
 
 -- ============================================
--- 9. 知识库标签表 (crm_knowledge_tag)
+-- 8. 知识库标签表 (crm_knowledge_tag)
 -- ============================================
 DROP TABLE IF EXISTS crm_knowledge_tag CASCADE;
 CREATE TABLE crm_knowledge_tag (
@@ -283,7 +239,7 @@ CREATE INDEX idx_knowledge_tag_knowledge_id ON crm_knowledge_tag (knowledge_id);
 COMMENT ON TABLE crm_knowledge_tag IS '知识库标签表';
 
 -- ============================================
--- 10. 任务表 (crm_task)
+-- 9. 任务表 (crm_task)
 -- ============================================
 DROP TABLE IF EXISTS crm_task CASCADE;
 CREATE TABLE crm_task (
@@ -295,7 +251,6 @@ CREATE TABLE crm_task (
     status VARCHAR(20) DEFAULT 'pending',
     assigned_to BIGINT,
     customer_id BIGINT,
-    relation_id BIGINT,
     generated_by_ai SMALLINT DEFAULT 0,
     ai_context TEXT,
     completed_time TIMESTAMP,
@@ -312,7 +267,6 @@ CREATE TABLE crm_task (
 
 CREATE INDEX idx_task_assigned_to ON crm_task (assigned_to);
 CREATE INDEX idx_task_customer_id ON crm_task (customer_id);
-CREATE INDEX idx_task_relation_id ON crm_task (relation_id);
 CREATE INDEX idx_task_status ON crm_task (status);
 CREATE INDEX idx_task_due_date ON crm_task (due_date);
 
@@ -331,7 +285,7 @@ COMMENT ON COLUMN crm_task.status IS '状态: pending, in_progress, completed';
 COMMENT ON COLUMN crm_task.generated_by_ai IS '是否AI生成: 0-否, 1-是';
 
 -- ============================================
--- 11. AI智能体表 (crm_ai_agent)
+-- 10. AI智能体表 (crm_ai_agent)
 -- ============================================
 DROP TABLE IF EXISTS crm_ai_agent CASCADE;
 CREATE TABLE crm_ai_agent (
@@ -363,7 +317,7 @@ COMMENT ON COLUMN crm_ai_agent.enabled IS '是否启用: 0-否, 1-是';
 COMMENT ON COLUMN crm_ai_agent.category IS '分类: default, custom';
 
 -- ============================================
--- 12. 会话表 (crm_chat_session)
+-- 11. 会话表 (crm_chat_session)
 -- ============================================
 DROP TABLE IF EXISTS crm_chat_session CASCADE;
 CREATE TABLE crm_chat_session (
@@ -372,7 +326,6 @@ CREATE TABLE crm_chat_session (
     agent_id BIGINT,
     customer_id BIGINT,
     employee_id BIGINT,
-    relation_id BIGINT,
     title VARCHAR(255),
     app_code VARCHAR(50) NOT NULL DEFAULT 'general',
     pinned BOOLEAN NOT NULL DEFAULT FALSE,
@@ -387,7 +340,6 @@ CREATE INDEX idx_chat_session_user_id ON crm_chat_session (user_id);
 CREATE INDEX idx_chat_session_agent_id ON crm_chat_session (agent_id);
 CREATE INDEX idx_chat_session_customer_id ON crm_chat_session (customer_id);
 CREATE INDEX idx_chat_session_employee_id ON crm_chat_session (employee_id);
-CREATE INDEX idx_chat_session_relation_id ON crm_chat_session (relation_id);
 CREATE INDEX idx_chat_session_app_code ON crm_chat_session (app_code);
 CREATE INDEX idx_chat_session_user_pin ON crm_chat_session (user_id, pinned DESC, pinned_time DESC, update_time DESC);
 

@@ -1,10 +1,4 @@
 ALTER TABLE crm_customer
-    ADD COLUMN IF NOT EXISTS ai_status_detection VARCHAR(100);
-
-ALTER TABLE crm_customer
-    ADD COLUMN IF NOT EXISTS ai_insight TEXT;
-
-ALTER TABLE crm_customer
     ADD COLUMN IF NOT EXISTS ai_analysis_status VARCHAR(32);
 
 ALTER TABLE crm_customer

@@ -1,17 +1,3 @@
-ALTER TABLE crm_custom_field
-    ADD COLUMN IF NOT EXISTS field_source VARCHAR(50) DEFAULT 'custom';
-
-UPDATE crm_custom_field
-SET field_source = 'system'
-WHERE field_source IS NULL
-  AND entity_type = 'customer'
-  AND field_name IN (
-      'companyName', 'industry', 'stage', 'ownerId', 'level', 'source',
-      'address', 'website', 'primaryContactName', 'primaryContactPhone',
-      'primaryContactPosition', 'tagNames', 'quotation', 'remark',
-      'contractAmount', 'revenue'
-  );
-
 DO $$
 BEGIN
     IF EXISTS (

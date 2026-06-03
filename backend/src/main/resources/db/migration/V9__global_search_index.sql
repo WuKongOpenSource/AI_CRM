@@ -1,7 +1,5 @@
 -- Unified global search index for customer/contact/task/schedule/knowledge
 
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 ALTER TABLE crm_schedule ADD COLUMN IF NOT EXISTS participant_user_ids TEXT;
 
 CREATE OR REPLACE FUNCTION update_timestamp()
@@ -46,23 +44,13 @@ CREATE INDEX IF NOT EXISTS idx_global_search_create_user_id ON crm_global_search
 CREATE INDEX IF NOT EXISTS idx_global_search_sort_time ON crm_global_search_index (tenant_id, sort_time DESC);
 CREATE INDEX IF NOT EXISTS idx_global_search_search_text_trgm ON crm_global_search_index USING GIN (search_text gin_trgm_ops);
 
-DO $$
-BEGIN
-    -- ParadeDB is not available in every local PostgreSQL environment. Keep the
-    -- standard trigram index above, and only add BM25 when the extension exists.
-    IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pdb')
-       AND EXISTS (SELECT 1 FROM pg_am WHERE amname = 'bm25') THEN
-        EXECUTE $bm25$
-            CREATE INDEX IF NOT EXISTS idx_global_search_bm25 ON crm_global_search_index
-            USING bm25 (
-                search_id,
-                (search_text::pdb.chinese_compatible('alias=global_search_cjk')),
-                (search_text::pdb.ngram(2,3,'alias=global_search_ngram'))
-            )
-            WITH (key_field = 'search_id')
-        $bm25$;
-    END IF;
-END $$;
+CREATE INDEX IF NOT EXISTS idx_global_search_bm25 ON crm_global_search_index
+USING bm25 (
+    search_id,
+    (search_text::pdb.chinese_compatible('alias=global_search_cjk')),
+    (search_text::pdb.ngram(2,3,'alias=global_search_ngram'))
+)
+WITH (key_field = 'search_id');
 
 DROP TRIGGER IF EXISTS trg_global_search_index_update_time ON crm_global_search_index;
 

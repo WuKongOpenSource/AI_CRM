@@ -13,7 +13,6 @@ CREATE TABLE crm_custom_field (
     field_name VARCHAR(100) NOT NULL,
     field_label VARCHAR(100) NOT NULL,
     field_type VARCHAR(50) NOT NULL,
-    field_source VARCHAR(50) DEFAULT 'custom',
     column_name VARCHAR(100) NOT NULL,
     column_type VARCHAR(100) NOT NULL,
     default_value VARCHAR(500) DEFAULT NULL,
