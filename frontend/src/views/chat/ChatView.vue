@@ -1322,23 +1322,16 @@
                           <span class="wk-chat-upload-menu__icon material-symbols-outlined">menu_book</span>
                           <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                         </button>
-                        <button
-                          type="button"
-                          class="wk-chat-upload-menu__item"
-                          :disabled="isUploading"
-                          @click="handleChatUploadMenuSelectApp('crm')"
+                        <div
+                          class="wk-chat-upload-menu__apps-group"
+                          :class="{ 'is-disabled': isUploading }"
+                          :aria-disabled="isUploading ? 'true' : undefined"
                         >
-                          <template #reference>
-                            <div
-                              class="wk-chat-upload-menu__apps-ref"
-                              role="button"
-                              tabindex="0"
-                            >
-                              <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span>
-                              <span class="wk-chat-upload-menu__label">悟空技能</span>
-                              <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
-                            </div>
-                          </template>
+                          <div class="wk-chat-upload-menu__apps-ref">
+                            <span class="wk-chat-upload-menu__icon material-symbols-outlined">apps</span>
+                            <span class="wk-chat-upload-menu__label">悟空技能</span>
+                            <span class="wk-chat-upload-menu__chevron material-symbols-outlined">chevron_right</span>
+                          </div>
                           <div
                             class="wk-chat-upload-submenu"
                             @mouseenter="clearChatUploadMenuLeaveTimer"
@@ -1347,6 +1340,7 @@
                             <button
                               type="button"
                               class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              :disabled="isUploading"
                               @click="handleChatUploadMenuSelectApp('crm')"
                             >
                               <WkIcon
@@ -1364,6 +1358,7 @@
                             <button
                               type="button"
                               class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              :disabled="isUploading"
                               @click="handleChatUploadMenuSelectApp('knowledge')"
                             >
                               <WkIcon
@@ -1381,6 +1376,7 @@
                             <button
                               type="button"
                               class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              :disabled="isUploading"
                               @click="handleChatUploadMenuSelectApp('address_book')"
                             >
                               <WkIcon
@@ -1396,7 +1392,7 @@
                               >check</span>
                             </button>
                           </div>
-                        </el-popover>
+                        </div>
                       </div>
                     </el-popover>
 
