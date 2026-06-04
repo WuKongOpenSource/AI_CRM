@@ -179,15 +179,19 @@ weknora:
 
 The Docker deployment includes a one-shot `aicrm-weknora-init` service. It registers or logs in to WeKnora, creates the configured remote LLM and embedding models, creates the default CRM knowledge base, and writes the WeKnora tenant API key and knowledge base ID into `crm_system_config`.
 
+When `WEKNORA_INIT_ENABLED=true`, the WeKnora account credentials, LLM model, and embedding model are required. The LLM model is used by WeKnora agent model selection, and the embedding model is used by knowledge base parsing and retrieval.
+
 Set these values in `docker/.env` before deployment:
 
 ```env
 WEKNORA_INIT_ENABLED=true
 WEKNORA_INIT_EMAIL=your_admin_email@example.com
 WEKNORA_INIT_PASSWORD=your_secure_password
+INIT_LLM_MODEL_PROVIDER=aliyun
 INIT_LLM_MODEL_NAME=qwen-max
 INIT_LLM_MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 INIT_LLM_MODEL_API_KEY=your_llm_api_key
+INIT_EMBEDDING_MODEL_PROVIDER=aliyun
 INIT_EMBEDDING_MODEL_NAME=text-embedding-v3
 INIT_EMBEDDING_MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 INIT_EMBEDDING_MODEL_API_KEY=your_embedding_api_key

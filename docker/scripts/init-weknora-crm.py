@@ -93,9 +93,16 @@ def ensure_model(token, model_type, prefix, default_provider):
     api_key = os.getenv(f"{prefix}_API_KEY", "").strip()
     provider = os.getenv(f"{prefix}_PROVIDER", default_provider).strip()
 
-    if not all([name, base_url, api_key]):
-        log(f"skip {model_type} model: {prefix}_NAME, {prefix}_BASE_URL, or {prefix}_API_KEY is empty")
-        return None
+    missing = [
+        key for key, value in (
+            (f"{prefix}_NAME", name),
+            (f"{prefix}_BASE_URL", base_url),
+            (f"{prefix}_API_KEY", api_key),
+        )
+        if not value
+    ]
+    if missing:
+        raise ApiError(f"{model_type} model config is incomplete; missing: {', '.join(missing)}")
 
     for model in list_models(token):
         if model.get("type") == model_type and model.get("name") == name:
@@ -107,7 +114,13 @@ def ensure_model(token, model_type, prefix, default_provider):
         "provider": provider,
     }
     if model_type == "Embedding":
-        dimension = int(os.getenv(f"{prefix}_DIMENSION", "1024"))
+        dimension_value = os.getenv(f"{prefix}_DIMENSION", "").strip()
+        if not dimension_value:
+            raise ApiError(f"Embedding model config is incomplete; missing: {prefix}_DIMENSION")
+        try:
+            dimension = int(dimension_value)
+        except ValueError:
+            raise ApiError(f"Embedding model dimension must be an integer: {prefix}_DIMENSION")
         parameters["embedding_parameters"] = {
             "dimension": dimension,
             "truncate_prompt_tokens": 0,
@@ -228,13 +241,9 @@ def main():
     llm_id = ensure_model(token, "KnowledgeQA", "INIT_LLM_MODEL", "aliyun")
     embedding_id = ensure_model(token, "Embedding", "INIT_EMBEDDING_MODEL", "aliyun")
 
-    if llm_id and embedding_id:
-        kb_id = ensure_knowledge_base(token, llm_id, embedding_id)
-        upsert_crm_config(api_key, kb_id, enabled=True)
-        log(f"RAG is ready; knowledge base id: {kb_id}")
-    else:
-        upsert_crm_config(api_key, "", enabled=False)
-        log("model API keys are incomplete; CRM WeKnora integration remains disabled")
+    kb_id = ensure_knowledge_base(token, llm_id, embedding_id)
+    upsert_crm_config(api_key, kb_id, enabled=True)
+    log(f"RAG is ready; knowledge base id: {kb_id}")
 
 
 if __name__ == "__main__":
