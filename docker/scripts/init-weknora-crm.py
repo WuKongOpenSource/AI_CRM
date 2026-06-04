@@ -59,8 +59,11 @@ def login(email, password):
 
 def ensure_account():
     username = os.getenv("WEKNORA_INIT_USERNAME", "admin")
-    email = os.getenv("WEKNORA_INIT_EMAIL", "admin@example.com")
-    password = os.getenv("WEKNORA_INIT_PASSWORD", "WkRag@2026")
+    email = os.getenv("WEKNORA_INIT_EMAIL", "").strip()
+    password = os.getenv("WEKNORA_INIT_PASSWORD", "").strip()
+
+    if not email or not password:
+        raise ApiError("WEKNORA_INIT_EMAIL and WEKNORA_INIT_PASSWORD must be configured")
 
     try:
         return login(email, password)
@@ -212,7 +215,7 @@ ON CONFLICT (config_key) DO UPDATE SET
 
 
 def main():
-    if os.getenv("WEKNORA_INIT_ENABLED", "true").lower() not in ("1", "true", "yes", "on"):
+    if os.getenv("WEKNORA_INIT_ENABLED", "false").lower() not in ("1", "true", "yes", "on"):
         log("disabled by WEKNORA_INIT_ENABLED")
         return
 

@@ -107,11 +107,11 @@ services:
     volumes:
       - ./scripts/init-weknora-crm.py:/opt/init/init-weknora-crm.py:ro
     environment:
-      - WEKNORA_INIT_ENABLED=${WEKNORA_INIT_ENABLED:-true}
+      - WEKNORA_INIT_ENABLED=${WEKNORA_INIT_ENABLED:-false}
       - WEKNORA_API_URL=${WEKNORA_API_URL:-http://app:8080/api/v1}
       - WEKNORA_INIT_USERNAME=${WEKNORA_INIT_USERNAME:-admin}
-      - WEKNORA_INIT_EMAIL=${WEKNORA_INIT_EMAIL:-admin@example.com}
-      - WEKNORA_INIT_PASSWORD=${WEKNORA_INIT_PASSWORD:-WkRag@2026}
+      - WEKNORA_INIT_EMAIL=${WEKNORA_INIT_EMAIL:-}
+      - WEKNORA_INIT_PASSWORD=${WEKNORA_INIT_PASSWORD:-}
       - WEKNORA_INIT_KB_NAME=${WEKNORA_INIT_KB_NAME:-CRM Default Knowledge Base}
       - INIT_LLM_MODEL_PROVIDER=${INIT_LLM_MODEL_PROVIDER:-aliyun}
       - INIT_LLM_MODEL_NAME=${INIT_LLM_MODEL_NAME:-}

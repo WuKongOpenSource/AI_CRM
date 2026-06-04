@@ -182,8 +182,9 @@ The Docker deployment includes a one-shot `aicrm-weknora-init` service. It regis
 Set these values in `docker/.env` before deployment:
 
 ```env
-WEKNORA_INIT_EMAIL=admin@example.com
-WEKNORA_INIT_PASSWORD=WkRag@2026
+WEKNORA_INIT_ENABLED=true
+WEKNORA_INIT_EMAIL=your_admin_email@example.com
+WEKNORA_INIT_PASSWORD=your_secure_password
 INIT_LLM_MODEL_NAME=qwen-max
 INIT_LLM_MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 INIT_LLM_MODEL_API_KEY=your_llm_api_key
