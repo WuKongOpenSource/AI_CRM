@@ -257,6 +257,9 @@ services:
       - LC_ALL=zh_CN.UTF-8
       - HOST_IP=${HOST_IP}
       - BASE_PATH=${CRM_BASE_PATH:-/}
+      - WEKNORA_INIT_USERNAME=${WEKNORA_INIT_USERNAME:-admin}
+      - WEKNORA_INIT_EMAIL=${WEKNORA_INIT_EMAIL:-}
+      - WEKNORA_INIT_PASSWORD=${WEKNORA_INIT_PASSWORD:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/"]
       interval: 30s

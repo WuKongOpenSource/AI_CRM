@@ -9,6 +9,8 @@ import type {
   WeKnoraConfig,
   WeKnoraConfigUpdateBO,
   WeKnoraConnectionTestResult,
+  WeKnoraModelTestBO,
+  WeKnoraModelTestResult,
   WeKnoraModelSyncBO,
   WeKnoraModelSyncResult
 } from '@/types/systemConfig'
@@ -90,6 +92,10 @@ export function testWeKnoraConnection(data: WeKnoraConfigUpdateBO): Promise<WeKn
  */
 export function syncWeKnoraModels(data: WeKnoraModelSyncBO): Promise<WeKnoraModelSyncResult> {
   return post('/systemConfig/weknora/syncModels', data)
+}
+
+export function testWeKnoraModel(data: WeKnoraModelTestBO): Promise<WeKnoraModelTestResult> {
+  return post('/systemConfig/weknora/testModel', data)
 }
 
 // ==================== 企业信息配置接口 ====================

@@ -19,7 +19,9 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeSalesScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
@@ -43,6 +45,7 @@ import reactor.core.publisher.Flux;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
@@ -74,6 +77,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private DynamicChatClientProvider chatClientProvider;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final int MAX_TEXT_PREVIEW_BYTES = 256 * 1024;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -93,7 +97,11 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         knowledge.setCustomerId(customerId);
         knowledge.setFilePath(relativePath);
         knowledge.setFileSize(file.getSize());
+        knowledge.setMimeType(file.getContentType());
         knowledge.setSummary(summary);
+        if (isTextPreviewFile(file.getContentType(), file.getOriginalFilename())) {
+            knowledge.setContentText(readTextPreview(file));
+        }
         knowledge.setUploadUserId(UserUtil.getUserId());
 
         // 检查文件类型是否被 WeKnora 支持
@@ -222,7 +230,52 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         if (ObjectUtil.isNull(knowledge)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
         }
-        return BeanUtil.copyProperties(knowledge, KnowledgeVO.class);
+        KnowledgeVO vo = BeanUtil.copyProperties(knowledge, KnowledgeVO.class);
+        if (StrUtil.isBlank(vo.getContentText()) && isTextPreviewFile(vo.getMimeType(), vo.getName())) {
+            vo.setContentText(readTextPreview(knowledge.getFilePath()));
+        }
+        return vo;
+    }
+
+    private boolean isTextPreviewFile(String mimeType, String fileName) {
+        String normalizedMime = StrUtil.blankToDefault(mimeType, "").toLowerCase();
+        if (normalizedMime.startsWith("text/")
+                || "application/json".equals(normalizedMime)
+                || "application/xml".equals(normalizedMime)
+                || "application/x-yaml".equals(normalizedMime)) {
+            return true;
+        }
+
+        String ext = StrUtil.blankToDefault(FileUtil.extName(fileName), "").toLowerCase();
+        return List.of("txt", "md", "markdown", "json", "csv", "log", "xml", "yaml", "yml").contains(ext);
+    }
+
+    private String readTextPreview(MultipartFile file) {
+        try (InputStream inputStream = file.getInputStream()) {
+            return readTextPreview(inputStream);
+        } catch (Exception e) {
+            log.warn("Failed to read text preview for upload file: {}", file.getOriginalFilename(), e);
+            return null;
+        }
+    }
+
+    private String readTextPreview(String filePath) {
+        try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
+            return readTextPreview(inputStream);
+        } catch (Exception e) {
+            log.warn("Failed to read text preview for stored file: {}", filePath, e);
+            return null;
+        }
+    }
+
+    private String readTextPreview(InputStream inputStream) throws IOException {
+        byte[] bytes = inputStream.readNBytes(MAX_TEXT_PREVIEW_BYTES + 1);
+        int length = Math.min(bytes.length, MAX_TEXT_PREVIEW_BYTES);
+        String content = new String(bytes, 0, length, StandardCharsets.UTF_8);
+        if (bytes.length > MAX_TEXT_PREVIEW_BYTES) {
+            return content + "\n...";
+        }
+        return content;
     }
 
     /**
@@ -360,6 +413,19 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         请用中文回答，回答要准确、简洁。如果文档中没有相关信息，请如实说明。
         """;
 
+    private static final String SALES_SCRIPT_PROMPT_TEMPLATE = """
+        你是资深 B2B 销售顾问。请基于下面的知识库内容，生成一份可以直接给销售人员使用的话术。
+
+        知识库参考内容：
+        %s
+
+        输出要求：
+        1. 用中文输出，不要写成检索结果列表。
+        2. 包含：开场白、需求探询问题、价值介绍、异议处理、推进下一步、可复制短话术。
+        3. 话术要贴合知识库内容，不要编造知识库之外的产品能力。
+        4. 如果知识库信息不足，请明确标注“需补充资料”的部分。
+        """;
+
     @Override
     public KnowledgeAiAnalyzeVO aiAnalyzeDocument(Long knowledgeId) {
         Knowledge knowledge = getById(knowledgeId);
@@ -448,6 +514,87 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         vo.setTalkingPoints(List.of());
         vo.setRelatedEntities(List.of());
         return vo;
+    }
+
+    @Override
+    public KnowledgeSalesScriptVO generateSalesScript() {
+        List<String> sources = new ArrayList<>();
+        String context = buildSalesScriptContext(sources);
+        if (StrUtil.isBlank(context)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "暂无可用于生成销售话术的知识库内容");
+        }
+
+        try {
+            String script = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(String.format(SALES_SCRIPT_PROMPT_TEMPLATE, context))
+                    .call()
+                    .content();
+            KnowledgeSalesScriptVO vo = new KnowledgeSalesScriptVO();
+            vo.setScript(StrUtil.blankToDefault(script, "生成失败，请补充知识库内容后重试"));
+            vo.setSources(sources);
+            return vo;
+        } catch (Exception e) {
+            log.error("销售话术生成失败: {}", e.getMessage(), e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "销售话术生成失败: " + e.getMessage());
+        }
+    }
+
+    private String buildSalesScriptContext(List<String> sources) {
+        StringBuilder context = new StringBuilder();
+
+        // 优先使用 WeKnora/RAG 检索结果，确保话术围绕已经解析入库的知识片段生成。
+        for (WeKnoraChunk chunk : weKnoraClient.hybridSearch("销售话术 产品价值 客户痛点 异议处理")) {
+            if (StrUtil.isBlank(chunk.getContent())) {
+                continue;
+            }
+            String source = firstNotBlank(chunk.getKnowledgeTitle(), chunk.getKnowledgeFilename(), "RAG 知识片段");
+            appendSource(sources, source);
+            context.append("【").append(source).append("】\n")
+                    .append(chunk.getContent()).append("\n\n");
+            if (context.length() >= 6000) {
+                return context.substring(0, 6000);
+            }
+        }
+
+        if (context.length() > 0) {
+            return context.toString();
+        }
+
+        // RAG 暂无结果时，使用本地知识库摘要和文本内容兜底，避免“立即开始”只变成一次关键词搜索。
+        List<Knowledge> localKnowledge = lambdaQuery()
+                .orderByDesc(Knowledge::getCreateTime)
+                .last("LIMIT 8")
+                .list();
+        for (Knowledge knowledge : localKnowledge) {
+            String text = firstNotBlank(knowledge.getSummary(), knowledge.getContentText());
+            if (StrUtil.isBlank(text)) {
+                continue;
+            }
+            appendSource(sources, knowledge.getName());
+            context.append("【").append(knowledge.getName()).append("】\n")
+                    .append(text.length() > 1200 ? text.substring(0, 1200) + "..." : text)
+                    .append("\n\n");
+            if (context.length() >= 6000) {
+                break;
+            }
+        }
+        return context.toString();
+    }
+
+    private String firstNotBlank(String... values) {
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private void appendSource(List<String> sources, String source) {
+        if (StrUtil.isNotBlank(source) && !sources.contains(source)) {
+            sources.add(source);
+        }
     }
 
     @Override

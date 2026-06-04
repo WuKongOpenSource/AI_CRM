@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.WeKnoraModelTestBO;
 import com.kakarote.ai_crm.entity.BO.WeKnoraModelSyncBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
@@ -13,6 +14,7 @@ import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraModelTestVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraModelSyncVO;
 import com.kakarote.ai_crm.mapper.SystemConfigMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
@@ -87,6 +89,15 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Value("${weknora.api-key:}")
     private String defaultWeKnoraApiKey;
+
+    @Value("${weknora.init.username:admin}")
+    private String weKnoraInitUsername;
+
+    @Value("${weknora.init.email:}")
+    private String weKnoraInitEmail;
+
+    @Value("${weknora.init.password:}")
+    private String weKnoraInitPassword;
 
     @Value("${weknora.knowledge-base-id:}")
     private String defaultWeKnoraKnowledgeBaseId;
@@ -224,7 +235,8 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         if (StrUtil.isNotBlank(updateBO.getApiUrl())) {
             configs.put("ai_api_url", updateBO.getApiUrl());
         }
-        if (StrUtil.isNotBlank(updateBO.getApiKey())) {
+        // 前端会回显脱敏后的密钥；保存脱敏值会覆盖真实密钥，所以这里仅保存用户新输入的明文密钥。
+        if (StrUtil.isNotBlank(updateBO.getApiKey()) && !isMaskedSecret(updateBO.getApiKey())) {
             configs.put("ai_api_key", updateBO.getApiKey());
         }
         if (StrUtil.isNotBlank(updateBO.getModel())) {
@@ -252,9 +264,10 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
         try {
             // 创建临时 ChatClient 进行测试
+            // 如果前端传入脱敏密钥，则用数据库中保存的真实密钥完成测试。
             ChatClient testClient = chatClientProvider.createTestChatClient(
                     configBO.getApiUrl(),
-                    configBO.getApiKey(),
+                    resolveSecret(configBO.getApiKey(), getConfigsByType(AI_CONFIG_TYPE).get("ai_api_key"), "AI API Key"),
                     configBO.getModel(),
                     configBO.getTemperature(),
                     configBO.getMaxTokens()
@@ -272,6 +285,38 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
         } catch (Exception e) {
             log.error("AI 连接测试失败: {}", e.getMessage(), e);
+            result.setSuccess(false);
+            result.setMessage("连接失败: " + extractErrorMessage(e));
+        }
+
+        result.setResponseTime(System.currentTimeMillis() - startTime);
+        return result;
+    }
+
+    @Override
+    public WeKnoraModelTestVO testWeKnoraModel(WeKnoraModelTestBO testBO) {
+        WeKnoraModelTestVO result = new WeKnoraModelTestVO();
+        long startTime = System.currentTimeMillis();
+
+        try {
+            Map<String, String> currentConfigs = getConfigsByType(WEKNORA_CONFIG_TYPE);
+            String modelType = required(testBO.getModelType(), "model type").toLowerCase();
+
+            if ("embedding".equals(modelType)) {
+                String modelName = required(firstNotBlank(testBO.getModelName(), currentConfigs.get("weknora_embedding_model_name")), "Embedding model name");
+                String baseUrl = normalizeProviderBaseUrl(firstNotBlank(testBO.getBaseUrl(), currentConfigs.get("weknora_embedding_base_url")));
+                String apiKey = resolveSecret(testBO.getApiKey(), currentConfigs.get("weknora_embedding_api_key"), "Embedding API Key");
+                testEmbeddingModel(result, baseUrl, apiKey, modelName);
+            } else if ("llm".equals(modelType) || "knowledgeqa".equals(modelType)) {
+                String modelName = required(firstNotBlank(testBO.getModelName(), currentConfigs.get("weknora_llm_model_name")), "LLM model name");
+                String baseUrl = normalizeProviderBaseUrl(firstNotBlank(testBO.getBaseUrl(), currentConfigs.get("weknora_llm_base_url")));
+                String apiKey = resolveSecret(testBO.getApiKey(), currentConfigs.get("weknora_llm_api_key"), "LLM API Key");
+                testLlmModel(result, baseUrl, apiKey, modelName);
+            } else {
+                throw new IllegalArgumentException("Unsupported model type: " + testBO.getModelType());
+            }
+        } catch (Exception e) {
+            log.error("WeKnora model connection test failed: {}", e.getMessage(), e);
             result.setSuccess(false);
             result.setMessage("连接失败: " + extractErrorMessage(e));
         }
@@ -388,7 +433,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         try {
             Map<String, String> currentConfigs = getConfigsByType(WEKNORA_CONFIG_TYPE);
             String baseUrl = normalizeBaseUrl(firstNotBlank(configBO.getBaseUrl(), currentConfigs.get("weknora_base_url"), defaultWeKnoraBaseUrl));
-            String apiKey = resolveSecret(configBO.getApiKey(), currentConfigs.get("weknora_api_key"), "WeKnora API Key");
+            String apiKey = ensureWeKnoraTenantApiKey(baseUrl, configBO.getApiKey(), currentConfigs.get("weknora_api_key"));
 
             if (StrUtil.isBlank(baseUrl) || StrUtil.isBlank(apiKey)) {
                 result.setSuccess(false);
@@ -437,7 +482,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         Map<String, String> currentConfigs = getConfigsByType(WEKNORA_CONFIG_TYPE);
 
         String baseUrl = normalizeBaseUrl(firstNotBlank(syncBO.getBaseUrl(), currentConfigs.get("weknora_base_url"), defaultWeKnoraBaseUrl));
-        String apiKey = resolveSecret(syncBO.getApiKey(), currentConfigs.get("weknora_api_key"), "WeKnora API Key");
+        String apiKey = ensureWeKnoraTenantApiKey(baseUrl, syncBO.getApiKey(), currentConfigs.get("weknora_api_key"));
         String knowledgeBaseName = firstNotBlank(syncBO.getKnowledgeBaseName(), currentConfigs.get("weknora_knowledge_base_name"), "CRM Default Knowledge Base");
 
         String llmProvider = firstNotBlank(syncBO.getLlmProvider(), currentConfigs.get("weknora_llm_provider"), "aliyun");
@@ -573,6 +618,54 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         return StrUtil.isNotBlank(value) && value.contains("****");
     }
 
+    private String ensureWeKnoraTenantApiKey(String baseUrl, String incoming, String stored) {
+        String apiKey = firstNotBlank(incoming, stored, defaultWeKnoraApiKey);
+        if (StrUtil.isNotBlank(apiKey)) {
+            return apiKey;
+        }
+
+        if (StrUtil.isBlank(weKnoraInitEmail) || StrUtil.isBlank(weKnoraInitPassword)) {
+            throw new IllegalArgumentException("WeKnora tenant API Key is missing; configure WEKNORA_INIT_EMAIL and WEKNORA_INIT_PASSWORD or provide an existing key");
+        }
+
+        String generatedApiKey = loginOrRegisterWeKnoraTenant(baseUrl);
+        Map<String, String> configs = new HashMap<>();
+        configs.put("weknora_base_url", baseUrl);
+        configs.put("weknora_api_key", generatedApiKey);
+        updateConfigsWithType(configs, WEKNORA_CONFIG_TYPE);
+        return generatedApiKey;
+    }
+
+    private String loginOrRegisterWeKnoraTenant(String baseUrl) {
+        Map<String, Object> loginPayload = new LinkedHashMap<>();
+        loginPayload.put("email", weKnoraInitEmail.trim());
+        loginPayload.put("password", weKnoraInitPassword.trim());
+
+        try {
+            return tenantApiKey(weKnoraAuthRequest(baseUrl, "/auth/login", loginPayload));
+        } catch (Exception loginError) {
+            log.info("WeKnora login failed for configured init account; trying to register account");
+            Map<String, Object> registerPayload = new LinkedHashMap<>();
+            registerPayload.put("username", StrUtil.blankToDefault(weKnoraInitUsername, "admin"));
+            registerPayload.put("email", weKnoraInitEmail.trim());
+            registerPayload.put("password", weKnoraInitPassword.trim());
+            weKnoraAuthRequest(baseUrl, "/auth/register", registerPayload);
+            return tenantApiKey(weKnoraAuthRequest(baseUrl, "/auth/login", loginPayload));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String tenantApiKey(Map<String, Object> session) {
+        Object tenant = session.get("tenant");
+        if (tenant instanceof Map<?, ?> tenantMap) {
+            Object apiKey = ((Map<String, Object>) tenantMap).get("api_key");
+            if (apiKey != null && StrUtil.isNotBlank(String.valueOf(apiKey))) {
+                return String.valueOf(apiKey);
+            }
+        }
+        throw new IllegalStateException("WeKnora tenant API Key was not returned by login");
+    }
+
     private String normalizeBaseUrl(String baseUrl) {
         String normalized = required(baseUrl, "WeKnora API base URL").trim();
         while (normalized.endsWith("/")) {
@@ -581,11 +674,103 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         return normalized;
     }
 
+    private String normalizeProviderBaseUrl(String baseUrl) {
+        String normalized = required(baseUrl, "model base URL").trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private HttpHeaders providerHeaders(String apiKey) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+        return headers;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void testLlmModel(WeKnoraModelTestVO result, String baseUrl, String apiKey, String modelName) {
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("role", "user");
+        message.put("content", "ping");
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", modelName);
+        payload.put("messages", List.of(message));
+        payload.put("temperature", 0);
+        payload.put("max_tokens", 8);
+
+        ResponseEntity<Map> response = new RestTemplate().exchange(
+                baseUrl + "/chat/completions",
+                HttpMethod.POST,
+                new HttpEntity<>(payload, providerHeaders(apiKey)),
+                Map.class
+        );
+        Map<String, Object> body = response.getBody();
+        Object choices = body == null ? null : body.get("choices");
+        if (!response.getStatusCode().is2xxSuccessful() || !(choices instanceof List<?>) || ((List<?>) choices).isEmpty()) {
+            throw new IllegalStateException("LLM response did not include choices");
+        }
+        result.setSuccess(true);
+        result.setMessage("LLM 连接成功");
+        result.setModel(modelName);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void testEmbeddingModel(WeKnoraModelTestVO result, String baseUrl, String apiKey, String modelName) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", modelName);
+        payload.put("input", List.of("ping"));
+
+        ResponseEntity<Map> response = new RestTemplate().exchange(
+                baseUrl + "/embeddings",
+                HttpMethod.POST,
+                new HttpEntity<>(payload, providerHeaders(apiKey)),
+                Map.class
+        );
+        Map<String, Object> body = response.getBody();
+        Object data = body == null ? null : body.get("data");
+        if (!response.getStatusCode().is2xxSuccessful() || !(data instanceof List<?>) || ((List<?>) data).isEmpty()) {
+            throw new IllegalStateException("Embedding response did not include data");
+        }
+
+        Object first = ((List<?>) data).get(0);
+        Integer dimension = null;
+        if (first instanceof Map<?, ?> item) {
+            Object embedding = ((Map<String, Object>) item).get("embedding");
+            if (embedding instanceof List<?>) {
+                dimension = ((List<?>) embedding).size();
+            }
+        }
+        result.setSuccess(true);
+        result.setMessage("Embedding 连接成功");
+        result.setModel(modelName);
+        result.setEmbeddingDimension(dimension);
+    }
+
     private HttpEntity<Object> weKnoraEntity(String apiKey, Object body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-API-Key", apiKey);
         return new HttpEntity<>(body, headers);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> weKnoraAuthRequest(String baseUrl, String path, Object body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<Map> response = new RestTemplate().exchange(
+                baseUrl + path,
+                HttpMethod.POST,
+                new HttpEntity<>(body, headers),
+                Map.class
+        );
+        Map<String, Object> responseBody = response.getBody();
+        if (!response.getStatusCode().is2xxSuccessful() || responseBody == null || Boolean.FALSE.equals(responseBody.get("success"))) {
+            throw new IllegalStateException("WeKnora auth request failed: " + path);
+        }
+        return responseBody;
     }
 
     @SuppressWarnings("unchecked")

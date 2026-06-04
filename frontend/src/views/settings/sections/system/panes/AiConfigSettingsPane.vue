@@ -188,7 +188,7 @@ async function loadAiConfig() {
     Object.assign(aiConfigForm, {
       provider: (config.provider || 'dashscope') as AiProvider,
       apiUrl: config.apiUrl || '',
-      apiKey: '',
+      apiKey: config.apiKey || '',
       model: config.model || '',
       temperature: config.temperature ?? 0.7,
       maxTokens: config.maxTokens ?? 2048,
@@ -246,6 +246,7 @@ async function handleSaveAiConfig() {
 
   savingAiConfig.value = true
   try {
+    // 已保存的密钥会以脱敏形式回显；如果用户没有重新输入，后端会沿用原密钥。
     await updateAiConfig({
       provider: aiConfigForm.provider,
       apiUrl: aiConfigForm.apiUrl,

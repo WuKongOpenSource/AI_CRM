@@ -129,6 +129,23 @@ export interface WeKnoraModelSyncResult {
   knowledgeBaseId: string
 }
 
+export interface WeKnoraModelTestBO {
+  modelType: 'llm' | 'embedding'
+  provider?: string
+  modelName?: string
+  baseUrl?: string
+  apiKey?: string
+  embeddingDimension?: number
+}
+
+export interface WeKnoraModelTestResult {
+  success: boolean
+  responseTime: number
+  message: string
+  model?: string
+  embeddingDimension?: number
+}
+
 /**
  * 企业信息配置
  */

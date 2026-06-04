@@ -26,12 +26,12 @@
           </el-input>
         </el-form-item>
 
-        <el-form-item label="API 密钥">
-          <div class="flex gap-2 w-full">
+        <el-form-item label="WeKnora 租户 API Key">
+          <div class="flex flex-wrap gap-2 w-full">
             <el-input
               v-model="form.apiKey"
               :type="showWeKnoraKey ? 'text' : 'password'"
-              placeholder="sk-xxxxxx"
+              placeholder="同步成功后自动填充，手动填写 WeKnora 生成的 sk-- 密钥"
               class="flex-1"
             >
               <template #prepend>Key</template>
@@ -46,6 +46,9 @@
               <el-icon class="mr-1"><Connection /></el-icon>
               测试连接
             </el-button>
+            <p class="basis-full text-xs text-slate-400 mt-1">
+              这里不是模型厂商 Key；模型 Key 请填写在下方 LLM / Embedding 配置中。
+            </p>
           </div>
         </el-form-item>
 
@@ -80,18 +83,25 @@
         </el-form-item>
 
         <el-form-item label="API Key">
-          <el-input
-            v-model="form.llmApiKey"
-            :type="showLlmKey ? 'text' : 'password'"
-            placeholder="LLM API Key"
-          >
-            <template #suffix>
-              <el-icon class="cursor-pointer" @click="showLlmKey = !showLlmKey">
-                <View v-if="showLlmKey" />
-                <Hide v-else />
-              </el-icon>
-            </template>
-          </el-input>
+          <div class="flex gap-2 w-full">
+            <el-input
+              v-model="form.llmApiKey"
+              :type="showLlmKey ? 'text' : 'password'"
+              placeholder="LLM API Key"
+              class="flex-1"
+            >
+              <template #suffix>
+                <el-icon class="cursor-pointer" @click="showLlmKey = !showLlmKey">
+                  <View v-if="showLlmKey" />
+                  <Hide v-else />
+                </el-icon>
+              </template>
+            </el-input>
+            <el-button :loading="testingLlm" @click="handleTestLlmModel">
+              <el-icon class="mr-1"><Connection /></el-icon>
+              测试连接
+            </el-button>
+          </div>
         </el-form-item>
 
         <el-form-item v-if="form.llmModelId" label="LLM 模型 ID">
@@ -122,18 +132,25 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
           <el-form-item label="API Key">
-            <el-input
-              v-model="form.embeddingApiKey"
-              :type="showEmbeddingKey ? 'text' : 'password'"
-              placeholder="Embedding API Key"
-            >
-              <template #suffix>
-                <el-icon class="cursor-pointer" @click="showEmbeddingKey = !showEmbeddingKey">
-                  <View v-if="showEmbeddingKey" />
-                  <Hide v-else />
-                </el-icon>
-              </template>
-            </el-input>
+            <div class="flex gap-2 w-full">
+              <el-input
+                v-model="form.embeddingApiKey"
+                :type="showEmbeddingKey ? 'text' : 'password'"
+                placeholder="Embedding API Key"
+                class="flex-1"
+              >
+                <template #suffix>
+                  <el-icon class="cursor-pointer" @click="showEmbeddingKey = !showEmbeddingKey">
+                    <View v-if="showEmbeddingKey" />
+                    <Hide v-else />
+                  </el-icon>
+                </template>
+              </el-input>
+              <el-button :loading="testingEmbedding" @click="handleTestEmbeddingModel">
+                <el-icon class="mr-1"><Connection /></el-icon>
+                测试连接
+              </el-button>
+            </div>
           </el-form-item>
           <el-form-item label="向量维度">
             <el-input-number v-model="form.embeddingDimension" :min="1" :step="1" class="w-full" />
@@ -172,6 +189,7 @@ import { Connection, Hide, View } from '@element-plus/icons-vue'
 import {
   getWeKnoraConfig,
   syncWeKnoraModels,
+  testWeKnoraModel,
   testWeKnoraConnection,
   updateWeKnoraConfig
 } from '@/api/systemConfig'
@@ -231,6 +249,8 @@ const showWeKnoraKey = ref(false)
 const showLlmKey = ref(false)
 const showEmbeddingKey = ref(false)
 const testing = ref(false)
+const testingLlm = ref(false)
+const testingEmbedding = ref(false)
 const saving = ref(false)
 const syncing = ref(false)
 const syncResult = ref<WeKnoraModelSyncResult | null>(null)
@@ -266,7 +286,7 @@ async function loadConfig() {
     })
     syncResult.value = null
   } catch {
-    // Error handled by interceptor
+    // 错误提示由请求拦截器统一处理。
   }
 }
 
@@ -286,7 +306,7 @@ function handleEmbeddingProviderChange(provider: string) {
 }
 
 async function handleTestConnection() {
-  if (!form.baseUrl || !form.apiKey) {
+  if (!form.baseUrl) {
     ElMessage.warning('请填写 WeKnora API 地址和密钥')
     return
   }
@@ -299,13 +319,67 @@ async function handleTestConnection() {
     })
     if (result.success) {
       ElMessage.success(result.message)
+      await loadConfig()
     } else {
       ElMessage.error(result.message)
     }
   } catch {
-    // Error handled by interceptor
   } finally {
     testing.value = false
+  }
+}
+
+async function handleTestLlmModel() {
+  if (!form.llmModelName || !form.llmBaseUrl || !form.llmApiKey) {
+    ElMessage.warning('请填写 LLM 模型名称、Base URL 和 API Key')
+    return
+  }
+
+  testingLlm.value = true
+  try {
+    const result = await testWeKnoraModel({
+      modelType: 'llm',
+      provider: form.llmProvider,
+      modelName: form.llmModelName,
+      baseUrl: form.llmBaseUrl,
+      apiKey: form.llmApiKey
+    })
+    if (result.success) {
+      ElMessage.success(result.message)
+    } else {
+      ElMessage.error(result.message)
+    }
+  } catch {
+  } finally {
+    testingLlm.value = false
+  }
+}
+
+async function handleTestEmbeddingModel() {
+  if (!form.embeddingModelName || !form.embeddingBaseUrl || !form.embeddingApiKey || !form.embeddingDimension) {
+    ElMessage.warning('请填写 Embedding 模型名称、Base URL、API Key 和向量维度')
+    return
+  }
+
+  testingEmbedding.value = true
+  try {
+    const result = await testWeKnoraModel({
+      modelType: 'embedding',
+      provider: form.embeddingProvider,
+      modelName: form.embeddingModelName,
+      baseUrl: form.embeddingBaseUrl,
+      apiKey: form.embeddingApiKey,
+      embeddingDimension: form.embeddingDimension
+    })
+    if (result.success) {
+      const dimensionText = result.embeddingDimension ? `，维度 ${result.embeddingDimension}` : ''
+      ElMessage.success(`${result.message}${dimensionText}`)
+    } else {
+      ElMessage.error(result.message)
+    }
+  } catch {
+  } finally {
+    testingEmbedding.value = false
   }
 }
 
@@ -324,14 +398,13 @@ async function handleSaveConfig() {
     ElMessage.success('WeKnora 配置已保存')
     await loadConfig()
   } catch {
-    // Error handled by interceptor
   } finally {
     saving.value = false
   }
 }
 
 async function handleSyncModels() {
-  if (!form.baseUrl || !form.apiKey) {
+  if (!form.baseUrl) {
     ElMessage.warning('请填写 WeKnora API 地址和密钥')
     return
   }
@@ -352,7 +425,6 @@ async function handleSyncModels() {
     ElMessage.success('WeKnora 模型和默认知识库已同步')
     await loadConfig()
   } catch {
-    // Error handled by interceptor
   } finally {
     syncing.value = false
   }

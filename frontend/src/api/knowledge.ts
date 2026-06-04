@@ -1,6 +1,6 @@
 import { post, get, upload, download, getToken, getApiBaseUrl } from '@/utils/request'
 import type { PageResult } from '@/types/api'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeAiAnalyzeVO } from '@/types/common'
+import type { Knowledge, KnowledgeQueryBO, KnowledgeAiAnalyzeVO, KnowledgeSalesScriptVO } from '@/types/common'
 
 /**
  * Upload file to knowledge base
@@ -73,6 +73,13 @@ export function getKnowledgeFileUrl(id: string): Promise<string> {
  */
 export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {
   return post(`/knowledge/${id}/ai-analyze`)
+}
+
+/**
+ * Generate a sales script from knowledge base content
+ */
+export function generateSalesScript(): Promise<KnowledgeSalesScriptVO> {
+  return post('/knowledge/sales-script')
 }
 
 /**

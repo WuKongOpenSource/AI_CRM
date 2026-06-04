@@ -58,6 +58,7 @@ export interface Knowledge {
   customerName?: string
   filePath?: string
   fileSize?: number
+  mimeType?: string
   summary?: string
   contentText?: string
   weKnoraParseStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'unsupported'
@@ -90,6 +91,11 @@ export interface KnowledgeAiAnalyzeVO {
     name: string
     type: string
   }>
+}
+
+export interface KnowledgeSalesScriptVO {
+  script: string
+  sources: string[]
 }
 
 // AI Agent types

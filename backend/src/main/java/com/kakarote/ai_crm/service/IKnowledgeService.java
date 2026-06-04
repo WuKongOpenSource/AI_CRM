@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeSalesScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
@@ -49,6 +50,11 @@ public interface IKnowledgeService extends IService<Knowledge> {
      * AI分析文档内容（核心提炼、推荐话术、关联实体）
      */
     KnowledgeAiAnalyzeVO aiAnalyzeDocument(Long knowledgeId);
+
+    /**
+     * 基于知识库内容生成销售话术。
+     */
+    KnowledgeSalesScriptVO generateSalesScript();
 
     /**
      * 向AI提问文档内容（流式响应）
