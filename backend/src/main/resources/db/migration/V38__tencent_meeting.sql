@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS crm_tencent_meeting_corp_config (
+﻿CREATE TABLE IF NOT EXISTS crm_tencent_meeting_corp_config (
     id BIGINT NOT NULL,
     tenant_id BIGINT NOT NULL,
     app_id VARCHAR(128) NOT NULL,
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS crm_tencent_meeting_corp_config (
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_config_tenant_app
     ON crm_tencent_meeting_corp_config (tenant_id, app_id);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_config_update_time ON crm_tencent_meeting_corp_config;
 CREATE TRIGGER trg_tencent_meeting_config_update_time
     BEFORE UPDATE ON crm_tencent_meeting_corp_config
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -47,6 +48,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_user_mapping
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_user_crm
     ON crm_tencent_meeting_user_mapping (tenant_id, crm_user_id);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_user_mapping_update_time ON crm_tencent_meeting_user_mapping;
 CREATE TRIGGER trg_tencent_meeting_user_mapping_update_time
     BEFORE UPDATE ON crm_tencent_meeting_user_mapping
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -90,6 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_tencent_meeting_customer
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_creator
     ON crm_tencent_meeting (tenant_id, crm_creator_user_id);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_update_time ON crm_tencent_meeting;
 CREATE TRIGGER trg_tencent_meeting_update_time
     BEFORE UPDATE ON crm_tencent_meeting
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -115,6 +118,7 @@ CREATE TABLE IF NOT EXISTS crm_tencent_meeting_participant (
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_participant_meeting
     ON crm_tencent_meeting_participant (tenant_id, meeting_db_id);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_participant_update_time ON crm_tencent_meeting_participant;
 CREATE TRIGGER trg_tencent_meeting_participant_update_time
     BEFORE UPDATE ON crm_tencent_meeting_participant
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -145,6 +149,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_recording
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_recording_meeting
     ON crm_tencent_meeting_recording (tenant_id, meeting_db_id);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_recording_update_time ON crm_tencent_meeting_recording;
 CREATE TRIGGER trg_tencent_meeting_recording_update_time
     BEFORE UPDATE ON crm_tencent_meeting_recording
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -171,6 +176,7 @@ CREATE TABLE IF NOT EXISTS crm_tencent_meeting_transcript_segment (
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_transcript_meeting
     ON crm_tencent_meeting_transcript_segment (tenant_id, meeting_db_id, start_time_ms);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_transcript_update_time ON crm_tencent_meeting_transcript_segment;
 CREATE TRIGGER trg_tencent_meeting_transcript_update_time
     BEFORE UPDATE ON crm_tencent_meeting_transcript_segment
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -196,6 +202,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_active_binding
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_binding_customer
     ON crm_tencent_meeting_customer_binding (tenant_id, customer_id);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_binding_update_time ON crm_tencent_meeting_customer_binding;
 CREATE TRIGGER trg_tencent_meeting_binding_update_time
     BEFORE UPDATE ON crm_tencent_meeting_customer_binding
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -215,6 +222,7 @@ CREATE TABLE IF NOT EXISTS crm_tencent_meeting_sync_cursor (
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_sync_cursor
     ON crm_tencent_meeting_sync_cursor (tenant_id, app_id, cursor_type);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_sync_cursor_update_time ON crm_tencent_meeting_sync_cursor;
 CREATE TRIGGER trg_tencent_meeting_sync_cursor_update_time
     BEFORE UPDATE ON crm_tencent_meeting_sync_cursor
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -239,6 +247,7 @@ CREATE TABLE IF NOT EXISTS crm_tencent_meeting_sync_log (
 CREATE INDEX IF NOT EXISTS idx_tencent_meeting_sync_log_time
     ON crm_tencent_meeting_sync_log (tenant_id, started_at DESC);
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_sync_log_update_time ON crm_tencent_meeting_sync_log;
 CREATE TRIGGER trg_tencent_meeting_sync_log_update_time
     BEFORE UPDATE ON crm_tencent_meeting_sync_log
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -261,17 +270,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tencent_meeting_webhook_trace
     ON crm_tencent_meeting_webhook_event (trace_id)
     WHERE trace_id IS NOT NULL;
 
+DROP TRIGGER IF EXISTS trg_tencent_meeting_webhook_update_time ON crm_tencent_meeting_webhook_event;
 CREATE TRIGGER trg_tencent_meeting_webhook_update_time
     BEFORE UPDATE ON crm_tencent_meeting_webhook_event
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
 INSERT INTO manager_menu (menu_id, parent_id, realm, realm_name, type)
 VALUES
-    (2440, 0, 'tencentMeeting', '腾讯会议', 3),
-    (2441, 2440, 'tencentMeeting:view', '查看列表', 5),
-    (2442, 2440, 'tencentMeeting:detail', '查看详情', 5),
-    (2443, 2440, 'tencentMeeting:bind', '关联客户', 5),
-    (2444, 2440, 'tencentMeeting:unbind', '取消关联', 5),
-    (2445, 2440, 'tencentMeeting:sync', '同步会议', 5),
-    (2446, 2440, 'tencentMeeting:config', '配置腾讯会议', 5)
+    (2440, 0, 'tencentMeeting', '鑵捐浼氳', 3),
+    (2441, 2440, 'tencentMeeting:view', '鏌ョ湅鍒楄〃', 5),
+    (2442, 2440, 'tencentMeeting:detail', '鏌ョ湅璇︽儏', 5),
+    (2443, 2440, 'tencentMeeting:bind', '鍏宠仈瀹㈡埛', 5),
+    (2444, 2440, 'tencentMeeting:unbind', '鍙栨秷鍏宠仈', 5),
+    (2445, 2440, 'tencentMeeting:sync', '鍚屾浼氳', 5),
+    (2446, 2440, 'tencentMeeting:config', '閰嶇疆鑵捐浼氳', 5)
 ON CONFLICT (menu_id) DO NOTHING;
+
+
+
+

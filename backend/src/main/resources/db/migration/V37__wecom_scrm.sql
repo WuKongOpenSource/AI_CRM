@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS crm_wecom_corp_config (
 CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_config_tenant_corp
     ON crm_wecom_corp_config (tenant_id, corp_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_corp_config_update_time ON crm_wecom_corp_config;
 CREATE TRIGGER trg_wecom_corp_config_update_time
     BEFORE UPDATE ON crm_wecom_corp_config
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -53,6 +54,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_employee_user
 CREATE INDEX IF NOT EXISTS idx_wecom_employee_crm_user
     ON crm_wecom_employee (tenant_id, crm_user_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_employee_update_time ON crm_wecom_employee;
 CREATE TRIGGER trg_wecom_employee_update_time
     BEFORE UPDATE ON crm_wecom_employee
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -84,6 +86,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_external_customer_user
 CREATE INDEX IF NOT EXISTS idx_wecom_external_customer_bind
     ON crm_wecom_external_customer (tenant_id, bind_status, customer_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_external_customer_update_time ON crm_wecom_external_customer;
 CREATE TRIGGER trg_wecom_external_customer_update_time
     BEFORE UPDATE ON crm_wecom_external_customer
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -114,6 +117,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_external_follow
 CREATE INDEX IF NOT EXISTS idx_wecom_external_follow_employee
     ON crm_wecom_external_customer_follow (tenant_id, employee_user_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_external_customer_follow_update_time ON crm_wecom_external_customer_follow;
 CREATE TRIGGER trg_wecom_external_customer_follow_update_time
     BEFORE UPDATE ON crm_wecom_external_customer_follow
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -141,6 +145,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_group_chat
 CREATE INDEX IF NOT EXISTS idx_wecom_group_chat_owner
     ON crm_wecom_group_chat (tenant_id, owner_user_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_group_chat_update_time ON crm_wecom_group_chat;
 CREATE TRIGGER trg_wecom_group_chat_update_time
     BEFORE UPDATE ON crm_wecom_group_chat
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -179,6 +184,7 @@ CREATE INDEX IF NOT EXISTS idx_wecom_conversation_customer
 CREATE INDEX IF NOT EXISTS idx_wecom_conversation_owner
     ON crm_wecom_conversation (tenant_id, owner_user_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_conversation_update_time ON crm_wecom_conversation;
 CREATE TRIGGER trg_wecom_conversation_update_time
     BEFORE UPDATE ON crm_wecom_conversation
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -217,6 +223,7 @@ CREATE INDEX IF NOT EXISTS idx_wecom_message_conversation_time
 CREATE INDEX IF NOT EXISTS idx_wecom_message_seq
     ON crm_wecom_message (tenant_id, seq);
 
+DROP TRIGGER IF EXISTS trg_wecom_message_update_time ON crm_wecom_message;
 CREATE TRIGGER trg_wecom_message_update_time
     BEFORE UPDATE ON crm_wecom_message
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -244,6 +251,7 @@ CREATE INDEX IF NOT EXISTS idx_wecom_media_msg
 CREATE INDEX IF NOT EXISTS idx_wecom_media_sdk_file
     ON crm_wecom_media (tenant_id, sdk_file_id);
 
+DROP TRIGGER IF EXISTS trg_wecom_media_update_time ON crm_wecom_media;
 CREATE TRIGGER trg_wecom_media_update_time
     BEFORE UPDATE ON crm_wecom_media
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -271,6 +279,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_customer_binding_active
 CREATE INDEX IF NOT EXISTS idx_wecom_customer_binding_customer
     ON crm_wecom_customer_binding (tenant_id, customer_id, status);
 
+DROP TRIGGER IF EXISTS trg_wecom_customer_binding_update_time ON crm_wecom_customer_binding;
 CREATE TRIGGER trg_wecom_customer_binding_update_time
     BEFORE UPDATE ON crm_wecom_customer_binding
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
@@ -291,6 +300,7 @@ CREATE TABLE IF NOT EXISTS crm_wecom_sync_cursor (
 CREATE UNIQUE INDEX IF NOT EXISTS uk_wecom_sync_cursor
     ON crm_wecom_sync_cursor (tenant_id, corp_id, cursor_type, cursor_key);
 
+DROP TRIGGER IF EXISTS trg_wecom_sync_cursor_update_time ON crm_wecom_sync_cursor;
 CREATE TRIGGER trg_wecom_sync_cursor_update_time
     BEFORE UPDATE ON crm_wecom_sync_cursor
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
