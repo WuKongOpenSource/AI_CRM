@@ -7,7 +7,7 @@
       aria-label="已置顶"
     >push_pin</span>
     <span
-      class="block min-w-0 flex-1 truncate text-[1rem] leading-5 text-[#0d0d0d]"
+      class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]"
       :title="displayTitle"
     >{{ displayTitle }}</span>
     <div class="shrink-0" @click.stop>
