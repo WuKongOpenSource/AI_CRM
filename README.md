@@ -175,6 +175,31 @@ weknora:
   knowledge-base-id: your_kb_id
 ```
 
+### Docker WeKnora auto initialization
+
+The Docker deployment includes a one-shot `aicrm-weknora-init` service. It registers or logs in to WeKnora, creates the configured remote LLM and embedding models, creates the default CRM knowledge base, and writes the WeKnora tenant API key and knowledge base ID into `crm_system_config`.
+
+Set these values in `docker/.env` before deployment:
+
+```env
+WEKNORA_INIT_EMAIL=admin@example.com
+WEKNORA_INIT_PASSWORD=WkRag@2026
+INIT_LLM_MODEL_NAME=qwen-max
+INIT_LLM_MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+INIT_LLM_MODEL_API_KEY=your_llm_api_key
+INIT_EMBEDDING_MODEL_NAME=text-embedding-v3
+INIT_EMBEDDING_MODEL_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+INIT_EMBEDDING_MODEL_API_KEY=your_embedding_api_key
+INIT_EMBEDDING_MODEL_DIMENSION=1024
+```
+
+After changing the model keys, run:
+
+```bash
+cd docker
+docker compose --env-file .env -f docker-compose.yaml run --rm aicrm-weknora-init
+```
+
 ## API 文档
 
 启动后端服务后，访问 Knife4j API 文档：

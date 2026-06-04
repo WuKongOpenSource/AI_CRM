@@ -89,13 +89,13 @@ oidc:
 # WeKnora 知识库服务配置
 weknora:
   # 是否启用 WeKnora 集成（设为 false 可禁用，仅使用本地存储）
-  enabled: true
+  enabled: ${WEKNORA_ENABLED:false}
   # WeKnora API 基础 URL
-  base-url: http://frontend/api/v1
+  base-url: ${WEKNORA_BASE_URL:http://frontend/api/v1}
   # WeKnora API Key（从 WeKnora 管理界面获取）
-  api-key: sk-NgkVLxONp7oNgyG3lm-EBGSLdDlGBCgJrEUW4ncowLRNlaLc
+  api-key: ${WEKNORA_API_KEY:}
   # 默认知识库 ID（CRM 文档将上传到此知识库）
-  knowledge-base-id: 398435ff-1a23-49ab-8571-91fa89f0f8e3
+  knowledge-base-id: ${WEKNORA_KNOWLEDGE_BASE_ID:}
   # 搜索配置
   search:
     # 检索返回的最大结果数
