@@ -309,19 +309,6 @@ public class ManagerRoleServiceImpl extends ServiceImpl<ManagerRoleMapper, Manag
                         "followup",
                         "schedule",
                         "knowledge",
-                        "wecomEmployeeSession",
-                        "wecomCustomerSession",
-                        "wecomGroupSession",
-                        "wecomCustomer",
-                        "tencentMeeting"
-                );
-                Set<String> dataScopeModules = Set.of(
-                        "customer",
-                        "contact",
-                        "task",
-                        "followup",
-                        "schedule",
-                        "knowledge",
                         "relation",
                         "wecomEmployeeSession",
                         "wecomCustomerSession",
