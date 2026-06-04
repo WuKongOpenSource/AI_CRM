@@ -1967,6 +1967,8 @@ const allMainNavItems: MainNavItem[] = [
   { key: 'task', icon: 'task-1', label: '项目', route: '/project', permission: 'task' },
   { key: 'calendar', icon: 'event', label: '日程', route: '/calendar', permission: 'schedule' },
   { key: 'mail', icon: 'event', materialIcon: 'mail', label: '邮箱', route: '/mail', permission: 'mail:view' },
+  { key: 'wecom', icon: 'event', materialIcon: 'forum', label: '企业微信', route: '/scrm', permission: 'wecomCustomerSession:view' },
+  { key: 'tencent-meetings', icon: 'event', materialIcon: 'video_camera_front', label: '腾讯会议', route: '/tencent-meetings', permission: 'tencentMeeting:view' },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
