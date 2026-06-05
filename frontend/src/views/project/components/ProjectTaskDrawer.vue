@@ -127,8 +127,9 @@
         <div class="flex flex-wrap gap-3">
           <button
             type="button"
-            class="flex-1 rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+            class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
             @click="$emit('enter-chat', task)"
+            data-ai-dialog-entry="task-drawer"
           >
             进入任务对话
           </button>
@@ -193,5 +194,27 @@ const open = computed({
 <style>
 .wk-project-task-drawer .el-drawer__body {
   padding: 0 !important;
+}
+
+[data-ai-dialog-entry='task-drawer']::before {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #202020;
+  color: #fff;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 0.14);
+  content: 'auto_awesome';
+  font-family: 'Material Symbols Outlined';
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 </style>

@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.service;
 
+import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
 
@@ -7,6 +8,8 @@ import java.util.List;
 
 public interface IProjectService {
     List<ProjectVO> listProjects();
+
+    BasePage<ProjectVO> queryPageList(ProjectBO.Query queryBO);
 
     ProjectVO getProject(Long projectId);
 

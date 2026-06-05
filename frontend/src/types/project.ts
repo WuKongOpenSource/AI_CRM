@@ -6,6 +6,23 @@ export type ProjectTaskSource = 'manual' | 'ai'
 
 export type ProjectViewMode = 'ai' | 'board' | 'list' | 'cards' | 'members' | 'task_ai'
 
+export type ProjectListViewMode = 'card' | 'table'
+
+export type ProjectListStatusFilter = 'all' | 'IN_PROGRESS' | 'COMPLETED'
+
+export interface ProjectListStats {
+  all: number
+  inProgress: number
+  completed: number
+}
+
+export interface ProjectListQuery {
+  keyword?: string
+  status?: ProjectListStatusFilter
+  page?: number
+  limit?: number
+}
+
 export type ProjectRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'READONLY' | 'EXTERNAL'
 
 export type ProjectMemberStatus = 'ACTIVE' | 'REMOVED' | 'DISABLED'

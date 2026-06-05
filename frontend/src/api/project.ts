@@ -1,9 +1,11 @@
 import { get, post } from '@/utils/request'
+import type { PageResult } from '@/types/api'
 import type {
   ProjectCreatePayload,
   ProjectAttachment,
   ProjectEntity,
   ProjectLane,
+  ProjectListQuery,
   ProjectMember,
   ProjectMemberPayload,
   ProjectPermission,
@@ -29,6 +31,14 @@ function date(value: unknown): string | undefined {
 
 function list<T>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : []
+}
+
+function isProjectWelcomeMessage(content: string) {
+  return content.startsWith('已进入项目「') && content.includes('上下文') && content.includes('创建任务')
+}
+
+function isTaskWelcomeMessage(content: string) {
+  return content.startsWith('当前对话对象：任务 - ') && content.includes('修改截止时间') && content.includes('追加备注')
 }
 
 export function normalizeProject(raw: RawProject): ProjectEntity {
@@ -95,12 +105,14 @@ export function normalizeProject(raw: RawProject): ProjectEntity {
         createTime: date(item.createTime) || new Date().toISOString(),
         createdByName: item.createdByName || ''
       })),
-      chatMessages: list<any>(task.chatMessages).map(item => ({
-        messageId: id(item.messageId) || '',
-        role: item.role === 'user' ? 'user' : 'assistant',
-        content: item.content || '',
-        createTime: date(item.createTime) || new Date().toISOString()
-      })),
+      chatMessages: list<any>(task.chatMessages)
+        .filter(item => !isTaskWelcomeMessage(String(item.content || '')))
+        .map(item => ({
+          messageId: id(item.messageId) || '',
+          role: item.role === 'user' ? 'user' : 'assistant',
+          content: item.content || '',
+          createTime: date(item.createTime) || new Date().toISOString()
+        })),
       createTime: date(task.createTime) || new Date().toISOString(),
       updateTime: date(task.updateTime) || new Date().toISOString()
     })),
@@ -118,12 +130,14 @@ export function normalizeProject(raw: RawProject): ProjectEntity {
       createTime: date(item.createTime) || new Date().toISOString(),
       createdByName: item.createdByName || ''
     })),
-    chatMessages: list<any>(raw.chatMessages).map(item => ({
-      messageId: id(item.messageId) || '',
-      role: item.role === 'user' ? 'user' : 'assistant',
-      content: item.content || '',
-      createTime: date(item.createTime) || new Date().toISOString()
-    })),
+    chatMessages: list<any>(raw.chatMessages)
+      .filter(item => !isProjectWelcomeMessage(String(item.content || '')))
+      .map(item => ({
+        messageId: id(item.messageId) || '',
+        role: item.role === 'user' ? 'user' : 'assistant',
+        content: item.content || '',
+        createTime: date(item.createTime) || new Date().toISOString()
+      })),
     members: list<any>(raw.members).map((member): ProjectMember => ({
       memberId: id(member.memberId) || '',
       userId: id(member.userId) || '',
@@ -184,6 +198,19 @@ async function unwrapProject(request: Promise<RawProject>): Promise<ProjectEntit
 export async function queryProjectList(): Promise<ProjectEntity[]> {
   const projects = await get<RawProject[]>('/project/list')
   return list<RawProject>(projects).map(normalizeProject)
+}
+
+export async function queryProjectPageList(query: ProjectListQuery = {}): Promise<PageResult<ProjectEntity>> {
+  const result = await post<PageResult<RawProject>>('/project/queryPageList', {
+    page: query.page || 1,
+    limit: query.limit || 10,
+    keyword: query.keyword?.trim() || undefined,
+    status: query.status && query.status !== 'all' ? query.status : undefined
+  })
+  return {
+    ...result,
+    list: list<RawProject>(result.list).map(normalizeProject)
+  }
 }
 
 export function getProjectDetail(projectId: string, taskKeyword?: string): Promise<ProjectEntity> {

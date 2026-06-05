@@ -161,7 +161,7 @@
                       <p class="mt-0.5 truncate text-xs text-slate-400">{{ relationTypeLabel(relation.relationType, relation.relationTypeName) }} · {{ relation.company || '-' }}</p>
                     </div>
                     <button type="button" class="relation-icon-btn shrink-0" title="AI 对话" @click.stop="openChat(relation)">
-                      <span class="material-symbols-outlined text-[18px] leading-none">chat</span>
+                      <AiDialogIcon :size="24" :sparkle-size="14" />
                     </button>
                   </div>
                   <div class="mt-3 grid grid-cols-1 gap-1 text-sm text-slate-600">
@@ -282,7 +282,7 @@
               <p class="mt-1 text-sm text-slate-500">{{ relationTypeLabel(currentDetail.relation.relationType, currentDetail.relation.relationTypeName) }}</p>
             </div>
             <button class="relation-icon-btn" title="AI 对话" @click="openChat(currentDetail.relation)">
-              <span class="material-symbols-outlined text-[18px] leading-none">chat</span>
+              <AiDialogIcon :size="24" :sparkle-size="14" />
             </button>
           </div>
           <div class="mt-4 grid grid-cols-1 gap-3 text-sm">
@@ -324,6 +324,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { addRelation, deleteRelation, getRelationDetail, queryRelationList, updateRelation } from '@/api/relation'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
+import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'

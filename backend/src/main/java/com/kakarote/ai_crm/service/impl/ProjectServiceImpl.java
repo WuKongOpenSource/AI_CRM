@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
@@ -125,6 +126,99 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     @Override
+    public BasePage<ProjectVO> queryPageList(ProjectBO.Query queryBO) {
+        ProjectBO.Query query = queryBO == null ? new ProjectBO.Query() : queryBO;
+        Long tenantId = currentTenantId();
+        Long userId = currentUserId();
+        boolean admin = isSystemAdmin();
+        String status = normalizeProjectQueryStatus(query.getStatus());
+        String keyword = StrUtil.trimToEmpty(query.getKeyword());
+
+        StringBuilder baseSql = new StringBuilder("""
+                FROM crm_project p
+                WHERE (p.tenant_id = ? OR ? IS NULL)
+                  AND (
+                    ? = TRUE
+                    OR p.owner_id = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM crm_project_member m
+                        WHERE m.project_id = p.project_id
+                          AND m.user_id = ?
+                          AND m.status = 'ACTIVE'
+                    )
+                  )
+                """);
+        List<Object> baseParams = new ArrayList<>();
+        baseParams.add(tenantId);
+        baseParams.add(tenantId);
+        baseParams.add(admin);
+        baseParams.add(userId);
+        baseParams.add(userId);
+
+        if (StrUtil.isNotBlank(keyword)) {
+            String like = "%" + keyword.toLowerCase(Locale.ROOT) + "%";
+            baseSql.append("""
+                    AND (
+                      LOWER(p.name) LIKE ?
+                      OR LOWER(COALESCE(p.description, '')) LIKE ?
+                      OR LOWER(COALESCE(p.customer_name, '')) LIKE ?
+                    )
+                    """);
+            baseParams.add(like);
+            baseParams.add(like);
+            baseParams.add(like);
+        }
+
+        Map<String, Long> statusCounts = jdbcTemplate.query(
+                "SELECT p.status, COUNT(*) AS count " + baseSql + " GROUP BY p.status",
+                rs -> {
+                    Map<String, Long> result = new LinkedHashMap<>();
+                    while (rs.next()) {
+                        result.put(rs.getString("status"), rs.getLong("count"));
+                    }
+                    return result;
+                },
+                baseParams.toArray());
+        long allCount = statusCounts.values().stream().mapToLong(Long::longValue).sum();
+        long inProgressCount = statusCounts.getOrDefault("IN_PROGRESS", 0L);
+        long completedCount = statusCounts.getOrDefault("COMPLETED", 0L);
+
+        StringBuilder filteredSql = new StringBuilder(baseSql);
+        List<Object> filteredParams = new ArrayList<>(baseParams);
+        if (status != null) {
+            filteredSql.append(" AND p.status = ? ");
+            filteredParams.add(status);
+        }
+
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) " + filteredSql, Long.class, filteredParams.toArray());
+        BasePage<ProjectVO> page = new BasePage<>(query.getPage(), query.getLimit());
+        page.setTotal(total == null ? 0L : total);
+
+        if (page.getTotal() > 0) {
+            long offset = Math.max(0, ((long) query.getPage() - 1) * query.getLimit());
+            List<Object> pageParams = new ArrayList<>(filteredParams);
+            pageParams.add(query.getLimit());
+            pageParams.add(offset);
+            List<Long> projectIds = jdbcTemplate.query(
+                    "SELECT p.project_id " + filteredSql + " ORDER BY p.update_time DESC LIMIT ? OFFSET ?",
+                    (rs, rowNum) -> rs.getLong("project_id"),
+                    pageParams.toArray());
+            page.setList(projectIds.stream()
+                    .map(this::buildProjectVO)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList()));
+        }
+
+        Map<String, Long> stats = new LinkedHashMap<>();
+        stats.put("all", allCount);
+        stats.put("inProgress", inProgressCount);
+        stats.put("completed", completedCount);
+        page.setExtraData(stats);
+        return page;
+    }
+
+    @Override
     public ProjectVO getProject(Long projectId) {
         return getProject(projectId, null);
     }
@@ -180,7 +274,6 @@ public class ProjectServiceImpl implements IProjectService {
                     "ADMIN", roleDefaultPermissions("ADMIN"), "项目创建人", "ACTIVE", false);
         }
 
-        appendProjectChat(projectId, "assistant", "已进入项目「" + createBO.getName().trim() + "」上下文。你可以让我创建任务、总结进展或查询项目任务。");
         updateProjectCustomerNameHint(projectId, customerName);
         return buildProjectVO(projectId);
     }
@@ -357,7 +450,6 @@ public class ProjectServiceImpl implements IProjectService {
         if (Boolean.TRUE.equals(taskBO.getHasSchedule())) {
             appendTaskSchedule(projectId, taskId, taskBO.getTitle().trim() + "相关日程", taskBO.getDueDate());
         }
-        appendTaskChat(projectId, taskId, "assistant", "当前对话对象：任务 - " + taskBO.getTitle().trim() + "。你可以继续让我修改截止时间、生成方案或追加备注。");
         touchProject(projectId);
         updateProjectCustomerNameHint(projectId, customerName);
         return taskId;
@@ -702,15 +794,9 @@ public class ProjectServiceImpl implements IProjectService {
 
         vo.setAttachments(loadProjectAttachments(projectId));
         vo.setSchedules(loadProjectSchedules(projectId));
-        vo.setChatMessages(loadProjectChats(projectId));
-        if (vo.getChatMessages().isEmpty()) {
-            ProjectVO.ProjectChatMessageVO welcome = new ProjectVO.ProjectChatMessageVO();
-            welcome.setMessageId(0L);
-            welcome.setRole("assistant");
-            welcome.setContent("已进入项目「" + project.name() + "」上下文。你可以让我创建任务、总结进展或查询项目任务。");
-            welcome.setCreateTime(project.createTime());
-            vo.getChatMessages().add(welcome);
-        }
+        vo.setChatMessages(loadProjectChats(projectId).stream()
+                .filter(message -> !isProjectWelcomeMessage(message.getContent()))
+                .collect(Collectors.toList()));
         vo.setMembers(loadMembers(projectId).stream().map(this::toMemberVO).collect(Collectors.toList()));
         vo.setMemberLogs(loadMemberLogs(projectId));
         return vo;
@@ -751,15 +837,9 @@ public class ProjectServiceImpl implements IProjectService {
         vo.setAttachments(loadTaskAttachments(task.taskId()));
         vo.setSchedules(loadTaskSchedules(task.taskId()));
         vo.setNotes(loadTaskNotes(task.taskId()));
-        vo.setChatMessages(loadTaskChats(task.taskId()));
-        if (vo.getChatMessages().isEmpty()) {
-            ProjectVO.ProjectTaskChatMessageVO welcome = new ProjectVO.ProjectTaskChatMessageVO();
-            welcome.setMessageId(0L);
-            welcome.setRole("assistant");
-            welcome.setContent("当前对话对象：任务 - " + task.title() + "。你可以让我修改截止时间、生成方案或追加备注。");
-            welcome.setCreateTime(task.createTime());
-            vo.getChatMessages().add(welcome);
-        }
+        vo.setChatMessages(loadTaskChats(task.taskId()).stream()
+                .filter(message -> !isTaskWelcomeMessage(message.getContent()))
+                .collect(Collectors.toList()));
         vo.setCreateTime(task.createTime());
         vo.setUpdateTime(task.updateTime());
         return vo;
@@ -1617,6 +1697,33 @@ public class ProjectServiceImpl implements IProjectService {
         return Set.of("NOT_STARTED", "IN_PROGRESS", "COMPLETED", "PAUSED", "ARCHIVED").contains(normalized)
                 ? normalized
                 : "NOT_STARTED";
+    }
+
+    private String normalizeProjectQueryStatus(String status) {
+        if (StrUtil.isBlank(status)) {
+            return null;
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+        if ("ALL".equals(normalized)) {
+            return null;
+        }
+        return Set.of("NOT_STARTED", "IN_PROGRESS", "COMPLETED", "PAUSED", "ARCHIVED").contains(normalized)
+                ? normalized
+                : null;
+    }
+
+    private boolean isProjectWelcomeMessage(String content) {
+        return StrUtil.isNotBlank(content)
+                && content.startsWith("已进入项目「")
+                && content.contains("上下文")
+                && content.contains("创建任务");
+    }
+
+    private boolean isTaskWelcomeMessage(String content) {
+        return StrUtil.isNotBlank(content)
+                && content.startsWith("当前对话对象：任务 - ")
+                && content.contains("修改截止时间")
+                && content.contains("追加备注");
     }
 
     private String projectStatusName(String status) {

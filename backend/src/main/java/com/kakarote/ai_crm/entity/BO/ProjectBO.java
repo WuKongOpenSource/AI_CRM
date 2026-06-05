@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.entity.BO;
 
+import com.kakarote.ai_crm.common.PageEntity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,6 +10,15 @@ import java.util.Date;
 import java.util.List;
 
 public class ProjectBO {
+
+    @Data
+    public static class Query extends PageEntity {
+        @Schema(description = "模糊搜索关键词")
+        private String keyword;
+
+        @Schema(description = "项目状态")
+        private String status;
+    }
 
     @Data
     public static class Create {

@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.controller;
 
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.service.IProjectService;
@@ -30,6 +31,12 @@ public class ProjectController {
     @Operation(summary = "项目列表")
     public Result<List<ProjectVO>> list() {
         return Result.ok(projectService.listProjects());
+    }
+
+    @PostMapping("/queryPageList")
+    @Operation(summary = "项目分页列表")
+    public Result<BasePage<ProjectVO>> queryPageList(@RequestBody ProjectBO.Query queryBO) {
+        return Result.ok(projectService.queryPageList(queryBO == null ? new ProjectBO.Query() : queryBO));
     }
 
     @GetMapping("/detail/{projectId}")

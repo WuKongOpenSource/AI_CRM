@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden bg-[#f6f7f4]">
     <div v-if="project && canViewProject" class="flex flex-1 flex-col overflow-hidden">
-      <header class="border-b border-slate-200 bg-white px-4 py-4 md:px-6">
+      <header v-if="!isProjectChatView" class="border-b border-slate-200 bg-white px-4 py-4 md:px-6">
         <div class="mx-auto flex max-w-7xl flex-col gap-4">
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
@@ -87,7 +87,7 @@
                     <button
                       v-if="canCreateTask"
                       type="button"
-                      class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+                      class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
                       @click="openCreateTask()"
                     >
                       <span class="material-symbols-outlined text-[17px]">add</span>
@@ -96,7 +96,7 @@
                     <el-dropdown trigger="click" @command="handleProjectMoreAction">
                       <button
                         type="button"
-                        class="flex size-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                        class="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
                         aria-label="更多项目操作"
                       >
                         <span class="material-symbols-outlined text-[20px]">more_horiz</span>
@@ -139,17 +139,28 @@
       </header>
 
       <main class="flex flex-1 flex-col overflow-hidden">
-        <div v-if="viewMode === 'ai'" class="mx-auto flex h-full max-w-7xl flex-col overflow-hidden px-4 py-4 md:px-6">
-          <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-100 px-5 py-4">
-              <p class="text-sm font-bold text-slate-900">项目 AI 对话</p>
-              <p class="mt-1 text-sm text-slate-500">
-                当前对话对象：项目 - {{ project.name }}。例如可以说“明天给客户汇报需求文档和设计方案，帮我创建一个任务”。
-              </p>
+        <div v-if="viewMode === 'ai'" class="wk-project-chat-shell">
+          <section class="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div class="wk-project-chat-header">
+              <div class="wk-project-chat-header__inner">
+                <span class="wk-project-chat-badge">项目</span>
+                <h2 class="min-w-0 truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
+                  {{ project.name }}
+                </h2>
+              </div>
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="material-symbols-outlined inline-flex size-8 shrink-0 items-center justify-center rounded-xl bg-[#f4f4f4] text-[18px] text-[#5d5d5d]">
+                  folder
+                </span>
+                <div class="min-w-0">
+                  <p class="text-[15px] font-semibold leading-5 text-[#0d0d0d]">项目对话</p>
+                  <p class="mt-0.5 truncate text-[12px] leading-4 text-[#8f8f8f]">{{ project.name }}</p>
+                </div>
+              </div>
             </div>
 
             <div
-              v-if="projectSchedules.length || projectAttachments.length"
+              v-if="false"
               class="border-b border-slate-100 bg-slate-50/60 px-5 py-4"
             >
               <div class="mx-auto grid max-w-4xl gap-3 md:grid-cols-2">
@@ -191,28 +202,70 @@
               </div>
             </div>
 
-            <div class="flex-1 overflow-y-auto px-5 py-5">
-              <div class="mx-auto flex max-w-4xl flex-col gap-4">
+            <div class="wk-project-chat-messages">
+              <div class="wk-project-chat-messages__inner px-4 md:px-8">
                 <div
                   v-for="message in project.chatMessages"
                   :key="message.messageId"
-                  class="flex"
-                  :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                  class="wk-project-chat-message mx-auto message-enter"
+                  :class="message.role === 'user' ? 'wk-project-chat-message--user' : 'wk-project-chat-message--assistant'"
                 >
-                  <div
-                    class="max-w-[88%] whitespace-pre-wrap rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm"
-                    :class="message.role === 'user' ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-slate-50 text-slate-700'"
-                  >
-                    {{ message.content }}
+                  <div v-if="message.role === 'user'" class="group flex w-full flex-row-reverse pb-0">
+                    <div class="min-w-[50px] max-w-[72%] space-y-3">
+                      <div class="rounded-[24px] bg-[#f4f4f4] px-4 py-2.5 text-[15px] leading-7 text-[#0d0d0d]">
+                        <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
+                      </div>
+                    </div>
                   </div>
+                  <div v-else class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-8">
+                    <div class="min-w-0 flex-1 space-y-3">
+                      <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
+                        <div class="wk-markdown" v-html="renderAssistantMessage(message.content)" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="project.chatMessages.length === 0" class="mx-auto mt-16 max-w-lg text-center text-slate-400">
+                  <span class="material-symbols-outlined text-5xl">forum</span>
+                  <p class="mt-4 text-sm">围绕这个项目继续沟通，AI 可以帮你拆解任务、梳理日程和沉淀附件。</p>
                 </div>
               </div>
             </div>
 
-            <div class="border-t border-slate-100 px-5 py-4">
-              <div class="mx-auto max-w-4xl">
+            <div class="wk-project-chat-composer-wrap">
+              <div class="mx-auto w-[calc(100%-20px)] max-w-4xl md:w-full">
                 <template v-if="canUseAiChat">
+                  <ProjectChatComposer
+                    v-model="aiInput"
+                    placeholder="发消息..."
+                    @send="handleSendAiMessage"
+                  />
+                  <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
+                    <div class="w-full min-w-0">
+                      <textarea
+                        ref="projectAiComposerInputRef"
+                        v-model="aiInput"
+                        rows="1"
+                        class="wk-project-chat-textarea"
+                        placeholder="输入项目指令"
+                        @input="handleProjectChatComposerInput"
+                        @keydown.enter.exact.prevent="handleSendAiMessage"
+                      ></textarea>
+                      <div class="flex min-w-0 items-center justify-end w-full px-1 pb-1 select-none mt-1">
+                        <button
+                          type="button"
+                          class="wk-project-chat-send-button"
+                          :disabled="!aiInput.trim()"
+                          aria-label="发送"
+                          @click="handleSendAiMessage"
+                        >
+                          <span class="material-symbols-outlined">arrow_upward</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   <el-input
+                    v-if="false"
                     v-model="aiInput"
                     type="textarea"
                     :rows="4"
@@ -221,15 +274,15 @@
                     placeholder="输入项目指令，例如：这个项目和北京百度公司合作，明天下午三点给客户汇报需求文档和设计方案，帮我创建一个任务。"
                     @keydown.enter.exact.prevent="handleSendAiMessage"
                   />
-                  <div class="mt-3 flex items-center justify-between gap-3">
-                    <p class="text-xs text-slate-400">AI 可创建任务、泳道、项目日程和项目附件，并会在执行前校验项目权限。</p>
+                  <div v-if="false" class="mt-3 flex items-center justify-end gap-3">
+                    <p class="hidden text-xs text-slate-400">AI 可创建任务、泳道、项目日程和项目附件，并会在执行前校验项目权限。</p>
                     <button
                       type="button"
-                      class="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      class="wk-project-chat-send-button"
                       :disabled="!aiInput.trim()"
                       @click="handleSendAiMessage"
                     >
-                      <span class="material-symbols-outlined text-[16px]">send</span>
+                      <span class="material-symbols-outlined">arrow_upward</span>
                       发送
                     </button>
                   </div>
@@ -242,93 +295,107 @@
           </section>
         </div>
 
-        <div v-else-if="viewMode === 'task_ai' && currentTaskConversation" class="flex h-full overflow-hidden bg-white">
+        <div v-else-if="viewMode === 'task_ai' && currentTaskConversation" class="wk-project-chat-shell wk-project-chat-shell--task relative">
           <section class="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <div class="shrink-0 border-b border-slate-100 bg-white px-4 py-3 md:px-8">
-              <div class="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div class="min-w-0">
-                  <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">当前对话对象：任务</p>
-                  <div class="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-                    <h2 class="min-w-[120px] max-w-[520px] truncate text-[18px] font-black leading-7 text-[#0d0d0d]">
+            <div class="wk-project-task-chat-header">
+              <div class="wk-project-task-chat-header__inner">
+                <div class="flex min-w-0 flex-1 items-center gap-2">
+                  <span class="wk-project-chat-badge">任务</span>
+                  <div class="min-w-0 flex-1">
+                    <h2 class="truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]">
                       {{ currentTaskConversation.title }}
                     </h2>
-                    <span class="rounded-full px-2.5 py-1 text-xs font-bold" :class="projectTaskPriorityClass(currentTaskConversation.priority)">
-                      {{ projectTaskPriorityLabel(currentTaskConversation.priority) }}
-                    </span>
-                    <span class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">
-                      {{ currentTaskConversation.status }}
-                    </span>
-                    <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600">
-                      {{ laneName(currentTaskConversation.laneId) }}
-                    </span>
+                    <p class="mt-0.5 truncate text-[12px] leading-4 text-[#8f8f8f]">
+                      {{ project.name }}
+                    </p>
                   </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-                  <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1.5">
-                    <span class="material-symbols-outlined text-[15px]">person</span>
-                    {{ currentTaskConversation.ownerName || '未指定负责人' }}
-                  </span>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-3 py-1.5">
-                    <span class="material-symbols-outlined text-[15px]">schedule</span>
-                    {{ currentTaskConversation.dueDate ? formatDateTime(currentTaskConversation.dueDate) : '未设置截止时间' }}
-                  </span>
-                  <button
-                    v-if="taskInfoPanelCollapsed"
-                    type="button"
-                    class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-slate-600 transition-colors hover:bg-slate-50"
-                    @click="taskInfoPanelCollapsed = false"
-                  >
-                    <span class="material-symbols-outlined text-[15px]">right_panel_open</span>
-                    展开信息
-                  </button>
-                </div>
               </div>
+              <button
+                v-if="showTaskDetailPanelShell && taskDetailPanelVisible"
+                type="button"
+                class="wk-project-object-panel-toggle wk-project-object-panel-toggle--inside"
+                aria-label="收起任务详情栏"
+                @click="taskDetailPanelVisible = false"
+              >
+                <span class="material-symbols-outlined text-[20px] leading-none">dock_to_right</span>
+                <span class="wk-project-object-panel-tooltip" role="tooltip">收起任务详情栏</span>
+              </button>
             </div>
 
-            <div class="flex-1 overflow-y-auto bg-[#f8fafc] px-5 py-6">
-              <div class="mx-auto flex max-w-4xl flex-col gap-4">
+            <div class="wk-project-task-chat-messages">
+              <div class="wk-project-task-chat-messages__inner px-4 md:px-8">
                 <div
                   v-for="message in currentTaskConversation.chatMessages"
                   :key="message.messageId"
-                  class="flex"
-                  :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                  class="wk-project-task-chat-message mx-auto message-enter"
+                  :class="message.role === 'user' ? 'wk-project-task-chat-message--user' : 'wk-project-task-chat-message--assistant'"
                 >
-                  <div
-                    class="max-w-[88%] whitespace-pre-wrap rounded-[24px] px-4 py-3 text-sm leading-6 shadow-sm"
-                    :class="message.role === 'user' ? 'bg-[#0d0d0d] text-white' : 'border border-slate-200 bg-white text-slate-700'"
-                  >
-                    {{ message.content }}
+                  <div v-if="message.role === 'user'" class="group flex w-full flex-row-reverse pb-0">
+                    <div class="min-w-[50px] max-w-[72%] space-y-3">
+                      <div class="rounded-[24px] bg-[#f4f4f4] px-4 py-2.5 text-[15px] leading-7 text-[#0d0d0d]">
+                        <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div v-if="currentTaskConversation.chatMessages.length === 0" class="mx-auto mt-16 max-w-lg text-center text-slate-400">
-                  <span class="material-symbols-outlined text-5xl">forum</span>
-                  <p class="mt-4 text-sm">围绕这个任务继续沟通，例如修改截止时间、生成执行方案或追加备注。</p>
+                  <div v-else class="group flex w-full gap-3 pb-4 md:gap-4 md:pb-8">
+                    <div class="min-w-0 flex-1 space-y-3">
+                      <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
+                        <div class="wk-markdown" v-html="renderTaskAssistantMessage(message.content)" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="shrink-0 border-t border-slate-100 bg-white px-5 py-4">
-              <div class="mx-auto max-w-4xl">
+            <div class="wk-project-task-chat-composer-wrap">
+              <div class="mx-auto w-[calc(100%-20px)] max-w-4xl md:w-full">
                 <template v-if="canUseCurrentTaskAi">
-                  <el-input
+                  <ProjectChatComposer
                     v-model="taskAiInput"
-                    type="textarea"
-                    :rows="4"
-                    resize="none"
-                    class="wk-crm-el-field-input"
-                    placeholder="输入任务指令，例如：把这个任务改到明天下午三点，或帮我生成一个汇报大纲。"
-                    @keydown.enter.exact.prevent="handleSendTaskAiMessage"
+                    placeholder="发消息..."
+                    @send="handleSendTaskAiMessage"
                   />
-                  <div class="mt-3 flex items-center justify-between gap-3">
-                    <p class="text-xs text-slate-400">任务 AI 会基于当前任务上下文修改字段、追加备注、挂载附件或生成执行方案。</p>
+                  <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
+                    <div class="w-full min-w-0">
+                      <textarea
+                        ref="taskAiComposerInputRef"
+                        v-model="taskAiInput"
+                        rows="1"
+                        class="wk-project-chat-textarea"
+                        placeholder="输入任务指令"
+                        @input="handleTaskChatComposerInput"
+                        @keydown.enter.exact.prevent="handleSendTaskAiMessage"
+                      ></textarea>
+                      <div class="flex min-w-0 items-center justify-end w-full px-1 pb-1 select-none mt-1">
+                        <button
+                          type="button"
+                          class="wk-project-chat-send-button"
+                          :disabled="!taskAiInput.trim()"
+                          aria-label="发送"
+                          @click="handleSendTaskAiMessage"
+                        >
+                          <span class="material-symbols-outlined">arrow_upward</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="false" class="wk-project-task-chat-composer mx-auto flex min-w-0 items-end rounded-[28px] p-[6px]">
+                    <textarea
+                      v-model="taskAiInput"
+                      rows="1"
+                      class="wk-project-task-chat-textarea"
+                      placeholder="输入任务指令，例如：把这个任务改到明天下午三点，或帮我生成一个汇报大纲。"
+                      @keydown.enter.exact.prevent="handleSendTaskAiMessage"
+                    />
                     <button
                       type="button"
-                      class="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      class="wk-project-task-chat-send-button"
                       :disabled="!taskAiInput.trim()"
                       @click="handleSendTaskAiMessage"
                     >
-                      <span class="material-symbols-outlined text-[16px]">send</span>
-                      发送
+                      <span class="material-symbols-outlined">arrow_upward</span>
                     </button>
                   </div>
                 </template>
@@ -338,91 +405,129 @@
               </div>
             </div>
           </section>
-
-          <aside
-            v-if="!taskInfoPanelCollapsed"
-            class="hidden w-[360px] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white lg:flex"
+          <button
+            v-if="showTaskDetailPanelShell && !taskDetailPanelVisible"
+            type="button"
+            class="wk-project-object-panel-toggle wk-project-object-panel-toggle--floating"
+            aria-label="展开任务详情栏"
+            @click="taskDetailPanelVisible = true"
           >
-            <div class="flex h-14 shrink-0 items-center justify-between border-b border-slate-100 px-5">
-              <div>
-                <p class="text-sm font-bold text-slate-900">任务基本信息</p>
-                <p class="text-xs text-slate-400">可展开/收起</p>
-              </div>
-              <button
-                type="button"
-                class="flex size-8 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-                aria-label="收起任务信息"
-                @click="taskInfoPanelCollapsed = true"
-              >
-                <span class="material-symbols-outlined text-[18px]">right_panel_close</span>
-              </button>
-            </div>
-
-            <div class="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-              <div class="space-y-4">
-                <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">所属项目</p>
-                  <p class="mt-2 text-sm font-semibold text-slate-900">{{ project.name }}</p>
+            <span class="material-symbols-outlined text-[20px] leading-none">dock_to_left</span>
+            <span class="wk-project-object-panel-tooltip" role="tooltip">展开任务详情栏</span>
+          </button>
+          <aside
+            v-if="showTaskDetailPanelShell && taskDetailPanelVisible"
+            class="wk-project-task-detail-panel relative flex shrink-0 flex-col border-l"
+          >
+            <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-4">
+              <div class="mb-5 flex items-start gap-3">
+                <span class="material-symbols-outlined flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#f5f5f5] text-[20px] text-[#8f8f8f]">
+                  task_alt
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[12px] font-medium leading-4 text-[#8f8f8f]">任务详情</p>
+                  <h3 class="mt-1 break-words text-[16px] font-semibold leading-6 text-[#0d0d0d]">
+                    {{ currentTaskConversation.title }}
+                  </h3>
                 </div>
-
-                <dl class="grid grid-cols-1 gap-3 text-sm">
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">任务描述</dt>
-                    <dd class="mt-2 leading-6 text-slate-700">{{ currentTaskConversation.description || '暂无描述' }}</dd>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">任务状态 / 泳道</dt>
-                    <dd class="mt-2 font-semibold text-slate-800">{{ currentTaskConversation.status }} / {{ laneName(currentTaskConversation.laneId) }}</dd>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">关联客户</dt>
-                    <dd class="mt-2 font-semibold text-slate-800">{{ currentTaskConversation.customerName || project.customerName || '未关联客户' }}</dd>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">参与人</dt>
-                    <dd class="mt-2 leading-6 text-slate-700">
-                      {{ currentTaskConversation.participantNames?.length ? currentTaskConversation.participantNames.join('、') : '暂无参与人' }}
-                    </dd>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">附件 / 日程</dt>
-                    <dd class="mt-2 flex items-center gap-3 text-slate-700">
-                      <span :class="currentTaskConversation.hasAttachments ? 'text-primary' : 'text-slate-400'" class="inline-flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[16px]">attach_file</span>
-                        {{ currentTaskConversation.attachments.length || (currentTaskConversation.hasAttachments ? 1 : 0) }}
-                      </span>
-                      <span :class="currentTaskConversation.hasSchedule ? 'text-emerald-600' : 'text-slate-400'" class="inline-flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[16px]">calendar_month</span>
-                        {{ currentTaskConversation.schedules.length || (currentTaskConversation.hasSchedule ? 1 : 0) }}
-                      </span>
-                    </dd>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">创建 / 更新</dt>
-                    <dd class="mt-2 space-y-1 text-slate-700">
-                      <p>创建：{{ formatDateTime(currentTaskConversation.createTime) }}</p>
-                      <p>更新：{{ formatDateTime(currentTaskConversation.updateTime) }}</p>
-                    </dd>
-                  </div>
-                  <div class="rounded-2xl border border-slate-200 px-4 py-3">
-                    <dt class="text-xs text-slate-400">AI 生成来源</dt>
-                    <dd class="mt-2 leading-6 text-slate-700">
-                      {{ currentTaskConversation.generatedByAi ? (currentTaskConversation.aiSourceText || 'AI 对话创建') : '手动创建' }}
-                    </dd>
-                  </div>
-                </dl>
+                <div class="ml-auto flex shrink-0 items-center gap-1" @click.stop>
+                  <button
+                    v-if="canEditTask(currentTaskConversation)"
+                    type="button"
+                    class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#f5f5f5] hover:text-[#0d0d0d]"
+                    aria-label="编辑任务"
+                    title="编辑任务"
+                    @click="handleEditTask(currentTaskConversation)"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">edit</span>
+                  </button>
+                  <button
+                    v-if="canDeleteTask(currentTaskConversation)"
+                    type="button"
+                    class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-red-50 hover:text-red-500"
+                    aria-label="删除任务"
+                    title="删除任务"
+                    @click="handleDeleteTask(currentTaskConversation)"
+                  >
+                    <span class="material-symbols-outlined text-[18px] leading-none">delete</span>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div class="shrink-0 border-t border-slate-100 p-4">
-              <button
-                v-if="canEditTask(currentTaskConversation)"
-                type="button"
-                class="w-full rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-slate-700"
-                @click="handleEditTask(currentTaskConversation)"
-              >
-                编辑任务
-              </button>
+              <div class="space-y-4">
+                <section class="wk-project-task-detail-section">
+                  <p class="wk-project-task-detail-section__title">基本信息</p>
+                  <dl class="mt-3 space-y-2">
+                    <div class="wk-project-task-detail-row">
+                      <dt>状态</dt>
+                      <dd>{{ currentTaskConversation.status || '未设置' }}</dd>
+                    </div>
+                    <div class="wk-project-task-detail-row">
+                      <dt>优先级</dt>
+                      <dd>
+                        <span class="inline-flex rounded-lg px-2 py-0.5 text-[12px] font-medium" :class="projectTaskPriorityClass(currentTaskConversation.priority)">
+                          {{ projectTaskPriorityLabel(currentTaskConversation.priority) }}
+                        </span>
+                      </dd>
+                    </div>
+                    <div class="wk-project-task-detail-row">
+                      <dt>泳道</dt>
+                      <dd>{{ laneName(currentTaskConversation.laneId) }}</dd>
+                    </div>
+                    <div class="wk-project-task-detail-row">
+                      <dt>负责人</dt>
+                      <dd>{{ currentTaskConversation.ownerName || '未指定' }}</dd>
+                    </div>
+                    <div class="wk-project-task-detail-row">
+                      <dt>截止时间</dt>
+                      <dd>{{ formatDateTime(currentTaskConversation.dueDate) }}</dd>
+                    </div>
+                    <div class="wk-project-task-detail-row">
+                      <dt>关联客户</dt>
+                      <dd>{{ currentTaskConversation.customerName || project.customerName || '未关联' }}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section class="wk-project-task-detail-section">
+                  <p class="wk-project-task-detail-section__title">参与人</p>
+                  <div v-if="currentTaskConversation.participantNames?.length" class="mt-3 flex flex-wrap gap-2">
+                    <span
+                      v-for="name in currentTaskConversation.participantNames"
+                      :key="name"
+                      class="rounded-lg bg-[#f5f5f5] px-2.5 py-1 text-[12px] font-medium text-[#5f5f5f]"
+                    >
+                      {{ name }}
+                    </span>
+                  </div>
+                  <p v-else class="mt-3 text-[13px] leading-5 text-[#8f8f8f]">暂无参与人</p>
+                </section>
+
+                <section class="wk-project-task-detail-section">
+                  <p class="wk-project-task-detail-section__title">任务描述</p>
+                  <p class="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-[#5f5f5f]">
+                    {{ currentTaskConversation.description || '暂无任务描述' }}
+                  </p>
+                </section>
+
+                <section class="wk-project-task-detail-section">
+                  <p class="wk-project-task-detail-section__title">执行资料</p>
+                  <div class="mt-3 grid grid-cols-3 gap-2">
+                    <div class="wk-project-task-detail-stat">
+                      <span>{{ currentTaskConversation.attachments.length }}</span>
+                      <p>附件</p>
+                    </div>
+                    <div class="wk-project-task-detail-stat">
+                      <span>{{ currentTaskConversation.schedules.length }}</span>
+                      <p>日程</p>
+                    </div>
+                    <div class="wk-project-task-detail-stat">
+                      <span>{{ currentTaskConversation.notes.length }}</span>
+                      <p>备注</p>
+                    </div>
+                  </div>
+                </section>
+              </div>
             </div>
           </aside>
         </div>
@@ -470,7 +575,7 @@
                 <section
                   v-for="lane in orderedLanes"
                   :key="lane.laneId"
-                  class="flex h-full min-h-0 w-[320px] flex-col rounded-[28px] border border-slate-200 bg-[#f8f8f6] p-3"
+                  class="flex h-full min-h-0 w-[320px] flex-col rounded-xl border border-slate-200 bg-[#f8f8f6] p-3"
                   @dragover.prevent="handleLaneDragOver(lane.laneId, $event)"
                   @drop.prevent="handleLaneDrop(lane.laneId)"
                 >
@@ -517,7 +622,7 @@
                       v-for="task in tasksByLane(lane.laneId)"
                       :key="task.taskId"
                       :draggable="canMoveTask(task)"
-                      class="cursor-pointer rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                      class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
                       :class="[
                         draggingTaskId === task.taskId ? 'opacity-60 ring-1 ring-primary/20' : '',
                         canMoveTask(task) ? 'cursor-grab active:cursor-grabbing' : ''
@@ -589,7 +694,7 @@
                 <button
                   v-if="canAddLane"
                   type="button"
-                  class="group flex h-full min-h-[420px] w-[260px] shrink-0 flex-col items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-white/70 p-6 text-center text-slate-400 transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                  class="group flex h-full min-h-[420px] w-[260px] shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-slate-400 transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
                   @click="promptAddLane"
                 >
                   <span class="material-symbols-outlined text-4xl transition-transform group-hover:scale-110">add</span>
@@ -712,7 +817,7 @@
           </div>
         </div>
 
-        <div v-else class="h-full overflow-y-auto px-4 py-4 md:px-6">
+        <div v-else-if="viewMode === 'members'" class="h-full overflow-y-auto px-4 py-4 md:px-6">
           <div class="mx-auto flex max-w-7xl flex-col gap-4">
             <section class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <article class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -899,11 +1004,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useProjectStore } from '@/stores/project'
+import { renderMarkdown } from '@/utils/markdown'
 import type {
   ProjectMember,
   ProjectPermission,
@@ -923,6 +1029,7 @@ import {
   projectTaskPriorityLabel
 } from '@/utils/project'
 import ProjectMemberDialog from '@/views/project/components/ProjectMemberDialog.vue'
+import ProjectChatComposer from '@/views/project/components/ProjectChatComposer.vue'
 import ProjectTaskDialog from '@/views/project/components/ProjectTaskDialog.vue'
 import ProjectTaskDrawer from '@/views/project/components/ProjectTaskDrawer.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
@@ -948,10 +1055,13 @@ const viewMode = ref<ProjectViewMode>('board')
 const lastProjectViewMode = ref<Exclude<ProjectViewMode, 'task_ai'>>('board')
 const aiInput = ref('')
 const taskAiInput = ref('')
+const projectAiComposerInputRef = ref<HTMLTextAreaElement | null>(null)
+const taskAiComposerInputRef = ref<HTMLTextAreaElement | null>(null)
 const showProjectDialog = ref(false)
 const showTaskDialog = ref(false)
 const showTaskDrawer = ref(false)
 const showMemberDialog = ref(false)
+const taskDetailPanelVisible = ref(true)
 const draggingTaskId = ref('')
 const dragOverLaneId = ref('')
 const defaultLaneId = ref('')
@@ -959,7 +1069,6 @@ const selectedTaskId = ref('')
 const editingTask = ref<ProjectTask | null>(null)
 const editingMember = ref<ProjectMember | null>(null)
 const taskConversationId = ref('')
-const taskInfoPanelCollapsed = ref(false)
 const projectTaskSearchKeyword = ref('')
 const projectTaskSearchLoading = ref(false)
 let projectTaskSearchTimer: number | null = null
@@ -1063,19 +1172,55 @@ const currentTaskConversation = computed(() =>
   project.value?.tasks.find(task => task.taskId === taskConversationId.value) || null
 )
 const isTaskConversation = computed(() => viewMode.value === 'task_ai')
+const isProjectChatView = computed(() => viewMode.value === 'ai' || viewMode.value === 'task_ai')
 const showTaskViewToolbar = computed(() => viewMode.value === 'board' || viewMode.value === 'list' || viewMode.value === 'cards')
 const canUseCurrentTaskAi = computed(() =>
   currentTaskConversation.value ? projectStore.canCurrentUserUseTaskAi(projectId.value, currentTaskConversation.value) : false
 )
+const showTaskDetailPanelShell = computed(() => !isMobile.value && isTaskConversation.value && Boolean(currentTaskConversation.value))
+
+function renderAssistantMessage(content: string) {
+  return renderMarkdown(content || '')
+}
+
+function renderTaskAssistantMessage(content: string) {
+  return renderAssistantMessage(content)
+}
+
+function resizeProjectChatTextarea(el: HTMLTextAreaElement | null) {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, 220)}px`
+}
+
+function handleProjectChatComposerInput() {
+  resizeProjectChatTextarea(projectAiComposerInputRef.value)
+}
+
+function handleTaskChatComposerInput() {
+  resizeProjectChatTextarea(taskAiComposerInputRef.value)
+}
 
 watch(currentTaskConversation, task => {
   if (!task && viewMode.value === 'task_ai') {
     backToProject()
   }
+  void nextTick(() => resizeProjectChatTextarea(taskAiComposerInputRef.value))
+})
+
+watch(aiInput, () => {
+  void nextTick(() => resizeProjectChatTextarea(projectAiComposerInputRef.value))
+})
+
+watch(taskAiInput, () => {
+  void nextTick(() => resizeProjectChatTextarea(taskAiComposerInputRef.value))
 })
 
 function syncTaskConversationFromRoute() {
   const routeTaskId = typeof route.query.taskId === 'string' ? route.query.taskId : ''
+  if (routeTaskId && routeTaskId !== taskConversationId.value) {
+    taskDetailPanelVisible.value = true
+  }
   taskConversationId.value = routeTaskId
   if (routeTaskId) {
     viewMode.value = 'task_ai'
@@ -1248,6 +1393,7 @@ function enterTaskConversation(task: ProjectTask) {
   showTaskDrawer.value = false
   selectedTaskId.value = task.taskId
   taskConversationId.value = task.taskId
+  taskDetailPanelVisible.value = true
   if (viewMode.value !== 'task_ai') {
     lastProjectViewMode.value = viewMode.value as Exclude<ProjectViewMode, 'task_ai'>
   }
@@ -1365,12 +1511,14 @@ async function handleSendAiMessage() {
   if (!project.value || !aiInput.value.trim() || !canUseAiChat.value) return
   await projectStore.handleAiCommand(project.value.projectId, aiInput.value.trim())
   aiInput.value = ''
+  void nextTick(() => resizeProjectChatTextarea(projectAiComposerInputRef.value))
 }
 
 async function handleSendTaskAiMessage() {
   if (!project.value || !currentTaskConversation.value || !taskAiInput.value.trim() || !canUseCurrentTaskAi.value) return
   await projectStore.handleTaskAiCommand(project.value.projectId, currentTaskConversation.value.taskId, taskAiInput.value.trim())
   taskAiInput.value = ''
+  void nextTick(() => resizeProjectChatTextarea(taskAiComposerInputRef.value))
 }
 
 function openAddMember() {
@@ -1460,3 +1608,646 @@ function memberActionLabel(action: string) {
   }
 }
 </script>
+
+<style scoped>
+.wk-project-chat-shell {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, var(--wk-bg-surface) 0%, rgb(var(--wk-bg-page-rgb) / 0.96) 62%, var(--wk-bg-page) 100%);
+}
+
+.wk-project-chat-header {
+  position: relative;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
+  padding: 0.5rem 0;
+  backdrop-filter: blur(14px);
+}
+
+.wk-project-chat-header > .flex {
+  display: none;
+}
+
+.wk-project-chat-header__inner {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.wk-project-chat-badge {
+  display: inline-flex;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--wk-bg-surface-muted);
+  padding: 0 8px;
+  color: var(--wk-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+@media (min-width: 768px) {
+  .wk-project-chat-header__inner {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.wk-project-chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: transparent;
+  padding-bottom: 1rem;
+  padding-top: 1.5rem;
+}
+
+.wk-project-chat-messages__inner {
+  min-width: 0;
+  width: 100%;
+}
+
+.wk-project-chat-composer-wrap {
+  flex-shrink: 0;
+  background: linear-gradient(to top, var(--wk-bg-page) 72%, rgb(var(--wk-bg-page-rgb) / 0));
+  padding: 0 0.5rem 0.5rem;
+}
+
+.wk-project-chat-composer {
+  width: 768px;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+  box-shadow:
+    0 20px 70px rgb(var(--wk-shadow-color) / 0.08),
+    0 2px 8px rgb(var(--wk-shadow-color) / 0.05);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.wk-project-chat-composer:focus-within {
+  border-color: var(--wk-border-muted);
+  box-shadow:
+    0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
+    0 0 0 1px rgb(var(--wk-primary-rgb) / 0.12);
+}
+
+.wk-project-chat-textarea {
+  min-height: 90px;
+  max-height: 220px;
+  width: 100%;
+  min-width: 0;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  background: transparent;
+  padding: 0.75rem;
+  color: #0d0d0d;
+  font-size: 16px;
+  line-height: 26px;
+  outline: none;
+}
+
+.wk-project-chat-textarea::placeholder {
+  color: #909090;
+}
+
+.wk-project-chat-composer-wrap :deep(.wk-crm-el-field-input) {
+  display: block;
+}
+
+.wk-project-chat-composer-wrap :deep(.el-textarea__inner) {
+  min-height: 110px !important;
+  resize: none;
+  border: 0;
+  border-radius: 28px;
+  background: #f4f4f4;
+  box-shadow: none;
+  color: #0d0d0d;
+  font-size: 16px;
+  line-height: 26px;
+  padding: 18px 18px;
+}
+
+.wk-project-chat-composer-wrap :deep(.el-textarea__inner:focus) {
+  box-shadow: inset 0 0 0 1px rgb(13 13 13 / 0.08);
+}
+
+.wk-project-chat-composer-wrap :deep(.el-textarea__inner::placeholder) {
+  color: #909090;
+}
+
+.wk-project-chat-send-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #0d0d0d;
+  color: #fff;
+  font-size: 0;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.wk-project-chat-send-button .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.wk-project-chat-send-button:hover:not(:disabled) {
+  background: #575757;
+}
+
+.wk-project-chat-send-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.wk-project-chat-send-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.wk-project-chat-message {
+  width: min(100%, 768px);
+  min-width: min(100%, 468px);
+  max-width: 768px;
+  overflow-wrap: anywhere;
+}
+
+.wk-project-chat-message--user {
+  margin-bottom: 1rem;
+}
+
+.wk-project-chat-message--user :deep(.rounded-\[24px\]),
+.wk-project-task-chat-message--user :deep(.rounded-\[24px\]) {
+  background-color: var(--wk-bg-surface-muted) !important;
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown) {
+  color: var(--wk-text-primary);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown > *:first-child),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown > *:first-child) {
+  margin-top: 0;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown > *:last-child),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown > *:last-child) {
+  margin-bottom: 0;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown p),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown p) {
+  margin: 0 0 0.85em;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown ul),
+.wk-project-chat-message--assistant :deep(.wk-markdown ol),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown ul),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown ol) {
+  margin: 0.85em 0;
+  padding-left: 1.5em;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown li),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown li) {
+  margin: 0.25em 0;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown pre),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown pre) {
+  margin: 1em 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: #1f1e1c;
+  padding: 14px 16px;
+  color: #f7f7f7;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown code),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown code) {
+  border-radius: 6px;
+  background: var(--wk-bg-surface-muted);
+  padding: 0.15em 0.35em;
+  color: var(--wk-text-primary);
+  font-size: 0.92em;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown pre code),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown blockquote),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown blockquote) {
+  margin: 1em 0;
+  border-left: 3px solid var(--wk-border-strong);
+  padding-left: 1em;
+  color: var(--wk-text-secondary);
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown table),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown table) {
+  width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown th),
+.wk-project-chat-message--assistant :deep(.wk-markdown td),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown th),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown td) {
+  border: 1px solid var(--wk-border-subtle);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.wk-project-chat-message--assistant :deep(.wk-markdown th),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown th) {
+  background: var(--wk-bg-surface-subtle);
+  font-weight: 600;
+}
+
+.wk-project-chat-customer-panel {
+  width: clamp(300px, 27vw, 420px);
+  min-width: 280px;
+  background: var(--wk-bg-surface);
+  border-color: var(--wk-border-subtle);
+}
+
+.wk-project-task-detail-panel {
+  width: 380px;
+  min-width: min(380px, 50%);
+  max-width: 50%;
+  background: var(--wk-bg-surface);
+  border-color: var(--wk-border-subtle);
+}
+
+.wk-project-task-detail-section {
+  border-top: 1px solid var(--wk-border-subtle);
+  padding-top: 14px;
+}
+
+.wk-project-task-detail-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.wk-project-task-detail-section__title {
+  color: #0d0d0d;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.wk-project-task-detail-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  color: #5f5f5f;
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.wk-project-task-detail-row dt {
+  color: #8f8f8f;
+}
+
+.wk-project-task-detail-row dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #0d0d0d;
+}
+
+.wk-project-task-detail-stat {
+  min-width: 0;
+  border-radius: 12px;
+  background: #f5f5f5;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.wk-project-task-detail-stat span {
+  display: block;
+  color: #0d0d0d;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.wk-project-task-detail-stat p {
+  margin-top: 2px;
+  color: #8f8f8f;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.wk-project-object-panel-toggle {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #8f8f8f;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.wk-project-object-panel-toggle:hover {
+  background: #efefef;
+  color: #0d0d0d;
+}
+
+.wk-project-object-panel-toggle--inside {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  z-index: 20;
+}
+
+.wk-project-object-panel-toggle--floating {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 20;
+  background: rgb(255 255 255 / 0.72);
+  box-shadow:
+    0 12px 28px rgb(15 23 42 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(16px);
+}
+
+.wk-project-object-panel-tooltip {
+  pointer-events: none;
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  z-index: 200;
+  margin-right: 8px;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  border-radius: 8px;
+  background: #000;
+  padding: 6px 12px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.18);
+  transition: opacity 150ms ease;
+}
+
+.wk-project-object-panel-toggle:hover .wk-project-object-panel-tooltip {
+  opacity: 1;
+}
+
+.message-enter {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wk-project-chat-shell--task {
+  background:
+    linear-gradient(180deg, var(--wk-bg-surface) 0%, rgb(var(--wk-bg-page-rgb) / 0.96) 62%, var(--wk-bg-page) 100%);
+}
+
+.wk-project-task-chat-header {
+  position: relative;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
+  padding: 0.5rem 0;
+  backdrop-filter: blur(14px);
+}
+
+.wk-project-task-chat-header__inner {
+  display: flex;
+  height: 44px;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 1rem;
+  padding-right: 3.5rem;
+}
+
+@media (min-width: 768px) {
+  .wk-project-task-chat-header__inner {
+    padding-left: 2rem;
+    padding-right: 4rem;
+  }
+}
+
+.wk-project-task-chat-messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+  padding-top: 1.5rem;
+}
+
+.wk-project-task-chat-messages__inner {
+  min-width: 0;
+  width: 100%;
+}
+
+.wk-project-task-chat-message {
+  width: min(100%, 768px);
+  min-width: min(100%, 468px);
+  max-width: 768px;
+  overflow-wrap: anywhere;
+}
+
+.wk-project-task-chat-message--user :deep(.rounded-\[24px\]) {
+  background-color: var(--wk-bg-surface-muted) !important;
+  color: var(--wk-text-primary) !important;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown) {
+  color: var(--wk-text-primary);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown > *:first-child) {
+  margin-top: 0;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown > *:last-child) {
+  margin-bottom: 0;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown p) {
+  margin: 0 0 0.85em;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown ul),
+.wk-project-task-chat-message--assistant :deep(.wk-markdown ol) {
+  margin: 0.85em 0;
+  padding-left: 1.5em;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown li) {
+  margin: 0.25em 0;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown pre) {
+  margin: 1em 0;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: #1f1e1c;
+  padding: 14px 16px;
+  color: #f7f7f7;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown code) {
+  border-radius: 6px;
+  background: var(--wk-bg-surface-muted);
+  padding: 0.15em 0.35em;
+  color: var(--wk-text-primary);
+  font-size: 0.92em;
+}
+
+.wk-project-task-chat-message--assistant :deep(.wk-markdown pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.wk-project-task-chat-composer-wrap {
+  flex-shrink: 0;
+  background: linear-gradient(to top, var(--wk-bg-page) 72%, rgb(var(--wk-bg-page-rgb) / 0));
+  padding: 0 0.5rem 0.5rem;
+}
+
+.wk-project-task-chat-composer {
+  width: 768px;
+  max-width: 100%;
+  border: 1px solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+  box-shadow:
+    0 20px 70px rgb(var(--wk-shadow-color) / 0.08),
+    0 2px 8px rgb(var(--wk-shadow-color) / 0.05);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.wk-project-task-chat-composer:focus-within {
+  border-color: var(--wk-border-muted);
+  box-shadow:
+    0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
+    0 0 0 1px rgb(var(--wk-primary-rgb) / 0.12);
+}
+
+.wk-project-task-chat-textarea {
+  min-height: 90px;
+  width: 100%;
+  min-width: 0;
+  resize: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  background: transparent;
+  padding: 0.75rem;
+  color: #0d0d0d;
+  font-size: 16px;
+  line-height: 26px;
+  outline: none;
+}
+
+.wk-project-task-chat-textarea::placeholder {
+  color: #909090;
+}
+
+.wk-project-task-chat-send-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: flex-end;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #0d0d0d;
+  color: #fff;
+  font-size: 0;
+  transition:
+    background-color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.wk-project-task-chat-send-button .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.wk-project-task-chat-send-button:hover:not(:disabled) {
+  background: #575757;
+}
+
+.wk-project-task-chat-send-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.wk-project-task-chat-send-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+@media (max-width: 640px) {
+  .wk-project-task-chat-message {
+    min-width: 0;
+  }
+
+  .wk-project-task-chat-message--user > div {
+    max-width: 88%;
+  }
+}
+</style>
