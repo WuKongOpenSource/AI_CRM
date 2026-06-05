@@ -2,6 +2,8 @@ import { post, get, upload, download, getToken, getApiBaseUrl } from '@/utils/re
 import type { PageResult } from '@/types/api'
 import type { Knowledge, KnowledgeQueryBO, KnowledgeAiAnalyzeVO, KnowledgeSalesScriptVO } from '@/types/common'
 
+const LONG_AI_TIMEOUT_MS = 180000
+
 /**
  * Upload file to knowledge base
  */
@@ -51,7 +53,7 @@ export function downloadKnowledge(id: string, filename: string): Promise<void> {
  * Reparse knowledge file
  */
 export function reparseKnowledge(id: string): Promise<void> {
-  return post(`/knowledge/reparse/${id}`)
+  return post(`/knowledge/reparse/${id}`, undefined, { timeout: LONG_AI_TIMEOUT_MS })
 }
 
 /**
@@ -72,14 +74,14 @@ export function getKnowledgeFileUrl(id: string): Promise<string> {
  * AI analyze knowledge document
  */
 export function aiAnalyzeKnowledge(id: string): Promise<KnowledgeAiAnalyzeVO> {
-  return post(`/knowledge/${id}/ai-analyze`)
+  return post(`/knowledge/${id}/ai-analyze`, undefined, { timeout: LONG_AI_TIMEOUT_MS })
 }
 
 /**
  * Generate a sales script from knowledge base content
  */
 export function generateSalesScript(): Promise<KnowledgeSalesScriptVO> {
-  return post('/knowledge/sales-script')
+  return post('/knowledge/sales-script', undefined, { timeout: LONG_AI_TIMEOUT_MS })
 }
 
 /**

@@ -2,11 +2,17 @@
   <div class="space-y-6">
     <el-card shadow="never" class="!border-slate-200">
       <template #header>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-3">
           <span class="font-medium">WeKnora 知识库服务配置</span>
-          <el-tag v-if="form.updateTime" size="small" type="info">
-            最后更新: {{ formatTime(form.updateTime) }}
-          </el-tag>
+          <div class="flex items-center gap-2">
+            <el-tag v-if="form.updateTime" size="small" type="info">
+              最后更新: {{ formatTime(form.updateTime) }}
+            </el-tag>
+            <el-button size="small" type="primary" @click="handleOpenWeKnoraAdmin">
+              <el-icon class="mr-1"><Link /></el-icon>
+              进入管理后台
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -185,7 +191,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Connection, Hide, View } from '@element-plus/icons-vue'
+import { Connection, Hide, Link, View } from '@element-plus/icons-vue'
 import {
   getWeKnoraConfig,
   syncWeKnoraModels,
@@ -428,6 +434,24 @@ async function handleSyncModels() {
   } finally {
     syncing.value = false
   }
+}
+
+function handleOpenWeKnoraAdmin() {
+  const win = window.open(resolveWeKnoraAdminUrl(), '_blank')
+  if (!win) {
+    ElMessage.warning('浏览器阻止了弹窗，请允许弹窗后重试')
+  }
+}
+
+function resolveWeKnoraAdminUrl() {
+  const protocol = window.location.protocol
+  const hostname = window.location.hostname
+  const port = window.location.port
+  // CRM 直连 8088 时没有 WeKnora 前端静态资源，管理后台应回到同主机的 Nginx /rag/ 入口。
+  if (!port || port === '8088') {
+    return `${protocol}//${hostname}/rag/`
+  }
+  return `${protocol}//${hostname}:${port}/rag/`
 }
 
 function formatTime(time: string | undefined): string {

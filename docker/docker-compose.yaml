@@ -238,6 +238,9 @@ services:
       - crm-network
   crm:
     image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260227
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.crm
     container_name: crm
     platform: linux/amd64
     ports:

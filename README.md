@@ -109,9 +109,11 @@ npm run dev
 
 ```bash
 cd docker
-docker-compose up -d
+docker-compose up -d --build
 # 访问 http://localhost 即可 (Nginx反向代理了前后端)
 ```
+
+`crm` 镜像会在构建时先编译 `frontend`，再把最新前端产物打进后端 Jar，避免部署到旧前端。
 
 配置文件：首次运行前，请根据 backend/src/main/resources/application.yml 中的注释，配置数据库、AI API密钥（如OpenAI、DeepSeek等）等必要信息。
 
@@ -355,9 +357,11 @@ npm run dev
 
 ```bash
 cd docker
-docker-compose up -d
+docker-compose up -d --build
 # Visit http://localhost (Nginx reverse proxies frontend and backend)
 ```
+
+The `crm` image builds the `frontend` source first and packages the latest frontend assets into the backend Jar, so Docker deployments do not fall back to stale frontend assets.
 
 Configuration: Before first run, configure necessary information like database and AI API keys (e.g., OpenAI, DeepSeek) according to comments in backend/src/main/resources/application.yml.
 

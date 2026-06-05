@@ -17,6 +17,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.util.*;
 
@@ -263,27 +268,26 @@ public class WeKnoraClient {
 
         String url = config.getBaseUrl() + "/knowledge-bases/" + config.getKnowledgeBaseId() + "/hybrid-search";
 
-        HttpHeaders headers = createHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("query_text", query);
         requestBody.put("vector_threshold", config.getSearch().getVectorThreshold());
         requestBody.put("match_count", config.getSearch().getMatchCount());
 
-        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-
         try {
-            // WeKnora hybrid-search 使用 GET 但带 body，用 exchange 发送
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    requestEntity,
-                    String.class
-            );
+            // WeKnora 当前接口定义为 GET 且读取 JSON body，RestTemplate 默认实现会丢弃 GET body。
+            // 使用 JDK HttpClient 显式发送 GET body，避免服务端解析请求体时出现 EOF。
+            String body = objectMapper.writeValueAsString(requestBody);
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                    .header("X-API-Key", config.getApiKey())
+                    .method("GET", HttpRequest.BodyPublishers.ofString(body))
+                    .build();
+            HttpResponse<String> response = HttpClient.newHttpClient()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode root = objectMapper.readTree(response.getBody());
+            if (response.statusCode() >= 200 && response.statusCode() < 300 && response.body() != null) {
+                JsonNode root = objectMapper.readTree(response.body());
                 if (root.has("success") && root.get("success").asBoolean() && root.has("data")) {
                     return objectMapper.convertValue(
                             root.get("data"),
@@ -291,7 +295,7 @@ public class WeKnoraClient {
                     );
                 }
             }
-            log.warn("WeKnora 混合搜索返回空结果: {}", response.getBody());
+            log.warn("WeKnora 混合搜索返回空结果: {}", response.body());
             return Collections.emptyList();
         } catch (Exception e) {
             log.error("WeKnora 混合搜索异常: {}", e.getMessage(), e);

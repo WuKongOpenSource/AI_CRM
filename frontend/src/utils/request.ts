@@ -106,6 +106,12 @@ service.interceptors.response.use(
       return Promise.reject(new Error(responseData?.msg || '认证失败'))
     }
 
+    if (error.code === 'ECONNABORTED' || String(error.message || '').includes('timeout')) {
+      const timeoutMessage = '请求处理超时，请稍后重试或检查模型服务是否响应较慢'
+      ElMessage.error(timeoutMessage)
+      return Promise.reject(new Error(timeoutMessage))
+    }
+
     const message = responseData?.msg || error.message || '网络错误'
     ElMessage.error(message)
     return Promise.reject(error)

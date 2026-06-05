@@ -1,0 +1,14 @@
+.git
+.idea
+.vscode
+
+frontend/node_modules
+frontend/dist
+backend/target
+
+docker/aicrm/logs
+docker/aicrm/config
+docker/nginx/cert
+
+*.log
+*.tmp
