@@ -29,6 +29,7 @@ import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -74,7 +75,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     private StringRedisTemplate redisTemplate;
 
     @Autowired
-    private DynamicChatClientProvider chatClientProvider;
+    private ObjectProvider<DynamicChatClientProvider> chatClientProviderProvider;
 
     @Autowired
     private FileStorageService fileStorageService;
@@ -262,7 +263,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         configs.put(AI_PROVIDER_CONFIGS_KEY, serializeProviderConfigs(providerConfigs));
 
         updateConfigs(configs);
-        chatClientProvider.refreshChatClient();
+        chatClientProvider().refreshChatClient();
 
         log.info("AI 配置已更新: tenantId={}, mode=custom, provider={}, model={}, supportsToolCall={}, supportsVision={}",
                 UserUtil.getTenantId(), descriptor.getCode(), updateBO.getModel(),
@@ -282,7 +283,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         }
 
         updateConfigs(buildActivationConfigMap(targetConfig, true));
-        chatClientProvider.refreshChatClient();
+        chatClientProvider().refreshChatClient();
         log.info("AI 自定义服务商已激活: tenantId={}, provider={}, model={}",
                 UserUtil.getTenantId(), targetConfig.providerCode(), targetConfig.model());
     }
@@ -294,7 +295,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     @Transactional(rollbackFor = Exception.class)
     public void useGiftAiConfig() {
         updateConfig(AI_MODE_KEY, AiMode.GIFT.getCode());
-        chatClientProvider.refreshChatClient();
+        chatClientProvider().refreshChatClient();
         log.info("AI 模式已切换为赠送额度: tenantId={}", UserUtil.getTenantId());
     }
 
@@ -313,7 +314,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前租户还没有保存可用的自定义 AI 配置");
         }
         updateConfigs(buildActivationConfigMap(targetConfig, true));
-        chatClientProvider.refreshChatClient();
+        chatClientProvider().refreshChatClient();
         log.info("AI 模式已切换为自定义模型: tenantId={}, provider={}, model={}",
                 UserUtil.getTenantId(), targetConfig.providerCode(), targetConfig.model());
     }
@@ -346,7 +347,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
             AiModelCapabilities capabilities = validateAiConfig(descriptor, configBO);
 
-            ChatClient testClient = chatClientProvider.createTestChatClient(
+            ChatClient testClient = chatClientProvider().createTestChatClient(
                     descriptor.getCode(),
                     normalizedApiUrl,
                     configBO.getApiKey().trim(),
@@ -469,6 +470,10 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
         CrmTenant tenant = tenantService.getById(tenantId);
         return tenant != null ? StrUtil.nullToEmpty(tenant.getTenantName()).trim() : null;
+    }
+
+    private DynamicChatClientProvider chatClientProvider() {
+        return chatClientProviderProvider.getObject();
     }
 
     /**
