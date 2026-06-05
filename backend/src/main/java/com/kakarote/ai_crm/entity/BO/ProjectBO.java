@@ -8,6 +8,7 @@ import lombok.Data;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 public class ProjectBO {
 
@@ -153,5 +154,10 @@ public class ProjectBO {
     public static class AiCommand {
         @NotBlank(message = "对话内容不能为空")
         private String content;
+    }
+
+    @Data
+    public static class RolePermissionConfig {
+        private Map<String, List<String>> rolePermissions;
     }
 }

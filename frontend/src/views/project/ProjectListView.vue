@@ -25,6 +25,26 @@
         <span class="material-symbols-outlined text-[20px] leading-none">add</span>
         <span>新建项目</span>
       </button>
+      <el-dropdown trigger="click" placement="bottom-end">
+        <button
+          type="button"
+          class="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] text-[#284462] transition-all hover:border-[var(--wk-input-border-hover)] hover:text-primary sm:self-auto"
+          title="更多项目设置"
+          aria-label="更多项目设置"
+        >
+          <span class="material-symbols-outlined text-[22px] leading-none">more_horiz</span>
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="showRolePermissionDialog = true">
+              <span class="inline-flex items-center gap-2">
+                <span class="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                <span>项目角色权限设置</span>
+              </span>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </header>
 
     <div class="flex min-w-0 flex-wrap items-center justify-between gap-3">
@@ -46,11 +66,12 @@
         </button>
       </div>
 
-      <div class="flex shrink-0 rounded-lg border border-slate-200 bg-slate-100 p-1">
+      <div class="flex shrink-0 items-center gap-2">
+        <div class="inline-flex h-9 shrink-0 items-center rounded-lg border border-[var(--wk-input-border)] bg-[var(--wk-input-bg)] p-1">
         <button
           type="button"
-          class="flex size-8 items-center justify-center rounded-md transition-all"
-          :class="viewMode === 'card' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+          class="inline-flex size-7 items-center justify-center rounded-md transition-all"
+          :class="viewMode === 'card' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'"
           title="卡片视图"
           @click="viewMode = 'card'"
         >
@@ -58,13 +79,14 @@
         </button>
         <button
           type="button"
-          class="flex size-8 items-center justify-center rounded-md transition-all"
-          :class="viewMode === 'table' ? 'bg-white text-primary shadow-sm ring-1 ring-primary/20' : 'text-slate-400 hover:text-slate-600'"
+          class="inline-flex size-7 items-center justify-center rounded-md transition-all"
+          :class="viewMode === 'table' ? 'bg-[var(--wk-bg-surface-hover)] text-primary' : 'text-[#8aa1c2] hover:text-primary'"
           title="表格视图"
           @click="viewMode = 'table'"
         >
           <span class="material-symbols-outlined text-[20px] leading-none">list</span>
         </button>
+        </div>
       </div>
     </div>
 
@@ -78,7 +100,7 @@
         <article
           v-for="project in projects"
           :key="project.projectId"
-          class="group rounded-[8px] border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
+          class="group rounded-[8px] border border-[var(--wk-input-border)] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-slate-200/60"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1 cursor-pointer" @click="goToProject(project.projectId)">
@@ -233,6 +255,7 @@
       :editing-project="editingProject"
       @submit="handleSubmitProject"
     />
+    <ProjectRolePermissionDialog v-model="showRolePermissionDialog" />
   </div>
 </template>
 
@@ -241,6 +264,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { queryProjectPageList } from '@/api/project'
+import ProjectRolePermissionDialog from '@/views/project/components/ProjectRolePermissionDialog.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
 import { useProjectStore } from '@/stores/project'
 import type {
@@ -272,6 +296,7 @@ const stats = ref<ProjectListStats>({
   completed: 0
 })
 const showDialog = ref(false)
+const showRolePermissionDialog = ref(false)
 const editingProject = ref<ProjectEntity | null>(null)
 let searchTimer: number | null = null
 

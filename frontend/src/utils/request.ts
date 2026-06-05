@@ -15,6 +15,10 @@ type KickoutNotice = {
   ip: string
 }
 
+type WkAxiosRequestConfig = AxiosRequestConfig & {
+  silentError?: boolean
+}
+
 export function getApiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL
   if (typeof raw !== 'string') return ''
@@ -50,6 +54,10 @@ function showErrorMessage(message?: string): void {
     ElMessage.error(pendingErrorMessage)
     errorMessageTimer = null
   }, ERROR_MESSAGE_DEBOUNCE_MS)
+}
+
+function shouldSilenceError(config?: AxiosRequestConfig): boolean {
+  return Boolean((config as WkAxiosRequestConfig | undefined)?.silentError)
 }
 
 function parseKickoutNotice(message: string): KickoutNotice | null {
@@ -191,7 +199,9 @@ service.interceptors.response.use(
       return handleNoPermission(res.msg)
     }
 
-    showErrorMessage(res.msg || '请求失败')
+    if (!shouldSilenceError(response.config)) {
+      showErrorMessage(res.msg || '请求失败')
+    }
     return Promise.reject(markRequestErrorHandled(new Error(res.msg || '请求失败')))
   },
   (error) => {
@@ -218,29 +228,31 @@ service.interceptors.response.use(
     }
 
     const message = responseData?.msg || error.message || '网络错误'
-    showErrorMessage(message)
+    if (!shouldSilenceError(error.config)) {
+      showErrorMessage(message)
+    }
     markRequestErrorHandled(error)
     return Promise.reject(error)
   }
 )
 
-export function get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+export function get<T = any>(url: string, config?: WkAxiosRequestConfig): Promise<T> {
   return service.get(url, config)
 }
 
-export function post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+export function post<T = any>(url: string, data?: any, config?: WkAxiosRequestConfig): Promise<T> {
   return service.post(url, data, config)
 }
 
-export function put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+export function put<T = any>(url: string, data?: any, config?: WkAxiosRequestConfig): Promise<T> {
   return service.put(url, data, config)
 }
 
-export function del<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+export function del<T = any>(url: string, config?: WkAxiosRequestConfig): Promise<T> {
   return service.delete(url, config)
 }
 
-export function upload<T = any>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<T> {
+export function upload<T = any>(url: string, formData: FormData, config?: WkAxiosRequestConfig): Promise<T> {
   return service.post(url, formData, {
     ...config,
     headers: {

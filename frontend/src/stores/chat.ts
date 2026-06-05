@@ -52,6 +52,7 @@ export const useChatStore = defineStore('chat', () => {
   const COMPOSER_DRAFT_BY_SESSION_STORAGE_KEY = 'wk_ai_crm:chat_composer_draft_by_session:v1'
   const GENERAL_APP_CODE = 'general'
   const CRM_APP_CODE = 'crm'
+  const PROJECT_APP_CODE = 'project'
   const KNOWLEDGE_APP_CODE = 'knowledge'
   const ADDRESS_BOOK_APP_CODE = 'address_book'
   const RELATION_APP_CODE = 'relation'
@@ -63,7 +64,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!raw) return {}
       const parsed = JSON.parse(raw) as Record<string, unknown>
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE])
+      const allowed = new Set([GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE])
       const out: Record<string, string> = {}
       for (const [k, v] of Object.entries(parsed)) {
         if (typeof v === 'string' && k.length > 0) {
@@ -805,7 +806,7 @@ export const useChatStore = defineStore('chat', () => {
     const code = (appCode || GENERAL_APP_CODE).trim().toLowerCase()
     const knownCodes = appOptions.value.map(option => option.code)
     if (knownCodes.length === 0) {
-      return [GENERAL_APP_CODE, CRM_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
+      return [GENERAL_APP_CODE, CRM_APP_CODE, PROJECT_APP_CODE, KNOWLEDGE_APP_CODE, ADDRESS_BOOK_APP_CODE, RELATION_APP_CODE].includes(code) ? code : GENERAL_APP_CODE
     }
     return knownCodes.includes(code) ? code : GENERAL_APP_CODE
   }

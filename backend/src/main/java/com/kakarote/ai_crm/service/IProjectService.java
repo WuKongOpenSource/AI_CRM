@@ -23,6 +23,10 @@ public interface IProjectService {
 
     void deleteProject(Long projectId);
 
+    ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig();
+
+    ProjectVO.ProjectRolePermissionConfigVO updateProjectRolePermissionConfig(ProjectBO.RolePermissionConfig configBO);
+
     ProjectVO addLane(Long projectId, ProjectBO.LaneSave laneBO);
 
     ProjectVO updateLane(Long projectId, ProjectBO.LaneSave laneBO);

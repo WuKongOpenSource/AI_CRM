@@ -474,6 +474,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     /**
      * 更新配置包含类型。
      */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateConfigsWithType(Map<String, String> configs, String configType) {
         for (Map.Entry<String, String> entry : configs.entrySet()) {

@@ -100,7 +100,7 @@
               : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] max-w-[248px]',
           ]"
           :title="primarySidebarContentCollapsed ? '新对话' : undefined"
-          @click="handleNewSession"
+          @click="handleNewSession()"
         >
           <!-- <span class="material-symbols-outlined wk-plus-button-icon text-[18px] leading-none">edit_square</span> -->
           <WkIcon name="new-chat" :size="18" class="shrink-0" />
@@ -244,7 +244,7 @@
                     title="在项目中开始对话"
                     @click.stop="handleStartProjectConversation(project.projectId)"
                   >
-                    <AiDialogIcon :size="22" :sparkle-size="13" />
+                    <WkIcon name="new-chat" :size="18" class="shrink-0" />
                   </button>
                 </button>
               </template>
@@ -1708,7 +1708,7 @@
       </Transition>
     </Teleport>
     <FloatingActionButton
-      v-if="route.path !== '/chat' && !chatDrawerOpen && !mobileDrawerRendered"
+      v-if="showFloatingNewChatButton"
       @new-chat="handleFloatingNewChat"
     />
     <AiChatDrawer />
@@ -1722,7 +1722,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import defaultLogoImg from '@/assets/images/logo.png'
 import FloatingActionButton from '@/components/common/FloatingActionButton.vue'
-import AiDialogIcon from '@/components/common/AiDialogIcon.vue'
 import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AiQuotaHeaderPopover from '@/components/layout/AiQuotaHeaderPopover.vue'
 import AiQuotaModals from '@/components/layout/AiQuotaModals.vue'
@@ -2150,6 +2149,7 @@ let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 let removeCustomerSidebarRefreshListener: (() => void) | null = null
+let removeProjectSidebarRefreshListener: (() => void) | null = null
 let removeMobileMainMenuOpenListener: (() => void) | null = null
 let removeMobileMainMenuDragListener: (() => void) | null = null
 let mobileDrawerDragSettleTimer: ReturnType<typeof setTimeout> | null = null
@@ -2164,6 +2164,10 @@ type CustomerListRefreshPayload = {
   preserveScroll?: boolean
 }
 
+type ProjectSidebarRefreshPayload = {
+  alreadyRefreshed?: boolean
+}
+
 type MobileMainMenuDragPayload = {
   progress?: number
   phase?: 'move' | 'end'
@@ -2172,6 +2176,12 @@ type MobileMainMenuDragPayload = {
 
 function refreshSidebarCustomersFromEvent(payload?: CustomerListRefreshPayload) {
   void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
+}
+
+function refreshSidebarProjectsFromEvent(payload?: ProjectSidebarRefreshPayload) {
+  if (payload?.alreadyRefreshed) return
+  if (!showSidebarProjects.value) return
+  void projectStore.ensureInitialized(true)
 }
 
 const chatComposerNarrow = ref(false)
@@ -2371,6 +2381,21 @@ const userAvatarInitials = computed(() => userDisplayName.value.trim().slice(0, 
 const showMobileDrawerNewChatButton = computed(() =>
   isMobile.value && drawerVisible.value && !chatDrawerOpen.value && !customerSearchDialogVisible.value && !showUserMenu.value
 )
+
+const showFloatingNewChatButton = computed(() => {
+  if (chatDrawerOpen.value || mobileDrawerRendered.value) return false
+  if (route.path.startsWith('/chat')) return false
+  if (route.name === 'ProjectDetail') {
+    const rawView = route.query.view
+    const view = typeof rawView === 'string' ? rawView : Array.isArray(rawView) ? rawView[0] : ''
+    const taskId = route.query.taskId
+    const hasTaskConversation = typeof taskId === 'string'
+      ? taskId.trim().length > 0
+      : Array.isArray(taskId) && taskId.some(value => typeof value === 'string' && value.trim().length > 0)
+    return !hasTaskConversation && view !== 'ai' && view !== 'task_ai'
+  }
+  return true
+})
 
 const activeMenu = computed(() => {
   const path = route.path
@@ -2639,6 +2664,10 @@ onMounted(() => {
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
   )
+  removeProjectSidebarRefreshListener = appEvents.on<ProjectSidebarRefreshPayload>(
+    APP_EVENT.PROJECT_SIDEBAR_REFRESH,
+    refreshSidebarProjectsFromEvent
+  )
   removeMobileMainMenuOpenListener = appEvents.on(
     APP_EVENT.MOBILE_MAIN_MENU_OPEN,
     openMobileDrawer
@@ -2687,6 +2716,8 @@ onBeforeUnmount(() => {
   removeCustomerListRefreshListener = null
   removeCustomerSidebarRefreshListener?.()
   removeCustomerSidebarRefreshListener = null
+  removeProjectSidebarRefreshListener?.()
+  removeProjectSidebarRefreshListener = null
   removeMobileMainMenuOpenListener?.()
   removeMobileMainMenuOpenListener = null
   removeMobileMainMenuDragListener?.()
@@ -2729,6 +2760,8 @@ watch(
     pcMainNavGroups.value.length,
     chatStore.sessions.length,
     chatStore.sessionsLoading,
+    sidebarProjects.value.length,
+    projectStore.loading,
     sidebarCustomers.value.length,
     sidebarCustomersLoading.value,
     sidebarEmployees.value.length,
@@ -3096,21 +3129,23 @@ const historySessionGroups = computed(() => [
   { key: 'earlier', label: '更早', sessions: groupedHistoryChatSessions.value.earlier },
 ])
 
-async function handleNewSession() {
+async function handleNewSession(appCode = 'general') {
   selectedPrimaryKey.value = ''
   await router.push('/chat')
   // HMR can keep an old store instance; fall back to legacy behavior if method missing.
   const api = chatStore as unknown as {
-    beginNewSessionDraft?: (title?: string) => void
-    startNewSessionIfNeeded?: (title?: string) => Promise<unknown>
+    beginNewSessionDraft?: (title?: string, agentId?: string, customerId?: string, appCode?: string) => void
+    startNewSessionIfNeeded?: (title?: string, agentId?: string, customerId?: string, appCode?: string) => Promise<unknown>
     clearMessages?: () => void
+    setSelectedAppCode?: (appCode: string) => void
   }
   if (api.beginNewSessionDraft) {
-    api.beginNewSessionDraft('新对话')
+    api.beginNewSessionDraft('新对话', undefined, undefined, appCode)
   } else if (api.startNewSessionIfNeeded) {
-    await api.startNewSessionIfNeeded('新对话')
+    await api.startNewSessionIfNeeded('新对话', undefined, undefined, appCode)
   } else {
     api.clearMessages?.()
+    api.setSelectedAppCode?.(appCode)
   }
   if (!isMobile.value) {
     chatStore.requestComposerFocus()
@@ -3120,6 +3155,33 @@ async function handleNewSession() {
 async function handleFloatingNewChat() {
   if (isMobile.value) {
     closeMobileDrawer()
+  }
+  if (route.name === 'ProjectDetail') {
+    const projectId = String(route.params.id || '').trim()
+    if (projectId) {
+      selectedPrimaryKey.value = ''
+      await router.push({ name: 'ProjectDetail', params: { id: projectId }, query: { view: 'ai' } })
+      return
+    }
+  }
+  if (route.name === 'CustomerDetail') {
+    const customerId = String(route.params.id || '').trim()
+    if (customerId) {
+      selectedPrimaryKey.value = ''
+      await router.push({ path: '/chat', query: { customerId } })
+      if (!isMobile.value) {
+        chatStore.requestComposerFocus()
+      }
+      return
+    }
+  }
+  if (route.name === 'CustomerList') {
+    await handleNewSession('crm')
+    return
+  }
+  if (route.name === 'ProjectList') {
+    await handleNewSession('project')
+    return
   }
   await handleNewSession()
 }

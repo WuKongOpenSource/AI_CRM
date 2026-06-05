@@ -49,6 +49,16 @@ export type ProjectPermission =
   | 'CREATE_SCHEDULE'
   | 'VIEW_STATISTICS'
 
+export type ProjectRolePermissionConfig = Record<ProjectRole, ProjectPermission[]>
+
+export interface ProjectRolePermissionConfigVO {
+  rolePermissions: ProjectRolePermissionConfig
+}
+
+export interface ProjectRolePermissionConfigPayload {
+  rolePermissions: Partial<Record<ProjectRole, ProjectPermission[]>>
+}
+
 export type ProjectMemberActionType =
   | 'ADD_MEMBER'
   | 'REMOVE_MEMBER'

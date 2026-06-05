@@ -217,7 +217,7 @@ const emit = defineEmits<{
 }>()
 
 const editing = ref(false)
-const editActionVisible = ref(!props.revealEditOnClick)
+const editActionVisible = ref(false)
 const saving = ref(false)
 const draftValue = ref<any>(null)
 const editorRef = ref<any>(null)
@@ -416,7 +416,7 @@ function cancel() {
   teardownFloatListeners()
   floatStyle.value = {}
   editing.value = false
-  editActionVisible.value = !props.revealEditOnClick
+  editActionVisible.value = false
   emit('cancel')
 }
 
@@ -434,7 +434,7 @@ async function commit() {
     teardownFloatListeners()
     floatStyle.value = {}
     editing.value = false
-    editActionVisible.value = !props.revealEditOnClick
+    editActionVisible.value = false
     emit('saved', submitValue)
   } finally {
     saving.value = false
@@ -444,12 +444,12 @@ async function commit() {
 watch(() => [props.modelValue, resolvedFieldName.value], () => {
   if (!editing.value) {
     draftValue.value = createDraftValue(props.modelValue)
-    editActionVisible.value = !props.revealEditOnClick
+    editActionVisible.value = false
   }
 })
 
-watch(() => props.revealEditOnClick, (value) => {
-  editActionVisible.value = !value
+watch(() => props.revealEditOnClick, () => {
+  editActionVisible.value = false
 })
 
 watch(editing, (v) => {
@@ -537,8 +537,8 @@ onUnmounted(() => {
 }
 
 /* 悬停/聚焦编辑钮时预留宽度，避免绝对定位按钮盖住省略号文案 */
-.inline-editable-field:not(.is-click-reveal):has(.inline-editable-field__edit):hover .inline-editable-field__content,
-.inline-editable-field:has(.inline-editable-field__edit:focus-visible) .inline-editable-field__content,
+.inline-editable-field:not(.is-click-reveal):has(.inline-editable-field__edit) .inline-editable-field__display:hover .inline-editable-field__content,
+.inline-editable-field:has(.inline-editable-field__edit:focus-visible) .inline-editable-field__display .inline-editable-field__content,
 .inline-editable-field.is-edit-action-visible .inline-editable-field__content {
   padding-right: 32px;
 }
@@ -574,7 +574,7 @@ onUnmounted(() => {
   background: #d6ebff;
 }
 
-.inline-editable-field:not(.is-click-reveal):hover .inline-editable-field__edit,
+.inline-editable-field:not(.is-click-reveal) .inline-editable-field__display:hover .inline-editable-field__edit,
 .inline-editable-field__edit:focus-visible,
 .inline-editable-field.is-edit-action-visible .inline-editable-field__edit {
   opacity: 1;

@@ -15,6 +15,7 @@ import com.kakarote.ai_crm.ai.tools.CustomerTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.MailTools;
+import com.kakarote.ai_crm.ai.tools.ProjectTools;
 import com.kakarote.ai_crm.ai.tools.RelationTools;
 import com.kakarote.ai_crm.ai.tools.ScheduleTools;
 import com.kakarote.ai_crm.ai.tools.TaskTools;
@@ -90,6 +91,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private TaskTools taskTools;
+
+    @Autowired
+    private ProjectTools projectTools;
 
     @Autowired
     private KnowledgeTools knowledgeTools;
@@ -581,7 +585,7 @@ public class DynamicChatClientProvider {
         boolean crmEnabled = chatApplicationRegistry.hasToolGroup(normalizedAppCode, ChatApplicationRegistry.TOOL_GROUP_CRM);
         boolean knowledgeEnabled = chatApplicationRegistry.hasToolGroup(normalizedAppCode, ChatApplicationRegistry.TOOL_GROUP_KNOWLEDGE);
         if (crmEnabled) {
-            return new Object[]{customerTools, taskTools, knowledgeTools, contactTools, followupTools, scheduleTools, relationTools, mailTools, tencentMeetingTools, crmNoopTools};
+            return new Object[]{customerTools, taskTools, projectTools, knowledgeTools, contactTools, followupTools, scheduleTools, relationTools, mailTools, tencentMeetingTools, crmNoopTools};
         }
         if (knowledgeEnabled) {
             return new Object[]{knowledgeTools};

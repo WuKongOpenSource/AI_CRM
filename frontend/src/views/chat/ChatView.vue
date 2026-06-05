@@ -915,7 +915,7 @@
                     <div class="flex items-center gap-2">
                       <el-popover
                         v-model:visible="chatUploadMenuVisible"
-                        trigger="manual"
+                        trigger="click"
                         placement="top-start"
                         width="200"
                         :show-arrow="false"
@@ -930,10 +930,6 @@
                             class="wk-chat-upload-trigger group/chat-upload-trigger relative flex size-8 items-center justify-center rounded-full text-[#0d0d0d] transition-colors hover:bg-[#F1F1F1]"
                             :disabled="isUploading"
                             aria-label="添加文件等"
-                            @pointerdown.stop.prevent="handleChatUploadTriggerPointerDown"
-                            @click.stop.prevent="noopChatUploadTriggerClick"
-                            @keydown.enter.prevent="handleChatUploadTriggerClick"
-                            @keydown.space.prevent="handleChatUploadTriggerClick"
                           >
                             <WkIcon name="add-1" :box-size="16" class="shrink-0" />
                             <span
@@ -1011,6 +1007,23 @@
                                 <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'crm' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">CRM管理</span>
                                 <span
                                   v-if="chatStore.selectedAppCode === 'crm'"
+                                  class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                                >check</span>
+                              </button>
+                              <button
+                                type="button"
+                                class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                                @click="handleChatUploadMenuSelectApp('project')"
+                              >
+                                <WkIcon
+                                  name="task"
+                                  :size="18"
+                                  class="shrink-0"
+                                  :class="chatStore.selectedAppCode === 'project' ? '!text-[var(--wk-text-primary)]' : ''"
+                                />
+                                <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label" :class="chatStore.selectedAppCode === 'project' ? 'text-[var(--wk-text-primary)]' : 'text-[#0d0d0d]'">项目</span>
+                                <span
+                                  v-if="chatStore.selectedAppCode === 'project'"
                                   class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
                                 >check</span>
                               </button>
@@ -1290,7 +1303,7 @@
                   <div v-else class="wk-mobile-composer-row flex w-full items-end gap-2">
                     <el-popover
                       v-model:visible="chatUploadMenuVisible"
-                      trigger="manual"
+                      trigger="click"
                       placement="top-start"
                       width="calc(100vw - 32px)"
                       :show-arrow="false"
@@ -1305,10 +1318,6 @@
                           class="wk-chat-upload-trigger wk-mobile-composer-icon-button"
                           :disabled="isUploading"
                           aria-label="添加文件等"
-                          @pointerdown.stop.prevent="handleChatUploadTriggerPointerDown"
-                          @click.stop.prevent="noopChatUploadTriggerClick"
-                          @keydown.enter.prevent="handleChatUploadTriggerClick"
-                          @keydown.space.prevent="handleChatUploadTriggerClick"
                         >
                           <WkIcon name="add-1" :box-size="16" class="shrink-0" />
                         </button>
@@ -1366,6 +1375,24 @@
                               <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">CRM管理</span>
                               <span
                                 v-if="chatStore.selectedAppCode === 'crm'"
+                                class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
+                              >check</span>
+                            </button>
+                            <button
+                              type="button"
+                              class="wk-chat-upload-menu__item wk-chat-upload-submenu__btn"
+                              :disabled="isUploading"
+                              @click="handleChatUploadMenuSelectApp('project')"
+                            >
+                              <WkIcon
+                                name="task"
+                                :size="18"
+                                class="shrink-0"
+                                :class="chatStore.selectedAppCode === 'project' ? 'text-primary' : ''"
+                              />
+                              <span class="wk-chat-upload-menu__label wk-chat-upload-submenu__label">项目</span>
+                              <span
+                                v-if="chatStore.selectedAppCode === 'project'"
                                 class="wk-chat-upload-menu__check material-symbols-outlined fill-1 text-primary"
                               >check</span>
                             </button>
@@ -2065,6 +2092,7 @@ import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
 import { useEnterpriseStore } from '@/stores/enterprise'
+import { useProjectStore } from '@/stores/project'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
@@ -2139,6 +2167,7 @@ const { composerFocusNonce } = storeToRefs(chatStore)
 const agentStore = useAgentStore()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
+const projectStore = useProjectStore()
 const { isMobile } = useResponsive()
 const {
   aiConfig,
@@ -2216,40 +2245,10 @@ function isInsideChatUploadMenuPopover(target: EventTarget | null): boolean {
   return Boolean(el?.closest('.wk-chat-upload-menu-popper'))
 }
 
-function isInsideChatUploadTrigger(target: EventTarget | null): boolean {
-  if (!(target instanceof Node)) return false
-  const el = target instanceof Element ? target : target.parentElement
-  return Boolean(el?.closest('.wk-chat-upload-trigger'))
-}
-
 function closeChatUploadMenu() {
   clearChatUploadMenuLeaveTimer()
   chatUploadMenuVisible.value = false
   chatUploadSubmenuVisible.value = false
-}
-
-function handleChatUploadTriggerClick() {
-  if (isUploading.value) return
-  clearChatUploadMenuLeaveTimer()
-  if (!chatUploadMenuVisible.value) {
-    chatModelPopoverVisible.value = false
-  }
-  chatUploadMenuVisible.value = !chatUploadMenuVisible.value
-}
-
-function handleChatUploadTriggerPointerDown(event: PointerEvent) {
-  if (event.pointerType === 'mouse' && event.button !== 0) return
-  handleChatUploadTriggerClick()
-}
-
-function noopChatUploadTriggerClick() {
-  // Pointer events handle this trigger; the click handler only swallows mobile ghost clicks.
-}
-
-function handleDocumentPointerDown(event: PointerEvent) {
-  if (!chatUploadMenuVisible.value) return
-  if (isInsideChatUploadTrigger(event.target) || isInsideChatUploadMenuPopover(event.target)) return
-  closeChatUploadMenu()
 }
 
 function handleChatUploadMenuMouseLeave(event: MouseEvent) {
@@ -2265,7 +2264,10 @@ function handleChatUploadMenuMouseLeave(event: MouseEvent) {
 }
 
 watch(chatUploadMenuVisible, (visible) => {
-  if (!visible) {
+  if (visible) {
+    clearChatUploadMenuLeaveTimer()
+    chatModelPopoverVisible.value = false
+  } else {
     chatUploadSubmenuVisible.value = false
     clearChatUploadMenuLeaveTimer()
   }
@@ -2443,6 +2445,7 @@ const selectedChatAppLabel = computed(() => {
     return chatStore.selectedApp.label == '知识库' ? '知识库检索' : chatStore.selectedApp.label
   }
   if (chatStore.selectedAppCode === 'crm') return 'CRM管理'
+  if (chatStore.selectedAppCode === 'project') return '项目'
   if (chatStore.selectedAppCode === 'address_book') return '通讯录'
   if (chatStore.selectedAppCode === 'relation') return '关系'
   if (chatStore.selectedAppCode === 'knowledge') return '知识库检索'
@@ -2455,6 +2458,7 @@ const selectedChatAppIcon = computed<WkIconName>(() => {
     return chatStore.selectedApp.iconName
   }
   if (chatStore.selectedAppCode === 'crm') return 'customer'
+  if (chatStore.selectedAppCode === 'project') return 'task'
   if (chatStore.selectedAppCode === 'address_book') return 'customer'
   if (chatStore.selectedAppCode === 'relation') return 'customer'
   if (chatStore.selectedAppCode === 'knowledge') return 'knowledge-1'
@@ -3579,7 +3583,6 @@ onMounted(async () => {
     chatMessagesResizeObserver.observe(messagesContainer.value)
   }
   registerMobileKeyboardInsetListeners()
-  document.addEventListener('pointerdown', handleDocumentPointerDown, true)
   document.addEventListener('touchmove', handleMobileSummaryTouchMove, { passive: false })
   emitChatComposerNarrowState(true)
   resizeChatTextarea()
@@ -3616,7 +3619,6 @@ onBeforeUnmount(() => {
   transcriptionToken += 1
   closeMobileCustomerSummary()
   unregisterMobileKeyboardInsetListeners()
-  document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
   document.removeEventListener('touchmove', handleMobileSummaryTouchMove)
   unregisterAiQuotaResumeSendHandler()
   customerPanelResizeObserver?.disconnect()
@@ -3935,6 +3937,11 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
     return
   }
 
+  if (effectiveAppCode === 'project') {
+    await refreshProjectsAfterProjectChat()
+    return
+  }
+
   if (effectiveAppCode !== 'crm') return
 
   appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat', preserveScroll: true })
@@ -3946,6 +3953,17 @@ async function refreshCrmContextAfterSend(effectiveAppCode: string, completedSes
     source: 'chat',
     modules: ['contacts', 'followUps', 'tasks', 'schedules', 'tencentMeetings']
   })
+}
+
+async function refreshProjectsAfterProjectChat() {
+  let refreshed = false
+  try {
+    await projectStore.ensureInitialized(true)
+    refreshed = true
+  } catch (error) {
+    console.error('Refresh project sidebar after project chat failed:', error)
+  }
+  appEvents.emit(APP_EVENT.PROJECT_SIDEBAR_REFRESH, { source: 'chat', alreadyRefreshed: refreshed })
 }
 
 function handleSendBarClick() {

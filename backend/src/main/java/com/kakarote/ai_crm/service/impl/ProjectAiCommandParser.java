@@ -69,7 +69,8 @@ final class ProjectAiCommandParser {
 
     private static boolean isCreateTask(String content) {
         return (hasCreateVerb(content) && hasAny(content, "任务", "待办", "事项"))
-                || Pattern.compile("(创建|新增|添加|安排|建立).+的任务").matcher(content).find();
+                || Pattern.compile("(创建|新增|添加|安排|建立).+的任务").matcher(content).find()
+                || isImplicitTaskCreation(content);
     }
 
     private static boolean isCreateProjectSchedule(String content) {
@@ -87,6 +88,31 @@ final class ProjectAiCommandParser {
 
     private static boolean hasScheduleIntent(String content) {
         return hasAny(content, "日程", "会议", "提醒") && hasAny(content, "安排", "创建", "新增", "添加", "建立");
+    }
+
+    private static boolean isImplicitTaskCreation(String content) {
+        if (hasQuestionIntent(content)
+                || hasAny(content, "项目状态", "项目进展", "项目总结", "泳道", "看板列", "状态列", "日程", "会议", "提醒", "附件", "文件", "文档")) {
+            return false;
+        }
+        return hasTaskObjectIntent(content) && hasDeadlineOrCompletionIntent(content);
+    }
+
+    private static boolean hasQuestionIntent(String content) {
+        return hasAny(content, "吗", "么", "如何", "怎么", "能不能", "是否", "有没有", "哪些", "多少", "查询", "查看", "看看", "总结", "汇总")
+                || content.contains("?")
+                || content.contains("？");
+    }
+
+    private static boolean hasTaskObjectIntent(String content) {
+        return hasAny(content,
+                "任务", "待办", "事项", "需求", "工作", "跟进", "处理", "测试", "开发", "设计", "汇报",
+                "整理", "准备", "交付", "修复", "对接", "确认", "评审", "上线", "验收", "调研", "分析");
+    }
+
+    private static boolean hasDeadlineOrCompletionIntent(String content) {
+        return hasAny(content, "完成", "截止", "到期", "交付", "上线", "验收", "本周", "这周", "下周", "本月", "月底", "月末", "今天", "明天", "后天")
+                || Pattern.compile("\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}/\\d{1,2}|\\d{1,2}月\\d{1,2}[日号]?|周[一二三四五六日天]|星期[一二三四五六日天]").matcher(content).find();
     }
 
     private static String parseProjectStatus(String content) {
@@ -146,7 +172,9 @@ final class ProjectAiCommandParser {
     private static String cleanTitle(String text) {
         String cleaned = StrUtil.blankToDefault(text, "")
                 .replaceAll("这个项目是.*?项目，?", "")
-                .replaceAll("今天|明天|后天|下周|上午|下午|晚上|早上|中午|\\d{1,2}[:：]\\d{1,2}|\\d{1,2}点|一点|两点|二点|三点|四点|五点|六点|七点|八点|九点|十点|十一点|十二点", "")
+                .replaceAll("(?:今天|明天|后天|本周|这周|下周|本月|月底|月末|年底|周[一二三四五六日天]|星期[一二三四五六日天]|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}/\\d{1,2}|\\d{1,2}月\\d{1,2}[日号]?)(?:前|之前|内|完成|交付|截止|上线|验收)*", "")
+                .replaceAll("上午|下午|晚上|早上|中午|\\d{1,2}[:：]\\d{1,2}|\\d{1,2}点|一点|两点|二点|三点|四点|五点|六点|七点|八点|九点|十点|十一点|十二点", "")
+                .replaceAll("(?:前|之前|内)?(?:完成|交付|截止|上线|验收)$", "")
                 .replaceAll("帮我|请|麻烦|一个|一条|1个", "")
                 .replaceAll("[，。,.、；;：:！!]+$", "")
                 .trim();

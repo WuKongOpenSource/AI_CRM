@@ -41,6 +41,8 @@ public interface ISystemConfigService extends IService<SystemConfig> {
      */
     void updateConfigs(Map<String, String> configs);
 
+    void updateConfigsWithType(Map<String, String> configs, String configType);
+
     /**
      * 获取AI 配置。
      */

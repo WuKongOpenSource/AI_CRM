@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto w-[calc(100%-20px)] max-w-4xl md:w-full">
+  <div class="mx-auto w-full max-w-4xl">
     <div class="relative group min-w-0 w-[768px] max-w-full mx-auto">
       <div class="wk-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
         <div class="w-full min-w-0">
@@ -43,11 +43,11 @@
                   @mouseenter="clearUploadMenuLeaveTimer"
                   @mouseleave="handleUploadMenuMouseLeave"
                 >
-                  <button type="button" class="wk-chat-upload-menu__item" @click="handleUnsupportedAttachment">
+                  <button type="button" class="wk-chat-upload-menu__item wk-chat-upload-menu__item--compact" @click="handleUnsupportedAttachment">
                     <WkIcon name="file" :box-size="18" class="shrink-0" />
                     <span class="wk-chat-upload-menu__label">上传图片和文件</span>
                   </button>
-                  <button type="button" class="wk-chat-upload-menu__item" @click="handleUnsupportedAttachment">
+                  <button type="button" class="wk-chat-upload-menu__item wk-chat-upload-menu__item--compact" @click="handleUnsupportedAttachment">
                     <WkIcon name="knowledge-1" :size="18" class="shrink-0" />
                     <span class="wk-chat-upload-menu__label">选择知识库文件</span>
                   </button>
@@ -111,21 +111,29 @@
               <button
                 v-if="selectedChatAppLabel"
                 type="button"
-                class="group/project-app-toolbar h-[36px] rounded-full pl-1 pr-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
+                class="group/project-app-toolbar h-[36px] max-w-[300px] rounded-full pl-1 pr-3.5 text-sm text-[var(--wk-text-primary)] transition-all hover:bg-[var(--wk-bg-surface-hover)]"
+                :class="selectedContextLocked ? 'cursor-default hover:bg-transparent' : ''"
                 aria-pressed="true"
-                :title="`已启用 ${selectedChatAppLabel}，点击关闭`"
-                @click="chatStore.setSelectedAppCode('general')"
+                :title="selectedChatAppTitle"
+                @click="handleSelectedAppChipClick"
               >
-                <span class="flex items-center gap-1.5">
+                <span class="flex min-w-0 items-center gap-1.5">
                   <span class="relative flex size-[22px] shrink-0 items-center justify-center">
-                    <span class="flex size-full items-center justify-center transition-opacity duration-150 group-hover/project-app-toolbar:pointer-events-none group-hover/project-app-toolbar:opacity-0">
+                    <span
+                      class="flex size-full items-center justify-center transition-opacity duration-150"
+                      :class="selectedContextLocked ? '' : 'group-hover/project-app-toolbar:pointer-events-none group-hover/project-app-toolbar:opacity-0'"
+                    >
                       <WkIcon :name="selectedChatAppIcon" :size="18" class="shrink-0" />
                     </span>
-                    <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 group-hover/project-app-toolbar:opacity-100" aria-hidden="true">
+                    <span
+                      v-if="!selectedContextLocked"
+                      class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-[var(--wk-bg-surface-active)] text-[var(--wk-text-primary)] opacity-0 transition-opacity duration-150 group-hover/project-app-toolbar:opacity-100"
+                      aria-hidden="true"
+                    >
                       <span class="material-symbols-outlined text-[14px] leading-none">close</span>
                     </span>
                   </span>
-                  <span>{{ selectedChatAppLabel }}</span>
+                  <span class="min-w-0 truncate">{{ selectedChatAppLabel }}</span>
                 </span>
               </button>
             </div>
@@ -289,6 +297,7 @@ import { getAiConfig } from '@/api/systemConfig'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatStore } from '@/stores/chat'
 import type { ChatModelOption } from '@/types/common'
+import type { WkIconName } from '@/components/common/wkIcon'
 import { useAiQuota } from '@/composables/useAiQuota'
 import {
   canCaptureMobileAudioFile,
@@ -310,9 +319,13 @@ const props = withDefaults(defineProps<{
   modelValue: string
   placeholder?: string
   disabled?: boolean
+  contextLabel?: string
+  contextIcon?: WkIconName
 }>(), {
   placeholder: '发消息...',
-  disabled: false
+  disabled: false,
+  contextLabel: '',
+  contextIcon: 'task'
 })
 
 const emit = defineEmits<{
@@ -341,6 +354,7 @@ let speechInputBase = ''
 
 const appChoices = [
   { code: 'crm', label: 'CRM管理', icon: 'customer' },
+  { code: 'project', label: '项目', icon: 'task' },
   { code: 'knowledge', label: '知识库检索', icon: 'knowledge-1' },
   { code: 'address_book', label: '通讯录', icon: 'customer' },
   { code: 'relation', label: '关系', icon: 'customer' }
@@ -363,13 +377,25 @@ const composerModelLabel = computed(() => {
 
 const selectedModelInitial = computed(() => composerModelLabel.value.slice(0, 1) || '?')
 
+const selectedContextLabel = computed(() => props.contextLabel.trim())
+const selectedContextLocked = computed(() => Boolean(selectedContextLabel.value))
+
 const selectedChatAppLabel = computed(() => {
+  if (selectedContextLabel.value) return selectedContextLabel.value
   if (chatStore.selectedAppCode === 'general') return ''
   return appChoices.find(app => app.code === chatStore.selectedAppCode)?.label || chatStore.selectedApp?.label || ''
 })
 
 const selectedChatAppIcon = computed(() =>
-  appChoices.find(app => app.code === chatStore.selectedAppCode)?.icon || 'application'
+  selectedContextLabel.value
+    ? props.contextIcon
+    : appChoices.find(app => app.code === chatStore.selectedAppCode)?.icon || 'application'
+)
+
+const selectedChatAppTitle = computed(() =>
+  selectedContextLabel.value
+    ? `当前上下文：${selectedContextLabel.value}`
+    : `已启用 ${selectedChatAppLabel.value}，点击关闭`
 )
 
 const isComposerInputEmpty = computed(() => !props.modelValue.trim())
@@ -461,7 +487,7 @@ function onModelImageError(event: Event) {
 }
 
 function shouldShowModelMultiplier(option: ChatModelOption): boolean {
-  return Number(option.creditMultiplier || 1) !== 1
+  return option.modelSource !== 'custom'
 }
 
 function formatModelMultiplier(value?: number | null) {
@@ -509,6 +535,11 @@ function handleModelChange(modelKey: string) {
 function handleOpenMoreModels() {
   modelPopoverVisible.value = false
   goToAiSettings()
+}
+
+function handleSelectedAppChipClick() {
+  if (selectedContextLocked.value) return
+  chatStore.setSelectedAppCode('general')
 }
 
 function handleSelectApp(appCode: string) {
@@ -774,6 +805,10 @@ function handleStopAudioRecording() {
 .wk-chat-upload-menu__item:hover,
 .wk-chat-upload-menu__apps-ref:hover {
   background: var(--wk-bg-surface-hover);
+}
+
+.wk-chat-upload-menu__item--compact {
+  gap: 8px;
 }
 
 .wk-chat-upload-menu__item:disabled {

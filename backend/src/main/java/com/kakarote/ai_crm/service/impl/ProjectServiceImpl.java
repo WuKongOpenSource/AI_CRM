@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.service.IProjectService;
+import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.PermissionService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.DayOfWeek;
+import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,7 +69,12 @@ public class ProjectServiceImpl implements IProjectService {
     private static final String PERMISSION_USE_AI_CHAT = "USE_AI_CHAT";
     private static final String PERMISSION_AI_CREATE_TASK = "AI_CREATE_TASK";
     private static final String PERMISSION_UPLOAD_ATTACHMENT = "UPLOAD_ATTACHMENT";
+    private static final String PERMISSION_DELETE_ATTACHMENT = "DELETE_ATTACHMENT";
     private static final String PERMISSION_CREATE_SCHEDULE = "CREATE_SCHEDULE";
+    private static final String PERMISSION_VIEW_STATISTICS = "VIEW_STATISTICS";
+    private static final String PROJECT_CONFIG_TYPE = "project";
+    private static final String PROJECT_ROLE_PERMISSION_CONFIG_KEY = "project.role.permissions";
+    private static final List<String> PROJECT_ROLES = List.of("OWNER", "ADMIN", "MEMBER", "READONLY", "EXTERNAL");
 
     private static final List<String> ALL_PERMISSIONS = List.of(
             PERMISSION_VIEW_PROJECT,
@@ -85,15 +94,16 @@ public class ProjectServiceImpl implements IProjectService {
             PERMISSION_USE_AI_CHAT,
             PERMISSION_AI_CREATE_TASK,
             PERMISSION_UPLOAD_ATTACHMENT,
-            "DELETE_ATTACHMENT",
+            PERMISSION_DELETE_ATTACHMENT,
             PERMISSION_CREATE_SCHEDULE,
-            "VIEW_STATISTICS"
+            PERMISSION_VIEW_STATISTICS
     );
 
-    private static final Map<String, List<String>> ROLE_PERMISSIONS = buildRolePermissions();
+    private static final Map<String, List<String>> DEFAULT_ROLE_PERMISSIONS = buildRolePermissions();
 
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
+    private final ISystemConfigService systemConfigService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -346,6 +356,25 @@ public class ProjectServiceImpl implements IProjectService {
         jdbcTemplate.update("DELETE FROM crm_project_lane WHERE project_id = ?", projectId);
         jdbcTemplate.update("DELETE FROM crm_task WHERE project_id = ? AND (tenant_id = ? OR ? IS NULL)", projectId, tenantId, tenantId);
         jdbcTemplate.update("DELETE FROM crm_project WHERE project_id = ? AND (tenant_id = ? OR ? IS NULL)", projectId, tenantId, tenantId);
+    }
+
+    @Override
+    public ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig() {
+        return buildRolePermissionConfigVO(loadProjectRolePermissions());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectVO.ProjectRolePermissionConfigVO updateProjectRolePermissionConfig(ProjectBO.RolePermissionConfig configBO) {
+        if (!isSystemAdmin()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH, "当前账号没有配置项目角色权限的权限");
+        }
+        Map<String, List<String>> rolePermissions = normalizeRolePermissionConfig(
+                configBO == null ? null : configBO.getRolePermissions());
+        systemConfigService.updateConfigsWithType(
+                Map.of(PROJECT_ROLE_PERMISSION_CONFIG_KEY, writeJson(rolePermissions)),
+                PROJECT_CONFIG_TYPE);
+        return buildRolePermissionConfigVO(rolePermissions);
     }
 
     @Override
@@ -1561,19 +1590,38 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private Date parseRelativeDateTime(String content) {
-        if (!containsAny(content, "今天", "明天", "后天", "下周", "上午", "下午", "晚上", "点", ":", "：")) {
+        if (!containsAny(content, "今天", "明天", "后天", "本周", "这周", "下周", "本月", "月底", "月末", "上午", "下午", "晚上", "点", ":", "：")
+                && !Pattern.compile("\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}/\\d{1,2}|\\d{1,2}月\\d{1,2}[日号]?|周[一二三四五六日天]|星期[一二三四五六日天]").matcher(content).find()) {
             return null;
         }
-        LocalDate date = LocalDate.now(DEFAULT_ZONE);
-        if (content.contains("后天")) {
+        LocalDate today = LocalDate.now(DEFAULT_ZONE);
+        LocalDate date = today;
+        LocalDate explicitDate = parseExplicitDate(content, today);
+        DayOfWeek weekday = parseChineseWeekday(content);
+        if (explicitDate != null) {
+            date = explicitDate;
+        } else if (weekday != null) {
+            LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            if (content.contains("下周")) {
+                weekStart = weekStart.plusWeeks(1);
+            }
+            date = weekStart.plusDays(weekday.getValue() - 1L);
+            if (!content.contains("下周") && date.isBefore(today)) {
+                date = date.plusWeeks(1);
+            }
+        } else if (content.contains("后天")) {
             date = date.plusDays(2);
         } else if (content.contains("明天")) {
             date = date.plusDays(1);
+        } else if (content.contains("本周") || content.contains("这周")) {
+            date = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
         } else if (content.contains("下周")) {
             date = date.plusWeeks(1);
+        } else if (content.contains("本月") || content.contains("月底") || content.contains("月末")) {
+            date = date.with(TemporalAdjusters.lastDayOfMonth());
         }
 
-        int hour = content.contains("下午") || content.contains("晚上") ? 15 : 9;
+        int hour = content.contains("下午") || content.contains("晚上") || containsAny(content, "本周", "这周", "本月", "月底", "月末", "完成", "截止") ? 18 : 9;
         int minute = 0;
         Matcher colon = Pattern.compile("(\\d{1,2})[:：](\\d{1,2})").matcher(content);
         if (colon.find()) {
@@ -1593,6 +1641,55 @@ public class ProjectServiceImpl implements IProjectService {
             hour += 12;
         }
         return Date.from(LocalDateTime.of(date, LocalTime.of(Math.min(hour, 23), Math.min(minute, 59))).atZone(DEFAULT_ZONE).toInstant());
+    }
+
+    private LocalDate parseExplicitDate(String content, LocalDate baseDate) {
+        Matcher iso = Pattern.compile("(\\d{4})-(\\d{1,2})-(\\d{1,2})").matcher(content);
+        if (iso.find()) {
+            return localDateOf(Integer.parseInt(iso.group(1)), Integer.parseInt(iso.group(2)), Integer.parseInt(iso.group(3)));
+        }
+        Matcher slash = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(content);
+        if (slash.find()) {
+            return localDateOf(baseDate.getYear(), Integer.parseInt(slash.group(1)), Integer.parseInt(slash.group(2)));
+        }
+        Matcher chinese = Pattern.compile("(\\d{1,2})月(\\d{1,2})[日号]?").matcher(content);
+        if (chinese.find()) {
+            return localDateOf(baseDate.getYear(), Integer.parseInt(chinese.group(1)), Integer.parseInt(chinese.group(2)));
+        }
+        return null;
+    }
+
+    private LocalDate localDateOf(int year, int month, int day) {
+        try {
+            return LocalDate.of(year, month, day);
+        } catch (DateTimeException ignored) {
+            return null;
+        }
+    }
+
+    private DayOfWeek parseChineseWeekday(String content) {
+        if (containsAny(content, "周一", "星期一")) {
+            return DayOfWeek.MONDAY;
+        }
+        if (containsAny(content, "周二", "星期二")) {
+            return DayOfWeek.TUESDAY;
+        }
+        if (containsAny(content, "周三", "星期三")) {
+            return DayOfWeek.WEDNESDAY;
+        }
+        if (containsAny(content, "周四", "星期四")) {
+            return DayOfWeek.THURSDAY;
+        }
+        if (containsAny(content, "周五", "星期五")) {
+            return DayOfWeek.FRIDAY;
+        }
+        if (containsAny(content, "周六", "星期六")) {
+            return DayOfWeek.SATURDAY;
+        }
+        if (containsAny(content, "周日", "周天", "星期日", "星期天")) {
+            return DayOfWeek.SUNDAY;
+        }
+        return null;
     }
 
     private String parsePriority(String content) {
@@ -1752,7 +1849,8 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private List<String> roleDefaultPermissions(String role) {
-        return ROLE_PERMISSIONS.getOrDefault(normalizeRole(role), ROLE_PERMISSIONS.get("MEMBER"));
+        Map<String, List<String>> rolePermissions = loadProjectRolePermissions();
+        return new ArrayList<>(rolePermissions.getOrDefault(normalizeRole(role), rolePermissions.get("MEMBER")));
     }
 
     private List<String> normalizePermissions(List<String> permissions) {
@@ -1764,6 +1862,58 @@ public class ProjectServiceImpl implements IProjectService {
                 .filter(allowed::contains)
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    private Map<String, List<String>> loadProjectRolePermissions() {
+        String raw = systemConfigService.getConfigValue(PROJECT_ROLE_PERMISSION_CONFIG_KEY, "");
+        if (StrUtil.isBlank(raw)) {
+            return defaultRolePermissionsCopy();
+        }
+        try {
+            Map<String, List<String>> parsed = objectMapper.readValue(raw, new TypeReference<Map<String, List<String>>>() {
+            });
+            return normalizeRolePermissionConfig(parsed);
+        } catch (Exception e) {
+            log.warn("Failed to parse project role permissions config, fallback to defaults", e);
+            return defaultRolePermissionsCopy();
+        }
+    }
+
+    private ProjectVO.ProjectRolePermissionConfigVO buildRolePermissionConfigVO(Map<String, List<String>> rolePermissions) {
+        ProjectVO.ProjectRolePermissionConfigVO vo = new ProjectVO.ProjectRolePermissionConfigVO();
+        vo.setRolePermissions(normalizeRolePermissionConfig(rolePermissions));
+        return vo;
+    }
+
+    private Map<String, List<String>> normalizeRolePermissionConfig(Map<String, List<String>> rolePermissions) {
+        Map<String, List<String>> normalized = defaultRolePermissionsCopy();
+        if (rolePermissions == null || rolePermissions.isEmpty()) {
+            return normalized;
+        }
+        for (String role : PROJECT_ROLES) {
+            List<String> submitted = rolePermissions.get(role);
+            if (submitted == null) {
+                submitted = rolePermissions.get(role.toLowerCase(Locale.ROOT));
+            }
+            if (submitted == null) {
+                continue;
+            }
+            List<String> permissions = normalizePermissions(submitted);
+            if (!permissions.contains(PERMISSION_VIEW_PROJECT)) {
+                permissions.add(0, PERMISSION_VIEW_PROJECT);
+            }
+            if ("OWNER".equals(role)) {
+                permissions = new ArrayList<>(ALL_PERMISSIONS);
+            }
+            normalized.put(role, permissions);
+        }
+        return normalized;
+    }
+
+    private Map<String, List<String>> defaultRolePermissionsCopy() {
+        Map<String, List<String>> defaults = new LinkedHashMap<>();
+        PROJECT_ROLES.forEach(role -> defaults.put(role, new ArrayList<>(DEFAULT_ROLE_PERMISSIONS.get(role))));
+        return defaults;
     }
 
     private String writeJson(Object value) {
@@ -1859,9 +2009,10 @@ public class ProjectServiceImpl implements IProjectService {
                 PERMISSION_USE_AI_CHAT,
                 PERMISSION_AI_CREATE_TASK,
                 PERMISSION_UPLOAD_ATTACHMENT,
-                PERMISSION_CREATE_SCHEDULE
+                PERMISSION_CREATE_SCHEDULE,
+                PERMISSION_VIEW_STATISTICS
         ));
-        map.put("READONLY", List.of(PERMISSION_VIEW_PROJECT));
+        map.put("READONLY", List.of(PERMISSION_VIEW_PROJECT, PERMISSION_VIEW_STATISTICS));
         map.put("EXTERNAL", List.of(PERMISSION_VIEW_PROJECT, PERMISSION_UPLOAD_ATTACHMENT));
         return map;
     }

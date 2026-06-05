@@ -70,6 +70,19 @@ public class ProjectController {
         return Result.ok();
     }
 
+    @GetMapping({"/role-permissions", "/rolePermissions"})
+    @Operation(summary = "椤圭洰瑙掕壊榛樿鏉冮檺閰嶇疆")
+    public Result<ProjectVO.ProjectRolePermissionConfigVO> getRolePermissions() {
+        return Result.ok(projectService.getProjectRolePermissionConfig());
+    }
+
+    @PostMapping({"/role-permissions", "/rolePermissions"})
+    @Operation(summary = "淇濆瓨椤圭洰瑙掕壊榛樿鏉冮檺閰嶇疆")
+    public Result<ProjectVO.ProjectRolePermissionConfigVO> updateRolePermissions(
+            @RequestBody ProjectBO.RolePermissionConfig configBO) {
+        return Result.ok(projectService.updateProjectRolePermissionConfig(configBO));
+    }
+
     @PostMapping("/{projectId}/lane/add")
     @Operation(summary = "新增项目泳道")
     public Result<ProjectVO> addLane(@PathVariable Long projectId, @Valid @RequestBody ProjectBO.LaneSave laneBO) {

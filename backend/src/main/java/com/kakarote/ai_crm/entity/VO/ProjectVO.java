@@ -7,7 +7,9 @@ import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Schema(description = "项目详情")
@@ -181,5 +183,10 @@ public class ProjectVO {
         private String beforeSummary;
         private String afterSummary;
         private Date createTime;
+    }
+
+    @Data
+    public static class ProjectRolePermissionConfigVO {
+        private Map<String, List<String>> rolePermissions = new LinkedHashMap<>();
     }
 }

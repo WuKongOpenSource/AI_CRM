@@ -1,9 +1,9 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden bg-[#f6f7f4]">
     <div v-if="project && canViewProject" class="flex flex-1 flex-col overflow-hidden">
-      <header v-if="!isProjectChatView" class="border-b border-slate-200 bg-white px-4 py-4 md:px-6">
-        <div class="mx-auto flex max-w-7xl flex-col gap-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <header v-if="!isProjectChatView" class="border-b border-slate-200 bg-white px-4 py-2 md:px-6">
+        <div class="flex w-full flex-col gap-2">
+          <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
               <button
                 v-if="isTaskConversation"
@@ -15,7 +15,7 @@
                 {{ isTaskConversation ? '返回项目' : '返回项目列表' }}
               </button>
 
-              <div class="mt-3 flex flex-wrap items-center gap-3">
+              <div class="mt-1.5 flex flex-wrap items-center gap-2">
                 <template v-if="isTaskConversation && currentTaskConversation">
                   <h1 class="text-2xl font-black tracking-tight text-slate-900">
                     当前对话对象：任务 - {{ currentTaskConversation.title }}
@@ -26,13 +26,13 @@
                 </template>
                 <template v-else>
                   <h1 class="text-[15px] font-semibold leading-5 text-slate-900">{{ project.name }}</h1>
-                  <span class="inline-flex rounded-full px-3 py-1 text-sm font-normal" :class="projectStatusClass(project.status)">
+                  <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-normal" :class="projectStatusClass(project.status)">
                     {{ projectStatusLabel(project.status) }}
                   </span>
                 </template>
               </div>
 
-              <div v-if="isTaskConversation && currentTaskConversation" class="mt-3 flex flex-wrap gap-3 text-sm text-slate-500">
+              <div v-if="isTaskConversation && currentTaskConversation" class="mt-1.5 flex flex-wrap gap-2 text-xs text-slate-500">
                 <span class="inline-flex items-center gap-1.5">
                   <span class="material-symbols-outlined text-[16px]">view_kanban</span>
                   {{ currentTaskConversation.status }}
@@ -47,7 +47,7 @@
                 </span>
               </div>
 
-              <div v-else class="mt-3 flex flex-wrap gap-3 text-sm text-slate-500">
+              <div v-else class="mt-1.5 flex flex-wrap gap-2 text-xs text-slate-500">
                 <span class="inline-flex items-center gap-1.5">
                   <span class="material-symbols-outlined text-[16px]">corporate_fare</span>
                   {{ project.customerName || '未关联客户' }}
@@ -87,7 +87,7 @@
                     <button
                       v-if="canCreateTask"
                       type="button"
-                      class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
+                      class="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-slate-700"
                       @click="openCreateTask()"
                     >
                       <span class="material-symbols-outlined text-[17px]">add</span>
@@ -96,7 +96,7 @@
                     <el-dropdown trigger="click" @command="handleProjectMoreAction">
                       <button
                         type="button"
-                        class="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                        class="flex size-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
                         aria-label="更多项目操作"
                       >
                         <span class="material-symbols-outlined text-[20px]">more_horiz</span>
@@ -125,6 +125,15 @@
                             <span class="inline-flex items-center gap-2">
                               <span class="material-symbols-outlined text-[16px]">inventory_2</span>
                               <span>归档项目</span>
+                            </span>
+                          </el-dropdown-item>
+                          <el-dropdown-item
+                            v-if="canDeleteProject"
+                            command="delete-project"
+                          >
+                            <span class="inline-flex items-center gap-2 text-red-600">
+                              <span class="material-symbols-outlined text-[16px]">delete</span>
+                              <span>删除项目</span>
                             </span>
                           </el-dropdown-item>
                         </el-dropdown-menu>
@@ -222,12 +231,18 @@
                       <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                         <div class="wk-markdown" v-html="renderAssistantMessage(message.content)" />
                       </div>
+                      <div v-if="message.content.trim()" class="flex h-8 items-center">
+                        <button
+                          type="button"
+                          class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
+                          aria-label="复制内容"
+                          @click="copyProjectAssistantMessage(message.content)"
+                        >
+                          <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div v-if="project.chatMessages.length === 0" class="mx-auto mt-16 max-w-lg text-center text-slate-400">
-                  <span class="material-symbols-outlined text-5xl">forum</span>
-                  <p class="mt-4 text-sm">围绕这个项目继续沟通，AI 可以帮你拆解任务、梳理日程和沉淀附件。</p>
                 </div>
               </div>
             </div>
@@ -238,6 +253,8 @@
                   <ProjectChatComposer
                     v-model="aiInput"
                     placeholder="发消息..."
+                    :context-label="project.name"
+                    context-icon="task"
                     @send="handleSendAiMessage"
                   />
                   <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
@@ -343,6 +360,16 @@
                       <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                         <div class="wk-markdown" v-html="renderTaskAssistantMessage(message.content)" />
                       </div>
+                      <div v-if="message.content.trim()" class="flex h-8 items-center">
+                        <button
+                          type="button"
+                          class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-all hover:bg-[#f1f1f1] hover:text-[#0d0d0d]"
+                          aria-label="复制内容"
+                          @click="copyProjectAssistantMessage(message.content)"
+                        >
+                          <WkIcon name="copy" :box-size="18" class="shrink-0 material-symbols-outlined leading-none" title="复制内容" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -355,6 +382,8 @@
                   <ProjectChatComposer
                     v-model="taskAiInput"
                     placeholder="发消息..."
+                    :context-label="currentTaskConversation.title"
+                    context-icon="task-1"
                     @send="handleSendTaskAiMessage"
                   />
                   <div v-if="false" class="wk-project-chat-composer relative flex min-w-0 items-center rounded-[28px] p-[6px]">
@@ -533,7 +562,7 @@
         </div>
 
         <div v-if="showTaskViewToolbar" class="shrink-0 px-4 pt-4 md:px-6">
-          <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="relative w-full max-w-sm">
               <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] leading-none text-[#8aa1c2]">search</span>
               <input
@@ -569,7 +598,7 @@
         </div>
 
         <div v-if="viewMode === 'board'" class="min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-3 md:px-6">
-          <div class="mx-auto flex h-full max-w-7xl flex-col overflow-hidden">
+          <div class="flex h-full w-full flex-col overflow-hidden">
             <div class="flex-1 overflow-x-auto overflow-y-hidden py-5">
               <div class="flex h-full min-w-max gap-4">
                 <section
@@ -707,15 +736,15 @@
         </div>
 
         <div v-else-if="viewMode === 'list'" class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 md:px-6">
-          <div class="mx-auto flex max-w-7xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
+          <div class="wk-project-task-list-table-shell flex w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div v-if="filteredProjectTasks.length === 0" class="px-6 py-20 text-center text-slate-400">
               <span class="material-symbols-outlined text-5xl">task_alt</span>
               <p class="mt-4 text-sm">{{ projectTaskSearchKeyword.trim() ? '没有匹配的任务。' : '当前项目还没有可查看的任务。' }}</p>
             </div>
 
             <div v-else class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-slate-100 text-sm">
-                <thead class="bg-slate-50 text-left text-slate-500">
+              <table class="wk-project-task-list-table min-w-[1080px] text-sm">
+                <thead class="text-left">
                   <tr>
                     <th class="px-5 py-3 font-semibold">任务名称</th>
                     <th class="px-5 py-3 font-semibold">泳道</th>
@@ -726,11 +755,11 @@
                     <th class="px-5 py-3 font-semibold">资料</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody>
                   <tr
                     v-for="task in filteredProjectTasks"
                     :key="task.taskId"
-                    class="cursor-pointer transition-colors hover:bg-slate-50"
+                    class="cursor-pointer transition-colors"
                     @click="enterTaskConversation(task)"
                   >
                     <td class="px-5 py-4">
@@ -767,8 +796,8 @@
         </div>
 
         <div v-else-if="viewMode === 'cards'" class="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3 md:px-6">
-          <div class="mx-auto flex max-w-7xl flex-col gap-4">
-            <div v-if="filteredProjectTasks.length === 0" class="rounded-[30px] border border-slate-200 bg-white px-6 py-20 text-center text-slate-400 shadow-sm">
+          <div class="flex w-full flex-col gap-4">
+            <div v-if="filteredProjectTasks.length === 0" class="rounded-[30px] border border-[var(--wk-input-border)] bg-white px-6 py-20 text-center text-slate-400 shadow-sm">
               <span class="material-symbols-outlined text-5xl">view_cozy</span>
               <p class="mt-4 text-sm">{{ projectTaskSearchKeyword.trim() ? '没有匹配的任务。' : '当前项目还没有可查看的任务。' }}</p>
             </div>
@@ -1010,6 +1039,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
 import { useProjectStore } from '@/stores/project'
 import { renderMarkdown } from '@/utils/markdown'
+import { appEvents, APP_EVENT } from '@/utils/events'
 import type {
   ProjectMember,
   ProjectPermission,
@@ -1154,6 +1184,7 @@ const filteredProjectTasks = computed(() => {
 })
 
 const canEditProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'EDIT_PROJECT'))
+const canDeleteProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'DELETE_PROJECT'))
 const canArchiveProject = computed(() => projectStore.getUserProjectPermission(projectId.value, 'ARCHIVE_PROJECT'))
 const canUseAiChat = computed(() => projectStore.getUserProjectPermission(projectId.value, 'USE_AI_CHAT'))
 const canCreateTask = computed(() => projectStore.getUserProjectPermission(projectId.value, 'CREATE_TASK'))
@@ -1185,6 +1216,38 @@ function renderAssistantMessage(content: string) {
 
 function renderTaskAssistantMessage(content: string) {
   return renderAssistantMessage(content)
+}
+
+function htmlToPlainText(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  return (div.textContent || '').replace(/\u00a0/g, ' ').trim()
+}
+
+async function copyToClipboard(text: string) {
+  const value = text.trim()
+  if (!value) return
+
+  try {
+    await navigator.clipboard.writeText(value)
+    ElMessage.success('已复制')
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.setAttribute('readonly', 'true')
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    if (ok) ElMessage.success('已复制')
+    else ElMessage.warning('复制失败')
+  }
+}
+
+async function copyProjectAssistantMessage(content: string) {
+  await copyToClipboard(htmlToPlainText(renderAssistantMessage(content)))
 }
 
 function resizeProjectChatTextarea(el: HTMLTextAreaElement | null) {
@@ -1256,6 +1319,10 @@ function handleProjectMoreAction(command: string | number) {
   }
   if (action === 'archive-project') {
     void handleArchiveProject()
+    return
+  }
+  if (action === 'delete-project') {
+    void handleDeleteProject()
   }
 }
 
@@ -1337,6 +1404,28 @@ async function handleArchiveProject() {
     await ElMessageBox.confirm(`确定归档项目“${project.value.name}”吗？`, '提示', { type: 'warning' })
     await projectStore.archiveProject(project.value.projectId)
     ElMessage.success('项目已归档')
+  } catch {
+    // noop
+  }
+}
+
+async function handleDeleteProject() {
+  if (!project.value || !canDeleteProject.value) return
+  const deletingProject = project.value
+  try {
+    await ElMessageBox.confirm(
+      `确定删除项目“${deletingProject.name}”吗？删除后项目及任务将不可恢复。`,
+      '提示',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消'
+      }
+    )
+    await projectStore.deleteProject(deletingProject.projectId)
+    appEvents.emit(APP_EVENT.PROJECT_SIDEBAR_REFRESH, { source: 'project-detail' })
+    ElMessage.success('项目已删除')
+    await router.push({ name: 'ProjectList' })
   } catch {
     // noop
   }
@@ -1795,8 +1884,9 @@ function memberActionLabel(action: string) {
   overflow-wrap: anywhere;
 }
 
-.wk-project-chat-message--user {
-  margin-bottom: 1rem;
+.wk-project-chat-message--user,
+.wk-project-task-chat-message--user {
+  margin-bottom: 2rem;
 }
 
 .wk-project-chat-message--user :deep(.rounded-\[24px\]),
@@ -2032,6 +2122,78 @@ function memberActionLabel(action: string) {
 
 .wk-project-object-panel-toggle:hover .wk-project-object-panel-tooltip {
   opacity: 1;
+}
+
+.wk-project-task-list-table-shell {
+  background: var(--wk-bg-surface);
+}
+
+.wk-project-task-list-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--wk-bg-surface);
+  color: var(--wk-text-secondary);
+}
+
+.wk-project-task-list-table th {
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--wk-border-muted);
+  background: var(--wk-bg-surface-subtle);
+  color: var(--wk-text-muted);
+  padding: 16px 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.wk-project-task-list-table td {
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--wk-border-subtle);
+  padding: 16px 20px;
+  color: var(--wk-text-secondary);
+  vertical-align: middle;
+}
+
+.wk-project-task-list-table th:nth-child(1),
+.wk-project-task-list-table td:nth-child(1) {
+  width: 360px;
+  min-width: 360px;
+}
+
+.wk-project-task-list-table th:nth-child(2),
+.wk-project-task-list-table td:nth-child(2),
+.wk-project-task-list-table th:nth-child(3),
+.wk-project-task-list-table td:nth-child(3),
+.wk-project-task-list-table th:nth-child(4),
+.wk-project-task-list-table td:nth-child(4),
+.wk-project-task-list-table th:nth-child(7),
+.wk-project-task-list-table td:nth-child(7) {
+  width: 100px;
+  min-width: 100px;
+}
+
+.wk-project-task-list-table th:nth-child(5),
+.wk-project-task-list-table td:nth-child(5) {
+  width: 170px;
+  min-width: 170px;
+}
+
+.wk-project-task-list-table th:nth-child(6),
+.wk-project-task-list-table td:nth-child(6) {
+  width: 150px;
+  min-width: 150px;
+}
+
+.wk-project-task-list-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.wk-project-task-list-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--wk-primary) 11%, var(--wk-bg-surface));
 }
 
 .message-enter {

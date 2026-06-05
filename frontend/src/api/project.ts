@@ -9,12 +9,19 @@ import type {
   ProjectMember,
   ProjectMemberPayload,
   ProjectPermission,
+  ProjectRole,
+  ProjectRolePermissionConfig,
+  ProjectRolePermissionConfigPayload,
+  ProjectRolePermissionConfigVO,
   ProjectSchedule,
   ProjectTask,
   ProjectTaskPayload,
   ProjectTaskUpdatePayload,
   ProjectUpdatePayload
 } from '@/types/project'
+
+const PROJECT_ROLES: ProjectRole[] = ['OWNER', 'ADMIN', 'MEMBER', 'READONLY', 'EXTERNAL']
+const PROJECT_ROLE_PERMISSION_PATHS = ['/project/role-permissions', '/project/rolePermissions'] as const
 
 type RawProject = Record<string, any>
 
@@ -235,6 +242,44 @@ export function archiveProject(projectId: string): Promise<ProjectEntity> {
 
 export function deleteProject(projectId: string): Promise<void> {
   return post(`/project/delete/${projectId}`)
+}
+
+function normalizeRolePermissionConfig(raw: any): ProjectRolePermissionConfig {
+  const source = raw?.rolePermissions && typeof raw.rolePermissions === 'object' ? raw.rolePermissions : {}
+  return PROJECT_ROLES.reduce((config, role) => {
+    config[role] = list<ProjectPermission>(source[role])
+    return config
+  }, {} as ProjectRolePermissionConfig)
+}
+
+export async function getProjectRolePermissionConfig(): Promise<ProjectRolePermissionConfigVO> {
+  const raw = await requestProjectRolePermissionConfig(path => get(path, { silentError: true }))
+  return {
+    rolePermissions: normalizeRolePermissionConfig(raw)
+  }
+}
+
+export async function updateProjectRolePermissionConfig(
+  payload: ProjectRolePermissionConfigPayload
+): Promise<ProjectRolePermissionConfigVO> {
+  const raw = await requestProjectRolePermissionConfig(path => post(path, payload, { silentError: true }))
+  return {
+    rolePermissions: normalizeRolePermissionConfig(raw)
+  }
+}
+
+async function requestProjectRolePermissionConfig<T>(
+  request: (path: string) => Promise<T>
+): Promise<T> {
+  let lastError: unknown
+  for (const path of PROJECT_ROLE_PERMISSION_PATHS) {
+    try {
+      return await request(path)
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
 }
 
 export function addLane(projectId: string, name: string): Promise<ProjectEntity> {

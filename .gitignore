@@ -5,6 +5,7 @@ logs/**
 *.log
 target
 */target/**
+backend/.parser-verify/
 frontend/node_modules
 frontend/dist
 frontend/.env.local

@@ -100,7 +100,7 @@
             :key="permission.value"
             class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3"
           >
-            <el-checkbox :label="permission.value" />
+            <el-checkbox :value="permission.value" :aria-label="permission.label" />
             <span class="text-sm text-slate-700">{{ permission.label }}</span>
           </label>
         </el-checkbox-group>
@@ -145,6 +145,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { queryUserList } from '@/api/auth'
+import { getProjectRolePermissionConfig } from '@/api/project'
 import { useResponsive } from '@/composables/useResponsive'
 import type {
   ProjectMember,
@@ -156,7 +157,8 @@ import {
   PROJECT_MEMBER_STATUS_OPTIONS,
   PROJECT_PERMISSION_OPTIONS,
   PROJECT_ROLE_OPTIONS,
-  roleDefaultPermissions
+  roleDefaultPermissions,
+  setProjectRolePermissions
 } from '@/utils/project'
 
 type UserOption = {
@@ -214,10 +216,21 @@ watch(
   () => [props.modelValue, props.editingMember?.userId] as const,
   ([visible]) => {
     if (!visible) return
-    hydrateForm()
+    void prepareForm()
   },
   { immediate: true }
 )
+
+async function prepareForm() {
+  try {
+    const config = await getProjectRolePermissionConfig()
+    setProjectRolePermissions(config.rolePermissions)
+  } catch {
+    // Keep the current in-memory defaults if the config request fails.
+  }
+  if (!props.modelValue) return
+  hydrateForm()
+}
 
 function hydrateForm() {
   userOptions.value = []

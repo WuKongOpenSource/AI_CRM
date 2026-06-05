@@ -46,6 +46,21 @@ public class ChatApplicationRegistry {
                 List.of("把今天新增但还没跟进的客户列出来", "找出快丢单的客户", "筛选出高意向客户", "总结本周的销售情况")
         ));
         register(new ChatApplicationDefinition(
+                ChatApplicationCodes.PROJECT,
+                "项目",
+                "task",
+                "管理项目、项目泳道和项目任务，并可参考项目关联客户与知识库内容。",
+                """
+                当前应用是项目助手。你可以围绕项目和项目任务提供帮助，包括查询项目、创建项目、更新项目、删除项目，以及创建、更新、移动、删除项目内任务。
+                当用户要求管理项目或项目任务时，优先调用 ProjectTools 中的项目工具，不要把项目任务误当作普通个人任务。
+                创建或修改项目、项目任务后，只有在工具结果确认成功后，才能说数据已创建、更新、移动或删除成功。
+                如果用户只说“任务”但上下文明确是在项目技能中，请先判断是否指项目任务；缺少项目ID或任务ID且无法从上下文确认时，请先询问。
+                """,
+                false,
+                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of("列出进行中的项目", "帮我新建一个项目", "查看这个项目的任务", "给某个项目新增一个任务")
+        ));
+        register(new ChatApplicationDefinition(
                 ChatApplicationCodes.KNOWLEDGE,
                 "知识库",
                 "knowledge-1",

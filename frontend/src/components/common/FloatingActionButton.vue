@@ -3,12 +3,11 @@
     class="wk-floating-new-chat-button"
     :class="`wk-floating-new-chat-button--${placement}`"
     type="button"
-    aria-label="新建对话"
-    title="新建对话"
+    aria-label="AI对话"
     @click="emit('new-chat')"
   >
     <WkIcon name="new-chat" :size="22" class="wk-floating-new-chat-button__icon" />
-    <span class="wk-floating-new-chat-button__label">聊天</span>
+    <span class="wk-floating-new-chat-button__tooltip" role="tooltip">AI对话</span>
   </button>
 </template>
 
@@ -29,11 +28,11 @@ const emit = defineEmits<{
 <style scoped>
 .wk-floating-new-chat-button {
   display: inline-flex;
-  height: 54px;
-  min-width: 124px;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 9999px;
   background: #252525;
@@ -42,7 +41,7 @@ const emit = defineEmits<{
     0 18px 42px rgb(15 23 42 / 0.24),
     0 2px 8px rgb(15 23 42 / 0.18);
   cursor: pointer;
-  padding: 0 22px;
+  padding: 0;
   transition:
     background-color 160ms ease,
     box-shadow 160ms ease,
@@ -88,12 +87,32 @@ const emit = defineEmits<{
   flex-shrink: 0;
 }
 
-.wk-floating-new-chat-button__label {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
+.wk-floating-new-chat-button__tooltip {
+  pointer-events: none;
+  position: absolute;
+  right: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(50%) translateY(4px);
   white-space: nowrap;
+  border-radius: 8px;
+  background: #000;
+  padding: 6px 12px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0;
+  opacity: 0;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.18);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.wk-floating-new-chat-button:hover .wk-floating-new-chat-button__tooltip,
+.wk-floating-new-chat-button:focus-visible .wk-floating-new-chat-button__tooltip {
+  opacity: 1;
+  transform: translateX(50%) translateY(0);
 }
 
 @media (max-width: 640px) {
@@ -111,14 +130,9 @@ const emit = defineEmits<{
   }
 
   .wk-floating-new-chat-button {
+    width: 52px;
     height: 52px;
-    min-width: 116px;
-    gap: 10px;
-    padding: 0 20px;
-  }
-
-  .wk-floating-new-chat-button__label {
-    font-size: 17px;
+    min-width: 52px;
   }
 }
 </style>
