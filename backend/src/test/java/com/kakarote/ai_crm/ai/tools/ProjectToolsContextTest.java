@@ -56,7 +56,7 @@ class ProjectToolsContextTest {
         when(projectService.addTask(any(), any(ProjectBO.TaskSave.class))).thenReturn(updated);
 
         String result = projectTools.createProjectTask(
-                null, "整理方案", null, null, null, null, null, null, null, "medium", null);
+                null, "整理方案", null, null, null, null, null, null, "medium", null);
 
         ArgumentCaptor<ProjectBO.TaskSave> captor = ArgumentCaptor.forClass(ProjectBO.TaskSave.class);
         verify(projectService).addTask(PROJECT_ID, captor.capture());
