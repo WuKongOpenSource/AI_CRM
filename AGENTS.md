@@ -6,7 +6,7 @@
 - `frontend/` 是 Vue 3/Vite 应用：入口为 `src/main.ts`，使用 hash router、Element Plus、Pinia 和 Tailwind。
 - `sync_data/` 是独立的 Spring Boot HTTP 服务，用于将旧 WK CRM MySQL 数据同步到 AI CRM PostgreSQL，默认端口为 `10456`；它不使用 backend 的 Services、认证或租户拦截器，也不会在启动时自动同步。
 - `mcp_server/` 是独立的 stdio MCP 服务器，会调用 backend HTTP API；它有意不调用也不暴露 `sync_data`。
-- `CLAUDE.md` 包含更多历史细节，但在把其中说法复制到这里前，请先对照可执行配置进行验证。
+- `CLAUDE.md` 是面向架构的综合参考（仓库结构、命令、认证与会话、AI 计费、第三方集成、身份联合/OIDC、业务模块、前端架构、卫星子项目等），与本文件互补；但在把其中说法复制到这里前，请先对照可执行配置进行验证。
 
 ## 命令
 - Backend (`backend/`)：`mvn compile`、`mvn test`、`mvn test -Dtest=ClassName`、`mvn test -Dtest=ClassName#method`、`mvn spring-boot:run`、`mvn clean install`。
