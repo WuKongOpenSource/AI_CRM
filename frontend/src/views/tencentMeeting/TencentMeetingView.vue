@@ -444,7 +444,28 @@ const activeFilterSummary = computed(() => {
   return filters.length ? `已筛选 ${filters.join(' / ')}` : '全部会议'
 })
 
+// 处理腾讯会议 OAuth 回调返回：路由用 hash 模式，后端把 tencentMeetingOAuth 拼在 # 之前的
+// location.search 里，vue-router 读不到，需要手动解析并在提示后清掉，避免参数滞留地址栏、
+// 并在下次授权时被层层叠加成 ?tencentMeetingOAuth=success&tencentMeetingOAuth=success...
+function handleOAuthReturn() {
+  const params = new URLSearchParams(window.location.search)
+  const result = params.get('tencentMeetingOAuth')
+  if (!result) return
+  if (result === 'success') {
+    ElMessage.success('腾讯会议授权成功')
+  } else {
+    const message = params.get('message')
+    ElMessage.error(message ? `腾讯会议授权失败：${message}` : '腾讯会议授权失败')
+  }
+  params.delete('tencentMeetingOAuth')
+  params.delete('message')
+  const search = params.toString()
+  const cleanUrl = window.location.pathname + (search ? `?${search}` : '') + window.location.hash
+  window.history.replaceState(null, '', cleanUrl)
+}
+
 onMounted(() => {
+  handleOAuthReturn()
   void loadMeetings()
   void loadSyncStatus()
   void loadOAuthStatus()

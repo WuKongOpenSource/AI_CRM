@@ -389,9 +389,12 @@ public class TencentMeetingOAuthService {
     }
 
     private String appendQuery(String url, String... keyValues) {
+        // 用 replaceQueryParam（幂等）而非 queryParam（追加）：前端会把当前完整 URL 当作 redirect 回传，
+        // 若该 URL 已带 tencentMeetingOAuth/message，再次授权时不能层层叠加，否则地址栏会出现
+        // ?tencentMeetingOAuth=success&tencentMeetingOAuth=success&... 这类重复参数。
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
         for (int i = 0; i + 1 < keyValues.length; i += 2) {
-            builder.queryParam(keyValues[i], keyValues[i + 1]);
+            builder.replaceQueryParam(keyValues[i], keyValues[i + 1]);
         }
         return builder.build().toUriString();
     }

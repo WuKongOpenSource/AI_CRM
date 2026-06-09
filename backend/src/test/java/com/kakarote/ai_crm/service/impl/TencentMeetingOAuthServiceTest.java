@@ -197,6 +197,41 @@ class TencentMeetingOAuthServiceTest {
         assertThat(accountCaptor.getValue().getUserName()).isEqualTo("Crm User");
     }
 
+    @Test
+    void handleCallbackShouldNotDuplicateOAuthResultParamWhenRedirectAlreadyHasIt() {
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        TencentMeetingOAuthService service = new TencentMeetingOAuthService(restTemplate);
+        TencentMeetingCorpConfigMapper configMapper = mock(TencentMeetingCorpConfigMapper.class);
+        TencentMeetingUserMappingMapper userMappingMapper = mock(TencentMeetingUserMappingMapper.class);
+        Redis redis = mock(Redis.class);
+        ManageUserService manageUserService = mock(ManageUserService.class);
+        SecretTextCipher cipher = new SecretTextCipher("0123456789abcdef");
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setAppId("219307879");
+        config.setSdkId("32360100872");
+        config.setAppSecretEncrypted(cipher.encrypt("secret"));
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
+        // 前端把已经带过一次回调参数的脏 URL 当作 redirect 回传，模拟用户二次授权的场景。
+        when(redis.get(anyString())).thenReturn("{\"tenantId\":99,\"userId\":9,"
+                + "\"redirect\":\"https://crm.example.com/?tencentMeetingOAuth=success#/tencent-meetings\"}");
+        when(restTemplate.postForObject(contains("access_token"), any(HttpEntity.class), eq(String.class)))
+                .thenReturn("{\"data\":{\"access_token\":\"access\",\"refresh_token\":\"refresh\",\"open_id\":\"open-1\",\"expires_in\":3600}}");
+        when(restTemplate.postForObject(contains("user_info"), any(HttpEntity.class), eq(String.class)))
+                .thenReturn("{}");
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("{}"));
+        ReflectionTestUtils.setField(service, "configMapper", configMapper);
+        ReflectionTestUtils.setField(service, "userMappingMapper", userMappingMapper);
+        ReflectionTestUtils.setField(service, "secretTextCipher", cipher);
+        ReflectionTestUtils.setField(service, "redis", redis);
+        ReflectionTestUtils.setField(service, "manageUserService", manageUserService);
+
+        String redirect = service.handleCallback("auth-code", "state-1", null, mock(HttpServletRequest.class));
+
+        assertThat(redirect).containsOnlyOnce("tencentMeetingOAuth=success");
+        assertThat(redirect).contains("#/tencent-meetings");
+    }
+
     private void initTencentMeetingUserMappingTableInfo() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), TencentMeetingUserMapping.class);
     }
