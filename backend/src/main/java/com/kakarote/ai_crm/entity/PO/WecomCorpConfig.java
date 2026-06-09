@@ -54,6 +54,8 @@ public class WecomCorpConfig implements Serializable {
 
     private String archivePublicKeyVersion;
 
+    private String archiveCorpId;
+
     private Boolean archiveEnabled;
 
     private Boolean customerContactEnabled;

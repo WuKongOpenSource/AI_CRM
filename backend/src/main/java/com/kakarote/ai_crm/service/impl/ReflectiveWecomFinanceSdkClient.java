@@ -42,6 +42,12 @@ public class ReflectiveWecomFinanceSdkClient implements WecomFinanceSdkClient {
         } catch (ClassNotFoundException e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
                     "企业微信会话存档 SDK 未加载，请添加 java_sdk.jar 和原生动态库");
+        } catch (LinkageError e) {
+            // ExceptionInInitializerError / UnsatisfiedLinkError / NoClassDefFoundError：
+            // SDK jar 在类路径上但当前平台的原生库(.so/.dll)缺失或不兼容（如缺少 OpenSSL 依赖）。
+            // 转为业务异常，保证应用在缺库时仍可正常启动、仅在调用会话存档时报错。
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
+                    "企业微信会话存档原生库加载失败，请确认对应平台的 .so/.dll 已就位: " + e.getMessage());
         } catch (Exception e) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
                     "拉取企业微信会话存档失败: " + e.getMessage());

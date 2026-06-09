@@ -110,6 +110,7 @@ public class WecomServiceImpl {
     public WecomConfigVO saveConfig(WecomConfigSaveBO saveBO) {
         WecomCorpConfig config = requireConfig();
         config.setArchivePublicKeyVersion(StrUtil.trim(saveBO.getArchivePublicKeyVersion()));
+        config.setArchiveCorpId(StrUtil.trimToNull(saveBO.getArchiveCorpId()));
         config.setArchiveEnabled(Boolean.TRUE.equals(saveBO.getArchiveEnabled()));
         config.setCustomerContactEnabled(Boolean.TRUE.equals(saveBO.getCustomerContactEnabled()));
         config.setSyncEnabled(Boolean.TRUE.equals(saveBO.getSyncEnabled()));
@@ -406,6 +407,7 @@ public class WecomServiceImpl {
         vo.setArchiveSecretConfigured(StrUtil.isNotBlank(config.getArchiveSecretEncrypted()));
         vo.setArchivePrivateKeyConfigured(StrUtil.isNotBlank(config.getArchivePrivateKeyEncrypted()));
         vo.setArchivePublicKeyVersion(config.getArchivePublicKeyVersion());
+        vo.setArchiveCorpId(config.getArchiveCorpId());
         vo.setArchiveEnabled(config.getArchiveEnabled());
         vo.setCustomerContactEnabled(config.getCustomerContactEnabled());
         vo.setSyncEnabled(config.getSyncEnabled());

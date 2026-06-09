@@ -11,6 +11,8 @@ public class WecomConfigSaveBO {
 
     private String archivePublicKeyVersion;
 
+    private String archiveCorpId;
+
     private Boolean archiveEnabled;
 
     private Boolean customerContactEnabled;

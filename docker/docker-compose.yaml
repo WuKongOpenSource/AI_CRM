@@ -230,6 +230,8 @@ services:
       - WECOM_OPEN_PLATFORM_LOGIN_REDIRECT_URI=${WECOM_OPEN_PLATFORM_LOGIN_REDIRECT_URI:-https://aicrm-saas.5kcrm.cn/crmapi/auth/external/wecom/callback}
       - WECOM_OPEN_PLATFORM_FRONTEND_REDIRECT_URI=${WECOM_OPEN_PLATFORM_FRONTEND_REDIRECT_URI:-https://aicrm-saas.5kcrm.cn/#/wecom/scrm}
       - WECOM_OPEN_PLATFORM_AUTH_TYPE=${WECOM_OPEN_PLATFORM_AUTH_TYPE:-1}
+      - WECOM_DEV_CALLBACK_TOKEN=${WECOM_DEV_CALLBACK_TOKEN:-}
+      - WECOM_DEV_CALLBACK_AES_KEY=${WECOM_DEV_CALLBACK_AES_KEY:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/"]
       interval: 30s

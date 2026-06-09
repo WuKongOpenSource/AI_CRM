@@ -607,6 +607,7 @@ CREATE TABLE IF NOT EXISTS crm_wecom_corp_config (
     archive_secret_encrypted TEXT,
     archive_private_key_encrypted TEXT,
     archive_public_key_version VARCHAR(128),
+    archive_corp_id VARCHAR(128),
     archive_enabled BOOLEAN DEFAULT FALSE,
     customer_contact_enabled BOOLEAN DEFAULT TRUE,
     sync_enabled BOOLEAN DEFAULT TRUE,

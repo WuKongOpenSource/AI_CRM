@@ -22,12 +22,28 @@ public class WecomCallbackCryptoService {
     @Autowired
     private WecomOpenPlatformProperties properties;
 
+    /**
+     * 使用第三方应用回调凭证(Token/EncodingAESKey)验签并解密。
+     */
     public String decrypt(String msgSignature, String timestamp, String nonce, String encryptedText) {
+        return decrypt(properties.getToken(), properties.getEncodingAesKey(), msgSignature, timestamp, nonce, encryptedText);
+    }
+
+    /**
+     * 使用指定的回调凭证(Token/EncodingAESKey)验签并解密。
+     * 供多套回调(第三方应用 / 代开发模板)复用同一 WXBizMsgCrypt 加解密实现。
+     */
+    public String decrypt(String token,
+                          String encodingAesKey,
+                          String msgSignature,
+                          String timestamp,
+                          String nonce,
+                          String encryptedText) {
         if (StrUtil.isBlank(encryptedText)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom callback encrypt text is empty");
         }
-        verifySignature(msgSignature, timestamp, nonce, encryptedText);
-        byte[] aesKey = aesKey();
+        verifySignature(token, msgSignature, timestamp, nonce, encryptedText);
+        byte[] aesKey = aesKey(encodingAesKey);
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(aesKey, "AES"), new IvParameterSpec(aesKey, 0, 16));
@@ -48,12 +64,12 @@ public class WecomCallbackCryptoService {
         }
     }
 
-    private void verifySignature(String msgSignature, String timestamp, String nonce, String encryptedText) {
+    private void verifySignature(String token, String msgSignature, String timestamp, String nonce, String encryptedText) {
         if (StrUtil.isBlank(msgSignature)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom callback signature is empty");
         }
         String[] parts = {
-                StrUtil.nullToEmpty(properties.getToken()),
+                StrUtil.nullToEmpty(token),
                 StrUtil.nullToEmpty(timestamp),
                 StrUtil.nullToEmpty(nonce),
                 StrUtil.nullToEmpty(encryptedText)
@@ -72,8 +88,8 @@ public class WecomCallbackCryptoService {
         }
     }
 
-    private byte[] aesKey() {
-        String key = StrUtil.trim(properties.getEncodingAesKey());
+    private byte[] aesKey(String encodingAesKey) {
+        String key = StrUtil.trim(encodingAesKey);
         if (key.length() != 43) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom EncodingAESKey must be 43 characters");
         }

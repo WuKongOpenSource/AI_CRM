@@ -17,12 +17,23 @@ export interface WecomConfigVO {
   archiveSecretConfigured?: boolean
   archivePrivateKeyConfigured?: boolean
   archivePublicKeyVersion?: string
+  archiveCorpId?: string
   archiveEnabled?: boolean
   customerContactEnabled?: boolean
   syncEnabled?: boolean
   lastSyncTime?: string
   lastSyncStatus?: string
   lastSyncError?: string
+}
+
+export interface WecomConfigSavePayload {
+  archiveSecret?: string
+  archivePrivateKey?: string
+  archivePublicKeyVersion?: string
+  archiveCorpId?: string
+  archiveEnabled?: boolean
+  customerContactEnabled?: boolean
+  syncEnabled?: boolean
 }
 
 export interface WecomOpenAuthorizeVO {

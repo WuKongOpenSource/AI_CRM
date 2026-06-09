@@ -33,6 +33,8 @@ public class WecomConfigVO {
 
     private String archivePublicKeyVersion;
 
+    private String archiveCorpId;
+
     private Boolean archiveEnabled;
 
     private Boolean customerContactEnabled;

@@ -1,6 +1,7 @@
 import { get, post } from '@/utils/request'
 import type {
   WecomConfigVO,
+  WecomConfigSavePayload,
   WecomConversationPage,
   WecomConversationQuery,
   WecomConversationTabVO,
@@ -21,7 +22,7 @@ export function getWecomConfig(): Promise<WecomConfigVO> {
   return get('/wecom/config')
 }
 
-export function saveWecomConfig(data: Partial<WecomConfigVO>): Promise<WecomConfigVO> {
+export function saveWecomConfig(data: WecomConfigSavePayload): Promise<WecomConfigVO> {
   return post('/wecom/config', data)
 }
 

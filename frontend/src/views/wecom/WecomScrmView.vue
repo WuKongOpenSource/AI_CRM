@@ -19,6 +19,10 @@
           <span class="material-symbols-outlined mr-1 text-[18px]">verified_user</span>
           {{ wecomConfig.thirdPartyAuthorized ? '重新授权' : '授权企业微信' }}
         </el-button>
+        <el-button v-if="canManageWecom" @click="openArchiveConfig">
+          <span class="material-symbols-outlined mr-1 text-[18px]">settings</span>
+          存档配置
+        </el-button>
         <el-segmented v-model="conversationType" :options="conversationTypeOptions" @change="loadConversations" />
         <el-button v-if="canManageWecom" :loading="orgSyncing" @click="handleSyncOrg">
           <span class="material-symbols-outlined mr-1 text-[18px]">account_tree</span>
@@ -118,6 +122,48 @@
         <WecomMessageList :messages="messages" :loading="messageLoading" />
       </section>
     </main>
+
+    <el-dialog
+      v-model="archiveConfigVisible"
+      title="会话存档配置"
+      width="540px"
+      :close-on-click-modal="false"
+    >
+      <el-form label-position="top">
+        <el-form-item label="会话存档 Secret">
+          <el-input
+            v-model="archiveForm.archiveSecret"
+            type="password"
+            show-password
+            :placeholder="wecomConfig.archiveSecretConfigured ? '已配置，留空则不修改' : '企业微信管理端 - 管理工具 - 会话内容存档'"
+          />
+        </el-form-item>
+        <el-form-item label="RSA 私钥（PEM）">
+          <el-input
+            v-model="archiveForm.archivePrivateKey"
+            type="textarea"
+            :rows="4"
+            :placeholder="wecomConfig.archivePrivateKeyConfigured ? '已配置，留空则不修改' : '-----BEGIN PRIVATE KEY-----'"
+          />
+        </el-form-item>
+        <el-form-item label="公钥版本">
+          <el-input v-model="archiveForm.archivePublicKeyVersion" placeholder="上传公钥时设置的版本号，如 1" />
+        </el-form-item>
+        <el-form-item label="真实 corpId（可选）">
+          <el-input
+            v-model="archiveForm.archiveCorpId"
+            placeholder="留空则使用授权返回的 corpId；若为密文 open_corpid 需填企业真实 corpid"
+          />
+        </el-form-item>
+        <el-form-item label="启用会话存档">
+          <el-switch v-model="archiveForm.archiveEnabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="archiveConfigVisible = false">取消</el-button>
+        <el-button type="primary" :loading="archiveSaving" @click="saveArchiveConfig">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -133,11 +179,13 @@ import {
   queryWecomEmployees,
   runMyWecomCustomerSync,
   runWecomOrgSync,
-  runWecomSync
+  runWecomSync,
+  saveWecomConfig
 } from '@/api/wecom'
 import { useUserStore } from '@/stores/user'
 import type {
   WecomConfigVO,
+  WecomConfigSavePayload,
   WecomConversationType,
   WecomConversationVO,
   WecomEmployeeSessionVO,
@@ -172,6 +220,22 @@ const archiveReady = computed(() => Boolean(
     && wecomConfig.value.archivePrivateKeyConfigured
     && wecomConfig.value.archivePublicKeyVersion
 ))
+
+const archiveConfigVisible = ref(false)
+const archiveSaving = ref(false)
+const archiveForm = ref<{
+  archiveSecret: string
+  archivePrivateKey: string
+  archivePublicKeyVersion: string
+  archiveCorpId: string
+  archiveEnabled: boolean
+}>({
+  archiveSecret: '',
+  archivePrivateKey: '',
+  archivePublicKeyVersion: '',
+  archiveCorpId: '',
+  archiveEnabled: false
+})
 
 const conversationTypeOptions = [
   { label: '客户会话', value: 'customer' },
@@ -329,6 +393,42 @@ async function handleAuthorize() {
     }
   } finally {
     authorizing.value = false
+  }
+}
+
+function openArchiveConfig() {
+  archiveForm.value = {
+    archiveSecret: '',
+    archivePrivateKey: '',
+    archivePublicKeyVersion: wecomConfig.value.archivePublicKeyVersion || '',
+    archiveCorpId: wecomConfig.value.archiveCorpId || '',
+    archiveEnabled: Boolean(wecomConfig.value.archiveEnabled)
+  }
+  archiveConfigVisible.value = true
+}
+
+async function saveArchiveConfig() {
+  archiveSaving.value = true
+  try {
+    const form = archiveForm.value
+    const payload: WecomConfigSavePayload = {
+      archivePublicKeyVersion: form.archivePublicKeyVersion.trim(),
+      archiveCorpId: form.archiveCorpId.trim() || undefined,
+      archiveEnabled: form.archiveEnabled,
+      // 保留现有开关，避免被后端整体重置为 false
+      customerContactEnabled: wecomConfig.value.customerContactEnabled ?? true,
+      syncEnabled: wecomConfig.value.syncEnabled ?? true
+    }
+    const secret = form.archiveSecret.trim()
+    const privateKey = form.archivePrivateKey.trim()
+    if (secret) payload.archiveSecret = secret
+    if (privateKey) payload.archivePrivateKey = privateKey
+    await saveWecomConfig(payload)
+    ElMessage.success('会话存档配置已保存')
+    archiveConfigVisible.value = false
+    await loadConfig()
+  } finally {
+    archiveSaving.value = false
   }
 }
 

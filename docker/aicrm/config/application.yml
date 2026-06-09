@@ -99,6 +99,11 @@ wecom:
     auth-type: ${WECOM_OPEN_PLATFORM_AUTH_TYPE:1}
     state-ttl-seconds: ${WECOM_OPEN_PLATFORM_STATE_TTL_SECONDS:600}
     token-cache-ttl-buffer-seconds: ${WECOM_OPEN_PLATFORM_TOKEN_CACHE_TTL_BUFFER_SECONDS:300}
+  dev-callback:
+    # 代开发模板回调（/wecom/dev/callback）的 Token / EncodingAESKey，必须与企微服务商后台「代开发模板回调配置」一致。
+    # 可在此直接填写明文，或用环境变量 WECOM_DEV_CALLBACK_TOKEN / WECOM_DEV_CALLBACK_AES_KEY 注入。
+    token: ${WECOM_DEV_CALLBACK_TOKEN:}
+    encoding-aes-key: ${WECOM_DEV_CALLBACK_AES_KEY:}
 
 minio:
   # 是否启用 MinIO（设为 false 使用本地文件存储）
