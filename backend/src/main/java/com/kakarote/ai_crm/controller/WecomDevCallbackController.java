@@ -3,6 +3,7 @@ package com.kakarote.ai_crm.controller;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.WecomDevCallbackProperties;
+import com.kakarote.ai_crm.service.impl.WecomAgencyDevService;
 import com.kakarote.ai_crm.service.impl.WecomCallbackCryptoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +42,9 @@ public class WecomDevCallbackController {
     @Autowired
     private WecomCallbackCryptoService cryptoService;
 
+    @Autowired
+    private WecomAgencyDevService agencyDevService;
+
     @GetMapping("/callback")
     @Operation(summary = "Verify WeCom agency-dev template callback URL")
     public ResponseEntity<String> verify(@RequestParam(value = "msg_signature", required = false) String msgSignature,
@@ -58,8 +62,12 @@ public class WecomDevCallbackController {
 
     @PostMapping("/callback")
     @Operation(summary = "Receive WeCom agency-dev template callback event")
-    public ResponseEntity<String> callback(@RequestBody(required = false) String body) {
-        // 会话存档不依赖回调事件（suite_ticket / 授权变更等），统一应答 success，避免企微重试。
+    public ResponseEntity<String> callback(@RequestBody(required = false) String body,
+                                           @RequestParam(value = "msg_signature", required = false) String msgSignature,
+                                           @RequestParam(required = false) String timestamp,
+                                           @RequestParam(required = false) String nonce) {
+        // 代开发集成启用时处理授权事件（suite_ticket / create_auth → 捕获 permanent_code）；未启用则仅应答 success。
+        agencyDevService.handleEvent(body, msgSignature, timestamp, nonce);
         return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body("success");
     }
 }

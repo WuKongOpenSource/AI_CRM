@@ -87,6 +87,18 @@ public class WecomOpenApiClient {
         return json;
     }
 
+    /**
+     * 代开发/自建式取企业 access_token：GET /cgi-bin/gettoken?corpid=&amp;corpsecret=permanent_code。
+     * 与第三方应用的 get_corp_token 不同（代开发拿到 permanent_code 后按自建方式取 token）。
+     */
+    public JSONObject fetchSelfBuiltCorpToken(String corpId, String corpSecret) {
+        JSONObject json = get("/gettoken", null, null,
+                builder -> builder.queryParam("corpid", corpId).queryParam("corpsecret", corpSecret));
+        assertWecomOk(json, "Fetch WeCom self-built corp token failed");
+        requireField(json, "access_token", "WeCom corp token is empty");
+        return json;
+    }
+
     public JSONObject fetchUserInfo3rd(String suiteAccessToken, String code) {
         JSONObject json = get("/service/auth/getuserinfo3rd", suiteAccessToken, "suite_access_token",
                 builder -> builder.queryParam("code", code));

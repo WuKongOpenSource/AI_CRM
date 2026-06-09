@@ -144,6 +144,11 @@ wecom:
     token: ${WECOM_ARCHIVE_CALLBACK_TOKEN:}
     encoding-aes-key: ${WECOM_ARCHIVE_CALLBACK_AES_KEY:}
     event-drain-max-pages: ${WECOM_ARCHIVE_EVENT_DRAIN_MAX_PAGES:10}
+  agency-dev:
+    # 代开发自建应用：suite 凭证（服务商后台「代开发应用」详情页）。回调 Token/AESKey 复用 wecom.dev-callback.*
+    enabled: ${WECOM_AGENCY_DEV_ENABLED:false}
+    suite-id: ${WECOM_AGENCY_DEV_SUITE_ID:}
+    suite-secret: ${WECOM_AGENCY_DEV_SUITE_SECRET:}
 
 tencent-meeting:
   oauth:
