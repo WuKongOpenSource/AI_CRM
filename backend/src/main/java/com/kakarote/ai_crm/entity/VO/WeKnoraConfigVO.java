@@ -25,6 +25,42 @@ public class WeKnoraConfigVO implements Serializable {
     @Schema(description = "知识库ID")
     private String knowledgeBaseId;
 
+    @Schema(description = "默认知识库名称")
+    private String knowledgeBaseName;
+
+    @Schema(description = "LLM服务商")
+    private String llmProvider;
+
+    @Schema(description = "LLM模型名称")
+    private String llmModelName;
+
+    @Schema(description = "LLM基础URL")
+    private String llmBaseUrl;
+
+    @Schema(description = "LLM API Key（脱敏显示）")
+    private String llmApiKey;
+
+    @Schema(description = "LLM模型ID")
+    private String llmModelId;
+
+    @Schema(description = "Embedding服务商")
+    private String embeddingProvider;
+
+    @Schema(description = "Embedding模型名称")
+    private String embeddingModelName;
+
+    @Schema(description = "Embedding基础URL")
+    private String embeddingBaseUrl;
+
+    @Schema(description = "Embedding API Key（脱敏显示）")
+    private String embeddingApiKey;
+
+    @Schema(description = "Embedding向量维度")
+    private Integer embeddingDimension;
+
+    @Schema(description = "Embedding模型ID")
+    private String embeddingModelId;
+
     @Schema(description = "最大匹配结果数")
     private Integer matchCount;
 

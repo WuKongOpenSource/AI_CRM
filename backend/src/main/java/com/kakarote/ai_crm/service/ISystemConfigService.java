@@ -4,12 +4,16 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.WeKnoraModelTestBO;
+import com.kakarote.ai_crm.entity.BO.WeKnoraModelSyncBO;
 import com.kakarote.ai_crm.entity.PO.SystemConfig;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraModelTestVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraModelSyncVO;
 
 import java.util.Map;
 
@@ -106,6 +110,10 @@ public interface ISystemConfigService extends IService<SystemConfig> {
      * @return 测试结果
      */
     WeKnoraConnectionTestVO testWeKnoraConnection(WeKnoraConfigUpdateBO configBO);
+
+    WeKnoraModelSyncVO syncWeKnoraModels(WeKnoraModelSyncBO syncBO);
+
+    WeKnoraModelTestVO testWeKnoraModel(WeKnoraModelTestBO testBO);
 
     /**
      * 获取企业信息配置

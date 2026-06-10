@@ -64,6 +64,18 @@ export interface WeKnoraConfig {
   baseUrl: string
   apiKey: string
   knowledgeBaseId: string
+  knowledgeBaseName?: string
+  llmProvider?: string
+  llmModelName?: string
+  llmBaseUrl?: string
+  llmApiKey?: string
+  llmModelId?: string
+  embeddingProvider?: string
+  embeddingModelName?: string
+  embeddingBaseUrl?: string
+  embeddingApiKey?: string
+  embeddingDimension?: number
+  embeddingModelId?: string
   matchCount: number
   vectorThreshold: number
   autoRagEnabled: boolean
@@ -91,6 +103,47 @@ export interface WeKnoraConnectionTestResult {
   responseTime: number
   message: string
   knowledgeCount?: number
+}
+
+export interface WeKnoraModelSyncBO {
+  enabled?: boolean
+  baseUrl?: string
+  apiKey?: string
+  knowledgeBaseName?: string
+  llmProvider?: string
+  llmModelName?: string
+  llmBaseUrl?: string
+  llmApiKey?: string
+  embeddingProvider?: string
+  embeddingModelName?: string
+  embeddingBaseUrl?: string
+  embeddingApiKey?: string
+  embeddingDimension?: number
+}
+
+export interface WeKnoraModelSyncResult {
+  success: boolean
+  message: string
+  llmModelId: string
+  embeddingModelId: string
+  knowledgeBaseId: string
+}
+
+export interface WeKnoraModelTestBO {
+  modelType: 'llm' | 'embedding'
+  provider?: string
+  modelName?: string
+  baseUrl?: string
+  apiKey?: string
+  embeddingDimension?: number
+}
+
+export interface WeKnoraModelTestResult {
+  success: boolean
+  responseTime: number
+  message: string
+  model?: string
+  embeddingDimension?: number
 }
 
 /**

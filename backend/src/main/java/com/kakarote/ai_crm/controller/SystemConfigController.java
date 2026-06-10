@@ -6,11 +6,15 @@ import com.kakarote.ai_crm.entity.BO.AiConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.EnterpriseConfigUpdateBO;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.WeKnoraConfigUpdateBO;
+import com.kakarote.ai_crm.entity.BO.WeKnoraModelTestBO;
+import com.kakarote.ai_crm.entity.BO.WeKnoraModelSyncBO;
 import com.kakarote.ai_crm.entity.VO.AiConfigVO;
 import com.kakarote.ai_crm.entity.VO.AiConnectionTestVO;
 import com.kakarote.ai_crm.entity.VO.EnterpriseConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConfigVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraConnectionTestVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraModelTestVO;
+import com.kakarote.ai_crm.entity.VO.WeKnoraModelSyncVO;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.service.OidcService;
 import com.kakarote.ai_crm.utils.RequestContextUtil;
@@ -131,6 +135,18 @@ public class SystemConfigController {
     @Operation(summary = "测试WeKnora连接")
     public Result<WeKnoraConnectionTestVO> testWeKnoraConnection(@Valid @RequestBody WeKnoraConfigUpdateBO configBO) {
         return Result.ok(systemConfigService.testWeKnoraConnection(configBO));
+    }
+
+    @PostMapping("/weknora/syncModels")
+    @Operation(summary = "同步WeKnora模型配置")
+    public Result<WeKnoraModelSyncVO> syncWeKnoraModels(@Valid @RequestBody WeKnoraModelSyncBO syncBO) {
+        return Result.ok(systemConfigService.syncWeKnoraModels(syncBO));
+    }
+
+    @PostMapping("/weknora/testModel")
+    @Operation(summary = "测试WeKnora模型连接")
+    public Result<WeKnoraModelTestVO> testWeKnoraModel(@Valid @RequestBody WeKnoraModelTestBO testBO) {
+        return Result.ok(systemConfigService.testWeKnoraModel(testBO));
     }
 
     // ==================== 企业信息配置接口 ====================

@@ -251,7 +251,7 @@
               <button
                 type="button"
                 class="relative z-10 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white transition-all hover:bg-primary/90"
-                @click="queryParams.keyword = '销售话术'"
+                @click="handleStartScriptGenerator"
               >
                 立即开始
               </button>
@@ -630,6 +630,42 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="showSalesScriptDialog"
+      title="AI 销售话术生成器"
+      width="720px"
+      :close-on-click-modal="!generatingSalesScript"
+    >
+      <div class="space-y-4">
+        <div v-if="generatingSalesScript" class="flex items-center justify-center py-12 text-slate-500">
+          <span class="material-symbols-outlined mr-2 animate-spin text-primary">progress_activity</span>
+          正在结合知识库生成销售话术...
+        </div>
+        <template v-else>
+          <div v-if="salesScriptResult?.sources?.length" class="rounded-xl bg-slate-50 p-3">
+            <p class="mb-2 text-xs font-bold text-slate-500">参考知识来源</p>
+            <div class="flex flex-wrap gap-2">
+              <span
+                v-for="source in salesScriptResult.sources"
+                :key="source"
+                class="rounded-full bg-white px-3 py-1 text-xs text-slate-600 ring-1 ring-slate-200"
+              >
+                {{ source }}
+              </span>
+            </div>
+          </div>
+          <pre class="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-700">{{ salesScriptResult?.script || '暂无生成内容' }}</pre>
+        </template>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <el-button @click="showSalesScriptDialog = false">关闭</el-button>
+          <el-button :disabled="!salesScriptResult?.script" @click="handleCopySalesScript">复制话术</el-button>
+          <el-button type="primary" :loading="generatingSalesScript" @click="handleStartScriptGenerator">重新生成</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- Document Detail Modal -->
     <KnowledgeDetailModal v-model="showDetailModal" :knowledge-id="selectedKnowledgeId" />
   </div>
@@ -638,9 +674,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useResponsive } from '@/composables/useResponsive'
-import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge } from '@/api/knowledge'
+import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge, reparseKnowledge, generateSalesScript } from '@/api/knowledge'
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
-import type { Knowledge, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
+import type { Knowledge, KnowledgeQueryBO, KnowledgeSalesScriptVO, KnowledgeType } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
 
 const { isMobile } = useResponsive()
@@ -654,8 +690,11 @@ const loading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
 const showDetailModal = ref(false)
+const showSalesScriptDialog = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
+const generatingSalesScript = ref(false)
+const salesScriptResult = ref<KnowledgeSalesScriptVO | null>(null)
 const totalCount = ref(0)
 const uploadingFile = ref<File | null>(null)
 const uploadRef = ref<UploadInstance>()
@@ -765,6 +804,25 @@ async function handleConfirmUpload() {
 function openDetail(item: Knowledge) {
   selectedKnowledgeId.value = item.knowledgeId
   showDetailModal.value = true
+}
+
+async function handleStartScriptGenerator() {
+  showSalesScriptDialog.value = true
+  generatingSalesScript.value = true
+  try {
+    // “立即开始”应直接生成话术，而不是只把关键词塞进检索框。
+    salesScriptResult.value = await generateSalesScript()
+  } catch {
+    salesScriptResult.value = null
+  } finally {
+    generatingSalesScript.value = false
+  }
+}
+
+async function handleCopySalesScript() {
+  if (!salesScriptResult.value?.script) return
+  await navigator.clipboard.writeText(salesScriptResult.value.script)
+  ElMessage.success('销售话术已复制')
 }
 
 async function handleDownload(item: Knowledge) {

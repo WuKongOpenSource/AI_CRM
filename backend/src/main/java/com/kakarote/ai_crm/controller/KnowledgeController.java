@@ -5,6 +5,7 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
+import com.kakarote.ai_crm.entity.VO.KnowledgeSalesScriptVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
@@ -115,6 +116,12 @@ public class KnowledgeController {
     @Operation(summary = "AI分析文档内容")
     public Result<KnowledgeAiAnalyzeVO> aiAnalyze(@PathVariable("id") Long id) {
         return Result.ok(knowledgeService.aiAnalyzeDocument(id));
+    }
+
+    @PostMapping("/sales-script")
+    @Operation(summary = "基于知识库生成销售话术")
+    public Result<KnowledgeSalesScriptVO> generateSalesScript() {
+        return Result.ok(knowledgeService.generateSalesScript());
     }
 
     @PostMapping(value = "/{id}/ask", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

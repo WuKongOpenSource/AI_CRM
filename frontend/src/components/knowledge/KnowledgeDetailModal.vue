@@ -113,7 +113,7 @@
 
               <!-- Fallback: plain text -->
               <div v-else class="h-full overflow-y-auto p-6">
-                <div v-if="previewFailed" class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
+                <div v-if="previewFailed && !inlineTextPreview" class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2">
                   <span class="material-symbols-outlined text-amber-500 text-sm">info</span>
                   <span class="text-xs text-amber-700">预览服务不可用，显示文本内容</span>
                 </div>
@@ -301,6 +301,7 @@ const knowledge = ref<Knowledge | null>(null)
 const analysis = ref<KnowledgeAiAnalyzeVO | null>(null)
 const previewUrl = ref('')
 const previewFailed = ref(false)
+const inlineTextPreview = ref(false)
 const loadingDetail = ref(false)
 const loadingAnalysis = ref(false)
 const mobileTab = ref<'document' | 'ai'>('document')
@@ -312,6 +313,32 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 // kkFileView base URL (proxied through nginx)
 function getKkfileviewUrl(): string {
   return `${window.location.origin}/kkfileview`
+}
+
+function isTextPreviewFile(detail: Knowledge): boolean {
+  const normalizedType = (detail.type || '').toLowerCase()
+  const normalizedMime = (detail.mimeType || '').toLowerCase()
+  const ext = (detail.name?.split('.').pop() || '').toLowerCase()
+
+  return (
+    ['txt', 'text', 'md', 'markdown'].includes(normalizedType)
+    || normalizedMime.startsWith('text/')
+    || ['application/json', 'application/xml', 'application/x-yaml'].includes(normalizedMime)
+    || ['txt', 'md', 'markdown', 'json', 'csv', 'log', 'xml', 'yaml', 'yml'].includes(ext)
+  )
+}
+
+function toKkfileviewFetchUrl(fileUrl: string): string {
+  try {
+    const url = new URL(fileUrl)
+    const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(url.hostname)
+    if (isLoopback) {
+      url.hostname = 'host.docker.internal'
+    }
+    return url.toString()
+  } catch {
+    return fileUrl
+  }
 }
 
 function close() {
@@ -330,6 +357,7 @@ watch(
       analysis.value = null
       previewUrl.value = ''
       previewFailed.value = false
+      inlineTextPreview.value = false
       chatMessages.value = []
       chatInput.value = ''
       mobileTab.value = 'document'
@@ -342,6 +370,7 @@ async function loadDocument(id: string) {
   loadingDetail.value = true
   loadingAnalysis.value = true
   previewFailed.value = false
+  inlineTextPreview.value = false
 
   try {
     // Load detail and file URL in parallel
@@ -352,10 +381,17 @@ async function loadDocument(id: string) {
 
     knowledge.value = detail
 
+    if (isTextPreviewFile(detail)) {
+      previewUrl.value = ''
+      inlineTextPreview.value = true
+      previewFailed.value = true
+      return
+    }
+
     // Construct kkFileView preview URL
     if (fileUrl) {
       try {
-        const encoded = encodeURIComponent(btoa(fileUrl))
+        const encoded = encodeURIComponent(btoa(toKkfileviewFetchUrl(fileUrl)))
         previewUrl.value = `${getKkfileviewUrl()}/onlinePreview?url=${encoded}`
       } catch {
         previewFailed.value = true

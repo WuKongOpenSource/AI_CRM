@@ -16,6 +16,7 @@ import ProfileSettingsPane from './panes/ProfileSettingsPane.vue'
 import EnterpriseSettingsPane from './panes/EnterpriseSettingsPane.vue'
 import AiConfigSettingsPane from './panes/AiConfigSettingsPane.vue'
 import AgentSettingsPane from './panes/AgentSettingsPane.vue'
+import WeKnoraConfigSettingsPane from './panes/WeKnoraConfigSettingsPane.vue'
 import StorageSettingsPane from './panes/StorageSettingsPane.vue'
 import CustomFieldSettingsPane from './panes/CustomFieldSettingsPane.vue'
 
@@ -32,6 +33,7 @@ const paneMap = {
   enterprise: EnterpriseSettingsPane,
   api: AiConfigSettingsPane,
   agent: AgentSettingsPane,
+  weknora: WeKnoraConfigSettingsPane,
   storage: StorageSettingsPane,
   customField: CustomFieldSettingsPane
 } as const

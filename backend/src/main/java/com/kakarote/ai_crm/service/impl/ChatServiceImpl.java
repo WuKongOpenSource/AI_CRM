@@ -143,6 +143,11 @@ public class ChatServiceImpl implements IChatService {
         - 联系人：带"总""经理""主任""工""姐""哥""先生""女士"等称呼的人名（如"王总""李经理""张工"）
         创建任何记录时，都应尽量关联提取到的客户名和联系人名，传给对应工具参数。
 
+        **实时数据查询规则**：
+        当用户请求查询客户、联系人、任务、日程、跟进记录、知识库文件等业务数据时，必须调用对应工具获取最新数据。
+        不要仅根据历史对话中的旧结果回答，也不要因为用户重复提问就复述上一次的查询结果。
+        如果用户没有指定筛选条件，例如"查询客户列表"，应按无筛选条件查询并展示工具返回的列表。
+
         请用中文回复，保持专业友好。
         当用户请求创建或查询数据时，使用提供的工具函数来完成操作。
         回复要简洁明了，重点突出关键信息。
@@ -280,7 +285,8 @@ public class ChatServiceImpl implements IChatService {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
         }
 
-        List<Message> history = buildMessageHistory(sessionId);
+        // 当前用户消息会在本轮 request.user(...) 中单独传入，历史上下文需要排除它，避免模型误判为重复请求。
+        List<Message> history = buildMessageHistory(sessionId, messageId);
 
         String attachmentContext = buildAttachmentContext(attachments);
         // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
@@ -388,7 +394,8 @@ public class ChatServiceImpl implements IChatService {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
         }
 
-        List<Message> history = buildMessageHistory(sessionId);
+        // 当前用户消息会在本轮 request.user(...) 中单独传入，历史上下文需要排除它，避免模型误判为重复请求。
+        List<Message> history = buildMessageHistory(sessionId, messageId);
 
         String attachmentContext = buildAttachmentContext(attachments);
         // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
@@ -574,7 +581,7 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
-    private List<Message> buildMessageHistory(Long sessionId) {
+    private List<Message> buildMessageHistory(Long sessionId, Long excludeMessageId) {
         List<ChatMessage> dbMessages = chatMessageMapper.selectList(
             new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getSessionId, sessionId)
@@ -584,6 +591,9 @@ public class ChatServiceImpl implements IChatService {
 
         List<Message> messages = new ArrayList<>();
         for (ChatMessage dbMsg : dbMessages) {
+            if (excludeMessageId != null && excludeMessageId.equals(dbMsg.getMessageId())) {
+                continue;
+            }
             switch (dbMsg.getRole()) {
                 case "user":
                     messages.add(new UserMessage(dbMsg.getContent()));

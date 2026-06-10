@@ -5,6 +5,7 @@ export type SystemSettingsTab =
   | 'enterprise'
   | 'api'
   | 'agent'
+  | 'weknora'
   | 'storage'
   | 'customField'
 

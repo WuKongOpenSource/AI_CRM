@@ -8,8 +8,14 @@ import type {
   MinioConsoleConfig,
   WeKnoraConfig,
   WeKnoraConfigUpdateBO,
-  WeKnoraConnectionTestResult
+  WeKnoraConnectionTestResult,
+  WeKnoraModelTestBO,
+  WeKnoraModelTestResult,
+  WeKnoraModelSyncBO,
+  WeKnoraModelSyncResult
 } from '@/types/systemConfig'
+
+const LONG_MODEL_TIMEOUT_MS = 180000
 
 /**
  * 获取 AI 配置
@@ -29,7 +35,7 @@ export function updateAiConfig(data: AiConfigUpdateBO): Promise<void> {
  * 测试 AI 连接
  */
 export function testAiConnection(data: AiConfigUpdateBO): Promise<AiConnectionTestResult> {
-  return post('/systemConfig/ai/test', data)
+  return post('/systemConfig/ai/test', data, { timeout: LONG_MODEL_TIMEOUT_MS })
 }
 
 /**
@@ -80,7 +86,18 @@ export function updateWeKnoraConfig(data: WeKnoraConfigUpdateBO): Promise<void> 
  * 测试 WeKnora 连接
  */
 export function testWeKnoraConnection(data: WeKnoraConfigUpdateBO): Promise<WeKnoraConnectionTestResult> {
-  return post('/systemConfig/weknora/test', data)
+  return post('/systemConfig/weknora/test', data, { timeout: LONG_MODEL_TIMEOUT_MS })
+}
+
+/**
+ * 同步 WeKnora LLM / Embedding 模型和默认知识库
+ */
+export function syncWeKnoraModels(data: WeKnoraModelSyncBO): Promise<WeKnoraModelSyncResult> {
+  return post('/systemConfig/weknora/syncModels', data, { timeout: LONG_MODEL_TIMEOUT_MS })
+}
+
+export function testWeKnoraModel(data: WeKnoraModelTestBO): Promise<WeKnoraModelTestResult> {
+  return post('/systemConfig/weknora/testModel', data, { timeout: LONG_MODEL_TIMEOUT_MS })
 }
 
 // ==================== 企业信息配置接口 ====================

@@ -82,7 +82,7 @@ public class CustomerTools {
         }
     }
 
-    @Tool(description = "查询客户列表。当用户查看、搜索、筛选客户时调用此工具。")
+    @Tool(description = "实时查询客户列表。当用户查看、搜索、筛选客户时必须调用此工具。用户没有明确筛选条件时，不要自行推断关键词、等级、阶段或行业，应传空参数查询全部客户。")
     public String queryCustomers(
             @ToolParam(description = "搜索关键词，可搜索公司名称", required = false) String keyword,
             @ToolParam(description = "客户级别筛选：A/B/C", required = false) String level,
@@ -90,6 +90,8 @@ public class CustomerTools {
             @ToolParam(description = "行业筛选", required = false) String industry) {
 
         try {
+            log.info("【Tool调用】queryCustomers keyword={}, level={}, stage={}, industry={}", keyword, level, stage, industry);
+
             CustomerQueryBO queryBO = new CustomerQueryBO();
             queryBO.setKeyword(keyword);
             queryBO.setLevel(level);

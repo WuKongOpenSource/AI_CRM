@@ -11,6 +11,7 @@ export const SYSTEM_SETTINGS_TABS: SettingsTabItem<SystemSettingsTab>[] = [
   { value: 'enterprise', label: '企业信息' },
   { value: 'api', label: 'AI/API 配置' },
   { value: 'agent', label: '智能体' },
+  { value: 'weknora', label: '知识库服务' },
   { value: 'storage', label: '对象存储' },
   { value: 'customField', label: '自定义字段' }
 ]
