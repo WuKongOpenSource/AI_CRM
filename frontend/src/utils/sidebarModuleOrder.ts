@@ -2,7 +2,13 @@ export const SIDEBAR_MODULE_KEYS = ['recent', 'customer', 'project', 'relation',
 
 export type SidebarModuleKey = (typeof SIDEBAR_MODULE_KEYS)[number]
 
-export const DEFAULT_SIDEBAR_MODULE_ORDER: SidebarModuleKey[] = [...SIDEBAR_MODULE_KEYS]
+export const DEFAULT_SIDEBAR_MODULE_ORDER: SidebarModuleKey[] = [
+  'recent',
+  'customer',
+  'project',
+  'relation',
+  'addressBook'
+]
 
 const SIDEBAR_MODULE_KEY_SET = new Set<string>(SIDEBAR_MODULE_KEYS)
 const STORAGE_KEY_PREFIX = 'wk_ai_crm:main_layout:sidebar_module_order:v1'

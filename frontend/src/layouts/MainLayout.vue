@@ -659,7 +659,7 @@
                         v-if="relationAvatarUrl(relation)"
                         :src="relationAvatarUrl(relation)"
                         :alt="relationName(relation)"
-                        class="size-full object-cover"
+                        class="size-full object-contain"
                       />
                       <span v-else class="flex size-full items-center justify-center bg-indigo-50 text-xs font-bold text-indigo-600">
                         {{ relationInitial(relation) }}
@@ -1351,7 +1351,7 @@
                       v-if="relationAvatarUrl(relation)"
                       :src="relationAvatarUrl(relation)"
                       :alt="relationName(relation)"
-                      class="size-full object-cover"
+                      class="size-full object-contain"
                     />
                     <span v-else class="flex size-full items-center justify-center bg-indigo-50 text-xs font-bold text-indigo-600">
                       {{ relationInitial(relation) }}
@@ -2254,8 +2254,17 @@ function onCollapsedPrimarySidebarLeave() {
   collapsedSidebarAsideHovered.value = false
 }
 
+function blurMobileKeyboardTarget() {
+  if (typeof document === 'undefined') return
+  const activeElement = document.activeElement
+  if (!(activeElement instanceof HTMLElement)) return
+  if (!activeElement.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return
+  activeElement.blur()
+}
+
 function openMobileDrawer() {
   if (!isMobile.value) return
+  blurMobileKeyboardTarget()
   clearMobileDrawerClosingTimer()
   mobileDrawerClosing.value = false
   resetMobileDrawerDragPreview()
@@ -2385,6 +2394,9 @@ function handleMobileMainMenuDrag(payload?: MobileMainMenuDragPayload) {
   }
 
   if (drawerVisible.value) return
+  if (!mobileDrawerDragActive.value && progress > 0) {
+    blurMobileKeyboardTarget()
+  }
   clearMobileDrawerDragSettleTimer()
   mobileDrawerDragActive.value = true
   mobileDrawerDragSettling.value = false
@@ -2669,6 +2681,7 @@ let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 let removeCustomerSidebarRefreshListener: (() => void) | null = null
+let removeRelationSidebarRefreshListener: (() => void) | null = null
 let removeProjectSidebarRefreshListener: (() => void) | null = null
 let removeMobileMainMenuOpenListener: (() => void) | null = null
 let removeMobileMainMenuDragListener: (() => void) | null = null
@@ -2699,6 +2712,10 @@ type SidebarProjectItem = Pick<ProjectEntity, 'projectId' | 'name'>
 
 function refreshSidebarCustomersFromEvent(payload?: SidebarRefreshPayload) {
   void fetchSidebarCustomers({ reset: true, preserveScroll: payload?.preserveScroll !== false })
+}
+
+function refreshSidebarRelationsFromEvent(payload?: SidebarRefreshPayload) {
+  void fetchSidebarRelations({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
 
 function refreshSidebarProjectsFromEvent(payload?: ProjectSidebarRefreshPayload) {
@@ -3233,6 +3250,10 @@ onMounted(() => {
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
   )
+  removeRelationSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
+    APP_EVENT.RELATION_SIDEBAR_REFRESH,
+    refreshSidebarRelationsFromEvent
+  )
   removeProjectSidebarRefreshListener = appEvents.on<ProjectSidebarRefreshPayload>(
     APP_EVENT.PROJECT_SIDEBAR_REFRESH,
     refreshSidebarProjectsFromEvent
@@ -3285,6 +3306,8 @@ onBeforeUnmount(() => {
   removeCustomerListRefreshListener = null
   removeCustomerSidebarRefreshListener?.()
   removeCustomerSidebarRefreshListener = null
+  removeRelationSidebarRefreshListener?.()
+  removeRelationSidebarRefreshListener = null
   removeProjectSidebarRefreshListener?.()
   removeProjectSidebarRefreshListener = null
   removeMobileMainMenuOpenListener?.()
@@ -3880,7 +3903,7 @@ function relationInitial(relation: RelationVO): string {
 }
 
 function relationAvatarUrl(relation: RelationVO): string {
-  return relation.avatarUrl || relation.avatar || ''
+  return relation.avatarUrl || ''
 }
 
 function focusCustomerSearchInput() {

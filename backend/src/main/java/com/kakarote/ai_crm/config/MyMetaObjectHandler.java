@@ -4,8 +4,6 @@ import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.apache.ibatis.reflection.MetaObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -17,8 +15,6 @@ import java.util.Date;
 @Component
 public class MyMetaObjectHandler implements MetaObjectHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(MyMetaObjectHandler.class);
-
     /**
      * 插入Fill。
      */
@@ -28,14 +24,10 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         this.strictInsertFill(metaObject, "createTime", Date.class, new Date());
         // 填充更新时间
         this.strictInsertFill(metaObject, "updateTime", Date.class, new Date());
-        // 填充创建人ID（捕获异常避免未登录时报错）
-        try {
-            Long userId = UserUtil.getUserId();
-            if (userId != null) {
-                this.strictInsertFill(metaObject, "createUserId", Long.class, userId);
-            }
-        } catch (Exception e) {
-            log.debug("无法获取当前用户ID进行自动填充: {}", e.getMessage());
+        // 填充创建人ID；系统任务和异步日志线程允许没有用户上下文。
+        Long userId = UserUtil.getUserIdOrNull();
+        if (userId != null) {
+            this.strictInsertFill(metaObject, "createUserId", Long.class, userId);
         }
         // 填充租户ID
         if (metaObject.hasSetter("tenantId")) {

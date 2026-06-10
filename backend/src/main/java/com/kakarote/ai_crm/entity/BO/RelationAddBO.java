@@ -32,8 +32,8 @@ public class RelationAddBO {
     @Schema(description = "关系类型")
     private String relationType;
 
-    @Schema(description = "所属公司")
-    private String company;
+    @Schema(description = "关联客户ID")
+    private Long customerId;
 
     @Schema(description = "备注")
     private String remark;

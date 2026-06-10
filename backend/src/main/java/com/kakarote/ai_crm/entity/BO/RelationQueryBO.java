@@ -25,6 +25,9 @@ public class RelationQueryBO extends PageEntity {
     @Schema(description = "来源客户ID")
     private Long sourceCustomerId;
 
+    @Schema(description = "关联客户ID")
+    private Long customerId;
+
     @Schema(description = "来源客户联系人ID")
     private Long sourceContactId;
 }

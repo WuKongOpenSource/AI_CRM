@@ -11,7 +11,10 @@
             r.wechat,
             r.email,
             r.relation_type,
-            r.company,
+            NULL AS company,
+            r.customer_id,
+            linked_customer.company_name AS customer_name,
+            linked_customer.logo AS customer_logo,
             r.remark,
             r.source,
             r.source_customer_id,
@@ -21,6 +24,7 @@
             r.create_time,
             r.update_time
         FROM crm_relation r
+        LEFT JOIN crm_customer linked_customer ON r.customer_id = linked_customer.customer_id
         LEFT JOIN crm_customer c ON r.source_customer_id = c.customer_id
         WHERE r.status = 1
           AND r.create_user_id = #{ownerUserId}
@@ -30,7 +34,7 @@
                 OR COALESCE(r.phone, '') LIKE CONCAT('%', #{query.keyword}, '%')
                 OR COALESCE(r.wechat, '') LIKE CONCAT('%', #{query.keyword}, '%')
                 OR COALESCE(r.email, '') LIKE CONCAT('%', #{query.keyword}, '%')
-                OR COALESCE(r.company, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(linked_customer.company_name, '') LIKE CONCAT('%', #{query.keyword}, '%')
                 OR COALESCE(r.remark, '') LIKE CONCAT('%', #{query.keyword}, '%')
             )
         </if>
@@ -42,6 +46,9 @@
         </if>
         <if test="query.sourceCustomerId != null">
             AND r.source_customer_id = #{query.sourceCustomerId}
+        </if>
+        <if test="query.customerId != null">
+            AND r.customer_id = #{query.customerId}
         </if>
         <if test="query.sourceContactId != null">
             AND r.source_contact_id = #{query.sourceContactId}
@@ -58,7 +65,10 @@
             r.wechat,
             r.email,
             r.relation_type,
-            r.company,
+            NULL AS company,
+            r.customer_id,
+            linked_customer.company_name AS customer_name,
+            linked_customer.logo AS customer_logo,
             r.remark,
             r.source,
             r.source_customer_id,
@@ -68,6 +78,7 @@
             r.create_time,
             r.update_time
         FROM crm_relation r
+        LEFT JOIN crm_customer linked_customer ON r.customer_id = linked_customer.customer_id
         LEFT JOIN crm_customer c ON r.source_customer_id = c.customer_id
         WHERE r.relation_id = #{relationId}
           AND r.create_user_id = #{ownerUserId}

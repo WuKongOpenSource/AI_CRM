@@ -173,7 +173,6 @@
         v-model="basicDrawerOpen"
         :customer="customer"
         :contacts="customer?.contacts || []"
-        :custom-fields="[]"
         @contacts-updated="handleContactsUpdated"
       />
     </template>

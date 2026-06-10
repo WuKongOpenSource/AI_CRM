@@ -3,8 +3,6 @@ package com.kakarote.ai_crm.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -60,6 +58,9 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
     private CustomerMapper customerMapper;
 
     @Autowired
+    private CustomerLogoService customerLogoService;
+
+    @Autowired
     private TaskMapper taskMapper;
 
     @Autowired
@@ -86,6 +87,7 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         if (StrUtil.isBlank(relation.getRelationType())) {
             relation.setRelationType(RELATION_TYPE_OTHER);
         }
+        normalizeLinkedCustomerFields(relation);
         customFieldService.validateUniqueCustomFieldValues(ENTITY_RELATION, null,
                 buildRelationUniqueFieldValues(relation, relationAddBO.getCustomFields()));
         save(relation);
@@ -100,6 +102,7 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         Relation relation = getOwnedRelation(relationUpdateBO.getRelationId());
         BeanUtil.copyProperties(relationUpdateBO, relation, "relationId", "source",
                 "sourceCustomerId", "sourceContactId", "createUserId", "createTime", "customFields");
+        normalizeLinkedCustomerFields(relation);
         customFieldService.validateUniqueCustomFieldValues(ENTITY_RELATION, relation.getRelationId(),
                 buildRelationUniqueFieldValues(relation, relationUpdateBO.getCustomFields()));
         updateById(relation);
@@ -117,11 +120,11 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
 
     @Override
     public BasePage<RelationVO> queryPageList(RelationQueryBO queryBO) {
-        BasePage<Relation> page = queryBO.parse();
-        page(page, buildQueryWrapper(queryBO));
-        BasePage<RelationVO> resultPage = page.copy(RelationVO.class, this::toRelationVO);
-        fillCustomFields(resultPage.getRecords());
-        return resultPage;
+        BasePage<RelationVO> page = queryBO.parse();
+        baseMapper.queryPageList(page, queryBO, UserUtil.getUserId());
+        page.getRecords().forEach(this::completeRelationVO);
+        fillCustomFields(page.getRecords());
+        return page;
     }
 
     @Override
@@ -162,14 +165,10 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         relation.setRemark(contact.getNotes());
         relation.setRelationType(SOURCE_CUSTOMER_CONTACT);
         relation.setSource(SOURCE_CUSTOMER_CONTACT);
+        relation.setCustomerId(contact.getCustomerId());
         relation.setSourceCustomerId(contact.getCustomerId());
         relation.setSourceContactId(contact.getContactId());
-        if (customerMapper != null && contact.getCustomerId() != null) {
-            Customer customer = customerMapper.selectById(contact.getCustomerId());
-            if (customer != null) {
-                relation.setCompany(customer.getCompanyName());
-            }
-        }
+        normalizeLinkedCustomerFields(relation);
         relation.setStatus(1);
         save(relation);
         refreshRelationIndex(relation.getRelationId());
@@ -191,39 +190,32 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
 
     @Override
     public RelationVO getOwnedRelationVO(Long relationId) {
-        RelationVO relationVO = toRelationVO(getOwnedRelation(relationId));
+        Relation relation = getOwnedRelation(relationId);
+        RelationVO relationVO = baseMapper.getRelationById(relationId, UserUtil.getUserId());
+        if (relationVO == null) {
+            relationVO = toRelationVO(relation);
+        } else {
+            completeRelationVO(relationVO);
+        }
         relationVO.setCustomFields(customFieldService.getCustomFieldValues(ENTITY_RELATION, relationId));
         return relationVO;
     }
 
-    private LambdaQueryWrapper<Relation> buildQueryWrapper(RelationQueryBO queryBO) {
-        LambdaQueryWrapper<Relation> wrapper = Wrappers.lambdaQuery(Relation.class)
-                .eq(Relation::getStatus, 1)
-                .eq(Relation::getCreateUserId, UserUtil.getUserId())
-                .eq(StrUtil.isNotBlank(queryBO.getRelationType()), Relation::getRelationType, queryBO.getRelationType())
-                .eq(StrUtil.isNotBlank(queryBO.getSource()), Relation::getSource, queryBO.getSource())
-                .eq(queryBO.getSourceCustomerId() != null, Relation::getSourceCustomerId, queryBO.getSourceCustomerId())
-                .eq(queryBO.getSourceContactId() != null, Relation::getSourceContactId, queryBO.getSourceContactId())
-                .orderByDesc(Relation::getCreateTime);
-        if (StrUtil.isNotBlank(queryBO.getKeyword())) {
-            wrapper.and(w -> w.like(Relation::getName, queryBO.getKeyword())
-                    .or()
-                    .like(Relation::getPhone, queryBO.getKeyword())
-                    .or()
-                    .like(Relation::getWechat, queryBO.getKeyword())
-                    .or()
-                    .like(Relation::getEmail, queryBO.getKeyword())
-                    .or()
-                    .like(Relation::getCompany, queryBO.getKeyword()));
-        }
-        return wrapper;
-    }
-
     private RelationVO toRelationVO(Relation relation) {
         RelationVO vo = BeanUtil.copyProperties(relation, RelationVO.class);
-        vo.setRelationTypeName(resolveRelationTypeName(relation.getRelationType()));
-        vo.setSourceName(resolveSourceName(relation.getSource()));
+        completeRelationVO(vo);
         return vo;
+    }
+
+    private void completeRelationVO(RelationVO vo) {
+        if (vo == null) {
+            return;
+        }
+        vo.setCompany(null);
+        vo.setAvatarUrl(resolveCustomerLogoUrl(vo.getAvatar()));
+        vo.setRelationTypeName(resolveRelationTypeName(vo.getRelationType()));
+        vo.setSourceName(resolveSourceName(vo.getSource()));
+        enrichRelationCustomerFields(vo, vo.getCustomerId());
     }
 
     private void fillCustomFields(List<RelationVO> records) {
@@ -238,6 +230,9 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
             return;
         }
         Map<Long, Map<String, Object>> customFieldMap = customFieldService.getBatchCustomFieldValues(ENTITY_RELATION, relationIds);
+        if (customFieldMap == null) {
+            customFieldMap = Collections.emptyMap();
+        }
         for (RelationVO record : records) {
             record.setCustomFields(customFieldMap.getOrDefault(record.getRelationId(), Collections.emptyMap()));
         }
@@ -307,7 +302,7 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
             values.put("wechat", relation.getWechat());
             values.put("email", relation.getEmail());
             values.put("relationType", relation.getRelationType());
-            values.put("company", relation.getCompany());
+            values.put("customerId", relation.getCustomerId());
         }
         if (customFields != null && !customFields.isEmpty()) {
             values.putAll(customFields);
@@ -319,8 +314,8 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         if (StrUtil.isBlank(relationType)) {
             return "其他";
         }
-        // 真相源：crm_custom_field.options（relation/relation_type）
-        return customFieldService.resolveOptionLabel("relation", "relation_type", relationType);
+        // 真相源：crm_custom_field.options（relation/relationType）
+        return customFieldService.resolveOptionLabel("relation", "relationType", relationType);
     }
 
     private String resolveSourceName(String source) {
@@ -329,5 +324,54 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
         }
         // 真相源：crm_custom_field.options（relation/source）
         return customFieldService.resolveOptionLabel("relation", "source", source);
+    }
+
+    private void normalizeLinkedCustomerFields(Relation relation) {
+        if (relation == null) {
+            return;
+        }
+        relation.setCompany(null);
+        if (relation.getCustomerId() == null) {
+            return;
+        }
+        Customer customer = customerMapper.selectById(relation.getCustomerId());
+        if (customer == null || Objects.equals(customer.getStatus(), 0)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
+        }
+    }
+
+    private void enrichRelationCustomerFields(RelationVO vo, Long customerId) {
+        if (vo == null || customerId == null) {
+            return;
+        }
+        String customerName = vo.getCustomerName();
+        String logo = vo.getCustomerLogo();
+        if (StrUtil.isBlank(customerName) || StrUtil.isBlank(logo)) {
+            Customer customer = customerMapper.selectByIdIgnoreDataPermission(customerId);
+            if (customer != null && !Objects.equals(customer.getStatus(), 0)) {
+                if (StrUtil.isBlank(customerName)) {
+                    customerName = customer.getCompanyName();
+                }
+                if (StrUtil.isBlank(logo)) {
+                    logo = customer.getLogo();
+                }
+            }
+        }
+        String logoUrl = resolveCustomerLogoUrl(logo);
+        vo.setCustomerId(customerId);
+        vo.setCustomerName(customerName);
+        vo.setCustomerLogo(logo);
+        vo.setCustomerLogoUrl(logoUrl);
+    }
+
+    private String resolveCustomerLogoUrl(String logo) {
+        if (StrUtil.isBlank(logo) || customerLogoService == null) {
+            return null;
+        }
+        try {
+            return customerLogoService.resolveLogoUrl(logo);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

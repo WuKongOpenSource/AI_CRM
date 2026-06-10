@@ -25,6 +25,10 @@ export interface RelationVO {
   relationType?: RelationType | string
   relationTypeName?: string
   company?: string
+  customerId?: string
+  customerName?: string
+  customerLogo?: string
+  customerLogoUrl?: string
   remark?: string
   source?: RelationSource
   sourceName?: string
@@ -52,7 +56,7 @@ export interface RelationAddBO {
   wechat?: string
   email?: string
   relationType?: RelationType | string
-  company?: string
+  customerId?: string
   remark?: string
   customFields?: Record<string, unknown>
 }
@@ -65,6 +69,7 @@ export interface RelationQueryBO {
   keyword?: string
   relationType?: RelationType | string
   source?: RelationSource
+  customerId?: string
   sourceCustomerId?: string
   sourceContactId?: string
   page?: number

@@ -475,10 +475,10 @@
               <div class="flex min-w-0 flex-1 items-center gap-2">
                 <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
                   <img
-                    v-if="selectedRelation?.avatarUrl || selectedRelation?.avatar"
-                    :src="selectedRelation.avatarUrl || selectedRelation.avatar"
-                    :alt="mobileRelationHeaderName || 'relation avatar'"
-                    class="size-full bg-white object-cover"
+                    v-if="selectedRelation?.avatarUrl"
+                    :src="selectedRelation.avatarUrl"
+                    :alt="mobileRelationHeaderName || '关系人头像'"
+                    class="size-full bg-white object-contain"
                   />
                   <span v-else class="text-xs font-bold text-slate-400">
                     {{ mobileRelationHeaderName.charAt(0) || '?' }}
@@ -488,10 +488,10 @@
                   {{ selectedRelation?.name || '未命名关系人' }}
                 </h2>
                 <span class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]">
-                  {{ selectedRelation?.relationTypeName || selectedRelation?.relationType || '关系' }}
+                  {{ selectedRelationTypeLabel }}
                 </span>
                 <span class="hidden min-w-0 truncate text-xs text-slate-400 md:inline">
-                  {{ selectedRelation?.company || '-' }}
+                  {{ selectedRelation?.customerName || '-' }}
                 </span>
               </div>
             </div>
@@ -530,6 +530,7 @@
               }
             ]"
             @scroll="handleMessagesScroll"
+            @touchmove.passive="dismissMobileKeyboardForConversationScroll"
           >
             <div class="wk-chat-messages__inner px-4 md:px-8">
             <!-- Welcome Section (no messages) -->
@@ -1989,7 +1990,6 @@
       v-model="showSelectedCustomerBasicInfoDrawer"
       :customer="selectedCustomer"
       :contacts="selectedCustomerContacts"
-      :custom-fields="[]"
       @contacts-updated="handleSelectedCustomerContactsUpdated"
       @edit="handleSelectedCustomerBasicInfoEdit"
     />
@@ -2325,6 +2325,8 @@ import { confirmDeleteChatSession } from '@/utils/confirmDeleteChatSession'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { shouldShowMobileCustomerSummaryAction } from '@/utils/chatMobileActions'
+import { resolveMobileKeyboardInset } from '@/utils/mobileKeyboardViewport'
+import { resolveRelationTypeLabel as resolveRelationTypeDisplayLabel } from '@/views/relation/constants'
 import {
   canCaptureMobileAudioFile,
   captureMobileAudioFile,
@@ -2364,6 +2366,7 @@ const enterpriseStore = useEnterpriseStore()
 const projectStore = useProjectStore()
 const enumStore = useEnumStore()
 enumStore.ensureCustomerStage()
+enumStore.ensureRelationType()
 const { isMobile } = useResponsive()
 const {
   aiConfig,
@@ -2412,7 +2415,6 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const chatComposerWrapRef = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobileKeyboardInset = ref(0)
-const mobileTopFixedLayerViewportOffset = ref(0)
 const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 /** 桌面端多行输入（模板中 v-if="!isMobile" 的 textarea） */
@@ -2616,9 +2618,7 @@ const chatComposerWrapStyle = computed(() => (
     : undefined
 ))
 const mobileTopFixedLayerStyle = computed(() => (
-  isMobile.value && mobileTopFixedLayerViewportOffset.value > 0
-    ? { transform: `translate3d(0, ${mobileTopFixedLayerViewportOffset.value}px, 0)` }
-    : undefined
+  undefined
 ))
 
 const CUSTOMER_STAGE_FLOW_FALLBACK = [
@@ -3152,8 +3152,15 @@ const mobileRelationHeaderName = computed(() =>
   selectedRelation.value?.name || boundRelationName.value || chatStore.currentSession?.title || '关系'
 )
 const mobileRelationHeaderAvatarUrl = computed(() =>
-  selectedRelation.value?.avatarUrl || selectedRelation.value?.avatar || ''
+  selectedRelation.value?.avatarUrl || ''
 )
+const selectedRelationTypeLabel = computed(() =>
+  resolveRelationTypeLabel(selectedRelation.value?.relationType, selectedRelation.value?.relationTypeName)
+)
+
+function resolveRelationTypeLabel(type?: string | null, fallback?: string | null) {
+  return resolveRelationTypeDisplayLabel(type, fallback, enumStore.relationType)
+}
 const showCustomerHeader = computed(() =>
   !chatStore.isNewSessionPending && Boolean(selectedCustomer.value || (isMobile.value && isCustomerContextChat.value))
 )
@@ -3186,12 +3193,6 @@ const showMobileCustomerHeaderSpacer = computed(() =>
 )
 const showMobileObjectHeaderSpacer = computed(() =>
   isMobile.value && (showEmployeeHeader.value || showRelationHeader.value)
-)
-const showMobileTopFixedLayer = computed(() =>
-  showMobileFloatingBar.value
-  || showMobileCustomerHeader.value
-  || showMobileEmployeeHeader.value
-  || showMobileRelationHeader.value
 )
 const mobileObjectDetailTitle = computed(() =>
   mobileObjectDetailKind.value === 'employee'
@@ -3285,6 +3286,13 @@ function handleMessagesScroll() {
     isPinnedToBottom.value = getMessagesDistanceToBottom(el) <= SCROLL_TO_BOTTOM_THRESHOLD_PX
   }
   updateScrollToBottomVisibility()
+}
+
+function dismissMobileKeyboardForConversationScroll() {
+  if (!isMobile.value || !isMobileComposerFocused()) return
+  mobileChatInputRef.value?.blur()
+  clearMobileKeyboardInsetTracking()
+  mobileKeyboardInset.value = 0
 }
 
 function scrollToBottomSmooth() {
@@ -3855,18 +3863,7 @@ function isMobileComposerFocused(): boolean {
   return activeElement === mobileChatInputRef.value || Boolean(chatComposerWrapRef.value?.contains(activeElement))
 }
 
-function updateMobileTopFixedLayerViewportOffset() {
-  if (!isMobile.value || typeof window === 'undefined' || !showMobileTopFixedLayer.value) {
-    mobileTopFixedLayerViewportOffset.value = 0
-    return
-  }
-
-  const offsetTop = window.visualViewport?.offsetTop ?? 0
-  mobileTopFixedLayerViewportOffset.value = offsetTop > 1 ? Math.round(offsetTop) : 0
-}
-
 function updateMobileKeyboardInset() {
-  updateMobileTopFixedLayerViewportOffset()
   if (!isMobile.value || typeof window === 'undefined' || !isMobileComposerFocused()) {
     mobileKeyboardInset.value = 0
     return
@@ -3878,10 +3875,17 @@ function updateMobileKeyboardInset() {
     return
   }
 
-  const coveredHeight = Math.max(0, window.innerHeight - visualViewport.height - visualViewport.offsetTop)
-  mobileKeyboardInset.value = coveredHeight > MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX
-    ? Math.round(coveredHeight + MOBILE_KEYBOARD_INSET_GAP_PX)
-    : 0
+  mobileKeyboardInset.value = resolveMobileKeyboardInset(
+    {
+      layoutHeight: window.innerHeight,
+      visualHeight: visualViewport.height,
+      offsetTop: visualViewport.offsetTop
+    },
+    {
+      gap: MOBILE_KEYBOARD_INSET_GAP_PX,
+      threshold: MOBILE_KEYBOARD_VISIBLE_THRESHOLD_PX
+    }
+  )
 }
 
 function clearMobileKeyboardInsetTracking() {
@@ -3925,18 +3929,9 @@ function scheduleMobileKeyboardInsetUpdate(trackKeyboardOpening: boolean | Event
   }
 }
 
-watch(
-  showMobileTopFixedLayer,
-  () => {
-    updateMobileTopFixedLayerViewportOffset()
-  },
-  { flush: 'post' }
-)
-
 function registerMobileKeyboardInsetListeners() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
   window.visualViewport?.addEventListener('resize', scheduleMobileKeyboardInsetUpdate)
-  window.visualViewport?.addEventListener('scroll', scheduleMobileKeyboardInsetUpdate)
   window.addEventListener('orientationchange', scheduleMobileKeyboardInsetUpdate)
   document.addEventListener('focusin', scheduleMobileKeyboardInsetUpdate, true)
   document.addEventListener('focusout', scheduleMobileKeyboardInsetUpdate, true)
@@ -3945,7 +3940,6 @@ function registerMobileKeyboardInsetListeners() {
 function unregisterMobileKeyboardInsetListeners() {
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     window.visualViewport?.removeEventListener('resize', scheduleMobileKeyboardInsetUpdate)
-    window.visualViewport?.removeEventListener('scroll', scheduleMobileKeyboardInsetUpdate)
     window.removeEventListener('orientationchange', scheduleMobileKeyboardInsetUpdate)
     document.removeEventListener('focusin', scheduleMobileKeyboardInsetUpdate, true)
     document.removeEventListener('focusout', scheduleMobileKeyboardInsetUpdate, true)
@@ -3956,7 +3950,6 @@ function unregisterMobileKeyboardInsetListeners() {
   }
   clearMobileKeyboardInsetTracking()
   mobileKeyboardInset.value = 0
-  mobileTopFixedLayerViewportOffset.value = 0
 }
 
 onMounted(async () => {

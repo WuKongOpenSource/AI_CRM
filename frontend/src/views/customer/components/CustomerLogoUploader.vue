@@ -15,7 +15,7 @@
       />
       <div v-else class="flex h-full w-full flex-col items-center justify-center">
         <span class="material-symbols-outlined text-[22px] leading-none">image</span>
-        <span class="mt-0.5 text-[11px] font-bold leading-none">Logo</span>
+        <span class="mt-0.5 text-[11px] font-bold leading-none">{{ label }}</span>
       </div>
 
       <span
@@ -60,11 +60,13 @@ import { isRequestErrorHandled } from '@/utils/requestError'
 const props = withDefaults(defineProps<{
   logoUrl?: string | null
   alt?: string
+  label?: string
   disabled?: boolean
   size?: number
 }>(), {
   logoUrl: '',
   alt: '公司 Logo',
+  label: 'Logo',
   disabled: false,
   size: 64
 })
@@ -119,7 +121,7 @@ async function handleFileChange(event: Event) {
   } catch (error) {
     console.error('Customer logo upload failed:', error)
     if (!isRequestErrorHandled(error)) {
-      ElMessage.error('Logo 上传失败')
+      ElMessage.error(`${props.label} 上传失败`)
     }
   } finally {
     uploading.value = false

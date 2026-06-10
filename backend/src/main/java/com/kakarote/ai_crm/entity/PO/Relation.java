@@ -48,6 +48,9 @@ public class Relation implements Serializable {
     @Schema(description = "所属公司")
     private String company;
 
+    @Schema(description = "关联客户ID")
+    private Long customerId;
+
     @Schema(description = "备注")
     private String remark;
 

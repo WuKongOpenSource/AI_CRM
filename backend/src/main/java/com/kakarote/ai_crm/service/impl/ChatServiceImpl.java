@@ -1623,7 +1623,7 @@ public class ChatServiceImpl implements IChatService {
                 continue;
             }
             session.setRelationName(relation.getName());
-            session.setRelationAvatarUrl(resolveRelationAvatarUrl(relation.getAvatar()));
+            session.setRelationAvatarUrl(resolveRelationAvatarUrl(relation));
         }
     }
 
@@ -1676,19 +1676,17 @@ public class ChatServiceImpl implements IChatService {
         });
     }
 
-    private String resolveRelationAvatarUrl(String avatar) {
-        if (StrUtil.isBlank(avatar)) {
+    private String resolveRelationAvatarUrl(Relation relation) {
+        if (relation == null) {
             return null;
         }
-        String normalized = avatar.trim();
-        String lower = normalized.toLowerCase(Locale.ROOT);
-        if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("data:")) {
-            return normalized;
+        if (StrUtil.isBlank(relation.getAvatar())) {
+            return null;
         }
         try {
-            return fileStorageService.getUrl(normalized);
+            return customerLogoService.resolveLogoUrl(relation.getAvatar());
         } catch (Exception ignored) {
-            return normalized;
+            return null;
         }
     }
 
@@ -1744,7 +1742,10 @@ public class ChatServiceImpl implements IChatService {
             .append("- relationId: ").append(relation.getRelationId()).append("\n")
             .append("- 姓名: ").append(StrUtil.blankToDefault(relation.getName(), "未命名关系人")).append("\n");
         appendCustomerContextLine(builder, "关系类型", relation.getRelationType());
-        appendCustomerContextLine(builder, "所属公司", relation.getCompany());
+        if (relation.getCustomerId() != null) {
+            Customer customer = customerMapper.selectByIdIgnoreDataPermission(relation.getCustomerId());
+            appendCustomerContextLine(builder, "关联客户", customer == null ? null : customer.getCompanyName());
+        }
         appendCustomerContextLine(builder, "手机号", relation.getPhone());
         appendCustomerContextLine(builder, "微信号", relation.getWechat());
         appendCustomerContextLine(builder, "邮箱", relation.getEmail());

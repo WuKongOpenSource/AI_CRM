@@ -273,6 +273,9 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
             return;
         }
 
+        Customer linkedCustomer = relation.getCustomerId() == null
+                ? null
+                : customerMapper.selectByIdIgnoreDataPermission(relation.getCustomerId());
         Customer sourceCustomer = relation.getSourceCustomerId() == null
                 ? null
                 : customerMapper.selectByIdIgnoreDataPermission(relation.getSourceCustomerId());
@@ -283,10 +286,10 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
         index.setEntityType(ENTITY_RELATION);
         index.setEntityId(relation.getRelationId());
         index.setTitle(relation.getName());
-        index.setSubtitle(buildSubtitle("关系", firstNonBlank(relation.getCompany(), sourceCustomer != null ? sourceCustomer.getCompanyName() : null)));
+        index.setSubtitle(buildSubtitle("关系", linkedCustomer != null ? linkedCustomer.getCompanyName() : null));
         index.setSummary(truncateSummary(firstNonBlank(relation.getRemark(), relation.getPhone(), relation.getEmail())));
-        index.setCustomerId(relation.getSourceCustomerId());
-        index.setCustomerName(sourceCustomer != null ? sourceCustomer.getCompanyName() : null);
+        index.setCustomerId(relation.getCustomerId());
+        index.setCustomerName(linkedCustomer != null ? linkedCustomer.getCompanyName() : null);
         index.setOwnerUserId(relation.getCreateUserId());
         index.setCreateUserId(relation.getCreateUserId());
         index.setRoutePath("/relation?openRelationId=" + relation.getRelationId());
@@ -296,9 +299,9 @@ public class GlobalSearchIndexServiceImpl extends ServiceImpl<GlobalSearchIndexM
                 relation.getPhone(),
                 relation.getWechat(),
                 relation.getEmail(),
-                relation.getCompany(),
                 relation.getRelationType(),
                 relation.getSource(),
+                linkedCustomer != null ? linkedCustomer.getCompanyName() : null,
                 sourceCustomer != null ? sourceCustomer.getCompanyName() : null,
                 extractSearchableCustomFieldText(ENTITY_RELATION, customFields),
                 relation.getRemark()

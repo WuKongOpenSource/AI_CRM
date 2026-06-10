@@ -80,7 +80,7 @@ const avatarAlt = computed(() => {
 })
 
 const avatarClass = computed(() =>
-  props.kind === 'customer'
+  props.kind === 'customer' || props.kind === 'relation'
     ? 'size-full bg-white object-contain'
     : 'size-full bg-white object-cover'
 )

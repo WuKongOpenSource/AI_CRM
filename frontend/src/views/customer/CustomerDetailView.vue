@@ -1057,7 +1057,6 @@
       v-model="showBasicInfoDrawer"
       :customer="customer"
       :contacts="contacts"
-      :custom-fields="customFields"
       :latest-ai-report="latestAiReport"
       @contacts-updated="onBasicInfoContactsUpdated"
       @edit="handleBasicInfoEdit"
@@ -1134,14 +1133,12 @@ import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, queryFollowUpPageList, updateFollowUp } from '@/api/followup'
 import { deleteContact, queryContactPageList, queryContactsByCustomer, setPrimaryContact } from '@/api/contact'
 import { addRelationFromContact } from '@/api/relation'
-import { getEnabledFieldsByEntity } from '@/api/customField'
 import { queryKnowledgeList } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Knowledge, Task, TaskStatus } from '@/types/common'
 import type { Contact, CustomerAiReportVO, CustomerDetailVO, CustomerTag, FollowUp, FollowUpAddBO, FollowUpAttachment, FollowUpTask, FollowUpUpdateBO } from '@/types/customer'
 import type { WecomCustomerBindingVO } from '@/types/wecom'
 import type { TencentMeetingVO } from '@/types/tencentMeeting'
-import type { CustomField } from '@/types/customField'
 import { compactCustomerAiInsight } from '@/utils/customerAi'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import FollowUpUpsertDialog from '@/components/customer/FollowUpUpsertDialog.vue'
@@ -1283,7 +1280,6 @@ const showKnowledgeUploadDialog = ref(false)
 const knowledgeUploadDialogRef = ref<InstanceType<typeof KnowledgeUploadDialog> | null>(null)
 const selectedKnowledgeId = ref('')
 const showKnowledgeDetailModal = ref(false)
-const customFields = ref<CustomField[]>([])
 const generatingAiReport = ref(false)
 const latestAiReport = ref<CustomerAiReportVO | null>(null)
 const ownerSearch = ref('')
@@ -1723,15 +1719,7 @@ async function loadCustomerDetailPage() {
 
   loading.value = true
   try {
-    await Promise.all([
-      refreshCustomerDetailModules(customerId),
-      getEnabledFieldsByEntity('customer').then(data => {
-        customFields.value = data.filter(field => field.fieldSource !== 'system')
-      }).catch(err => {
-        console.error('Failed to fetch custom fields:', err)
-        customFields.value = []
-      })
-    ])
+    await refreshCustomerDetailModules(customerId)
   } finally {
     loading.value = false
   }

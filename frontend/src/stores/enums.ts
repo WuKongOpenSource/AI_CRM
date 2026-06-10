@@ -11,7 +11,7 @@ import {
 /**
  * 选项枚举 store（单一真相源）。
  *
- * stage / level / relation_type / source 等系统下拉的选项与标签统一从后端
+ * stage / level / relationType / source 等系统下拉的选项与标签统一从后端
  * `/enum/*` 接口获取（后端读 crm_custom_field.options）。组件挂载时调用对应
  * ensureXxx() 拉取一次并复用；设置页编辑选项后调用 refreshAll() 立即生效。
  */

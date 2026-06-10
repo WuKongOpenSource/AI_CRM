@@ -22,6 +22,9 @@ public class RelationVO {
     @Schema(description = "头像")
     private String avatar;
 
+    @Schema(description = "头像访问URL")
+    private String avatarUrl;
+
     @Schema(description = "手机号")
     private String phone;
 
@@ -39,6 +42,18 @@ public class RelationVO {
 
     @Schema(description = "所属公司")
     private String company;
+
+    @Schema(description = "关联客户ID")
+    private Long customerId;
+
+    @Schema(description = "关联客户名称")
+    private String customerName;
+
+    @Schema(description = "关联客户Logo")
+    private String customerLogo;
+
+    @Schema(description = "关联客户Logo访问URL")
+    private String customerLogoUrl;
 
     @Schema(description = "备注")
     private String remark;

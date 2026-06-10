@@ -3,7 +3,8 @@
     v-model="dialogVisible"
     :title="editingAgent ? '编辑智能体' : '添加智能体'"
     :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
-    class="wk-dialog--flush wk-crm-el-field-scope wk-mobile-inset-dialog"
+    append-to-body
+    class="wk-dialog--flush wk-crm-el-field-scope wk-mobile-inset-dialog wk-agent-dialog"
   >
     <el-form :model="agentForm" label-position="top">
       <el-form-item label="名称">
@@ -60,3 +61,34 @@ const dialogVisible = computed({
   set: (value: boolean) => emit('update:visible', value)
 })
 </script>
+
+<style>
+.el-dialog.wk-agent-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  overscroll-behavior: none;
+}
+
+.el-dialog.wk-agent-dialog .el-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.el-dialog.wk-agent-dialog .el-dialog__header,
+.el-dialog.wk-agent-dialog .el-dialog__footer {
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .el-dialog.wk-agent-dialog.wk-mobile-inset-dialog {
+    --wk-agent-dialog-top: max(96px, calc(var(--wk-safe-top) + 72px));
+    --wk-agent-dialog-bottom: max(16px, var(--wk-safe-bottom));
+
+    max-height: calc(100dvh - var(--wk-agent-dialog-top) - var(--wk-agent-dialog-bottom));
+    margin: var(--wk-agent-dialog-top) auto var(--wk-agent-dialog-bottom) !important;
+  }
+}
+</style>

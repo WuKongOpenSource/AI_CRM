@@ -64,6 +64,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     }
 
     private static final Set<String> CUSTOMER_SEARCHABLE_TEXT_FIELD_TYPES = Set.of("text", "textarea", "select", "multiselect");
+    private static final Set<String> HIDDEN_RELATION_SYSTEM_FIELDS = Set.of("avatar", "company");
     private static final String FIELD_SOURCE_SYSTEM = "system";
     private static final String FIELD_SOURCE_CUSTOM = "custom";
     private static final Object SYSTEM_FIELD_INIT_LOCK = new Object();
@@ -319,7 +320,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 .eq(CustomField::getEntityType, entityType)
                 .orderByAsc(CustomField::getSortOrder)
                 .orderByAsc(CustomField::getCreateTime));
-        return convertToVO(fields);
+        return convertToVO(filterHiddenSystemFields(fields));
     }
 
     /**
@@ -333,7 +334,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 .eq(CustomField::getStatus, 1)
                 .orderByAsc(CustomField::getSortOrder)
                 .orderByAsc(CustomField::getCreateTime));
-        return convertToVO(fields);
+        return convertToVO(filterHiddenSystemFields(fields));
     }
 
     /**
@@ -348,7 +349,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 .eq(CustomField::getIsShowInList, 1)
                 .orderByAsc(CustomField::getSortOrder)
                 .orderByAsc(CustomField::getCreateTime));
-        return convertToVO(fields);
+        return convertToVO(filterHiddenSystemFields(fields));
     }
 
     /**
@@ -362,7 +363,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                 .eq(CustomField::getStatus, 1)
                 .orderByAsc(CustomField::getSortOrder)
                 .orderByAsc(CustomField::getCreateTime));
-        return convertToVO(fields);
+        return convertToVO(filterHiddenSystemFields(fields));
     }
 
     /**
@@ -877,6 +878,21 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         return !isSystemField(field);
     }
 
+    private boolean isHiddenSystemField(CustomField field) {
+        return isSystemField(field)
+                && "relation".equals(field.getEntityType())
+                && HIDDEN_RELATION_SYSTEM_FIELDS.contains(field.getFieldName());
+    }
+
+    private List<CustomField> filterHiddenSystemFields(List<CustomField> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return fields.stream()
+                .filter(field -> !isHiddenSystemField(field))
+                .toList();
+    }
+
     /**
      * 获取启用项自定义字段VOS。
      */
@@ -939,18 +955,50 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             return cached.options();
         }
 
-        CustomField field = getOne(new LambdaQueryWrapper<CustomField>()
+        List<String> fieldNames = optionFieldNames(entityType, fieldName);
+        List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
                 .eq(CustomField::getEntityType, entityType)
-                .eq(CustomField::getFieldName, fieldName)
-                .last("LIMIT 1"), false);
+                .in(CustomField::getFieldName, fieldNames));
+        CustomField field = fields.stream()
+                .filter(item -> StrUtil.equals(item.getFieldName(), fieldName) && StrUtil.isNotEmpty(item.getOptions()))
+                .findFirst()
+                .orElseGet(() -> fields.stream()
+                        .filter(item -> StrUtil.isNotEmpty(item.getOptions()))
+                        .findFirst()
+                        .orElse(null));
+        if (field == null) {
+            field = fields.stream()
+                    .filter(item -> StrUtil.equals(item.getFieldName(), fieldName))
+                    .findFirst()
+                    .orElse(fields.isEmpty() ? null : fields.get(0));
+        }
         List<FieldOption> options = (field != null && StrUtil.isNotEmpty(field.getOptions()))
                 ? JSON.parseArray(field.getOptions(), FieldOption.class)
-                : builtinOptions(entityType, fieldName);
+                : builtinOptions(entityType, builtinFieldName(entityType, fieldName));
         if (options == null) {
             options = Collections.emptyList();
         }
         optionsCache.put(key, new OptionsCacheEntry(System.currentTimeMillis() + OPTIONS_CACHE_TTL_MS, options));
         return options;
+    }
+
+    private List<String> optionFieldNames(String entityType, String fieldName) {
+        if ("relation".equals(entityType)) {
+            if ("relationType".equals(fieldName)) {
+                return List.of("relationType", "relation_type");
+            }
+            if ("relation_type".equals(fieldName)) {
+                return List.of("relation_type", "relationType");
+            }
+        }
+        return List.of(fieldName);
+    }
+
+    private String builtinFieldName(String entityType, String fieldName) {
+        if ("relation".equals(entityType) && "relation_type".equals(fieldName)) {
+            return "relationType";
+        }
+        return fieldName;
     }
 
     /**

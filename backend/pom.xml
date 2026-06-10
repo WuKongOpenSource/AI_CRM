@@ -210,16 +210,6 @@
             <artifactId>javase</artifactId>
             <version>3.5.3</version>
         </dependency>
-        <!-- 企业微信「会话内容存档」官方 SDK 的 Java 绑定 (com.tencent.wework.Finance)。
-             专有库，无法从 Maven 仓库获取，随仓库 vendored 于 lib/ 下；原生 .so/.dll 见 lib/native/。
-             安装/运行说明见 lib/README.md。 -->
-        <dependency>
-            <groupId>com.tencent.wework</groupId>
-            <artifactId>wework-finance-sdk</artifactId>
-            <version>1.0.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/lib/wework-finance-sdk-1.0.0.jar</systemPath>
-        </dependency>
     </dependencies>
 
     <repositories>
@@ -248,5 +238,28 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>wework-finance-sdk</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/lib/wework-finance-sdk-1.0.0.jar</exists>
+                </file>
+            </activation>
+            <dependencies>
+                <!-- 企业微信「会话内容存档」官方 SDK 的 Java 绑定 (com.tencent.wework.Finance)。
+                     专有库，无法从 Maven 仓库获取；需要启用会话存档时，将 jar 放到 backend/lib/。
+                     原生 .so/.dll 仍需通过 java.library.path 或运行环境加载。 -->
+                <dependency>
+                    <groupId>com.tencent.wework</groupId>
+                    <artifactId>wework-finance-sdk</artifactId>
+                    <version>1.0.0</version>
+                    <scope>system</scope>
+                    <systemPath>${basedir}/lib/wework-finance-sdk-1.0.0.jar</systemPath>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
 </project>

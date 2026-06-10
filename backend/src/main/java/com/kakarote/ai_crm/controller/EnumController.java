@@ -70,7 +70,7 @@ public class EnumController {
     @GetMapping("/relationType")
     @Operation(summary = "关系类型枚举")
     public Result<List<EnumVO>> relationType() {
-        return Result.ok(toEnumList("relation", "relation_type", Map.of()));
+        return Result.ok(toEnumList("relation", "relationType", Map.of()));
     }
 
     /**

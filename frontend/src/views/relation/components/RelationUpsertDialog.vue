@@ -38,6 +38,19 @@
 
     <div class="space-y-5 bg-white px-5 pb-6 pt-5 md:px-6 md:pb-7 md:pt-6">
       <div>
+        <label class="relation-field-label">头像</label>
+        <CustomerLogoUploader
+          :logo-url="relationAvatarUrl"
+          :alt="form.name || '关系人头像'"
+          label="头像"
+          :disabled="submitting"
+          :size="72"
+          @uploaded="handleAvatarUploaded"
+          @removed="handleAvatarRemoved"
+        />
+      </div>
+
+      <div>
         <label class="relation-field-label">
           姓名
           <span class="text-red-500">*</span>
@@ -69,13 +82,27 @@
         </div>
         <div>
           <label class="relation-field-label">所属公司</label>
-          <el-input
-            v-model="form.company"
-            maxlength="255"
-            placeholder="请输入所属公司"
+          <el-select
+            v-model="form.customerId"
+            filterable
+            remote
+            reserve-keyword
+            clearable
+            default-first-option
+            placeholder="搜索并选择客户"
+            :remote-method="searchCustomers"
+            :loading="customerSearchLoading"
             size="large"
-            class="w-full wk-crm-el-field-input"
-          />
+            class="w-full wk-crm-el-field-select"
+            @focus="loadRecentCustomers"
+          >
+            <el-option
+              v-for="item in customerOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </div>
       </div>
 
@@ -109,16 +136,6 @@
             v-model="form.email"
             maxlength="100"
             placeholder="请输入邮箱"
-            size="large"
-            class="w-full wk-crm-el-field-input"
-          />
-        </div>
-        <div>
-          <label class="relation-field-label">头像 URL</label>
-          <el-input
-            v-model="form.avatar"
-            maxlength="500"
-            placeholder="请输入头像 URL"
             size="large"
             class="w-full wk-crm-el-field-input"
           />
@@ -174,11 +191,14 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { addRelation, updateRelation } from '@/api/relation'
+import { queryCustomerList } from '@/api/customer'
 import DynamicFieldForm from '@/components/DynamicFieldForm.vue'
+import CustomerLogoUploader from '@/views/customer/components/CustomerLogoUploader.vue'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import { relationTypeOptions } from '@/views/relation/constants'
+import { normalizeRelationTypeOptions } from '@/views/relation/constants'
 import { useEnumStore } from '@/stores/enums'
+import type { CustomerListVO } from '@/types/customer'
 import type { RelationAddBO, RelationUpdateBO, RelationVO } from '@/types/relation'
 
 type RelationUpsertSavedPayload = {
@@ -202,12 +222,15 @@ const { isMobile } = useResponsive()
 const enumStore = useEnumStore()
 enumStore.ensureRelationType()
 const relationTypeChoices = computed(() =>
-  enumStore.relationType.length ? enumStore.relationType : relationTypeOptions
+  normalizeRelationTypeOptions(enumStore.relationType)
 )
 
 const submitting = ref(false)
 const dynamicFieldFormRef = ref<InstanceType<typeof DynamicFieldForm> | null>(null)
 const customFieldValues = ref<Record<string, unknown>>({})
+const customerSearchLoading = ref(false)
+const customerOptions = ref<Array<{ value: string; label: string }>>([])
+const relationAvatarUrl = ref('')
 
 const form = reactive<RelationAddBO>({
   name: '',
@@ -216,7 +239,7 @@ const form = reactive<RelationAddBO>({
   wechat: '',
   email: '',
   relationType: 'other',
-  company: '',
+  customerId: '',
   remark: ''
 })
 
@@ -248,8 +271,10 @@ function resetForm() {
   form.wechat = ''
   form.email = ''
   form.relationType = 'other'
-  form.company = ''
+  form.customerId = ''
   form.remark = ''
+  relationAvatarUrl.value = ''
+  customerOptions.value = []
   customFieldValues.value = {}
 }
 
@@ -258,14 +283,64 @@ function hydrateForm() {
   const relation = props.editingRelation
   if (!relation) return
   form.name = relation.name || ''
-  form.avatar = relation.avatar || relation.avatarUrl || ''
+  form.avatar = relation.avatar || ''
+  relationAvatarUrl.value = relation.avatarUrl || ''
   form.phone = relation.phone || ''
   form.wechat = relation.wechat || ''
   form.email = relation.email || ''
   form.relationType = relation.relationType || 'other'
-  form.company = relation.company || ''
+  form.customerId = relation.customerId ? String(relation.customerId) : ''
+  if (relation.customerId && relation.customerName) {
+    customerOptions.value = [{
+      value: String(relation.customerId),
+      label: relation.customerName
+    }]
+  }
   form.remark = relation.remark || ''
   customFieldValues.value = { ...(relation.customFields || {}) }
+}
+
+function handleAvatarUploaded(payload: { logo: string; logoUrl: string }) {
+  form.avatar = payload.logo
+  relationAvatarUrl.value = payload.logoUrl
+}
+
+function handleAvatarRemoved() {
+  form.avatar = ''
+  relationAvatarUrl.value = ''
+}
+
+function setCustomerOptions(customers: CustomerListVO[]) {
+  const options = (customers || [])
+    .map((customer: CustomerListVO) => ({
+      value: String(customer.customerId),
+      label: customer.companyName || ''
+    }))
+    .filter(item => item.value && item.label)
+  const selectedOption = customerOptions.value.find(item => item.value === String(form.customerId || ''))
+  if (selectedOption && !options.some(item => item.value === selectedOption.value)) {
+    options.unshift(selectedOption)
+  }
+  customerOptions.value = options
+}
+
+async function loadCustomerOptions(keyword: string, limit: number) {
+  customerSearchLoading.value = true
+  try {
+    const response = await queryCustomerList({ keyword: keyword || undefined, page: 1, limit })
+    setCustomerOptions(response.list || [])
+  } finally {
+    customerSearchLoading.value = false
+  }
+}
+
+function loadRecentCustomers() {
+  void loadCustomerOptions('', 10)
+}
+
+async function searchCustomers(query: string) {
+  const keyword = query.trim()
+  await loadCustomerOptions(keyword, keyword ? 20 : 10)
 }
 
 async function submitRelation() {
@@ -308,12 +383,12 @@ async function submitRelation() {
 function normalizeRelationPayload(): RelationAddBO {
   return {
     name: form.name.trim(),
-    avatar: form.avatar?.trim() || undefined,
+    avatar: form.avatar?.trim() ?? '',
     phone: form.phone?.trim() || undefined,
     wechat: form.wechat?.trim() || undefined,
     email: form.email?.trim() || undefined,
     relationType: form.relationType || 'other',
-    company: form.company?.trim() || undefined,
+    customerId: form.customerId || undefined,
     remark: form.remark?.trim() || undefined,
     customFields: customFieldValues.value
   }

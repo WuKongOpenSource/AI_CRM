@@ -12,7 +12,7 @@
           <input
             v-model="keyword"
             type="text"
-            placeholder="搜索姓名、手机号、微信、邮箱或公司"
+            placeholder="搜索姓名、手机号、微信、邮箱或客户"
             class="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 sm:w-80"
             @input="debouncedLoadRelations"
             @keydown.enter="loadRelations"
@@ -59,7 +59,7 @@
             <template #default="{ row }">
               <div class="flex min-w-0 items-center gap-3">
                 <div class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-white">
-                  <img v-if="avatarUrl(row)" :src="avatarUrl(row)" class="size-full object-cover" alt="avatar" />
+                  <img v-if="avatarUrl(row)" :src="avatarUrl(row)" class="size-full object-contain" alt="关系人头像" />
                   <span v-else class="flex size-full items-center justify-center bg-primary/10 text-xs font-bold text-primary">
                     {{ relationInitial(row) }}
                   </span>
@@ -86,7 +86,7 @@
               <span class="normal-case tracking-normal">所属公司</span>
             </template>
             <template #default="{ row }">
-              <span class="block truncate text-sm text-slate-600">{{ row.company || '-' }}</span>
+              <span class="block truncate text-sm text-slate-600">{{ row.customerName || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="来源" width="120">
@@ -149,7 +149,7 @@
             >
               <div class="flex items-start gap-3">
                 <div class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
-                  <img v-if="avatarUrl(relation)" :src="avatarUrl(relation)" class="size-full object-cover" alt="avatar" />
+                  <img v-if="avatarUrl(relation)" :src="avatarUrl(relation)" class="size-full object-contain" alt="关系人头像" />
                   <span v-else class="flex size-full items-center justify-center bg-primary/10 text-sm font-bold text-primary">
                     {{ relationInitial(relation) }}
                   </span>
@@ -158,7 +158,7 @@
                   <div class="flex items-start gap-2">
                     <div class="min-w-0 flex-1">
                       <div class="truncate text-sm font-bold text-slate-900">{{ relation.name }}</div>
-                      <p class="mt-0.5 truncate text-xs text-slate-400">{{ relationTypeLabel(relation.relationType, relation.relationTypeName) }} · {{ relation.company || '-' }}</p>
+                      <p class="mt-0.5 truncate text-xs text-slate-400">{{ relationTypeLabel(relation.relationType, relation.relationTypeName) }} · {{ relation.customerName || '-' }}</p>
                     </div>
                     <button type="button" class="relation-icon-btn shrink-0" title="AI 对话" @click.stop="openChat(relation)">
                       <AiDialogIcon :size="24" :sparkle-size="14" />
@@ -221,7 +221,7 @@
       <div v-else-if="currentDetail?.relation" class="space-y-5">
         <section class="rounded-lg border border-slate-200 p-4">
           <div class="flex items-start gap-3">
-            <img v-if="avatarUrl(currentDetail.relation)" :src="avatarUrl(currentDetail.relation)" class="size-12 rounded-full object-cover" alt="avatar" />
+            <img v-if="avatarUrl(currentDetail.relation)" :src="avatarUrl(currentDetail.relation)" class="size-12 rounded-lg object-contain" alt="关系人头像" />
             <div v-else class="flex size-12 shrink-0 items-center justify-center rounded-full bg-slate-900 text-base font-bold text-white">
               {{ relationInitial(currentDetail.relation) }}
             </div>
@@ -237,7 +237,7 @@
             <p><span class="text-slate-400">手机号：</span>{{ currentDetail.relation.phone || '-' }}</p>
             <p><span class="text-slate-400">微信号：</span>{{ currentDetail.relation.wechat || '-' }}</p>
             <p><span class="text-slate-400">邮箱：</span>{{ currentDetail.relation.email || '-' }}</p>
-            <p><span class="text-slate-400">所属公司：</span>{{ currentDetail.relation.company || '-' }}</p>
+            <p><span class="text-slate-400">所属公司：</span>{{ currentDetail.relation.customerName || '-' }}</p>
             <p><span class="text-slate-400">来源：</span>{{ sourceLabel(currentDetail.relation) }}</p>
             <p v-if="currentDetail.relation.sourceCustomerName"><span class="text-slate-400">来源客户：</span>{{ currentDetail.relation.sourceCustomerName }}</p>
           </div>
@@ -279,7 +279,10 @@ import { useEnumStore } from '@/stores/enums'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import { appEvents, APP_EVENT } from '@/utils/events'
-import { relationTypeOptions } from '@/views/relation/constants'
+import {
+  normalizeRelationTypeOptions,
+  resolveRelationTypeLabel
+} from '@/views/relation/constants'
 import type { RelationDetailVO, RelationVO } from '@/types/relation'
 
 const router = useRouter()
@@ -289,7 +292,7 @@ const userStore = useUserStore()
 const enumStore = useEnumStore()
 enumStore.ensureRelationType()
 const relationTypeChoices = computed(() =>
-  enumStore.relationType.length ? enumStore.relationType : relationTypeOptions
+  normalizeRelationTypeOptions(enumStore.relationType)
 )
 const { isMobile } = useResponsive()
 
@@ -489,12 +492,11 @@ function relationInitial(relation: RelationVO) {
 }
 
 function avatarUrl(relation: RelationVO) {
-  return relation.avatarUrl || relation.avatar || ''
+  return relation.avatarUrl || ''
 }
 
 function relationTypeLabel(type?: string, fallback?: string) {
-  if (fallback) return fallback
-  return relationTypeOptions.find(option => option.value === type)?.label || type || '其他'
+  return resolveRelationTypeLabel(type, fallback, relationTypeChoices.value)
 }
 
 function sourceLabel(relation: RelationVO) {

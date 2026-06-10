@@ -153,7 +153,7 @@ public interface ICustomFieldService extends IService<CustomField> {
      * 无租户上下文或无数据时回退到系统内置定义。
      *
      * @param entityType 实体类型
-     * @param fieldName  字段标识（如 stage / level / relation_type）
+     * @param fieldName  字段标识（如 stage / level / relationType）
      * @return 选项列表，永不为 null
      */
     List<FieldOption> getFieldOptions(String entityType, String fieldName);

@@ -256,8 +256,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { getEnabledFieldsByEntity } from '@/api/customField'
 import { useCustomerStore } from '@/stores/customer'
 import { useUserStore } from '@/stores/user'
 import { useResponsive } from '@/composables/useResponsive'
@@ -272,7 +273,6 @@ const props = defineProps<{
   modelValue: boolean
   customer: CustomerDetailVO | null
   contacts: Contact[]
-  customFields: CustomField[]
   latestAiReport?: CustomerAiReportVO | null
 }>()
 
@@ -308,6 +308,8 @@ const primaryContactInlineFields: Record<string, Partial<CustomField>> = {
 
 const canEditCustomer = computed(() => userStore.hasPermission('customer:edit'))
 const logoSaving = ref(false)
+const customFields = ref<CustomField[]>([])
+const customFieldsLoaded = ref(false)
 
 function isPrimaryContact(contact?: Pick<Contact, 'isPrimary'> | null): boolean {
   const value = contact?.isPrimary as boolean | number | string | undefined
@@ -329,6 +331,18 @@ const currentAiInsight = computed(() =>
 const currentAiReportVisible = computed(() =>
   !!currentAiStatusDetection.value || !!currentAiInsight.value
 )
+
+async function ensureCustomerCustomFieldsLoaded() {
+  if (customFieldsLoaded.value) return
+  try {
+    customFields.value = (await getEnabledFieldsByEntity('customer'))
+      .filter(field => field.fieldSource !== 'system')
+    customFieldsLoaded.value = true
+  } catch (error) {
+    console.error('Failed to fetch customer custom fields:', error)
+    customFields.value = []
+  }
+}
 
 function getAiStatusMeta(value: string | undefined | null) {
   return getCustomerAiStatusMeta(value)
@@ -393,6 +407,15 @@ async function handleLogoUploaded(payload: { logo: string; logoUrl: string }) {
 async function handleLogoRemoved() {
   await saveLogoValue('', 'Logo 已移除')
 }
+
+watch(
+  () => [props.modelValue, props.customer?.customerId] as const,
+  ([visible, customerId]) => {
+    if (!visible || !customerId) return
+    void ensureCustomerCustomFieldsLoaded()
+  },
+  { immediate: true }
+)
 </script>
 
 <style>

@@ -50,7 +50,7 @@ public class RelationTools {
             updateBO.setWechat(relation.getWechat());
             updateBO.setEmail(relation.getEmail());
             updateBO.setRelationType(relation.getRelationType());
-            updateBO.setCompany(relation.getCompany());
+            updateBO.setCustomerId(relation.getCustomerId());
             updateBO.setRemark(nextRemark);
             relationService.updateRelation(updateBO);
 
