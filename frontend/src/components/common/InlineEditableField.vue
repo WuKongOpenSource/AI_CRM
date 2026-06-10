@@ -233,6 +233,7 @@ const FLOAT_MAX_WIDTH = 300
 const FLOAT_OVERLAP_UP = 28
 /** 普通页面内联编辑时的基准层；在抽屉/对话框内会按遮罩层抬高 */
 const FLOAT_Z_INDEX_BASE = 1900
+const MOBILE_FLOAT_BREAKPOINT = 767
 
 let floatListenersBound = false
 let tableScrollEl: HTMLElement | null = null
@@ -240,6 +241,20 @@ let floatResizeObserver: ResizeObserver | null = null
 
 function onFloatReposition() {
   requestAnimationFrame(() => updateFloatPosition())
+}
+
+function isMobileFloatViewport() {
+  return window.innerWidth <= MOBILE_FLOAT_BREAKPOINT
+}
+
+function getVisibleViewportBounds() {
+  const visualViewport = window.visualViewport
+  return {
+    left: visualViewport?.offsetLeft ?? 0,
+    top: visualViewport?.offsetTop ?? 0,
+    width: visualViewport?.width ?? window.innerWidth,
+    height: visualViewport?.height ?? window.innerHeight
+  }
 }
 
 /** 锚点在 ElDrawer / ElDialog 等 Teleport 遮罩内时，浮动层也在 body 上，必须高于 .el-overlay 的 z-index，否则会整层被挡住看起来像「点了没反应」 */
@@ -258,25 +273,34 @@ function updateFloatPosition() {
   if (!anchor || !panel) return
 
   const ar = anchor.getBoundingClientRect()
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const targetW = Math.min(
-    FLOAT_MAX_WIDTH,
-    Math.max(FLOAT_MIN_WIDTH, vw - FLOAT_MARGIN * 2)
-  )
+  const viewport = getVisibleViewportBounds()
+  const mobileFloat = isMobileFloatViewport()
+  const visibleLeft = viewport.left
+  const visibleTop = viewport.top
+  const visibleRight = viewport.left + viewport.width
+  const visibleBottom = viewport.top + viewport.height
+  const targetW = mobileFloat
+    ? Math.max(0, viewport.width - FLOAT_MARGIN * 2)
+    : Math.min(
+        FLOAT_MAX_WIDTH,
+        Math.max(FLOAT_MIN_WIDTH, viewport.width - FLOAT_MARGIN * 2)
+      )
   /* 左缘与锚点一致，表单/抽屉里与上方字段标题对齐；窄视口则贴边夹紧 */
-  let left = ar.left
-  left = Math.max(FLOAT_MARGIN, Math.min(left, vw - targetW - FLOAT_MARGIN))
+  let left = mobileFloat ? visibleLeft + FLOAT_MARGIN : ar.left
+  left = Math.max(visibleLeft + FLOAT_MARGIN, Math.min(left, visibleRight - targetW - FLOAT_MARGIN))
 
   const gap = 6
   const ph = panel.getBoundingClientRect().height
   // 默认在锚点下方但整体上移，盖住单元格文案；空间不足时改到锚点上方
-  let top = ar.bottom + gap - FLOAT_OVERLAP_UP
-  if (top + ph > vh - FLOAT_MARGIN) {
+  let top = mobileFloat ? ar.top - gap : ar.bottom + gap - FLOAT_OVERLAP_UP
+  if (top + ph > visibleBottom - FLOAT_MARGIN) {
+    top = mobileFloat ? visibleBottom - ph - FLOAT_MARGIN : ar.top - ph - gap
+  }
+  if (!mobileFloat && top + ph > visibleBottom - FLOAT_MARGIN) {
     top = ar.top - ph - gap
   }
-  if (top < FLOAT_MARGIN) {
-    top = FLOAT_MARGIN
+  if (top < visibleTop + FLOAT_MARGIN) {
+    top = visibleTop + FLOAT_MARGIN
   }
 
   floatStyle.value = {
@@ -294,6 +318,8 @@ function bindFloatListeners() {
   floatListenersBound = true
   window.addEventListener('scroll', onFloatReposition, true)
   window.addEventListener('resize', onFloatReposition)
+  window.visualViewport?.addEventListener('resize', onFloatReposition)
+  window.visualViewport?.addEventListener('scroll', onFloatReposition)
   tableScrollEl = anchorRef.value?.closest?.('.el-table__body-wrapper') ?? null
   tableScrollEl?.addEventListener('scroll', onFloatReposition, true)
   const el = floatPanelRef.value
@@ -308,6 +334,8 @@ function teardownFloatListeners() {
   floatListenersBound = false
   window.removeEventListener('scroll', onFloatReposition, true)
   window.removeEventListener('resize', onFloatReposition)
+  window.visualViewport?.removeEventListener('resize', onFloatReposition)
+  window.visualViewport?.removeEventListener('scroll', onFloatReposition)
   tableScrollEl?.removeEventListener('scroll', onFloatReposition, true)
   tableScrollEl = null
   floatResizeObserver?.disconnect()
@@ -407,6 +435,8 @@ async function startEdit() {
       const editor = editorRef.value
       if (editor?.focus) editor.focus()
       else if (editor?.$el?.querySelector) editor.$el.querySelector('input, textarea')?.focus()
+      window.setTimeout(updateFloatPosition, 120)
+      window.setTimeout(updateFloatPosition, 320)
     })
   })
 }
@@ -597,6 +627,24 @@ onUnmounted(() => {
   .inline-editable-field.is-edit-action-visible .inline-editable-field__edit {
     opacity: 0.92;
     pointer-events: auto;
+  }
+}
+
+@media (max-width: 767px) {
+  .inline-editable-field__float .inline-editable-field__editor {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .inline-editable-field__float .inline-editable-field__editor-actions {
+    justify-content: stretch;
+    flex-wrap: nowrap;
+  }
+
+  .inline-editable-field__float .inline-editable-field__btn {
+    flex: 1 1 0;
+    min-height: 36px;
+    min-width: 0;
   }
 }
 

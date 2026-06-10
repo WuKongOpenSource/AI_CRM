@@ -3,6 +3,7 @@
     v-model="dialogVisible"
     title="重置用户名"
     :width="isMobile ? 'calc(100vw - 2rem)' : '460px'"
+    append-to-body
     class="wk-dialog--flush wk-crm-el-field-scope wk-reset-username-dialog wk-mobile-inset-dialog"
   >
     <div class="space-y-5">
@@ -113,8 +114,11 @@ const dialogVisible = computed({
 
 @media (max-width: 767px) {
   .el-dialog.wk-reset-username-dialog.wk-mobile-inset-dialog {
-    max-height: calc(100dvh - 2rem);
-    margin: 1rem auto !important;
+    --wk-reset-username-dialog-top: max(96px, calc(var(--wk-safe-top) + 72px));
+    --wk-reset-username-dialog-bottom: max(16px, var(--wk-safe-bottom));
+
+    max-height: calc(100dvh - var(--wk-reset-username-dialog-top) - var(--wk-reset-username-dialog-bottom));
+    margin: var(--wk-reset-username-dialog-top) auto var(--wk-reset-username-dialog-bottom) !important;
   }
 }
 </style>

@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -29,6 +30,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class ManagerMenuServiceImpl extends ServiceImpl<ManagerMenuMapper, ManagerMenu> implements IManagerMenuService {
+
+    private static final Set<String> LEGACY_SUPER_ADMIN_ROLE_NAMES = Set.of("超级管理员", "super admin");
+    private static final String LEGACY_IMPORTED_ROLE_REALM_PREFIX = "wk_role_";
 
     @Autowired
     private IManagerUserRoleService userRoleService;
@@ -63,7 +67,7 @@ public class ManagerMenuServiceImpl extends ServiceImpl<ManagerMenuMapper, Manag
     }
 
     /**
-     * 判断用户是否拥有超级管理员角色（realm='super_admin'）
+     * 判断用户是否拥有超级管理员角色。
      */
     private boolean isSuperAdmin(Long userId) {
         // 查询用户的所有角色ID
@@ -76,10 +80,12 @@ public class ManagerMenuServiceImpl extends ServiceImpl<ManagerMenuMapper, Manag
         List<Long> roleIds = userRoles.stream()
                 .map(ManagerUserRole::getRoleId)
                 .collect(Collectors.toList());
-        // 检查是否有 super_admin 角色（使用 Mapper 避免与 RoleService 循环依赖）
+        // 检查是否有超级管理员角色（使用 Mapper 避免与 RoleService 循环依赖）。
         LambdaQueryWrapper<ManagerRole> wrapper = new LambdaQueryWrapper<ManagerRole>()
                 .in(ManagerRole::getRoleId, roleIds)
-                .eq(ManagerRole::getRealm, RegistrationServiceImpl.SUPER_ADMIN_REALM);
+                .and(role -> role.eq(ManagerRole::getRealm, RegistrationServiceImpl.SUPER_ADMIN_REALM)
+                        .or(legacy -> legacy.in(ManagerRole::getRoleName, LEGACY_SUPER_ADMIN_ROLE_NAMES)
+                                .likeRight(ManagerRole::getRealm, LEGACY_IMPORTED_ROLE_REALM_PREFIX)));
         return roleMapper.selectCount(wrapper) > 0;
     }
 }

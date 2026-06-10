@@ -3,6 +3,7 @@
     v-model="dialogVisible"
     :title="editingMember ? '编辑员工' : '新增员工'"
     :width="isMobile ? 'calc(100vw - 2rem)' : '650px'"
+    append-to-body
     class="wk-dialog--flush wk-member-dialog wk-crm-el-field-scope wk-mobile-inset-dialog"
   >
     <el-form :model="memberForm" label-position="top">
@@ -211,8 +212,11 @@ const isEditingTenantCreator = computed(() => Boolean(props.editingMember?.tenan
 
 @media (max-width: 767px) {
   .el-dialog.wk-member-dialog.wk-mobile-inset-dialog {
-    max-height: calc(100dvh - 2rem);
-    margin: 1rem auto !important;
+    --wk-member-dialog-top: max(96px, calc(var(--wk-safe-top) + 72px));
+    --wk-member-dialog-bottom: max(16px, var(--wk-safe-bottom));
+
+    max-height: calc(100dvh - var(--wk-member-dialog-top) - var(--wk-member-dialog-bottom));
+    margin: var(--wk-member-dialog-top) auto var(--wk-member-dialog-bottom) !important;
   }
 }
 </style>

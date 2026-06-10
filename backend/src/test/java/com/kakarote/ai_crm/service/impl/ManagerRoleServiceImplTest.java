@@ -1,10 +1,16 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.kakarote.ai_crm.common.Const;
 import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.entity.PO.ManagerMenu;
+import com.kakarote.ai_crm.entity.PO.ManagerRole;
+import com.kakarote.ai_crm.entity.PO.ManagerUserRole;
 import com.kakarote.ai_crm.entity.VO.RolePermissionVO;
+import com.kakarote.ai_crm.mapper.ManagerRoleMapper;
 import com.kakarote.ai_crm.service.IManagerMenuService;
 import com.kakarote.ai_crm.service.IManagerRoleMenuService;
 import com.kakarote.ai_crm.service.IManagerUserRoleService;
@@ -123,6 +129,36 @@ class ManagerRoleServiceImplTest {
 
         assertThat(customerSession.getActions().getFirst().isHasScopeOption()).isTrue();
         assertThat(wecomCustomer.getActions().getFirst().isHasScopeOption()).isTrue();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void managerMenuShouldTreatLegacyImportedSuperAdminRoleAsSuperAdmin() {
+        ManagerMenuServiceImpl service = new ManagerMenuServiceImpl();
+        IManagerUserRoleService userRoleService = mock(IManagerUserRoleService.class);
+        ManagerRoleMapper roleMapper = mock(ManagerRoleMapper.class);
+        LambdaQueryChainWrapper<ManagerUserRole> userRoleQuery = mock(LambdaQueryChainWrapper.class);
+
+        ReflectionTestUtils.setField(service, "userRoleService", userRoleService);
+        ReflectionTestUtils.setField(service, "roleMapper", roleMapper);
+
+        Long userId = 310967000560087040L;
+        ManagerUserRole legacySuperAdminUserRole = new ManagerUserRole();
+        legacySuperAdminUserRole.setRoleId(310966977172647936L);
+
+        when(userRoleService.lambdaQuery()).thenReturn(userRoleQuery);
+        when(userRoleQuery.eq(org.mockito.Mockito.<SFunction<ManagerUserRole, ?>>any(), eq(userId)))
+                .thenReturn(userRoleQuery);
+        when(userRoleQuery.list()).thenReturn(List.of(legacySuperAdminUserRole));
+        when(roleMapper.selectCount(org.mockito.Mockito.<LambdaQueryWrapper<ManagerRole>>any()))
+                .thenAnswer(invocation -> {
+                    LambdaQueryWrapper<ManagerRole> wrapper = invocation.getArgument(0);
+                    return wrapper.getSqlSegment().contains("role_name") ? 1L : 0L;
+                });
+
+        Boolean isSuperAdmin = ReflectionTestUtils.invokeMethod(service, "isSuperAdmin", userId);
+
+        assertThat(isSuperAdmin).isTrue();
     }
 
     private ManagerMenu menu(Long menuId, Long parentId, String realm, Integer type) {

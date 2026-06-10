@@ -8,7 +8,6 @@
             <span class="mail-account-label">当前邮箱：</span>
             <el-dropdown v-if="authStatus.authorized" trigger="click" @command="handleAccountCommand">
               <el-button class="mail-account-button">
-                <span class="material-symbols-outlined text-[18px]">alternate_email</span>
                 <span class="max-w-[220px] truncate">{{ currentAccountEmailLabel }}</span>
                 <el-tag v-if="currentAccountIsDefault" class="mail-default-tag" size="small" type="success">默认</el-tag>
                 <span class="material-symbols-outlined text-[18px]">expand_more</span>
@@ -68,7 +67,7 @@
               v-model="keyword"
               clearable
               class="mail-search-input"
-              placeholder="搜索主题、收件人、发件人或正文"
+              :placeholder="searchPlaceholder"
               :prefix-icon="Search"
               @clear="loadActiveTab"
               @keyup.enter="loadActiveTab"
@@ -146,7 +145,7 @@
           </el-table-column>
           <el-table-column label="操作" width="190" fixed="right" align="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click.stop="openMessage(row)">详情</el-button>
+              <el-button class="mail-table-action-primary" link type="primary" @click.stop="openMessage(row)">详情</el-button>
               <el-button link @click.stop="reuseMessage(row)">转发</el-button>
               <el-button link type="danger" @click.stop="removeMessage(row)">删除</el-button>
             </template>
@@ -178,7 +177,7 @@
               </button>
             </template>
           </el-table-column>
-          <el-table-column label="发件人" min-width="210" show-overflow-tooltip>
+          <el-table-column label="发件人" min-width="210" :show-overflow-tooltip="mailOverflowTooltip">
             <template #default="{ row }">
               <div class="min-w-0">
                 <p :class="row.readStatus !== 'read' ? 'font-semibold text-slate-950' : 'text-slate-700'">
@@ -188,7 +187,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="收件邮箱" min-width="200" show-overflow-tooltip>
+          <el-table-column label="收件邮箱" min-width="200" :show-overflow-tooltip="mailOverflowTooltip">
             <template #default="{ row }">{{ row.toAddresses || '-' }}</template>
           </el-table-column>
           <el-table-column label="标题与摘要" min-width="320">
@@ -209,7 +208,7 @@
           </el-table-column>
           <el-table-column label="操作" width="230" fixed="right" align="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click.stop="replyMessage(row, false)">回复</el-button>
+              <el-button class="mail-table-action-primary" link type="primary" @click.stop="replyMessage(row, false)">回复</el-button>
               <el-button link @click.stop="replyMessage(row, true)">全部回复</el-button>
               <el-button link @click.stop="reuseMessage(row)">转发</el-button>
               <el-button link type="danger" @click.stop="removeMessage(row)">删除</el-button>
@@ -529,10 +528,17 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="previewVisible" title="邮件预览" :width="isMobile ? '92%' : '620px'">
-      <h3 class="mb-3 text-base font-semibold text-slate-950">{{ composeForm.subject || '(无主题)' }}</h3>
-      <p class="mb-3 text-sm text-slate-500">收件人：{{ composeForm.toAddresses || '-' }}</p>
-      <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700" v-html="composeForm.bodyText || '暂无正文'" />
+    <el-dialog
+      v-model="previewVisible"
+      title="邮件预览"
+      :width="isMobile ? '92%' : '620px'"
+      class="mail-preview-dialog"
+    >
+      <div class="mail-preview-dialog__content">
+        <h3 class="mb-3 text-base font-semibold text-slate-950">{{ composeForm.subject || '(无主题)' }}</h3>
+        <p class="mb-3 text-sm text-slate-500">收件人：{{ composeForm.toAddresses || '-' }}</p>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700" v-html="composeForm.bodyText || '暂无正文'" />
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -768,10 +774,15 @@ const mailProviderPresets: MailProviderPreset[] = [
 ]
 
 const variableHints = '{{客户姓名}} {{公司名称}} {{销售姓名}} {{当前日期}}'
+const mailOverflowTooltip = { popperClass: 'wk-sidebar-like-tooltip' }
 
 const enabledAccounts = computed(() => authStatus.accounts.filter(account => account.enabled))
 
-const currentAccountEmailLabel = computed(() => authStatus.currentAccount?.emailAddress || '邮箱账号')
+const currentAccountEmailLabel = computed(() => normalizeAccountEmailLabel(authStatus.currentAccount?.emailAddress) || '邮箱账号')
+
+const searchPlaceholder = computed(() =>
+  activeTab.value === 'templates' ? '搜索模板名称' : '搜索主题、收件人、发件人或正文'
+)
 
 const currentAccountIsDefault = computed(() => Boolean(authStatus.currentAccount?.isDefault))
 
@@ -1077,13 +1088,22 @@ async function sendCurrentDraft() {
     }
     await sendMail(composeForm.draftId ? { draftId: composeForm.draftId } : { draft: buildDraftPayload() })
     ElMessage.success('邮件已发送')
-    composeVisible.value = false
+    closeComposeAfterSent()
     activeTab.value = 'sent'
     pagination.page = 1
     await loadActiveTab()
   } finally {
     sending.value = false
   }
+}
+
+function closeComposeAfterSent() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer)
+    autoSaveTimer = null
+  }
+  previewVisible.value = false
+  composeVisible.value = false
 }
 
 async function sendDraft(draft: MailDraft) {
@@ -1433,6 +1453,10 @@ function formatAddressLabel(name?: string, address?: string) {
   const trimmedAddress = address?.trim()
   if (trimmedName && trimmedAddress) return `${trimmedName} <${trimmedAddress}>`
   return trimmedAddress || trimmedName || '-'
+}
+
+function normalizeAccountEmailLabel(email?: string) {
+  return (email || '').trim().replace(/^@+/, '')
 }
 
 // 纯文本正文兜底渲染：去掉 [image:] 噪声、把 <url>/裸链接转成可点击链接、保留段落
@@ -1809,6 +1833,20 @@ const MAIL_FRAME_STYLE =
   color: #ffffff !important;
 }
 
+.mail-table-action-primary {
+  border-radius: 7px !important;
+  background: #171717 !important;
+  padding: 6px 12px !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.mail-table-action-primary:hover,
+.mail-table-action-primary:focus {
+  background: #0d0d0d !important;
+  color: #ffffff !important;
+}
+
 .mail-list-panel--empty :deep(.el-table__empty-block) {
   min-height: 370px;
 }
@@ -2096,6 +2134,13 @@ const MAIL_FRAME_STYLE =
   padding: 8px;
 }
 
+.mail-preview-dialog__content {
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
 /* 邮件详情抽屉：头部/操作固定，正文 iframe 填满剩余空间内部滚动。
    .el-drawer__body 的 flex 布局放在文件末尾的非 scoped 样式块里（抽屉 teleport 后 :deep 不稳定）。 */
 .mail-detail {
@@ -2254,6 +2299,10 @@ const MAIL_FRAME_STYLE =
   display: flex;
   flex-direction: column;
   padding: 0;
+  overflow: hidden;
+}
+
+.mail-preview-dialog .el-dialog__body {
   overflow: hidden;
 }
 </style>
