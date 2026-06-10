@@ -103,10 +103,6 @@ public class WecomServiceImpl {
     @Autowired
     private WecomApiClient apiClient;
 
-    /** 打开外部联系人会话时的增量拉取节流（每企业最短间隔，进程内） */
-    private static final long ARCHIVE_ON_OPEN_THROTTLE_MS = 10_000L;
-    private final java.util.concurrent.ConcurrentHashMap<String, Long> archiveOnOpenLastPull = new java.util.concurrent.ConcurrentHashMap<>();
-
     @Autowired
     private WecomOpenPlatformService openPlatformService;
 
@@ -255,7 +251,6 @@ public class WecomServiceImpl {
     }
 
     public BasePage<WecomConversationVO> queryConversations(WecomConversationQueryBO queryBO) {
-        refreshArchiveOnOpen();
         String type = normalizeConversationType(queryBO.getConversationType());
         LambdaQueryWrapper<WecomConversation> wrapper = Wrappers.<WecomConversation>lambdaQuery()
                 .eq(StrUtil.isNotBlank(type), WecomConversation::getConversationType, type)
@@ -328,7 +323,6 @@ public class WecomServiceImpl {
     }
 
     public List<WecomConversationTabVO> getCustomerConversationTabs(Long customerId) {
-        refreshArchiveOnOpen();
         List<WecomCustomerBindingVO> bindings = bindingService.queryByCustomerId(customerId);
         List<Long> externalCustomerIds = bindings.stream()
                 .map(WecomCustomerBindingVO::getExternalCustomerId)
@@ -361,30 +355,6 @@ public class WecomServiceImpl {
             }
         }
         return queryConversationMessages(conversationId, page, limit);
-    }
-
-    /**
-     * 打开会话/外部联系人时触发一次增量拉取（尽力而为、按企业节流），让视图尽量显示最新存档。
-     * 失败不影响列表查看（显式“同步会话”会抛出明确错误）。
-     */
-    private void refreshArchiveOnOpen() {
-        try {
-            WecomCorpConfig config = findConfig();
-            if (config == null
-                    || !Boolean.TRUE.equals(config.getArchiveEnabled())
-                    || StrUtil.isBlank(config.getArchiveSecretEncrypted())) {
-                return;
-            }
-            long now = System.currentTimeMillis();
-            Long last = archiveOnOpenLastPull.get(config.getCorpId());
-            if (last != null && now - last < ARCHIVE_ON_OPEN_THROTTLE_MS) {
-                return;
-            }
-            archiveOnOpenLastPull.put(config.getCorpId(), now);
-            syncService.drainArchive(config, 1);
-        } catch (Exception ignored) {
-            // 尽力而为：打开会话时的增量拉取失败不应影响查看
-        }
     }
 
     private WecomCorpConfig findConfig() {

@@ -476,6 +476,12 @@ function isEmployeeConversation(conversation?: WecomConversationVO | null) {
   return conversation?.conversationType === 'employee'
 }
 
+function isUnmatchedCustomerConversation(conversation?: WecomConversationVO | null) {
+  return conversation?.conversationType === 'customer'
+    && !!conversation.matchStatus
+    && conversation.matchStatus !== 'MATCHED'
+}
+
 function conversationParticipants(conversation?: WecomConversationVO | null) {
   const raw = conversation?.chatId || [conversation?.employeeUserId, conversation?.externalUserId]
     .filter(Boolean)
@@ -488,6 +494,7 @@ function conversationParticipants(conversation?: WecomConversationVO | null) {
 }
 
 function conversationDisplayTitle(conversation?: WecomConversationVO | null) {
+  if (isUnmatchedCustomerConversation(conversation)) return '未匹配客户'
   if (!conversation) return '会话详情'
   return conversation.title || conversation.peerName || conversation.chatId || '企微会话'
 }

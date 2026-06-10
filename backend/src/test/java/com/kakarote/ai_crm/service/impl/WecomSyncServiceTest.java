@@ -98,6 +98,8 @@ class WecomSyncServiceTest {
     @Test
     void runSyncShouldUseExternalCustomerNameAsConversationTitle() {
         WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
         WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
         WecomConversationMapper conversationMapper = mapper(service, "conversationMapper");
         WecomMessageMapper messageMapper = mapper(service, "messageMapper");
@@ -116,6 +118,9 @@ class WecomSyncServiceTest {
 
         when(cursorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         when(archiveGateway.fetchMessages(eq(config), eq(0L), eq(10))).thenReturn(List.of(textArchiveMessage()));
+        when(tokenService.fetchContactAccessToken(config)).thenReturn("contact-token");
+        when(apiClient.convertExternalUserIds("contact-token", List.of("wm_customer_1")))
+                .thenReturn(Map.of("wm_customer_1", "wm_customer_1"));
         when(conversationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
         doAnswer(invocation -> {
             WecomConversation conversation = invocation.getArgument(0);
@@ -130,9 +135,135 @@ class WecomSyncServiceTest {
         ArgumentCaptor<WecomConversation> conversationCaptor = ArgumentCaptor.forClass(WecomConversation.class);
         verify(conversationMapper).updateById(conversationCaptor.capture());
         assertThat(conversationCaptor.getValue().getExternalCustomerId()).isEqualTo(200L);
+        assertThat(conversationCaptor.getValue().getArchiveExternalUserId()).isEqualTo("wm_customer_1");
+        assertThat(conversationCaptor.getValue().getExternalUserId()).isEqualTo("wm_customer_1");
         assertThat(conversationCaptor.getValue().getCustomerId()).isEqualTo(100L);
         assertThat(conversationCaptor.getValue().getPeerName()).isEqualTo("Acme");
         assertThat(conversationCaptor.getValue().getTitle()).isEqualTo("Acme");
+        assertThat(conversationCaptor.getValue().getMatchStatus()).isEqualTo("MATCHED");
+    }
+
+    @Test
+    void runSyncShouldConvertArchiveExternalUseridBeforeMatchingCustomer() {
+        WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
+        WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
+        WecomConversationMapper conversationMapper = mapper(service, "conversationMapper");
+        WecomMessageMapper messageMapper = mapper(service, "messageMapper");
+        WecomSyncCursorMapper cursorMapper = mapper(service, "cursorMapper");
+        WecomExternalCustomerMapper externalCustomerMapper = mapper(service, "externalCustomerMapper");
+
+        WecomCorpConfig config = config();
+        config.setArchiveEnabled(true);
+        WecomSyncRunBO runBO = archiveOnlyRunBO();
+        JSONObject rawMessage = textArchiveMessage("wm_old_customer_1");
+        WecomExternalCustomer externalCustomer = new WecomExternalCustomer();
+        externalCustomer.setId(200L);
+        externalCustomer.setExternalUserId("wm_customer_1");
+        externalCustomer.setCustomerId(100L);
+        externalCustomer.setName("Acme");
+
+        when(cursorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(archiveGateway.fetchMessages(eq(config), eq(0L), eq(10))).thenReturn(List.of(rawMessage));
+        when(tokenService.fetchContactAccessToken(config)).thenReturn("contact-token");
+        when(apiClient.convertExternalUserIds("contact-token", List.of("wm_old_customer_1")))
+                .thenReturn(Map.of("wm_old_customer_1", "wm_customer_1"));
+        when(conversationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            WecomConversation conversation = invocation.getArgument(0);
+            conversation.setId(300L);
+            return 1;
+        }).when(conversationMapper).insert(any(WecomConversation.class));
+        when(externalCustomerMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(externalCustomer);
+        when(messageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        service.runSync(config, runBO);
+
+        ArgumentCaptor<WecomConversation> conversationCaptor = ArgumentCaptor.forClass(WecomConversation.class);
+        verify(conversationMapper).updateById(conversationCaptor.capture());
+        WecomConversation conversation = conversationCaptor.getValue();
+        assertThat(conversation.getArchiveExternalUserId()).isEqualTo("wm_old_customer_1");
+        assertThat(conversation.getExternalUserId()).isEqualTo("wm_customer_1");
+        assertThat(conversation.getExternalCustomerId()).isEqualTo(200L);
+        assertThat(conversation.getCustomerId()).isEqualTo(100L);
+        assertThat(conversation.getPeerName()).isEqualTo("Acme");
+        assertThat(conversation.getMatchStatus()).isEqualTo("MATCHED");
+        assertThat(conversation.getMatchError()).isNull();
+    }
+
+    @Test
+    void runSyncShouldTreatWoPrefixAsExternalCustomerConversation() {
+        WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
+        WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
+        WecomConversationMapper conversationMapper = mapper(service, "conversationMapper");
+        WecomMessageMapper messageMapper = mapper(service, "messageMapper");
+        WecomSyncCursorMapper cursorMapper = mapper(service, "cursorMapper");
+
+        WecomCorpConfig config = config();
+        config.setArchiveEnabled(true);
+        WecomSyncRunBO runBO = archiveOnlyRunBO();
+        JSONObject rawMessage = textArchiveMessage("wo_customer_1");
+
+        when(cursorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(archiveGateway.fetchMessages(eq(config), eq(0L), eq(10))).thenReturn(List.of(rawMessage));
+        when(tokenService.fetchContactAccessToken(config)).thenReturn("contact-token");
+        when(apiClient.convertExternalUserIds("contact-token", List.of("wo_customer_1")))
+                .thenReturn(Map.of("wo_customer_1", "wo_customer_1"));
+        when(conversationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            WecomConversation conversation = invocation.getArgument(0);
+            conversation.setId(300L);
+            return 1;
+        }).when(conversationMapper).insert(any(WecomConversation.class));
+        when(messageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        service.runSync(config, runBO);
+
+        ArgumentCaptor<WecomConversation> conversationCaptor = ArgumentCaptor.forClass(WecomConversation.class);
+        verify(conversationMapper).updateById(conversationCaptor.capture());
+        assertThat(conversationCaptor.getValue().getConversationType()).isEqualTo("customer");
+        assertThat(conversationCaptor.getValue().getExternalUserId()).isEqualTo("wo_customer_1");
+        assertThat(conversationCaptor.getValue().getArchiveExternalUserId()).isEqualTo("wo_customer_1");
+    }
+
+    @Test
+    void runSyncShouldRecordDiagnosticWhenArchiveExternalUseridConversionFails() {
+        WecomSyncServiceImpl service = newService();
+        WecomTokenService tokenService = mapper(service, "tokenService");
+        WecomApiClient apiClient = mapper(service, "apiClient");
+        WecomFinanceArchiveGateway archiveGateway = mapper(service, "archiveGateway");
+        WecomConversationMapper conversationMapper = mapper(service, "conversationMapper");
+        WecomMessageMapper messageMapper = mapper(service, "messageMapper");
+        WecomSyncCursorMapper cursorMapper = mapper(service, "cursorMapper");
+        WecomExternalCustomerMapper externalCustomerMapper = mapper(service, "externalCustomerMapper");
+
+        WecomCorpConfig config = config();
+        config.setArchiveEnabled(true);
+        WecomSyncRunBO runBO = archiveOnlyRunBO();
+
+        when(cursorMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(archiveGateway.fetchMessages(eq(config), eq(0L), eq(10))).thenReturn(List.of(textArchiveMessage()));
+        when(tokenService.fetchContactAccessToken(config)).thenReturn("contact-token");
+        when(apiClient.convertExternalUserIds("contact-token", List.of("wm_customer_1")))
+                .thenThrow(new RuntimeException("WeCom API request failed: 48002 api forbidden"));
+        when(conversationMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        doAnswer(invocation -> {
+            WecomConversation conversation = invocation.getArgument(0);
+            conversation.setId(300L);
+            return 1;
+        }).when(conversationMapper).insert(any(WecomConversation.class));
+        when(messageMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        service.runSync(config, runBO);
+
+        verify(externalCustomerMapper, never()).insert(any(WecomExternalCustomer.class));
+        ArgumentCaptor<WecomConversation> conversationCaptor = ArgumentCaptor.forClass(WecomConversation.class);
+        verify(conversationMapper).updateById(conversationCaptor.capture());
+        assertThat(conversationCaptor.getValue().getMatchStatus()).isEqualTo("UNMATCHED_API_ERROR");
+        assertThat(conversationCaptor.getValue().getMatchError()).contains("48002 api forbidden");
     }
 
     @Test
@@ -869,12 +1000,16 @@ class WecomSyncServiceTest {
     }
 
     private static JSONObject textArchiveMessage() {
+        return textArchiveMessage("wm_customer_1");
+    }
+
+    private static JSONObject textArchiveMessage(String externalUserId) {
         JSONObject raw = new JSONObject();
         raw.put("seq", 7L);
         raw.put("msgid", "msg_1");
         raw.put("msgtype", "text");
         raw.put("from", "employee_1");
-        raw.put("tolist", new JSONArray(List.of("wm_customer_1")));
+        raw.put("tolist", new JSONArray(List.of(externalUserId)));
         raw.put("msgtime", 1710000000000L);
         JSONObject text = new JSONObject();
         text.put("content", "hello");

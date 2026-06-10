@@ -2,6 +2,8 @@ package com.kakarote.ai_crm.service.impl;
 
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.entity.BO.WecomConversationQueryBO;
 import com.kakarote.ai_crm.entity.PO.WecomCorpConfig;
 import com.kakarote.ai_crm.entity.VO.WecomConfigVO;
 import com.kakarote.ai_crm.entity.VO.WecomJsSdkAgentConfigVO;
@@ -22,7 +24,10 @@ import java.security.MessageDigest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class WecomServiceImplTest {
@@ -73,6 +78,30 @@ class WecomServiceImplTest {
         assertThat(vo.getTimestamp()).isPositive();
         assertThat(vo.getSignature()).isEqualTo(sha1("jsapi_ticket=agent-ticket&noncestr="
                 + vo.getNonceStr() + "&timestamp=" + vo.getTimestamp() + "&url=https://example.com/crm/"));
+    }
+
+    @Test
+    void queryConversationsShouldNotDrainArchiveOnOpen() {
+        WecomServiceImpl service = newService();
+        WecomCorpConfigMapper configMapper = mapper(service, "configMapper");
+        WecomConversationMapper conversationMapper = mapper(service, "conversationMapper");
+        WecomSyncServiceImpl syncService = mapper(service, "syncService");
+        com.kakarote.ai_crm.service.DataPermissionService dataPermissionService = mapper(service, "dataPermissionService");
+        WecomCorpConfig config = new WecomCorpConfig();
+        config.setCorpId("corp_1");
+        config.setArchiveEnabled(true);
+        config.setArchiveSecretEncrypted("encrypted-secret");
+
+        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(dataPermissionService.createContext("wecomCustomerSession")).thenReturn(DataPermissionContext.all());
+        when(conversationMapper.selectPage(any(), any(LambdaQueryWrapper.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        WecomConversationQueryBO queryBO = new WecomConversationQueryBO();
+        queryBO.setConversationType("customer");
+        service.queryConversations(queryBO);
+
+        verify(syncService, never()).drainArchive(any(WecomCorpConfig.class), anyInt());
     }
 
     @SuppressWarnings("unchecked")

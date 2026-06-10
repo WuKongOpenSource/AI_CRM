@@ -19,7 +19,15 @@ public class WecomApiClient {
 
     private static final String BASE_URL = "https://qyapi.weixin.qq.com/cgi-bin";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public WecomApiClient() {
+        this(new RestTemplate());
+    }
+
+    WecomApiClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     public List<JSONObject> listDepartments(String accessToken) {
         JSONObject response = get("/department/list", accessToken, null);
@@ -87,6 +95,39 @@ public class WecomApiClient {
 
     public JSONObject getExternalCustomer(String accessToken, String externalUserId) {
         return get("/externalcontact/get", accessToken, builder -> builder.queryParam("external_userid", externalUserId));
+    }
+
+    public Map<String, String> convertExternalUserIds(String accessToken, List<String> externalUserIds) {
+        if (externalUserIds == null || externalUserIds.isEmpty()) {
+            return Map.of();
+        }
+        List<String> normalizedExternalUserIds = externalUserIds.stream()
+                .filter(externalUserId -> externalUserId != null && !externalUserId.isBlank())
+                .distinct()
+                .toList();
+        if (normalizedExternalUserIds.isEmpty()) {
+            return Map.of();
+        }
+        JSONObject body = new JSONObject();
+        body.put("external_userid_list", normalizedExternalUserIds);
+        JSONObject response = post("/externalcontact/get_new_external_userid", accessToken, body);
+        JSONArray items = response.getJSONArray("items");
+        if (items == null || items.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Object item : items) {
+            if (!(item instanceof JSONObject json)) {
+                continue;
+            }
+            String externalUserId = json.getString("external_userid");
+            String newExternalUserId = json.getString("new_external_userid");
+            if (externalUserId != null && !externalUserId.isBlank()
+                    && newExternalUserId != null && !newExternalUserId.isBlank()) {
+                result.put(externalUserId, newExternalUserId);
+            }
+        }
+        return result;
     }
 
     public JSONObject getCustomerGroupChat(String accessToken, String chatId) {

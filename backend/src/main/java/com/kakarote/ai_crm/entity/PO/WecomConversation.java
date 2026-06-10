@@ -36,6 +36,10 @@ public class WecomConversation implements Serializable {
 
     private String externalUserId;
 
+    private String archiveExternalUserId;
+
+    private String contactEmployeeUserId;
+
     private Long groupChatId;
 
     private String chatId;
@@ -57,6 +61,10 @@ public class WecomConversation implements Serializable {
     private String lastMsgPreview;
 
     private Integer messageCount;
+
+    private String matchStatus;
+
+    private String matchError;
 
     @TableField(fill = FieldFill.INSERT)
     private Date createTime;

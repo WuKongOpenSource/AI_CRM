@@ -57,6 +57,9 @@ public class WecomSyncServiceImpl {
     private static final String CRM_CUSTOMER_STAGE_LEAD = "lead";
     private static final String CRM_CUSTOMER_SOURCE_WECOM = "企业微信";
     private static final String WECOM_BIND_STATUS_BOUND = "BOUND";
+    private static final String MATCH_STATUS_MATCHED = "MATCHED";
+    private static final String MATCH_STATUS_UNMATCHED_NOT_VISIBLE = "UNMATCHED_NOT_VISIBLE";
+    private static final String MATCH_STATUS_UNMATCHED_API_ERROR = "UNMATCHED_API_ERROR";
 
     @Autowired
     private WecomTokenService tokenService;
@@ -766,6 +769,7 @@ public class WecomSyncServiceImpl {
                 .last("LIMIT 1"));
         long startSeq = cursor == null || cursor.getSeq() == null ? 0L : cursor.getSeq();
         List<JSONObject> messages = archiveGateway.fetchMessages(config, startSeq, resolveArchiveLimit(archiveLimit));
+        ArchiveExternalUserConversion externalUserConversion = convertArchiveExternalUserIds(config, messages);
         long maxSeq = startSeq;
         int saved = 0;
         for (JSONObject raw : messages) {
@@ -779,7 +783,7 @@ public class WecomSyncServiceImpl {
             if (shouldSkipArchiveRecord(raw)) {
                 continue;
             }
-            Long conversationId = ensureConversation(config, raw);
+            Long conversationId = ensureConversation(config, raw, externalUserConversion);
             WecomMessage message = messageNormalizeService.normalize(conversationId, raw);
             message.setCorpId(config.getCorpId());
             if (seq != null) {
@@ -804,7 +808,31 @@ public class WecomSyncServiceImpl {
                 cursorMapper.updateById(cursor);
             }
         }
+        reconcileArchiveCustomerRelations(config);
         return new ArchiveSyncResult(messages.size(), saved);
+    }
+
+    private ArchiveExternalUserConversion convertArchiveExternalUserIds(WecomCorpConfig config, List<JSONObject> messages) {
+        return convertArchiveExternalUserIdList(config, collectArchiveExternalUserIds(messages));
+    }
+
+    private List<String> collectArchiveExternalUserIds(List<JSONObject> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+        Set<String> externalUserIds = new LinkedHashSet<>();
+        for (JSONObject raw : messages) {
+            if (raw == null
+                    || raw.getBooleanValue(WecomFinanceSdkClient.SKIP_MESSAGE_FIELD)
+                    || shouldSkipArchiveRecord(raw)) {
+                continue;
+            }
+            String externalUserId = resolveExternalUserId(raw.getString("from"), raw.getJSONArray("tolist"));
+            if (StrUtil.isNotBlank(externalUserId)) {
+                externalUserIds.add(externalUserId);
+            }
+        }
+        return new ArrayList<>(externalUserIds);
     }
 
     private boolean shouldSkipArchiveRecord(JSONObject raw) {
@@ -823,18 +851,23 @@ public class WecomSyncServiceImpl {
         return StrUtil.isBlank(from) && StrUtil.isBlank(roomId) && (toList == null || toList.isEmpty());
     }
 
-    private Long ensureConversation(WecomCorpConfig config, JSONObject raw) {
+    private Long ensureConversation(WecomCorpConfig config,
+                                    JSONObject raw,
+                                    ArchiveExternalUserConversion externalUserConversion) {
         String from = raw.getString("from");
         JSONArray toList = raw.getJSONArray("tolist");
         String firstTo = toList == null || toList.isEmpty() ? "" : toList.getString(0);
         String roomId = raw.getString("roomid");
-        String externalUserId = resolveExternalUserId(from, toList);
+        String archiveExternalUserId = resolveExternalUserId(from, toList);
+        String externalUserId = resolveContactExternalUserId(archiveExternalUserId, externalUserConversion);
         String employeeUserId = resolveEmployeeUserId(from, toList);
         String conversationKey = resolveConversationKey(roomId, from, firstTo, employeeUserId, externalUserId);
-        WecomConversation conversation = conversationMapper.selectOne(Wrappers.<WecomConversation>lambdaQuery()
-                .eq(WecomConversation::getCorpId, config.getCorpId())
-                .eq(WecomConversation::getChatId, conversationKey)
-                .last("LIMIT 1"));
+        WecomConversation conversation = findConversationByChatId(config, conversationKey);
+        if (conversation == null && StrUtil.isBlank(roomId) && StrUtil.isNotBlank(archiveExternalUserId)
+                && !StrUtil.equals(archiveExternalUserId, externalUserId)) {
+            String archiveConversationKey = resolveConversationKey(roomId, from, firstTo, employeeUserId, archiveExternalUserId);
+            conversation = findConversationByChatId(config, archiveConversationKey);
+        }
         if (conversation == null) {
             conversation = new WecomConversation();
             conversation.setCorpId(config.getCorpId());
@@ -847,13 +880,25 @@ public class WecomSyncServiceImpl {
         conversation.setConversationType(resolveConversationType(roomId, externalUserId));
         conversation.setEmployeeUserId(employeeUserId);
         conversation.setExternalUserId(externalUserId);
-        applyConversationRelations(config, conversation, roomId, employeeUserId, externalUserId, from, toList);
+        conversation.setArchiveExternalUserId(archiveExternalUserId);
+        applyConversationRelations(config, conversation, roomId, employeeUserId, externalUserId,
+                externalUserConversion == null ? null : externalUserConversion.errorMessage(), from, toList);
         conversation.setLastMsgId(raw.getString("msgid"));
         conversation.setLastMsgTime(raw.getLong("msgtime") == null ? null : new Date(raw.getLong("msgtime")));
         conversation.setLastMsgPreview(messageNormalizeService.normalize(conversation.getId(), raw).getContentText());
         conversation.setMessageCount(conversation.getMessageCount() == null ? 1 : conversation.getMessageCount() + 1);
         conversationMapper.updateById(conversation);
         return conversation.getId();
+    }
+
+    private WecomConversation findConversationByChatId(WecomCorpConfig config, String chatId) {
+        if (StrUtil.isBlank(chatId)) {
+            return null;
+        }
+        return conversationMapper.selectOne(Wrappers.<WecomConversation>lambdaQuery()
+                .eq(WecomConversation::getCorpId, config.getCorpId())
+                .eq(WecomConversation::getChatId, chatId)
+                .last("LIMIT 1"));
     }
 
     private String resolveConversationKey(String roomId,
@@ -882,6 +927,7 @@ public class WecomSyncServiceImpl {
                                             String roomId,
                                             String employeeUserId,
                                             String externalUserId,
+                                            String externalUserConversionError,
                                             String from,
                                             JSONArray toList) {
         if (StrUtil.isNotBlank(roomId)) {
@@ -900,14 +946,13 @@ public class WecomSyncServiceImpl {
             }
         }
         if (StrUtil.isNotBlank(externalUserId)) {
+            conversation.setContactEmployeeUserId(resolveContactEmployeeUserId(config, employeeUserId));
             WecomExternalCustomer customer = externalCustomerMapper.selectOne(Wrappers.<WecomExternalCustomer>lambdaQuery()
                     .eq(WecomExternalCustomer::getCorpId, config.getCorpId())
                     .eq(WecomExternalCustomer::getExternalUserId, externalUserId)
                     .last("LIMIT 1"));
             if (customer != null) {
-                conversation.setExternalCustomerId(customer.getId());
-                conversation.setCustomerId(customer.getCustomerId());
-                applyConversationPeer(conversation, customer.getName(), customer.getAvatar());
+                applyMatchedExternalCustomer(conversation, customer);
             } else {
                 Customer crmCustomer = customerMapper.selectOne(Wrappers.<Customer>lambdaQuery()
                         .eq(Customer::getWecomCustomer, true)
@@ -917,12 +962,23 @@ public class WecomSyncServiceImpl {
                 if (crmCustomer != null) {
                     conversation.setCustomerId(crmCustomer.getCustomerId());
                     applyConversationPeer(conversation, resolveCustomerDisplayName(crmCustomer), crmCustomer.getLogo());
+                    markConversationMatched(conversation);
+                } else if (StrUtil.isNotBlank(externalUserConversionError)) {
+                    markConversationUnmatched(conversation, MATCH_STATUS_UNMATCHED_API_ERROR, externalUserConversionError);
                 } else {
-                    WecomExternalCustomer syncedCustomer = syncArchiveExternalCustomer(config, externalUserId);
-                    if (syncedCustomer != null) {
-                        conversation.setExternalCustomerId(syncedCustomer.getId());
-                        conversation.setCustomerId(syncedCustomer.getCustomerId());
-                        applyConversationPeer(conversation, syncedCustomer.getName(), syncedCustomer.getAvatar());
+                    try {
+                        WecomExternalCustomer syncedCustomer = syncArchiveExternalCustomer(config, externalUserId);
+                        if (syncedCustomer != null) {
+                            applyMatchedExternalCustomer(conversation, syncedCustomer);
+                        } else {
+                            markConversationUnmatched(conversation, MATCH_STATUS_UNMATCHED_NOT_VISIBLE,
+                                    "external customer is not visible");
+                        }
+                    } catch (Exception e) {
+                        String errorSummary = safeErrorSummary(e);
+                        markConversationUnmatched(conversation, isInvalidExternalUserError(errorSummary)
+                                ? MATCH_STATUS_UNMATCHED_NOT_VISIBLE
+                                : MATCH_STATUS_UNMATCHED_API_ERROR, errorSummary);
                     }
                 }
             }
@@ -935,13 +991,130 @@ public class WecomSyncServiceImpl {
         if (StrUtil.isBlank(externalUserId)) {
             return null;
         }
+        String token = tokenService.fetchContactAccessToken(config);
+        return saveExternalCustomerRecord(config, apiClient.getExternalCustomer(token, externalUserId),
+                resolveSyncOwnerId(), Map.of());
+    }
+
+    private void reconcileArchiveCustomerRelations(WecomCorpConfig config) {
+        if (config == null || StrUtil.isBlank(config.getCorpId())) {
+            return;
+        }
+        List<WecomConversation> conversations = conversationMapper.selectList(Wrappers.<WecomConversation>lambdaQuery()
+                .eq(WecomConversation::getCorpId, config.getCorpId())
+                .eq(WecomConversation::getConversationType, "customer")
+                .and(wrapper -> wrapper.isNull(WecomConversation::getMatchStatus)
+                        .or()
+                        .ne(WecomConversation::getMatchStatus, MATCH_STATUS_MATCHED)
+                        .or()
+                        .isNull(WecomConversation::getCustomerId))
+                .last("LIMIT 500"));
+        if (conversations == null || conversations.isEmpty()) {
+            return;
+        }
+        Set<String> archiveExternalUserIds = new LinkedHashSet<>();
+        for (WecomConversation conversation : conversations) {
+            String archiveExternalUserId = resolveArchiveExternalUserId(conversation);
+            if (StrUtil.isNotBlank(archiveExternalUserId)) {
+                archiveExternalUserIds.add(archiveExternalUserId);
+            }
+        }
+        if (archiveExternalUserIds.isEmpty()) {
+            return;
+        }
+        ArchiveExternalUserConversion externalUserConversion =
+                convertArchiveExternalUserIdList(config, new ArrayList<>(archiveExternalUserIds));
+        for (WecomConversation conversation : conversations) {
+            String archiveExternalUserId = resolveArchiveExternalUserId(conversation);
+            if (StrUtil.isBlank(archiveExternalUserId)) {
+                continue;
+            }
+            String externalUserId = resolveContactExternalUserId(archiveExternalUserId, externalUserConversion);
+            conversation.setArchiveExternalUserId(archiveExternalUserId);
+            conversation.setExternalUserId(externalUserId);
+            applyConversationRelations(config, conversation, null, conversation.getEmployeeUserId(), externalUserId,
+                    externalUserConversion.errorMessage(), null, null);
+            conversationMapper.updateById(conversation);
+        }
+    }
+
+    private ArchiveExternalUserConversion convertArchiveExternalUserIdList(WecomCorpConfig config, List<String> archiveExternalUserIds) {
+        if (archiveExternalUserIds == null || archiveExternalUserIds.isEmpty()) {
+            return new ArchiveExternalUserConversion(Map.of(), null);
+        }
         try {
             String token = tokenService.fetchContactAccessToken(config);
-            return saveExternalCustomerRecord(config, apiClient.getExternalCustomer(token, externalUserId),
-                    resolveSyncOwnerId(), Map.of());
-        } catch (Exception ignored) {
+            Map<String, String> converted = apiClient.convertExternalUserIds(token, archiveExternalUserIds);
+            return new ArchiveExternalUserConversion(converted == null ? Map.of() : converted, null);
+        } catch (Exception e) {
+            return new ArchiveExternalUserConversion(Map.of(), safeErrorSummary(e));
+        }
+    }
+
+    private String resolveArchiveExternalUserId(WecomConversation conversation) {
+        if (conversation == null) {
             return null;
         }
+        return StrUtil.blankToDefault(conversation.getArchiveExternalUserId(), conversation.getExternalUserId());
+    }
+
+    private String resolveContactExternalUserId(String archiveExternalUserId,
+                                                ArchiveExternalUserConversion externalUserConversion) {
+        if (StrUtil.isBlank(archiveExternalUserId)) {
+            return null;
+        }
+        if (externalUserConversion == null || externalUserConversion.externalUserIds().isEmpty()) {
+            return archiveExternalUserId;
+        }
+        return StrUtil.blankToDefault(externalUserConversion.externalUserIds().get(archiveExternalUserId),
+                archiveExternalUserId);
+    }
+
+    private String resolveContactEmployeeUserId(WecomCorpConfig config, String employeeUserId) {
+        if (StrUtil.isBlank(employeeUserId) || agencyDevService == null || !agencyDevService.owns(config)) {
+            return employeeUserId;
+        }
+        try {
+            String token = tokenService.fetchContactAccessToken(config);
+            Map<String, String> openUserIds = apiClient.convertUserIdsToOpenUserIds(token, List.of(employeeUserId));
+            return openUserIds == null ? employeeUserId : StrUtil.blankToDefault(openUserIds.get(employeeUserId), employeeUserId);
+        } catch (Exception ignored) {
+            return employeeUserId;
+        }
+    }
+
+    private void applyMatchedExternalCustomer(WecomConversation conversation, WecomExternalCustomer customer) {
+        conversation.setExternalCustomerId(customer.getId());
+        conversation.setCustomerId(customer.getCustomerId());
+        applyConversationPeer(conversation, customer.getName(), customer.getAvatar());
+        markConversationMatched(conversation);
+    }
+
+    private void markConversationMatched(WecomConversation conversation) {
+        conversation.setMatchStatus(MATCH_STATUS_MATCHED);
+        conversation.setMatchError(null);
+    }
+
+    private void markConversationUnmatched(WecomConversation conversation, String matchStatus, String matchError) {
+        conversation.setExternalCustomerId(null);
+        conversation.setCustomerId(null);
+        conversation.setMatchStatus(matchStatus);
+        conversation.setMatchError(matchError);
+    }
+
+    private boolean isInvalidExternalUserError(String errorSummary) {
+        return StrUtil.containsIgnoreCase(errorSummary, "40096")
+                || StrUtil.containsIgnoreCase(errorSummary, "invalid external userid");
+    }
+
+    private String safeErrorSummary(Exception e) {
+        String message = e == null ? null : e.getMessage();
+        if (StrUtil.isBlank(message) && e != null) {
+            message = e.getClass().getSimpleName();
+        }
+        String summary = StrUtil.blankToDefault(message, "unknown error")
+                .replaceAll("access_token=[^&\\s]+", "access_token=***");
+        return summary.length() > 500 ? summary.substring(0, 500) : summary;
     }
 
     private void applyGroupConversationRelations(WecomCorpConfig config,
@@ -1209,7 +1382,7 @@ public class WecomSyncServiceImpl {
     }
 
     private boolean isWecomExternalUser(String userId) {
-        return StrUtil.isNotBlank(userId) && userId.startsWith("wm");
+        return StrUtil.isNotBlank(userId) && (userId.startsWith("wm") || userId.startsWith("wo"));
     }
 
     private String jsonArrayToString(JSONArray array) {
@@ -1230,5 +1403,8 @@ public class WecomSyncServiceImpl {
     }
 
     public record ArchiveSyncResult(int fetched, int saved) {
+    }
+
+    private record ArchiveExternalUserConversion(Map<String, String> externalUserIds, String errorMessage) {
     }
 }

@@ -705,6 +705,8 @@ CREATE TABLE IF NOT EXISTS crm_wecom_conversation (
     employee_user_id VARCHAR(255),
     external_customer_id BIGINT,
     external_user_id VARCHAR(255),
+    archive_external_user_id VARCHAR(255),
+    contact_employee_user_id VARCHAR(255),
     group_chat_id BIGINT,
     chat_id VARCHAR(255),
     title VARCHAR(500),
@@ -716,9 +718,16 @@ CREATE TABLE IF NOT EXISTS crm_wecom_conversation (
     last_msg_time TIMESTAMP(3),
     last_msg_preview TEXT,
     message_count INTEGER DEFAULT 0,
+    match_status VARCHAR(64),
+    match_error TEXT,
     create_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_wecom_conversation_archive_external
+    ON crm_wecom_conversation (tenant_id, corp_id, archive_external_user_id);
+CREATE INDEX IF NOT EXISTS idx_wecom_conversation_match_status
+    ON crm_wecom_conversation (tenant_id, corp_id, match_status);
 
 CREATE TABLE IF NOT EXISTS crm_wecom_message (
     id BIGINT NOT NULL PRIMARY KEY,

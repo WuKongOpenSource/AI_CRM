@@ -97,6 +97,8 @@ export interface WecomConversationVO {
   employeeUserId?: string
   externalCustomerId?: string
   externalUserId?: string
+  archiveExternalUserId?: string
+  contactEmployeeUserId?: string
   groupChatId?: string
   chatId?: string
   title?: string
@@ -108,6 +110,8 @@ export interface WecomConversationVO {
   lastMsgTime?: string
   lastMsgPreview?: string
   messageCount?: number
+  matchStatus?: string
+  matchError?: string
 }
 
 export interface WecomMessageVO {

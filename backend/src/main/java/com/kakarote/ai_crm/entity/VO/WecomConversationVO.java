@@ -21,6 +21,10 @@ public class WecomConversationVO {
 
     private String externalUserId;
 
+    private String archiveExternalUserId;
+
+    private String contactEmployeeUserId;
+
     private Long groupChatId;
 
     private String chatId;
@@ -42,4 +46,8 @@ public class WecomConversationVO {
     private String lastMsgPreview;
 
     private Integer messageCount;
+
+    private String matchStatus;
+
+    private String matchError;
 }
