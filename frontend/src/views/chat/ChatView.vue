@@ -2650,9 +2650,10 @@ const CUSTOMER_STAGE_FLOW = computed(() =>
 const selectedCustomerStageText = computed(() => {
   const c = selectedCustomer.value
   if (!c) return '--'
-  if ('stageName' in c && c.stageName) return c.stageName
   const stage = CUSTOMER_STAGE_FLOW.value.find(item => item.value === c.stage)
-  return stage?.label || c.stage || '--'
+  if (stage?.label) return stage.label
+  if ('stageName' in c && c.stageName && c.stageName !== c.stage) return c.stageName
+  return enumStore.stageLabel(c.stage) || c.stage || '--'
 })
 const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage || 'lead'))
 const canEditSelectedCustomerTags = computed(() => userStore.hasPermission('customer:edit'))

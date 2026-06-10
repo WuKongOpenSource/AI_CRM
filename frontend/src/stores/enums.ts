@@ -8,6 +8,19 @@ import {
   type EnumOption
 } from '@/api/enum'
 
+const CUSTOMER_STAGE_FALLBACK_OPTIONS: EnumOption[] = [
+  { value: 'lead', label: '线索' },
+  { value: 'qualified', label: '资格审查' },
+  { value: 'proposal', label: '方案报价' },
+  { value: 'negotiation', label: '谈判中' },
+  { value: 'closed', label: '已成交' },
+  { value: 'lost', label: '已流失' }
+]
+
+const CUSTOMER_STAGE_LABELS = new Map(
+  CUSTOMER_STAGE_FALLBACK_OPTIONS.map(option => [option.value, option.label])
+)
+
 /**
  * 选项枚举 store（单一真相源）。
  *
@@ -28,6 +41,7 @@ export const useEnumStore = defineStore('enums', () => {
     key: string,
     target: Ref<EnumOption[]>,
     fetcher: () => Promise<EnumOption[]>,
+    normalize?: (options: EnumOption[]) => EnumOption[],
     force = false
   ): Promise<void> {
     if (loaded[key] && !force) return
@@ -35,7 +49,8 @@ export const useEnumStore = defineStore('enums', () => {
     const task = (async () => {
       try {
         const data = await fetcher()
-        target.value = Array.isArray(data) ? data : []
+        const options = Array.isArray(data) ? data : []
+        target.value = normalize ? normalize(options) : options
         loaded[key] = true
       } catch {
         // 静默：失败时保持已有/空选项，避免阻塞页面
@@ -47,14 +62,33 @@ export const useEnumStore = defineStore('enums', () => {
     return task
   }
 
+  function normalizeCustomerStageOptions(options: EnumOption[]): EnumOption[] {
+    const normalized = options
+      .map(option => {
+        const value = String(option?.value || '').trim()
+        if (!value) return null
+        const fallbackLabel = CUSTOMER_STAGE_LABELS.get(value)
+        const rawLabel = String(option?.label || '').trim()
+        const rawLabelIsCode = rawLabel.toLowerCase() === value.toLowerCase()
+        const label = fallbackLabel && (!rawLabel || rawLabelIsCode) ? fallbackLabel : (rawLabel || fallbackLabel || value)
+        return {
+          ...option,
+          value,
+          label
+        }
+      })
+      .filter((option): option is EnumOption => Boolean(option))
+    return normalized.length ? normalized : CUSTOMER_STAGE_FALLBACK_OPTIONS
+  }
+
   const ensureCustomerStage = (force = false) =>
-    ensure('customerStage', customerStage, getCustomerStageEnum, force)
+    ensure('customerStage', customerStage, getCustomerStageEnum, normalizeCustomerStageOptions, force)
   const ensureCustomerLevel = (force = false) =>
-    ensure('customerLevel', customerLevel, getCustomerLevelEnum, force)
+    ensure('customerLevel', customerLevel, getCustomerLevelEnum, undefined, force)
   const ensureRelationType = (force = false) =>
-    ensure('relationType', relationType, getRelationTypeEnum, force)
+    ensure('relationType', relationType, getRelationTypeEnum, undefined, force)
   const ensureRelationSource = (force = false) =>
-    ensure('relationSource', relationSource, getRelationSourceEnum, force)
+    ensure('relationSource', relationSource, getRelationSourceEnum, undefined, force)
 
   function labelOf(options: EnumOption[], value?: string | null): string {
     if (!value) return ''
