@@ -558,6 +558,7 @@ import {
   disconnectMailbox,
   getMailAuthStatus,
   getMailMessage,
+  listMailboxSyncLogs,
   markMailRead,
   queryDrafts,
   queryInbox,
@@ -577,14 +578,18 @@ import {
   type MailDraftPayload,
   type MailImapConnectPayload,
   type MailMessage,
+  type MailSyncLog,
   type MailTemplate,
   type MailTemplatePayload,
 } from '@/api/mail'
+import { buildAccountScopedMailQuery, isMailSyncRunning } from './mailListQuery'
 
 type MailTab = 'drafts' | 'sent' | 'inbox' | 'templates'
 type AutoSaveState = 'idle' | 'saving' | 'saved' | 'failed'
 
 const AUTO_SYNC_INTERVAL_MILLIS = 5 * 60 * 1000
+const SYNC_STATUS_POLL_INTERVAL_MILLIS = 1000
+const SYNC_STATUS_MAX_POLLS = 12
 
 type MailProviderPreset = {
   value: string
@@ -903,7 +908,13 @@ async function loadAuthStatus(showLoading = true) {
 async function loadActiveTab() {
   if (!authStatus.authorized) return
   loading.value = true
-  const query = {
+  const query = buildAccountScopedMailQuery({
+    page: pagination.page,
+    limit: pagination.limit,
+    keyword: keyword.value,
+    accountId: authStatus.currentAccount?.accountId,
+  })
+  const templateQuery = {
     page: pagination.page,
     limit: pagination.limit,
     keyword: keyword.value.trim() || undefined,
@@ -922,7 +933,7 @@ async function loadActiveTab() {
       inboxMessages.value = result.list || []
       totalRow.value = result.totalRow || 0
     } else {
-      const result = await queryMailTemplates({ ...query, category: templateCategoryFilter.value || undefined })
+      const result = await queryMailTemplates({ ...templateQuery, category: templateCategoryFilter.value || undefined })
       templates.value = result.list || []
       totalRow.value = result.totalRow || 0
     }
@@ -963,10 +974,27 @@ async function syncCurrentMailbox(options: { force: boolean; notifyNoNew: boolea
     ? undefined
     : ElMessage({ message: '正在检查新邮件...', type: 'info', duration: 0 })
   try {
-    await syncMailbox(account.accountId)
+    const result = await syncMailbox(account.accountId)
     checkingMessage?.close()
-    account.lastSyncStatus = 'running'
+    account.lastSyncStatus = result.status || 'running'
     account.lastSyncTime = new Date().toISOString()
+    if (options.force) {
+      const syncLog = await waitForMailboxSync(account.accountId, result.logId)
+      if (syncLog) {
+        await loadAuthStatus(false)
+        if (syncLog.status === 'failed') {
+          ElMessage.error(syncLog.errorMessage || '邮箱同步失败，请稍后重试')
+          return false
+        }
+        const savedCount = syncLog.savedCount || 0
+        if (savedCount > 0) {
+          ElMessage.success(`邮箱同步完成，新增 ${savedCount} 封邮件`)
+        } else if (options.notifyNoNew) {
+          ElMessage.info('邮箱同步完成，暂无新邮件')
+        }
+        return true
+      }
+    }
     ElMessage.success('同步任务已开始，正在后台同步中')
     return true
   } catch (error) {
@@ -976,6 +1004,29 @@ async function syncCurrentMailbox(options: { force: boolean; notifyNoNew: boolea
   } finally {
     syncingMailbox.value = false
   }
+}
+
+async function waitForMailboxSync(accountId: string, logId?: string) {
+  for (let attempt = 0; attempt < SYNC_STATUS_MAX_POLLS; attempt += 1) {
+    await sleep(SYNC_STATUS_POLL_INTERVAL_MILLIS)
+    const logs = await listMailboxSyncLogs(accountId, 5)
+    const latestLog = findSyncLog(logs, logId)
+    if (!latestLog) continue
+    if (!isMailSyncRunning(latestLog)) {
+      return latestLog
+    }
+  }
+  return null
+}
+
+function findSyncLog(logs: MailSyncLog[], logId?: string) {
+  if (!logs.length) return null
+  if (!logId) return logs[0]
+  return logs.find(log => String(log.logId) === String(logId)) || null
+}
+
+function sleep(milliseconds: number) {
+  return new Promise(resolve => window.setTimeout(resolve, milliseconds))
 }
 
 function shouldAutoSyncMailbox(lastSyncTime?: string) {
@@ -1303,6 +1354,8 @@ async function handleAccountCommand(command: string) {
   if (command.startsWith('default:')) {
     await setDefaultMailbox(command.slice('default:'.length))
     await loadAuthStatus()
+    pagination.page = 1
+    await loadActiveTab()
   }
 }
 

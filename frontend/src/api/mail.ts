@@ -42,6 +42,21 @@ export interface MailSyncResult {
   errorMessage?: string
 }
 
+export interface MailSyncLog {
+  logId: string
+  accountId: string
+  userId?: string
+  syncType?: string
+  status: string
+  fetchedCount?: number
+  savedCount?: number
+  skippedCount?: number
+  failedCount?: number
+  startedAt?: string
+  finishedAt?: string
+  errorMessage?: string
+}
+
 export interface MailOAuthStart {
   provider: string
   authorizeUrl: string
@@ -185,6 +200,10 @@ export function disconnectMailbox(accountId: string): Promise<void> {
 
 export function syncMailbox(accountId: string): Promise<MailSyncResult> {
   return post(`/email/accounts/${accountId}/sync`)
+}
+
+export function listMailboxSyncLogs(accountId: string, limit = 20): Promise<MailSyncLog[]> {
+  return get(`/email/accounts/${accountId}/sync-logs`, { params: { limit } })
 }
 
 export function queryInbox(query: MailListQuery): Promise<PageResult<MailMessage>> {
