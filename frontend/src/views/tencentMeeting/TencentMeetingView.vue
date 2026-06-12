@@ -99,7 +99,7 @@
           </template>
         </el-table-column>
         <el-table-column label="会议时间" width="190">
-          <template #default="{ row }">{{ formatDate(row.startTime) || '-' }}</template>
+          <template #default="{ row }">{{ formatMeetingTimeRange(row) }}</template>
         </el-table-column>
         <el-table-column label="发起人" width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.creatorName || row.creatorUserId || '-' }}</template>
@@ -183,7 +183,7 @@
         <section>
           <h3>会议信息</h3>
           <dl>
-            <div><dt>会议时间</dt><dd>{{ formatDate(detail.startTime) || '-' }}</dd></div>
+            <div><dt>会议时间</dt><dd>{{ formatMeetingTimeRange(detail) }}</dd></div>
             <div><dt>发起人</dt><dd>{{ detail.creatorName || detail.creatorUserId || '-' }}</dd></div>
             <div><dt>会议时长</dt><dd>{{ formatDuration(detail.durationSeconds) }}</dd></div>
             <div><dt>关联客户</dt><dd>{{ detail.customerName || '未关联' }}</dd></div>
@@ -523,14 +523,17 @@ async function handleAuthorize() {
 }
 
 async function handleOAuthUnbind() {
-  await ElMessageBox.confirm('确认取消当前用户的腾讯会议授权？取消后将无法创建和同步你的会议。', '提示', {
+  await ElMessageBox.confirm('确认取消当前用户的腾讯会议授权？取消后将删除当前数据权限内的腾讯会议记录，且无法继续创建和同步你的会议。', '提示', {
     type: 'warning',
     confirmButtonText: '取消授权',
     cancelButtonText: '保留'
   })
   await unbindTencentMeetingOAuth()
   ElMessage.success('已取消腾讯会议授权')
+  detailVisible.value = false
+  detail.value = null
   await loadOAuthStatus()
+  await loadMeetings()
 }
 
 async function handleSync() {

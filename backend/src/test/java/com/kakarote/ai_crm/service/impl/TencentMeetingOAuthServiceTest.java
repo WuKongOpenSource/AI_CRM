@@ -1,14 +1,25 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.kakarote.ai_crm.common.redis.Redis;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingCustomerBinding;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingParticipant;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingRecording;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.mapper.TencentMeetingCorpConfigMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingCustomerBindingMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingTranscriptSegmentMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingUserMappingMapper;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
@@ -23,6 +34,8 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
 
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -157,6 +170,64 @@ class TencentMeetingOAuthServiceTest {
     }
 
     @Test
+    void unbindCurrentUserShouldDeleteCurrentUsersMeetingRecords() {
+        initTencentMeetingTableInfo(TencentMeetingUserMapping.class);
+        initTencentMeetingTableInfo(TencentMeeting.class);
+        initTencentMeetingTableInfo(TencentMeetingParticipant.class);
+        initTencentMeetingTableInfo(TencentMeetingRecording.class);
+        initTencentMeetingTableInfo(TencentMeetingTranscriptSegment.class);
+        initTencentMeetingTableInfo(TencentMeetingCustomerBinding.class);
+        TencentMeetingOAuthService service = new TencentMeetingOAuthService(mock(RestTemplate.class));
+        TencentMeetingCorpConfigMapper configMapper = mock(TencentMeetingCorpConfigMapper.class);
+        TencentMeetingUserMappingMapper userMappingMapper = mock(TencentMeetingUserMappingMapper.class);
+        TencentMeetingMapper meetingMapper = mock(TencentMeetingMapper.class);
+        TencentMeetingParticipantMapper participantMapper = mock(TencentMeetingParticipantMapper.class);
+        TencentMeetingRecordingMapper recordingMapper = mock(TencentMeetingRecordingMapper.class);
+        TencentMeetingTranscriptSegmentMapper transcriptMapper = mock(TencentMeetingTranscriptSegmentMapper.class);
+        TencentMeetingCustomerBindingMapper bindingMapper = mock(TencentMeetingCustomerBindingMapper.class);
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setAppId("app-1");
+        config.setSdkId("sdk-1");
+        config.setAppSecretEncrypted("secret-encrypted");
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
+        TencentMeetingUserMapping account = new TencentMeetingUserMapping();
+        account.setId(700L);
+        account.setAppId("app-1");
+        account.setMeetingUserId("open-1");
+        account.setCrmUserId(9L);
+        account.setAuthStatus(TencentMeetingOAuthService.AUTH_STATUS_ACTIVE);
+        account.setStatus(1);
+        when(userMappingMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(account);
+        TencentMeeting firstMeeting = new TencentMeeting();
+        firstMeeting.setId(100L);
+        TencentMeeting secondMeeting = new TencentMeeting();
+        secondMeeting.setId(101L);
+        when(meetingMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(firstMeeting, secondMeeting));
+        ReflectionTestUtils.setField(service, "configMapper", configMapper);
+        ReflectionTestUtils.setField(service, "userMappingMapper", userMappingMapper);
+        ReflectionTestUtils.setField(service, "meetingMapper", meetingMapper);
+        ReflectionTestUtils.setField(service, "participantMapper", participantMapper);
+        ReflectionTestUtils.setField(service, "recordingMapper", recordingMapper);
+        ReflectionTestUtils.setField(service, "transcriptMapper", transcriptMapper);
+        ReflectionTestUtils.setField(service, "bindingMapper", bindingMapper);
+        mockLoginUser();
+
+        service.unbindCurrentUser();
+
+        var meetingSelectWrapper = forClass(LambdaQueryWrapper.class);
+        verify(meetingMapper).selectList(meetingSelectWrapper.capture());
+        meetingSelectWrapper.getValue().getSqlSegment();
+        assertThat(meetingSelectWrapper.getValue().getParamNameValuePairs().values())
+                .contains("app-1", 9L);
+        assertDeleteTargets(transcriptMapper);
+        assertDeleteTargets(recordingMapper);
+        assertDeleteTargets(participantMapper);
+        assertDeleteTargets(bindingMapper);
+        assertDeleteTargets(meetingMapper);
+        verify(userMappingMapper).deleteById(700L);
+    }
+
+    @Test
     void handleCallbackShouldFallbackAccountNameToCrmUserWhenBasicInfoHasNoUsername() {
         RestTemplate restTemplate = mock(RestTemplate.class);
         TencentMeetingOAuthService service = new TencentMeetingOAuthService(restTemplate);
@@ -234,6 +305,18 @@ class TencentMeetingOAuthServiceTest {
 
     private void initTencentMeetingUserMappingTableInfo() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), TencentMeetingUserMapping.class);
+    }
+
+    private void initTencentMeetingTableInfo(Class<?> entityClass) {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), entityClass);
+    }
+
+    private void assertDeleteTargets(BaseMapper<?> mapper) {
+        var wrapperCaptor = forClass(LambdaQueryWrapper.class);
+        verify(mapper).delete(wrapperCaptor.capture());
+        wrapperCaptor.getValue().getSqlSegment();
+        assertThat(wrapperCaptor.getValue().getParamNameValuePairs().values())
+                .contains(100L, 101L);
     }
 
     private void mockLoginUser() {

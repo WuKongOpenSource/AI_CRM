@@ -11,12 +11,22 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.config.tenant.TenantContextHolder;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingCustomerBinding;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingParticipant;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingRecording;
+import com.kakarote.ai_crm.entity.PO.TencentMeetingTranscriptSegment;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingUserMapping;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingOAuthAccountVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingOAuthAuthorizeVO;
 import com.kakarote.ai_crm.entity.VO.TencentMeetingOAuthStatusVO;
 import com.kakarote.ai_crm.mapper.TencentMeetingCorpConfigMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingCustomerBindingMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingParticipantMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
+import com.kakarote.ai_crm.mapper.TencentMeetingTranscriptSegmentMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingUserMappingMapper;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
@@ -39,6 +49,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 
 @Slf4j
@@ -59,6 +70,21 @@ public class TencentMeetingOAuthService {
 
     @Autowired
     private TencentMeetingUserMappingMapper userMappingMapper;
+
+    @Autowired
+    private TencentMeetingMapper meetingMapper;
+
+    @Autowired
+    private TencentMeetingParticipantMapper participantMapper;
+
+    @Autowired
+    private TencentMeetingRecordingMapper recordingMapper;
+
+    @Autowired
+    private TencentMeetingTranscriptSegmentMapper transcriptMapper;
+
+    @Autowired
+    private TencentMeetingCustomerBindingMapper bindingMapper;
 
     @Autowired
     private SecretTextCipher secretTextCipher;
@@ -170,8 +196,38 @@ public class TencentMeetingOAuthService {
         TencentMeetingCorpConfig config = requireOAuthConfig();
         TencentMeetingUserMapping account = findAccountByCrmUser(config, UserUtil.getUserIdOrNull());
         if (account != null) {
+            deleteCurrentAccountMeetingRecords(config, account);
             userMappingMapper.deleteById(account.getId());
         }
+    }
+
+    private void deleteCurrentAccountMeetingRecords(TencentMeetingCorpConfig config, TencentMeetingUserMapping account) {
+        if (config == null || account == null || account.getCrmUserId() == null) {
+            return;
+        }
+        List<Long> meetingIds = meetingMapper.selectList(Wrappers.<TencentMeeting>lambdaQuery()
+                        .select(TencentMeeting::getId)
+                        .eq(TencentMeeting::getAppId, config.getAppId())
+                        .eq(TencentMeeting::getCrmCreatorUserId, account.getCrmUserId()))
+                .stream()
+                .map(TencentMeeting::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (meetingIds.isEmpty()) {
+            return;
+        }
+        transcriptMapper.delete(Wrappers.<TencentMeetingTranscriptSegment>lambdaQuery()
+                .in(TencentMeetingTranscriptSegment::getMeetingDbId, meetingIds));
+        recordingMapper.delete(Wrappers.<TencentMeetingRecording>lambdaQuery()
+                .eq(TencentMeetingRecording::getAppId, config.getAppId())
+                .in(TencentMeetingRecording::getMeetingDbId, meetingIds));
+        participantMapper.delete(Wrappers.<TencentMeetingParticipant>lambdaQuery()
+                .eq(TencentMeetingParticipant::getAppId, config.getAppId())
+                .in(TencentMeetingParticipant::getMeetingDbId, meetingIds));
+        bindingMapper.delete(Wrappers.<TencentMeetingCustomerBinding>lambdaQuery()
+                .in(TencentMeetingCustomerBinding::getMeetingId, meetingIds));
+        meetingMapper.delete(Wrappers.<TencentMeeting>lambdaQuery()
+                .in(TencentMeeting::getId, meetingIds));
     }
 
     private void upsertAuthorizedAccount(TencentMeetingCorpConfig config,
