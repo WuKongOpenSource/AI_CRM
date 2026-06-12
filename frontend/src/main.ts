@@ -18,7 +18,7 @@ import '@fontsource-variable/noto-sans-sc'
 import 'material-symbols/outlined.css'
 import WkIcon from '@/components/common/WkIcon.vue'
 import { useTheme } from '@/composables/useTheme'
-import { scheduleCapacitorUpdateCheck } from '@/utils/capacitorUpdate'
+import { scheduleCapacitorUpdateCheck, scheduleLiveUpdateHealthReport } from '@/utils/capacitorUpdate'
 
 import App from './App.vue'
 import router from './router'
@@ -28,17 +28,19 @@ import './styles/wk-crm-el-field-skin.css'
 
 useTheme()
 
-// Capacitor iOS safe-area: only enable for native mobile shell
-if (typeof window !== 'undefined') {
+function isNativeMobileRuntime(): boolean {
+  if (typeof window === 'undefined') return false
+
   const isMobile =
     window.innerWidth < 768 ||
     (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches)
 
-  const isNativePlatform = Capacitor.isNativePlatform()
+  return isMobile && Capacitor.isNativePlatform()
+}
 
-  if (isMobile && isNativePlatform) {
-    document.documentElement.classList.add('wk-native-mobile')
-  }
+// Capacitor iOS safe-area: only enable for native mobile shell
+if (isNativeMobileRuntime()) {
+  document.documentElement.classList.add('wk-native-mobile')
 }
 
 const app = createApp(App)
@@ -51,5 +53,9 @@ app.component('WkIcon', WkIcon)
 // Wait for router to be ready before mounting to prevent duplicate initial navigation
 router.isReady().then(() => {
   app.mount('#app')
-  scheduleCapacitorUpdateCheck()
+
+  if (isNativeMobileRuntime()) {
+    scheduleLiveUpdateHealthReport()
+    scheduleCapacitorUpdateCheck()
+  }
 })
