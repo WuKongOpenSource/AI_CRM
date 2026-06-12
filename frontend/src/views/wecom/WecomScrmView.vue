@@ -154,6 +154,7 @@
           :messages="messages"
           :loading="messageLoading"
           :corp-id="activeConversation?.corpId || wecomConfig.corpId"
+          :self-user-id="activeMessageSelfUserId"
         />
       </section>
     </main>
@@ -224,8 +225,7 @@ import type {
   WecomConversationType,
   WecomConversationVO,
   WecomEmployeeSessionVO,
-  WecomMessageVO,
-  WecomSyncStatusVO
+  WecomMessageVO
 } from '@/types/wecom'
 import WecomMessageList from './components/WecomMessageList.vue'
 import WecomOpenDataName from './components/WecomOpenDataName.vue'
@@ -256,6 +256,21 @@ const archiveReady = computed(() => Boolean(
     && wecomConfig.value.archivePrivateKeyConfigured
     && wecomConfig.value.archivePublicKeyVersion
 ))
+
+const activeConversationParticipants = computed(() =>
+  activeConversation.value ? conversationParticipants(activeConversation.value) : []
+)
+
+const activeMessageSelfUserId = computed(() => {
+  const conversation = activeConversation.value
+  if (!conversation || !isEmployeeConversation(conversation)) return ''
+
+  const participants = activeConversationParticipants.value
+  const selectedEmployee = selectedEmployeeUserId.value.trim()
+  if (selectedEmployee && participants.includes(selectedEmployee)) return selectedEmployee
+
+  return participants[1] || participants[0] || ''
+})
 
 const archiveConfigVisible = ref(false)
 const archiveSaving = ref(false)
@@ -353,11 +368,12 @@ async function handleSyncCustomers() {
   }
   customerSyncing.value = true
   try {
-    const status = canManageWecom.value
-      ? await runWecomSync({ syncEmployees: false, syncCustomers: true, syncConversations: false })
-      : await runMyWecomCustomerSync()
-    showSyncMessage(status, canManageWecom.value ? '客户同步完成' : '我的客户同步完成')
-    await Promise.all([loadConfig(), loadEmployees(), loadStatus(), loadConversations()])
+    if (canManageWecom.value) {
+      await runWecomSync({ syncEmployees: false, syncCustomers: true, syncConversations: false })
+    } else {
+      await runMyWecomCustomerSync()
+    }
+    showBackgroundSyncStarted()
   } finally {
     customerSyncing.value = false
   }
@@ -373,9 +389,8 @@ async function handleSyncConversations() {
   }
   archiveSyncing.value = true
   try {
-    const status = await runWecomSync({ syncEmployees: false, syncCustomers: false, syncConversations: true })
-    showSyncMessage(status, '会话存档同步完成')
-    await Promise.all([loadConfig(), loadStatus(), loadConversations()])
+    await runWecomSync({ syncEmployees: false, syncCustomers: false, syncConversations: true })
+    showBackgroundSyncStarted()
   } finally {
     archiveSyncing.value = false
   }
@@ -387,24 +402,16 @@ async function handleSyncOrg() {
   }
   orgSyncing.value = true
   try {
-    const status = await runWecomOrgSync()
-    showSyncMessage(status, '组织同步完成')
-    await Promise.all([loadConfig(), loadEmployees(), loadStatus(), loadConversations()])
+    await runWecomOrgSync()
+    showBackgroundSyncStarted()
   } finally {
     orgSyncing.value = false
   }
 }
 
-function showSyncMessage(status: WecomSyncStatusVO, successText: string) {
-  if (status.lastSyncStatus === 'failed') {
-    ElMessage.warning(status.lastSyncError || `${successText}，但已记录失败状态`)
-    return
-  }
-  if ((status.failedCount || 0) > 0) {
-    ElMessage.warning(`${successText}，${status.failedCount} 条失败`)
-    return
-  }
-  ElMessage.success(successText)
+function showBackgroundSyncStarted() {
+  lastSyncText.value = '正在后台同步中'
+  ElMessage.success('同步任务已开始，正在后台同步中')
 }
 
 function ensureWecomAuthorized() {

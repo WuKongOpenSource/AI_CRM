@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.kakarote.ai_crm.common.auth.DataPermissionContext;
+import com.kakarote.ai_crm.entity.BO.TencentMeetingSyncRunBO;
 import com.kakarote.ai_crm.entity.PO.TencentMeeting;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingCorpConfig;
 import com.kakarote.ai_crm.entity.PO.TencentMeetingSyncLog;
@@ -14,6 +15,7 @@ import com.kakarote.ai_crm.mapper.TencentMeetingCorpConfigMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingSyncLogMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -21,7 +23,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -119,5 +124,54 @@ class TencentMeetingServiceImplTest {
         JSONObject savedRaw = JSONObject.parseObject(meetingCaptor.getValue().getRawJson());
         assertThat(savedRaw.getString("subject")).isEqualTo("Sales review");
         assertThat(savedRaw.getString("join_url")).isEqualTo("https://meeting.tencent.com/s/abc");
+    }
+
+    @Test
+    void runSyncShouldReturnRunningAndSubmitBackgroundTask() {
+        TencentMeetingServiceImpl service = new TencentMeetingServiceImpl();
+        TencentMeetingCorpConfigMapper configMapper = mock(TencentMeetingCorpConfigMapper.class);
+        TencentMeetingSyncServiceImpl syncService = mock(TencentMeetingSyncServiceImpl.class);
+        SyncTaskExecutor syncTaskExecutor = mock(SyncTaskExecutor.class);
+
+        TencentMeetingCorpConfig config = new TencentMeetingCorpConfig();
+        config.setAppId("app-1");
+        config.setSdkId("sdk-1");
+        when(configMapper.selectLatestOAuthConfigIgnoreTenant()).thenReturn(config);
+
+        ReflectionTestUtils.setField(service, "configMapper", configMapper);
+        ReflectionTestUtils.setField(service, "syncService", syncService);
+        ReflectionTestUtils.setField(service, "syncTaskExecutor", syncTaskExecutor);
+
+        TencentMeetingSyncStatusVO status = service.runSync(new TencentMeetingSyncRunBO());
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("running");
+        assertThat(status.getAppId()).isEqualTo("app-1");
+        verify(syncTaskExecutor).submit(anyString(), any(Runnable.class));
+        verify(syncService, never()).runSync(any(TencentMeetingCorpConfig.class), any(TencentMeetingSyncRunBO.class));
+    }
+
+    @Test
+    void refreshMeetingShouldSubmitBackgroundTaskAfterAccessCheck() {
+        TencentMeetingServiceImpl service = new TencentMeetingServiceImpl();
+        TencentMeetingMapper meetingMapper = mock(TencentMeetingMapper.class);
+        TencentMeetingSyncServiceImpl syncService = mock(TencentMeetingSyncServiceImpl.class);
+        SyncTaskExecutor syncTaskExecutor = mock(SyncTaskExecutor.class);
+        DataPermissionService dataPermissionService = mock(DataPermissionService.class);
+
+        TencentMeeting meeting = new TencentMeeting();
+        meeting.setId(100L);
+        meeting.setMeetingId("meeting-1");
+        when(meetingMapper.selectById(100L)).thenReturn(meeting);
+        when(dataPermissionService.createContext("tencentMeeting")).thenReturn(DataPermissionContext.all());
+
+        ReflectionTestUtils.setField(service, "meetingMapper", meetingMapper);
+        ReflectionTestUtils.setField(service, "syncService", syncService);
+        ReflectionTestUtils.setField(service, "syncTaskExecutor", syncTaskExecutor);
+        ReflectionTestUtils.setField(service, "dataPermissionService", dataPermissionService);
+
+        service.refreshMeeting(100L);
+
+        verify(syncTaskExecutor).submit(anyString(), any(Runnable.class));
+        verify(syncService, never()).refreshMeetingByExternalId(anyString(), anyString());
     }
 }

@@ -18,6 +18,7 @@ import com.kakarote.ai_crm.mapper.WecomCorpConfigMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomSuiteTicketMapper;
 import com.kakarote.ai_crm.service.RegistrationService;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -273,6 +274,7 @@ class WecomOpenPlatformServiceTest {
         WecomEmployeeMapper employeeMapper = mapper(service, "employeeMapper");
         ExternalTenantBindingMapper tenantBindingMapper = mapper(service, "tenantBindingMapper");
         WecomSyncServiceImpl syncService = mapper(service, "syncService");
+        SyncTaskExecutor syncTaskExecutor = mapper(service, "syncTaskExecutor");
         when(redis.get("wecom:open:suite-token:suite_1")).thenReturn("suite-token");
         when(apiClient.fetchPermanentCode("suite-token", "auth_code_1")).thenReturn(permanentDataWithoutContact());
         when(tenantBindingMapper.selectOne(any())).thenReturn(null);
@@ -313,6 +315,7 @@ class WecomOpenPlatformServiceTest {
         verify(syncService).syncOrganization(configCaptor.capture());
         assertThat(configCaptor.getValue().getCorpId()).isEqualTo("corp_1");
         assertThat(configCaptor.getValue().getTenantId()).isEqualTo(66L);
+        verify(syncTaskExecutor).submitWithTenant(eq("wecom-auth-org-sync-corp_1"), eq(66L), any(Runnable.class));
     }
 
     @Test
@@ -394,6 +397,12 @@ class WecomOpenPlatformServiceTest {
         ReflectionTestUtils.setField(service, "secretTextCipher", new SecretTextCipher("0123456789abcdef"));
         ReflectionTestUtils.setField(service, "redis", mock(Redis.class));
         ReflectionTestUtils.setField(service, "syncService", mock(WecomSyncServiceImpl.class));
+        SyncTaskExecutor syncTaskExecutor = mock(SyncTaskExecutor.class);
+        doAnswer(invocation -> {
+            invocation.getArgument(2, Runnable.class).run();
+            return null;
+        }).when(syncTaskExecutor).submitWithTenant(any(String.class), any(Long.class), any(Runnable.class));
+        ReflectionTestUtils.setField(service, "syncTaskExecutor", syncTaskExecutor);
         return service;
     }
 }

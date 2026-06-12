@@ -29,6 +29,7 @@ import com.kakarote.ai_crm.mapper.WecomCorpConfigMapper;
 import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomSuiteTicketMapper;
 import com.kakarote.ai_crm.service.RegistrationService;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -114,6 +115,9 @@ public class WecomOpenPlatformService {
     @Autowired(required = false)
     @Lazy
     private WecomSyncServiceImpl syncService;
+
+    @Autowired
+    private SyncTaskExecutor syncTaskExecutor;
 
     public boolean isUsable() {
         return properties != null && properties.isUsable();
@@ -713,12 +717,18 @@ public class WecomOpenPlatformService {
         if (syncService == null || config == null) {
             return;
         }
-        try {
-            runWithWecomEmployeeDataPermission(() -> syncService.syncOrganization(config));
-        } catch (Exception e) {
-            log.warn("WeCom organization sync after authorization failed: corpId={}, error={}",
-                    config.getCorpId(), e.getMessage());
-        }
+        syncTaskExecutor.submitWithTenant("wecom-auth-org-sync-" + config.getCorpId(), config.getTenantId(), () -> {
+            try {
+                runWithWecomEmployeeDataPermission(() -> syncService.syncOrganization(config));
+            } catch (Exception e) {
+                log.warn("WeCom organization sync after authorization failed: corpId={}, error={}",
+                        config.getCorpId(), e.getMessage());
+                if (e instanceof RuntimeException runtimeException) {
+                    throw runtimeException;
+                }
+                throw new IllegalStateException(e);
+            }
+        });
     }
 
     private void upsertTenantBinding(Long tenantId, String corpId, String corpName) {

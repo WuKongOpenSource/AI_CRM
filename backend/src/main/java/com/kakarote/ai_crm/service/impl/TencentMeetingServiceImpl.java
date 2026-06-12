@@ -45,6 +45,7 @@ import com.kakarote.ai_crm.mapper.TencentMeetingRecordingMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingSyncLogMapper;
 import com.kakarote.ai_crm.mapper.TencentMeetingTranscriptSegmentMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -53,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 public class TencentMeetingServiceImpl {
@@ -87,6 +89,9 @@ public class TencentMeetingServiceImpl {
     private TencentMeetingSyncServiceImpl syncService;
 
     @Autowired
+    private SyncTaskExecutor syncTaskExecutor;
+
+    @Autowired
     private TencentMeetingCustomerBindingServiceImpl bindingService;
 
     @Autowired
@@ -101,12 +106,11 @@ public class TencentMeetingServiceImpl {
     @Transactional(rollbackFor = Exception.class)
     public TencentMeetingSyncStatusVO runSync(TencentMeetingSyncRunBO runBO) {
         TencentMeetingCorpConfig config = requireConfig();
-        TencentMeetingSyncStatusVO status = syncService.runSync(config, runBO);
-        config.setLastSyncTime(status.getLastSyncTime());
-        config.setLastSyncStatus(status.getLastSyncStatus());
-        config.setLastSyncError(status.getLastSyncError());
-        configMapper.updateSyncStatusIgnoreTenant(config);
-        return status;
+        TencentMeetingSyncRunBO actualRunBO = runBO == null ? new TencentMeetingSyncRunBO() : runBO;
+        TencentMeetingSyncStatusVO runningStatus = markConfigSyncRunning(config);
+        syncTaskExecutor.submit("tencent-meeting-sync-" + config.getAppId(),
+                () -> runBackgroundSync(config, () -> syncService.runSync(config, actualRunBO)));
+        return runningStatus;
     }
 
     public TencentMeetingSyncStatusVO getSyncStatus() {
@@ -233,7 +237,8 @@ public class TencentMeetingServiceImpl {
 
     public void refreshMeeting(Long id) {
         TencentMeeting meeting = requireMeetingAccess(id);
-        syncService.refreshMeetingByExternalId("manual.refresh", meeting.getMeetingId());
+        syncTaskExecutor.submit("tencent-meeting-refresh-" + meeting.getMeetingId(),
+                () -> syncService.refreshMeetingByExternalId("manual.refresh", meeting.getMeetingId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -381,6 +386,40 @@ public class TencentMeetingServiceImpl {
 
     private boolean isAuthRequiredError(String errorMessage) {
         return StrUtil.isNotBlank(errorMessage) && errorMessage.contains(AUTH_REQUIRED_ERROR);
+    }
+
+    private TencentMeetingSyncStatusVO markConfigSyncRunning(TencentMeetingCorpConfig config) {
+        TencentMeetingSyncStatusVO status = new TencentMeetingSyncStatusVO();
+        status.setAppId(config.getAppId());
+        status.setLastSyncTime(new Date());
+        status.setLastSyncStatus("running");
+        status.setFetchedCount(0);
+        status.setSavedCount(0);
+        status.setFailedCount(0);
+        config.setLastSyncTime(status.getLastSyncTime());
+        config.setLastSyncStatus(status.getLastSyncStatus());
+        config.setLastSyncError(null);
+        configMapper.updateSyncStatusIgnoreTenant(config);
+        return status;
+    }
+
+    private void runBackgroundSync(TencentMeetingCorpConfig config, Supplier<TencentMeetingSyncStatusVO> action) {
+        try {
+            TencentMeetingSyncStatusVO status = action.get();
+            config.setLastSyncTime(status.getLastSyncTime());
+            config.setLastSyncStatus(status.getLastSyncStatus());
+            config.setLastSyncError(status.getLastSyncError());
+            configMapper.updateSyncStatusIgnoreTenant(config);
+        } catch (Exception e) {
+            config.setLastSyncTime(new Date());
+            config.setLastSyncStatus("failed");
+            config.setLastSyncError(StrUtil.maxLength(e.getMessage(), 1000));
+            configMapper.updateSyncStatusIgnoreTenant(config);
+            if (e instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException(e);
+        }
     }
 
     private TencentMeetingCorpConfig requireConfig() {

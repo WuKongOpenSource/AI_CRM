@@ -540,15 +540,10 @@ async function handleSync() {
   }
   syncing.value = true
   try {
-    const data = await runTencentMeetingSync({ syncDays: 30, syncRecordings: true, syncTranscripts: true })
-    syncStatus.value = data.lastSyncStatus || ''
-    syncError.value = data.lastSyncError || ''
-    if (data.lastSyncStatus === 'failed') {
-      ElMessage.error(data.lastSyncError || '同步失败')
-      return
-    }
-    ElMessage.success(`同步已完成，获取 ${data.fetchedCount || 0} 场会议`)
-    await loadMeetings()
+    await runTencentMeetingSync({ syncDays: 30, syncRecordings: true, syncTranscripts: true })
+    syncStatus.value = 'running'
+    syncError.value = ''
+    ElMessage.success('同步任务已开始，正在后台同步中')
   } finally {
     syncing.value = false
   }

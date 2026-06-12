@@ -86,6 +86,8 @@ public class TencentMeetingSyncServiceImpl {
         syncLog.setFailedCount(0);
         syncLog.setStartedAt(new Date());
         syncLogMapper.insert(syncLog);
+        log.debug("Tencent Meeting sync started: syncLogId={}, appId={}, syncDays={}, syncRecordings={}, syncTranscripts={}",
+                syncLog.getId(), config.getAppId(), syncDays, syncRecordings, syncTranscripts);
 
         TencentMeetingSyncStatusVO status = new TencentMeetingSyncStatusVO();
         status.setAppId(config.getAppId());
@@ -95,19 +97,29 @@ public class TencentMeetingSyncServiceImpl {
         String lastError = null;
         try {
             List<TencentMeetingUserMapping> mappings = loadMappings(config, actualRunBO);
+            log.debug("Tencent Meeting sync mappings resolved: syncLogId={}, appId={}, userId={}, mappingCount={}",
+                    syncLog.getId(), config.getAppId(), UserUtil.getUserIdOrNull(), mappings.size());
             if (mappings.isEmpty()) {
                 failed++;
+                log.debug("Tencent Meeting sync has no active authorized account: syncLogId={}, appId={}",
+                        syncLog.getId(), config.getAppId());
                 lastError = "请先授权腾讯会议账号";
             }
             for (TencentMeetingUserMapping mapping : mappings) {
                 try {
+                    log.debug("Tencent Meeting account sync start: syncLogId={}, appId={}, openId={}, crmUserId={}",
+                            syncLog.getId(), config.getAppId(), mapping.getMeetingUserId(), mapping.getCrmUserId());
                     TencentMeetingOAuthCredential credential = tokenProvider.credential(config, mapping);
                     List<JSONObject> meetings = listMeetingsForSync(credential, syncDays);
+                    log.debug("Tencent Meeting meetings fetched: syncLogId={}, appId={}, openId={}, syncDays={}, meetingCount={}",
+                            syncLog.getId(), config.getAppId(), mapping.getMeetingUserId(), syncDays, meetings.size());
                     fetched += meetings.size();
                     for (JSONObject rawMeeting : meetings) {
                         TencentMeeting meeting = upsertMeeting(config, mapping, rawMeeting);
                         saved++;
                         try {
+                            log.debug("Tencent Meeting participants fetch start: syncLogId={}, meetingId={}, openId={}",
+                                    syncLog.getId(), meeting.getMeetingId(), mapping.getMeetingUserId());
                             List<JSONObject> participants = apiGateway.getMeetingParticipants(credential, meeting.getMeetingId());
                             List<TencentMeetingParticipant> savedParticipants = new ArrayList<>();
                             for (JSONObject rawParticipant : participants) {
@@ -115,6 +127,8 @@ public class TencentMeetingSyncServiceImpl {
                                 saved++;
                             }
                             applyParticipantSummary(meeting, savedParticipants);
+                            log.debug("Tencent Meeting participants saved: syncLogId={}, meetingId={}, openId={}, participantCount={}",
+                                    syncLog.getId(), meeting.getMeetingId(), mapping.getMeetingUserId(), savedParticipants.size());
                         } catch (Exception detailException) {
                             failed++;
                             log.warn("Tencent Meeting participant sync skipped: meetingId={}, openId={}, error={}",
@@ -122,11 +136,17 @@ public class TencentMeetingSyncServiceImpl {
                         }
                         if (syncRecordings) {
                             try {
+                                log.debug("Tencent Meeting recordings scan start: syncLogId={}, meetingId={}, openId={}, syncTranscripts={}",
+                                        syncLog.getId(), meeting.getMeetingId(), mapping.getMeetingUserId(),
+                                        syncTranscripts && Boolean.TRUE.equals(config.getTranscriptEnabled()));
                                 List<JSONObject> recordings = apiGateway.listRecordings(credential, syncDays);
+                                int matchedRecordings = 0;
+                                int savedSegments = 0;
                                 for (JSONObject rawRecording : recordings) {
                                     if (!matchesMeeting(meeting, rawRecording)) {
                                         continue;
                                     }
+                                    matchedRecordings++;
                                     TencentMeetingRecording recording = saveRecording(config, meeting, rawRecording);
                                     saved++;
                                     List<JSONObject> segments;
@@ -146,6 +166,7 @@ public class TencentMeetingSyncServiceImpl {
                                         if (StrUtil.isNotBlank(segment.getText())) {
                                             texts.add(formatTranscriptLine(segment));
                                         }
+                                        savedSegments++;
                                         saved++;
                                     }
                                     if (!texts.isEmpty() || StrUtil.isNotBlank(recording.getSummary()) || StrUtil.isNotBlank(recording.getTodoText())) {
@@ -155,6 +176,9 @@ public class TencentMeetingSyncServiceImpl {
                                         meetingMapper.updateById(meeting);
                                     }
                                 }
+                                log.debug("Tencent Meeting recordings saved: syncLogId={}, meetingId={}, openId={}, matchedRecordings={}, transcriptSegments={}",
+                                        syncLog.getId(), meeting.getMeetingId(), mapping.getMeetingUserId(),
+                                        matchedRecordings, savedSegments);
                             } catch (Exception recordingException) {
                                 failed++;
                                 log.warn("Tencent Meeting recording sync skipped: meetingId={}, openId={}, error={}",
@@ -165,6 +189,8 @@ public class TencentMeetingSyncServiceImpl {
                     mapping.setLastSyncTime(new Date());
                     mapping.setLastSyncError(null);
                     userMappingMapper.updateById(mapping);
+                    log.debug("Tencent Meeting account sync done: syncLogId={}, appId={}, openId={}, fetchedSoFar={}, savedSoFar={}, failedSoFar={}",
+                            syncLog.getId(), config.getAppId(), mapping.getMeetingUserId(), fetched, saved, failed);
                 } catch (Exception accountException) {
                     failed++;
                     lastError = accountException.getMessage();
@@ -204,6 +230,9 @@ public class TencentMeetingSyncServiceImpl {
         if (status.getLastSyncError() == null) {
             status.setLastSyncError(syncLog.getErrorMessage());
         }
+        log.debug("Tencent Meeting sync finished: syncLogId={}, appId={}, status={}, fetched={}, saved={}, failed={}, error={}",
+                syncLog.getId(), config.getAppId(), syncLog.getStatus(), fetched, saved, failed,
+                StrUtil.maxLength(syncLog.getErrorMessage(), 500));
         return status;
     }
 
@@ -573,6 +602,8 @@ public class TencentMeetingSyncServiceImpl {
         } else {
             meetingMapper.updateById(meeting);
         }
+        log.debug("Tencent Meeting upserted: appId={}, meetingId={}, dbId={}, inserted={}, status={}",
+                config.getAppId(), externalMeetingId, meeting.getId(), insert, meeting.getStatus());
         return meeting;
     }
 

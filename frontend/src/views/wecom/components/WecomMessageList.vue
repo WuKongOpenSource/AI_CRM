@@ -12,7 +12,7 @@
         v-for="message in messages"
         :key="message.id || message.msgId"
         class="wecom-message-list__row"
-        :class="message.senderType === 'employee' ? 'is-employee' : 'is-external'"
+        :class="messageRowClass(message)"
       >
         <div class="wecom-message-list__avatar">
           {{ avatarLabel(message.senderId) }}
@@ -57,16 +57,38 @@
 import type { WecomMessageVO } from '@/types/wecom'
 import WecomOpenDataName from './WecomOpenDataName.vue'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   messages: WecomMessageVO[]
   corpId?: string
   loading?: boolean
   emptyText?: string
+  selfUserId?: string
 }>(), {
   corpId: '',
   loading: false,
-  emptyText: '暂无企微会话记录'
+  emptyText: '暂无企微会话记录',
+  selfUserId: ''
 })
+
+function normalizeUserId(value?: string) {
+  return (value || '').trim()
+}
+
+function isSelfMessage(message: WecomMessageVO) {
+  const selfUserId = normalizeUserId(props.selfUserId)
+  const senderId = normalizeUserId(message.senderId)
+  if (selfUserId && senderId) {
+    return senderId === selfUserId
+  }
+  return message.senderType === 'employee'
+}
+
+function messageRowClass(message: WecomMessageVO) {
+  return [
+    isSelfMessage(message) ? 'is-self' : 'is-peer',
+    message.senderType === 'employee' ? 'is-employee-sender' : 'is-external-sender'
+  ]
+}
 
 function formatDate(value?: string) {
   if (!value) return ''
@@ -119,12 +141,12 @@ function messageTypeLabel(type?: string) {
   gap: 10px;
 }
 
-.wecom-message-list__row.is-employee {
+.wecom-message-list__row.is-self {
   align-self: flex-end;
   flex-direction: row-reverse;
 }
 
-.wecom-message-list__row.is-external {
+.wecom-message-list__row.is-peer {
   align-self: flex-start;
 }
 
@@ -142,8 +164,12 @@ function messageTypeLabel(type?: string) {
   font-weight: 700;
 }
 
-.wecom-message-list__row.is-employee .wecom-message-list__avatar {
+.wecom-message-list__row.is-self .wecom-message-list__avatar {
   background: #166534;
+}
+
+.wecom-message-list__row.is-peer.is-employee-sender .wecom-message-list__avatar {
+  background: #334155;
 }
 
 .wecom-message-list__bubble {
@@ -155,7 +181,7 @@ function messageTypeLabel(type?: string) {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.wecom-message-list__row.is-employee .wecom-message-list__bubble {
+.wecom-message-list__row.is-self .wecom-message-list__bubble {
   border-color: #bbf7d0;
   background: #f0fdf4;
 }

@@ -51,6 +51,7 @@ import com.kakarote.ai_crm.mapper.MailTemplateMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.IMailService;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import com.kakarote.ai_crm.utils.MailMimeParser;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -194,6 +195,9 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private SyncTaskExecutor syncTaskExecutor;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
@@ -462,7 +466,14 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     @Override
     public MailSyncResultVO syncAccount(Long accountId) {
         MailAccount account = loadUserAccount(accountId);
-        return syncAccountWithLock(account);
+        MailSyncLog syncLog = startSyncLog(account, "mailbox");
+        markAccountSyncRunning(account);
+        MailSyncResultVO result = buildRunningSyncResult(account, syncLog);
+        log.debug("mail sync accepted: logId={}, accountId={}, email={}, provider={}",
+                syncLog.getLogId(), account.getAccountId(), account.getEmailAddress(), account.getProvider());
+        syncTaskExecutor.submit("mail-sync-" + account.getAccountId(),
+                () -> syncAccountWithLock(account, syncLog));
+        return result;
     }
 
     @Override
@@ -533,10 +544,14 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     }
 
     private MailSyncResultVO syncAccountWithLock(MailAccount account) {
+        return syncAccountWithLock(account, null);
+    }
+
+    private MailSyncResultVO syncAccountWithLock(MailAccount account, MailSyncLog syncLog) {
         ReentrantLock lock = accountSyncLocks.computeIfAbsent(account.getAccountId(), ignored -> new ReentrantLock());
         lock.lock();
         try {
-            return syncAccountInternal(account);
+            return syncAccountInternal(account, syncLog);
         } finally {
             lock.unlock();
         }
@@ -1256,9 +1271,13 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     }
 
     private MailSyncResultVO syncAccountInternal(MailAccount account) {
+        return syncAccountInternal(account, null);
+    }
+
+    private MailSyncResultVO syncAccountInternal(MailAccount account, MailSyncLog existingSyncLog) {
         MailSyncResultVO result = new MailSyncResultVO();
         result.setAccountId(account.getAccountId());
-        MailSyncLog syncLog = startSyncLog(account, "mailbox");
+        MailSyncLog syncLog = existingSyncLog == null ? startSyncLog(account, "mailbox") : existingSyncLog;
         result.setLogId(syncLog.getLogId());
         try {
             logSyncStage(syncLog, account, "credentials.decrypt", "Decrypting mailbox credentials");
@@ -2251,6 +2270,25 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         return syncLog;
     }
 
+    private void markAccountSyncRunning(MailAccount account) {
+        account.setLastSyncTime(new Date());
+        account.setLastSyncStatus("running");
+        account.setLastSyncError(null);
+        updateById(account);
+    }
+
+    private MailSyncResultVO buildRunningSyncResult(MailAccount account, MailSyncLog syncLog) {
+        MailSyncResultVO result = new MailSyncResultVO();
+        result.setAccountId(account.getAccountId());
+        result.setLogId(syncLog.getLogId());
+        result.setFetchedCount(0);
+        result.setSavedCount(0);
+        result.setSkippedCount(0);
+        result.setFailedCount(0);
+        result.setStatus("running");
+        return result;
+    }
+
     private void finishSyncLog(MailSyncLog syncLog, MailSyncResultVO result) {
         syncLog.setStatus(result.getStatus());
         syncLog.setFetchedCount(result.getFetchedCount());
@@ -2269,7 +2307,7 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private void logSyncStage(MailSyncLog syncLog, MailAccount account, String stage, String detail) {
         Date startedAt = syncLog == null ? null : syncLog.getStartedAt();
         Long elapsedMs = startedAt == null ? null : Math.max(0L, System.currentTimeMillis() - startedAt.getTime());
-        log.info("mail sync stage: logId={}, accountId={}, email={}, provider={}, stage={}, elapsedMs={}, detail={}",
+        log.debug("mail sync stage: logId={}, accountId={}, email={}, provider={}, stage={}, elapsedMs={}, detail={}",
                 syncLog == null ? null : syncLog.getLogId(),
                 account == null ? null : account.getAccountId(),
                 account == null ? null : account.getEmailAddress(),

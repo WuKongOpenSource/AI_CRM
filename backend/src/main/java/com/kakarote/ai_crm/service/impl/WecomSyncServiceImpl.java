@@ -31,6 +31,7 @@ import com.kakarote.ai_crm.mapper.WecomMessageMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncCursorMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
 import com.kakarote.ai_crm.utils.UserUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.HashSet;
 
+@Slf4j
 @Service
 public class WecomSyncServiceImpl {
 
@@ -112,61 +114,83 @@ public class WecomSyncServiceImpl {
     private PasswordEncoder passwordEncoder;
 
     public WecomSyncStatusVO runSync(WecomCorpConfig config, WecomSyncRunBO runBO) {
-        WecomSyncLog log = new WecomSyncLog();
-        log.setCorpId(config.getCorpId());
-        log.setSyncType("manual");
-        log.setStatus("running");
-        log.setFetchedCount(0);
-        log.setSavedCount(0);
-        log.setFailedCount(0);
-        log.setStartedAt(new Date());
-        syncLogMapper.insert(log);
+        WecomSyncRunBO actualRunBO = runBO == null ? new WecomSyncRunBO() : runBO;
+        WecomSyncLog syncLog = new WecomSyncLog();
+        syncLog.setCorpId(config.getCorpId());
+        syncLog.setSyncType("manual");
+        syncLog.setStatus("running");
+        syncLog.setFetchedCount(0);
+        syncLog.setSavedCount(0);
+        syncLog.setFailedCount(0);
+        syncLog.setStartedAt(new Date());
+        syncLogMapper.insert(syncLog);
+        log.debug("WeCom sync started: syncLogId={}, corpId={}, syncEmployees={}, syncCustomers={}, syncConversations={}, archiveLimit={}",
+                syncLog.getId(), config.getCorpId(), actualRunBO.getSyncEmployees(), actualRunBO.getSyncCustomers(),
+                actualRunBO.getSyncConversations(), actualRunBO.getArchiveLimit());
 
         int fetched = 0;
         int saved = 0;
         int failed = 0;
         StringBuilder errorMessage = new StringBuilder();
         try {
-            if (Boolean.TRUE.equals(runBO.getSyncEmployees())) {
+            if (Boolean.TRUE.equals(actualRunBO.getSyncEmployees())) {
+                log.debug("WeCom organization sync start: syncLogId={}, corpId={}", syncLog.getId(), config.getCorpId());
                 int orgSaved = syncOrganization(config);
+                log.debug("WeCom organization sync done: syncLogId={}, corpId={}, saved={}",
+                        syncLog.getId(), config.getCorpId(), orgSaved);
                 fetched += orgSaved;
                 saved += orgSaved;
             }
-            if (Boolean.TRUE.equals(runBO.getSyncCustomers())) {
+            if (Boolean.TRUE.equals(actualRunBO.getSyncCustomers())) {
+                log.debug("WeCom customer sync start: syncLogId={}, corpId={}", syncLog.getId(), config.getCorpId());
                 String token = tokenService.fetchContactAccessToken(config);
                 List<String> followUsers = apiClient.listFollowUsers(token);
+                log.debug("WeCom customer follow users fetched: syncLogId={}, corpId={}, followUserCount={}",
+                        syncLog.getId(), config.getCorpId(), followUsers == null ? 0 : followUsers.size());
                 CustomerSyncResult customerResult = syncCustomersForUsers(config, token, followUsers, resolveSyncOwnerId(), false);
+                log.debug("WeCom customer sync done: syncLogId={}, corpId={}, fetched={}, saved={}, failed={}, error={}",
+                        syncLog.getId(), config.getCorpId(), customerResult.fetched(), customerResult.saved(),
+                        customerResult.failed(), StrUtil.maxLength(customerResult.errorMessage(), 500));
                 fetched += customerResult.fetched();
                 saved += customerResult.saved();
                 failed += customerResult.failed();
                 appendError(errorMessage, customerResult.errorMessage());
             }
-            if (Boolean.TRUE.equals(runBO.getSyncConversations())) {
-                ArchiveSyncResult archiveResult = syncArchiveMessages(config, runBO.getArchiveLimit());
+            if (Boolean.TRUE.equals(actualRunBO.getSyncConversations())) {
+                log.debug("WeCom archive sync start: syncLogId={}, corpId={}, archiveLimit={}",
+                        syncLog.getId(), config.getCorpId(), actualRunBO.getArchiveLimit());
+                ArchiveSyncResult archiveResult = syncArchiveMessages(config, actualRunBO.getArchiveLimit());
+                log.debug("WeCom archive sync done: syncLogId={}, corpId={}, fetched={}, saved={}",
+                        syncLog.getId(), config.getCorpId(), archiveResult.fetched(), archiveResult.saved());
                 fetched += archiveResult.fetched();
                 saved += archiveResult.saved();
             }
-            log.setStatus(SYNC_STATUS_SUCCESS);
+            syncLog.setStatus(SYNC_STATUS_SUCCESS);
         } catch (Exception e) {
             failed++;
-            log.setStatus(SYNC_STATUS_FAILED);
+            syncLog.setStatus(SYNC_STATUS_FAILED);
             appendError(errorMessage, e.getMessage());
+            log.debug("WeCom sync failed: syncLogId={}, corpId={}, error={}",
+                    syncLog.getId(), config.getCorpId(), e.getMessage(), e);
         } finally {
             if (!errorMessage.isEmpty()) {
-                log.setErrorMessage(errorMessage.toString());
+                syncLog.setErrorMessage(errorMessage.toString());
             }
-            log.setFetchedCount(fetched);
-            log.setSavedCount(saved);
-            log.setFailedCount(failed);
-            log.setFinishedAt(new Date());
-            syncLogMapper.updateById(log);
+            syncLog.setFetchedCount(fetched);
+            syncLog.setSavedCount(saved);
+            syncLog.setFailedCount(failed);
+            syncLog.setFinishedAt(new Date());
+            syncLogMapper.updateById(syncLog);
+            log.debug("WeCom sync finished: syncLogId={}, corpId={}, status={}, fetched={}, saved={}, failed={}, error={}",
+                    syncLog.getId(), config.getCorpId(), syncLog.getStatus(), fetched, saved, failed,
+                    StrUtil.maxLength(syncLog.getErrorMessage(), 500));
         }
 
         WecomSyncStatusVO status = new WecomSyncStatusVO();
         status.setCorpId(config.getCorpId());
-        status.setLastSyncTime(log.getFinishedAt());
-        status.setLastSyncStatus(log.getStatus());
-        status.setLastSyncError(log.getErrorMessage());
+        status.setLastSyncTime(syncLog.getFinishedAt());
+        status.setLastSyncStatus(syncLog.getStatus());
+        status.setLastSyncError(syncLog.getErrorMessage());
         status.setFetchedCount(fetched);
         status.setSavedCount(saved);
         status.setFailedCount(failed);
@@ -179,10 +203,18 @@ public class WecomSyncServiceImpl {
 
     public CustomerSyncResult syncVisibleCustomersWithResult(WecomCorpConfig config, String employeeUserId, Long ownerId) {
         if (StrUtil.isBlank(employeeUserId) || ownerId == null) {
+            log.debug("WeCom visible customer sync skipped: corpId={}, employeeUserId={}, ownerId={}",
+                    config == null ? null : config.getCorpId(), employeeUserId, ownerId);
             return new CustomerSyncResult(0, 0, 0, null);
         }
+        log.debug("WeCom visible customer sync start: corpId={}, employeeUserId={}, ownerId={}",
+                config.getCorpId(), employeeUserId, ownerId);
         String token = tokenService.fetchContactAccessToken(config);
-        return syncCustomersForUsers(config, token, List.of(employeeUserId), ownerId, true);
+        CustomerSyncResult result = syncCustomersForUsers(config, token, List.of(employeeUserId), ownerId, true);
+        log.debug("WeCom visible customer sync done: corpId={}, employeeUserId={}, ownerId={}, fetched={}, saved={}, failed={}, error={}",
+                config.getCorpId(), employeeUserId, ownerId, result.fetched(), result.saved(), result.failed(),
+                StrUtil.maxLength(result.errorMessage(), 500));
+        return result;
     }
 
     private CustomerSyncResult syncCustomersForUsers(WecomCorpConfig config,
@@ -195,6 +227,8 @@ public class WecomSyncServiceImpl {
         int failed = 0;
         StringBuilder errors = new StringBuilder();
         List<FollowUserLookup> followUserLookups = resolveCustomerFollowUserLookups(config, token, followUsers, localEmployeeUserIds);
+        log.debug("WeCom customer follow users resolved: corpId={}, inputCount={}, lookupCount={}, localEmployeeUserIds={}",
+                config.getCorpId(), followUsers == null ? 0 : followUsers.size(), followUserLookups.size(), localEmployeeUserIds);
         Map<String, String> followUserAliases = new LinkedHashMap<>();
         for (FollowUserLookup followUser : followUserLookups) {
             followUserAliases.put(followUser.queryUserId(), followUser.employeeUserId());
@@ -203,18 +237,31 @@ public class WecomSyncServiceImpl {
             List<String> externalUserIds;
             try {
                 externalUserIds = apiClient.listExternalUserIds(token, followUser.queryUserId());
+                if (externalUserIds == null) {
+                    externalUserIds = List.of();
+                }
+                log.debug("WeCom external user ids fetched: corpId={}, queryUserId={}, employeeUserId={}, externalUserCount={}",
+                        config.getCorpId(), followUser.queryUserId(), followUser.employeeUserId(),
+                        externalUserIds.size());
             } catch (Exception e) {
                 failed++;
                 appendError(errors, "follow user " + followUser.employeeUserId() + ": " + e.getMessage());
+                log.debug("WeCom external user id fetch failed: corpId={}, queryUserId={}, employeeUserId={}, error={}",
+                        config.getCorpId(), followUser.queryUserId(), followUser.employeeUserId(), e.getMessage(), e);
                 continue;
             }
             fetched += externalUserIds.size();
             for (String externalUserId : externalUserIds) {
                 try {
-                    saved += saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId), ownerId, followUserAliases);
+                    int savedCustomer = saveExternalCustomer(config, apiClient.getExternalCustomer(token, externalUserId), ownerId, followUserAliases);
+                    saved += savedCustomer;
+                    log.debug("WeCom external customer synced: corpId={}, externalUserId={}, ownerId={}, saved={}",
+                            config.getCorpId(), externalUserId, ownerId, savedCustomer);
                 } catch (Exception e) {
                     failed++;
                     appendError(errors, "external customer " + externalUserId + ": " + e.getMessage());
+                    log.debug("WeCom external customer sync failed: corpId={}, externalUserId={}, ownerId={}, error={}",
+                            config.getCorpId(), externalUserId, ownerId, e.getMessage(), e);
                 }
             }
         }
@@ -318,10 +365,14 @@ public class WecomSyncServiceImpl {
     }
 
     public int syncOrganization(WecomCorpConfig config) {
+        log.debug("WeCom organization sync preparing: corpId={}", config.getCorpId());
         String token = tokenService.fetchAppAccessToken(config);
         List<JSONObject> departments = apiClient.listDepartments(token);
+        log.debug("WeCom departments fetched: corpId={}, departmentCount={}",
+                config.getCorpId(), departments == null ? 0 : departments.size());
         Map<Long, Long> deptIdMap = new LinkedHashMap<>();
         int saved = 0;
+        int userSaved = 0;
         Date syncedAt = new Date();
         List<JSONObject> sortedDepartments = departments.stream()
                 .filter(item -> item.getLong("id") != null)
@@ -340,9 +391,13 @@ public class WecomSyncServiceImpl {
                 if (StrUtil.isBlank(userId) || !syncedUsers.add(userId)) {
                     continue;
                 }
-                saved += saveSystemUserAndEmployee(config, user, deptIdMap, syncedAt);
+                int savedUser = saveSystemUserAndEmployee(config, user, deptIdMap, syncedAt);
+                saved += savedUser;
+                userSaved += savedUser;
             }
         }
+        log.debug("WeCom organization sync finished: corpId={}, departmentSaved={}, userSaved={}, saved={}",
+                config.getCorpId(), saved - userSaved, userSaved, saved);
         return saved;
     }
 
@@ -743,23 +798,33 @@ public class WecomSyncServiceImpl {
      */
     public int drainArchive(WecomCorpConfig config, int maxPages) {
         if (config == null || !Boolean.TRUE.equals(config.getArchiveEnabled())) {
+            log.debug("WeCom archive drain skipped: corpId={}, archiveEnabled={}",
+                    config == null ? null : config.getCorpId(),
+                    config == null ? null : config.getArchiveEnabled());
             return 0;
         }
         int limit = resolveArchiveLimit(null);
         int totalSaved = 0;
         int pages = Math.max(1, maxPages);
+        log.debug("WeCom archive drain start: corpId={}, maxPages={}, limit={}",
+                config.getCorpId(), pages, limit);
         for (int i = 0; i < pages; i++) {
             ArchiveSyncResult result = syncArchiveMessages(config, limit);
             totalSaved += result.saved();
+            log.debug("WeCom archive drain page done: corpId={}, page={}/{}, fetched={}, saved={}, totalSaved={}",
+                    config.getCorpId(), i + 1, pages, result.fetched(), result.saved(), totalSaved);
             if (result.fetched() < limit) {
                 break;
             }
         }
+        log.debug("WeCom archive drain finished: corpId={}, totalSaved={}", config.getCorpId(), totalSaved);
         return totalSaved;
     }
 
     private ArchiveSyncResult syncArchiveMessages(WecomCorpConfig config, Integer archiveLimit) {
         if (!Boolean.TRUE.equals(config.getArchiveEnabled())) {
+            log.debug("WeCom archive sync skipped: corpId={}, archiveEnabled={}",
+                    config.getCorpId(), config.getArchiveEnabled());
             return new ArchiveSyncResult(0, 0);
         }
         WecomSyncCursor cursor = cursorMapper.selectOne(Wrappers.<WecomSyncCursor>lambdaQuery()
@@ -768,19 +833,31 @@ public class WecomSyncServiceImpl {
                 .eq(WecomSyncCursor::getCursorKey, CURSOR_KEY_MAIN)
                 .last("LIMIT 1"));
         long startSeq = cursor == null || cursor.getSeq() == null ? 0L : cursor.getSeq();
-        List<JSONObject> messages = archiveGateway.fetchMessages(config, startSeq, resolveArchiveLimit(archiveLimit));
+        int limit = resolveArchiveLimit(archiveLimit);
+        log.debug("WeCom archive page fetch start: corpId={}, startSeq={}, limit={}",
+                config.getCorpId(), startSeq, limit);
+        List<JSONObject> messages = archiveGateway.fetchMessages(config, startSeq, limit);
+        if (messages == null) {
+            messages = List.of();
+        }
+        log.debug("WeCom archive page fetched: corpId={}, startSeq={}, fetched={}",
+                config.getCorpId(), startSeq, messages.size());
         ArchiveExternalUserConversion externalUserConversion = convertArchiveExternalUserIds(config, messages);
         long maxSeq = startSeq;
         int saved = 0;
+        int skipped = 0;
+        int duplicated = 0;
         for (JSONObject raw : messages) {
             Long seq = raw.getLong("seq");
             if (seq != null) {
                 maxSeq = Math.max(maxSeq, seq);
             }
             if (raw.getBooleanValue(WecomFinanceSdkClient.SKIP_MESSAGE_FIELD)) {
+                skipped++;
                 continue;
             }
             if (shouldSkipArchiveRecord(raw)) {
+                skipped++;
                 continue;
             }
             Long conversationId = ensureConversation(config, raw, externalUserConversion);
@@ -793,9 +870,12 @@ public class WecomSyncServiceImpl {
                     .eq(WecomMessage::getMsgId, message.getMsgId())) == 0) {
                 messageMapper.insert(message);
                 saved++;
+            } else {
+                duplicated++;
             }
         }
-        if (!Objects.equals(maxSeq, startSeq)) {
+        boolean cursorUpdated = !Objects.equals(maxSeq, startSeq);
+        if (cursorUpdated) {
             if (cursor == null) {
                 cursor = new WecomSyncCursor();
                 cursor.setCorpId(config.getCorpId());
@@ -809,6 +889,9 @@ public class WecomSyncServiceImpl {
             }
         }
         reconcileArchiveCustomerRelations(config);
+        log.debug("WeCom archive page processed: corpId={}, startSeq={}, maxSeq={}, fetched={}, saved={}, skipped={}, duplicated={}, cursorUpdated={}, conversionError={}",
+                config.getCorpId(), startSeq, maxSeq, messages.size(), saved, skipped, duplicated, cursorUpdated,
+                StrUtil.maxLength(externalUserConversion.errorMessage(), 500));
         return new ArchiveSyncResult(messages.size(), saved);
     }
 
@@ -991,9 +1074,16 @@ public class WecomSyncServiceImpl {
         if (StrUtil.isBlank(externalUserId)) {
             return null;
         }
+        log.debug("WeCom archive external customer fetch start: corpId={}, externalUserId={}",
+                config.getCorpId(), externalUserId);
         String token = tokenService.fetchContactAccessToken(config);
-        return saveExternalCustomerRecord(config, apiClient.getExternalCustomer(token, externalUserId),
+        WecomExternalCustomer customer = saveExternalCustomerRecord(config, apiClient.getExternalCustomer(token, externalUserId),
                 resolveSyncOwnerId(), Map.of());
+        log.debug("WeCom archive external customer synced: corpId={}, externalUserId={}, customerId={}, crmCustomerId={}",
+                config.getCorpId(), externalUserId,
+                customer == null ? null : customer.getId(),
+                customer == null ? null : customer.getCustomerId());
+        return customer;
     }
 
     private void reconcileArchiveCustomerRelations(WecomCorpConfig config) {
@@ -1010,8 +1100,11 @@ public class WecomSyncServiceImpl {
                         .isNull(WecomConversation::getCustomerId))
                 .last("LIMIT 500"));
         if (conversations == null || conversations.isEmpty()) {
+            log.debug("WeCom archive customer reconcile skipped: corpId={}, pendingCount=0", config.getCorpId());
             return;
         }
+        log.debug("WeCom archive customer reconcile start: corpId={}, pendingCount={}",
+                config.getCorpId(), conversations.size());
         Set<String> archiveExternalUserIds = new LinkedHashSet<>();
         for (WecomConversation conversation : conversations) {
             String archiveExternalUserId = resolveArchiveExternalUserId(conversation);
@@ -1020,6 +1113,8 @@ public class WecomSyncServiceImpl {
             }
         }
         if (archiveExternalUserIds.isEmpty()) {
+            log.debug("WeCom archive customer reconcile skipped: corpId={}, archiveExternalUserCount=0",
+                    config.getCorpId());
             return;
         }
         ArchiveExternalUserConversion externalUserConversion =
@@ -1036,6 +1131,9 @@ public class WecomSyncServiceImpl {
                     externalUserConversion.errorMessage(), null, null);
             conversationMapper.updateById(conversation);
         }
+        log.debug("WeCom archive customer reconcile finished: corpId={}, pendingCount={}, archiveExternalUserCount={}, conversionError={}",
+                config.getCorpId(), conversations.size(), archiveExternalUserIds.size(),
+                StrUtil.maxLength(externalUserConversion.errorMessage(), 500));
     }
 
     private ArchiveExternalUserConversion convertArchiveExternalUserIdList(WecomCorpConfig config, List<String> archiveExternalUserIds) {
@@ -1043,10 +1141,16 @@ public class WecomSyncServiceImpl {
             return new ArchiveExternalUserConversion(Map.of(), null);
         }
         try {
+            log.debug("WeCom archive external user conversion start: corpId={}, archiveExternalUserCount={}",
+                    config.getCorpId(), archiveExternalUserIds.size());
             String token = tokenService.fetchContactAccessToken(config);
             Map<String, String> converted = apiClient.convertExternalUserIds(token, archiveExternalUserIds);
+            log.debug("WeCom archive external user conversion done: corpId={}, archiveExternalUserCount={}, convertedCount={}",
+                    config.getCorpId(), archiveExternalUserIds.size(), converted == null ? 0 : converted.size());
             return new ArchiveExternalUserConversion(converted == null ? Map.of() : converted, null);
         } catch (Exception e) {
+            log.debug("WeCom archive external user conversion failed: corpId={}, archiveExternalUserCount={}, error={}",
+                    config.getCorpId(), archiveExternalUserIds.size(), e.getMessage(), e);
             return new ArchiveExternalUserConversion(Map.of(), safeErrorSummary(e));
         }
     }

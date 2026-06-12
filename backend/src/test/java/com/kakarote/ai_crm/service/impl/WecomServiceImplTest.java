@@ -4,9 +4,11 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.common.auth.DataPermissionContext;
 import com.kakarote.ai_crm.entity.BO.WecomConversationQueryBO;
+import com.kakarote.ai_crm.entity.BO.WecomSyncRunBO;
 import com.kakarote.ai_crm.entity.PO.WecomCorpConfig;
 import com.kakarote.ai_crm.entity.VO.WecomConfigVO;
 import com.kakarote.ai_crm.entity.VO.WecomJsSdkAgentConfigVO;
+import com.kakarote.ai_crm.entity.VO.WecomSyncStatusVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ExternalAuthIdentityMapper;
 import com.kakarote.ai_crm.mapper.WecomConversationMapper;
@@ -15,6 +17,7 @@ import com.kakarote.ai_crm.mapper.WecomEmployeeMapper;
 import com.kakarote.ai_crm.mapper.WecomExternalCustomerMapper;
 import com.kakarote.ai_crm.mapper.WecomMessageMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -25,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -104,6 +108,43 @@ class WecomServiceImplTest {
         verify(syncService, never()).drainArchive(any(WecomCorpConfig.class), anyInt());
     }
 
+    @Test
+    void runSyncShouldReturnRunningAndSubmitBackgroundTask() {
+        WecomServiceImpl service = newService();
+        WecomCorpConfigMapper configMapper = mapper(service, "configMapper");
+        WecomOpenPlatformService openPlatformService = mapper(service, "openPlatformService");
+        WecomSyncServiceImpl syncService = mapper(service, "syncService");
+        SyncTaskExecutor syncTaskExecutor = mapper(service, "syncTaskExecutor");
+        WecomCorpConfig config = authorizedConfig();
+        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(openPlatformService.isAuthorized(config)).thenReturn(true);
+
+        WecomSyncStatusVO status = service.runSync(new WecomSyncRunBO());
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("running");
+        assertThat(status.getCorpId()).isEqualTo("corp_1");
+        verify(syncTaskExecutor).submit(anyString(), any(Runnable.class));
+        verify(syncService, never()).runSync(any(WecomCorpConfig.class), any(WecomSyncRunBO.class));
+    }
+
+    @Test
+    void syncOrganizationShouldReturnRunningAndSubmitBackgroundTask() {
+        WecomServiceImpl service = newService();
+        WecomCorpConfigMapper configMapper = mapper(service, "configMapper");
+        WecomOpenPlatformService openPlatformService = mapper(service, "openPlatformService");
+        WecomSyncServiceImpl syncService = mapper(service, "syncService");
+        SyncTaskExecutor syncTaskExecutor = mapper(service, "syncTaskExecutor");
+        WecomCorpConfig config = authorizedConfig();
+        when(configMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(config);
+        when(openPlatformService.isAuthorized(config)).thenReturn(true);
+
+        WecomSyncStatusVO status = service.syncOrganization();
+
+        assertThat(status.getLastSyncStatus()).isEqualTo("running");
+        verify(syncTaskExecutor).submit(anyString(), any(Runnable.class));
+        verify(syncService, never()).syncOrganization(any(WecomCorpConfig.class));
+    }
+
     @SuppressWarnings("unchecked")
     private static <T> T mapper(WecomServiceImpl service, String fieldName) {
         return (T) ReflectionTestUtils.getField(service, fieldName);
@@ -120,12 +161,21 @@ class WecomServiceImplTest {
         ReflectionTestUtils.setField(service, "customerMapper", mock(CustomerMapper.class));
         ReflectionTestUtils.setField(service, "identityMapper", mock(ExternalAuthIdentityMapper.class));
         ReflectionTestUtils.setField(service, "syncService", mock(WecomSyncServiceImpl.class));
+        ReflectionTestUtils.setField(service, "syncTaskExecutor", mock(SyncTaskExecutor.class));
         ReflectionTestUtils.setField(service, "openPlatformService", mock(WecomOpenPlatformService.class));
         ReflectionTestUtils.setField(service, "tokenService", mock(WecomTokenService.class));
         ReflectionTestUtils.setField(service, "apiClient", mock(WecomApiClient.class));
         ReflectionTestUtils.setField(service, "bindingService", mock(WecomCustomerBindingServiceImpl.class));
         ReflectionTestUtils.setField(service, "dataPermissionService", mock(com.kakarote.ai_crm.service.DataPermissionService.class));
         return service;
+    }
+
+    private static WecomCorpConfig authorizedConfig() {
+        WecomCorpConfig config = new WecomCorpConfig();
+        config.setId(10L);
+        config.setTenantId(20L);
+        config.setCorpId("corp_1");
+        return config;
     }
 
     private static String sha1(String value) throws Exception {

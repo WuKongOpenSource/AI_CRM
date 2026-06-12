@@ -42,6 +42,7 @@ import com.kakarote.ai_crm.mapper.WecomExternalCustomerMapper;
 import com.kakarote.ai_crm.mapper.WecomMessageMapper;
 import com.kakarote.ai_crm.mapper.WecomSyncLogMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
+import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -96,6 +98,9 @@ public class WecomServiceImpl {
 
     @Autowired
     private WecomSyncServiceImpl syncService;
+
+    @Autowired
+    private SyncTaskExecutor syncTaskExecutor;
 
     @Autowired
     private WecomTokenService tokenService;
@@ -158,24 +163,22 @@ public class WecomServiceImpl {
     @Transactional(rollbackFor = Exception.class)
     public WecomSyncStatusVO runSync(WecomSyncRunBO runBO) {
         WecomCorpConfig config = requireConfig();
-        WecomSyncStatusVO status = syncService.runSync(config, runBO == null ? new WecomSyncRunBO() : runBO);
-        config.setLastSyncTime(status.getLastSyncTime());
-        config.setLastSyncStatus(status.getLastSyncStatus());
-        config.setLastSyncError(status.getLastSyncError());
-        configMapper.updateById(config);
-        return status;
+        WecomSyncRunBO actualRunBO = runBO == null ? new WecomSyncRunBO() : runBO;
+        WecomSyncStatusVO runningStatus = markConfigSyncRunning(config);
+        syncTaskExecutor.submit("wecom-sync-" + config.getCorpId(),
+                () -> runBackgroundSync(config, () -> syncService.runSync(config, actualRunBO)));
+        return runningStatus;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public WecomSyncStatusVO syncOrganization() {
         WecomCorpConfig config = requireConfig();
-        int saved = syncService.syncOrganization(config);
-        WecomSyncStatusVO status = buildSyncStatus(config, saved, saved);
-        config.setLastSyncTime(status.getLastSyncTime());
-        config.setLastSyncStatus(status.getLastSyncStatus());
-        config.setLastSyncError(status.getLastSyncError());
-        configMapper.updateById(config);
-        return status;
+        WecomSyncStatusVO runningStatus = markConfigSyncRunning(config);
+        syncTaskExecutor.submit("wecom-org-sync-" + config.getCorpId(), () -> runBackgroundSync(config, () -> {
+            int saved = syncService.syncOrganization(config);
+            return buildSyncStatus(config, saved, saved);
+        }));
+        return runningStatus;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -197,15 +200,17 @@ public class WecomServiceImpl {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "WeCom binding is incomplete");
         }
         WecomCorpConfig config = requireConfig(corpId);
-        WecomSyncServiceImpl.CustomerSyncResult syncResult = syncService.syncVisibleCustomersWithResult(config, wecomUserId, currentUserId);
-        WecomSyncStatusVO status = buildSyncStatus(config, syncResult.fetched(), syncResult.saved());
-        status.setFailedCount(syncResult.failed());
-        status.setLastSyncError(syncResult.errorMessage());
-        config.setLastSyncTime(status.getLastSyncTime());
-        config.setLastSyncStatus(status.getLastSyncStatus());
-        config.setLastSyncError(status.getLastSyncError());
-        configMapper.updateById(config);
-        return status;
+        WecomSyncStatusVO runningStatus = markConfigSyncRunning(config);
+        syncTaskExecutor.submit("wecom-my-customers-sync-" + config.getCorpId() + "-" + currentUserId,
+                () -> runBackgroundSync(config, () -> {
+                    WecomSyncServiceImpl.CustomerSyncResult syncResult =
+                            syncService.syncVisibleCustomersWithResult(config, wecomUserId, currentUserId);
+                    WecomSyncStatusVO status = buildSyncStatus(config, syncResult.fetched(), syncResult.saved());
+                    status.setFailedCount(syncResult.failed());
+                    status.setLastSyncError(syncResult.errorMessage());
+                    return status;
+                }));
+        return runningStatus;
     }
 
     public WecomSyncStatusVO getSyncStatus() {
@@ -409,6 +414,40 @@ public class WecomServiceImpl {
         status.setSavedCount(saved);
         status.setFailedCount(0);
         return status;
+    }
+
+    private WecomSyncStatusVO markConfigSyncRunning(WecomCorpConfig config) {
+        WecomSyncStatusVO status = new WecomSyncStatusVO();
+        status.setCorpId(config.getCorpId());
+        status.setLastSyncTime(new Date());
+        status.setLastSyncStatus("running");
+        status.setFetchedCount(0);
+        status.setSavedCount(0);
+        status.setFailedCount(0);
+        config.setLastSyncTime(status.getLastSyncTime());
+        config.setLastSyncStatus(status.getLastSyncStatus());
+        config.setLastSyncError(null);
+        configMapper.updateById(config);
+        return status;
+    }
+
+    private void runBackgroundSync(WecomCorpConfig config, Supplier<WecomSyncStatusVO> action) {
+        try {
+            WecomSyncStatusVO status = action.get();
+            config.setLastSyncTime(status.getLastSyncTime());
+            config.setLastSyncStatus(status.getLastSyncStatus());
+            config.setLastSyncError(status.getLastSyncError());
+            configMapper.updateById(config);
+        } catch (Exception e) {
+            config.setLastSyncTime(new Date());
+            config.setLastSyncStatus("failed");
+            config.setLastSyncError(StrUtil.maxLength(e.getMessage(), 1000));
+            configMapper.updateById(config);
+            if (e instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new IllegalStateException(e);
+        }
     }
 
     private String resolveSubjectCorpId(String subject) {

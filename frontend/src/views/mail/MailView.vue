@@ -577,7 +577,6 @@ import {
   type MailDraftPayload,
   type MailImapConnectPayload,
   type MailMessage,
-  type MailSyncResult,
   type MailTemplate,
   type MailTemplatePayload,
 } from '@/api/mail'
@@ -956,6 +955,7 @@ async function syncMailboxIfStale() {
 async function syncCurrentMailbox(options: { force: boolean; notifyNoNew: boolean }) {
   const account = authStatus.currentAccount
   if (!account?.accountId || syncingMailbox.value) return false
+  if (!options.force && account.lastSyncStatus === 'running') return false
   if (!options.force && !shouldAutoSyncMailbox(account.lastSyncTime)) return false
 
   syncingMailbox.value = true
@@ -963,10 +963,11 @@ async function syncCurrentMailbox(options: { force: boolean; notifyNoNew: boolea
     ? undefined
     : ElMessage({ message: '正在检查新邮件...', type: 'info', duration: 0 })
   try {
-    const result = await syncMailbox(account.accountId)
+    await syncMailbox(account.accountId)
     checkingMessage?.close()
-    showMailboxSyncResult(result, options.notifyNoNew)
-    await loadAuthStatus(false)
+    account.lastSyncStatus = 'running'
+    account.lastSyncTime = new Date().toISOString()
+    ElMessage.success('同步任务已开始，正在后台同步中')
     return true
   } catch (error) {
     checkingMessage?.close()
@@ -988,25 +989,6 @@ function parseDateTime(value: string) {
   const normalized = value.includes('T') ? value : value.replace(' ', 'T')
   const timestamp = new Date(normalized).getTime()
   return Number.isNaN(timestamp) ? null : timestamp
-}
-
-function showMailboxSyncResult(result: MailSyncResult, notifyNoNew: boolean) {
-  if (result.status === 'failed') {
-    ElMessage.error(result.errorMessage || '邮箱同步失败，请稍后重试')
-    return
-  }
-  if (result.savedCount > 0) {
-    const suffix = result.failedCount > 0 ? '，部分邮件同步失败' : ''
-    ElMessage.success(`已同步 ${result.savedCount} 封新邮件${suffix}`)
-    return
-  }
-  if (result.failedCount > 0) {
-    ElMessage.warning('部分邮件同步失败，请稍后刷新重试')
-    return
-  }
-  if (notifyNoNew) {
-    ElMessage.info('暂无新邮件')
-  }
 }
 
 function handleCompose() {
