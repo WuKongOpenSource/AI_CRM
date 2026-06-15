@@ -43,6 +43,10 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function applyLoginResult(result: LoginResult): Promise<void> {
+    if (!result.token || !result.userInfo) {
+      throw new Error('Invalid login response')
+    }
+
     token.value = result.token
     setToken(result.token)
     userInfo.value = result.userInfo
