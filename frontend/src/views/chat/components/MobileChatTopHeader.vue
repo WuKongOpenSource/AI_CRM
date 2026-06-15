@@ -8,14 +8,13 @@
       <div class="mx-auto flex h-9 w-full items-center justify-between gap-2">
         <button
           type="button"
-          class="wk-mobile-chat-header-action"
+          class="wk-mobile-customer-header-menu flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
           aria-label="打开菜单"
           title="打开菜单"
           @click="emit('menu')"
         >
           <span class="material-symbols-outlined text-[22px] leading-none">menu</span>
         </button>
-
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
             <img
@@ -40,7 +39,6 @@
               {{ title.charAt(0) || '?' }}
             </span>
           </div>
-
           <button
             type="button"
             class="min-w-[80px] max-w-[190px] truncate text-left text-[15px] font-semibold leading-5 text-[#0d0d0d]"
@@ -50,15 +48,14 @@
             {{ title }}
           </button>
         </div>
-
         <button
           type="button"
-          class="wk-mobile-chat-header-action"
+          class="wk-mobile-customer-header-detail flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
           :aria-label="detailable ? detailLabel : '新建会话'"
           :title="detailable ? detailLabel : '新建会话'"
           @click="detailable ? emit('detail') : emit('newSession')"
         >
-          <span class="material-symbols-outlined text-[23px] leading-none">
+          <span class="material-symbols-outlined text-[24px] leading-none">
             {{ detailable ? 'more_horiz' : 'edit_square' }}
           </span>
         </button>
@@ -102,9 +99,9 @@ const avatarAlt = computed(() => {
 })
 
 const avatarClass = computed(() =>
-  props.kind === 'employee'
-    ? 'size-full bg-white object-cover'
-    : 'size-full bg-white object-contain'
+  props.kind === 'customer' || props.kind === 'relation' || props.kind === 'product'
+    ? 'size-full bg-white object-contain'
+    : 'size-full bg-white object-cover'
 )
 </script>
 
@@ -119,25 +116,5 @@ const avatarClass = computed(() =>
   border-color: var(--wk-border-subtle);
   background: color-mix(in srgb, var(--wk-bg-surface) 92%, transparent);
   backdrop-filter: blur(14px);
-}
-
-.wk-mobile-chat-header-action {
-  display: flex;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  color: #0d0d0d;
-  transition: background-color 140ms ease, transform 140ms ease;
-}
-
-.wk-mobile-chat-header-action:hover {
-  background: rgb(13 13 13 / 0.05);
-}
-
-.wk-mobile-chat-header-action:active {
-  transform: scale(0.94);
 }
 </style>
