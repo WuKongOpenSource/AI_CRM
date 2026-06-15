@@ -45,6 +45,36 @@ public class ChatSessionVO {
     @Schema(description = "关联客户名称")
     private String customerName;
 
+    @Schema(description = "关联客户Logo访问URL")
+    private String customerLogoUrl;
+
+    @Schema(description = "关联员工名称")
+    private String employeeName;
+
+    @Schema(description = "关联员工头像访问URL")
+    private String employeeAvatarUrl;
+
+    @Schema(description = "关联关系人名称")
+    private String relationName;
+
+    @Schema(description = "关联关系人头像访问URL")
+    private String relationAvatarUrl;
+
+    @Schema(description = "关联产品名称")
+    private String productName;
+
+    @Schema(description = "关联产品编码")
+    private String productCode;
+
+    @Schema(description = "关联产品图片访问URL")
+    private String productImageUrl;
+
+    @Schema(description = "关联项目名称")
+    private String projectName;
+
+    @Schema(description = "关联项目任务标题")
+    private String projectTaskTitle;
+
     @Schema(description = "Application code")
     private String appCode;
 

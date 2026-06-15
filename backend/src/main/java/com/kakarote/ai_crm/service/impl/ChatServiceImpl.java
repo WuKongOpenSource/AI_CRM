@@ -22,11 +22,23 @@ import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.PO.ChatAttachment;
 import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
+import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
+import com.kakarote.ai_crm.entity.PO.Product;
+import com.kakarote.ai_crm.entity.PO.Project;
+import com.kakarote.ai_crm.entity.PO.ProjectTask;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.ManageUserMapper;
+import com.kakarote.ai_crm.mapper.ProductMapper;
+import com.kakarote.ai_crm.mapper.ProjectMapper;
+import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.*;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +83,24 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private ChatMessageMapper chatMessageMapper;
+
+    @Autowired
+    private CustomerMapper customerMapper;
+
+    @Autowired
+    private ManageUserMapper manageUserMapper;
+
+    @Autowired
+    private RelationMapper relationMapper;
+
+    @Autowired
+    private ProductMapper productMapper;
+
+    @Autowired
+    private ProjectMapper projectMapper;
+
+    @Autowired
+    private ProjectTaskMapper projectTaskMapper;
 
     @Autowired
     private IChatAttachmentService chatAttachmentService;
@@ -270,7 +300,90 @@ public class ChatServiceImpl implements IChatService {
                 .orderByDesc(ChatSession::getPinnedTime)
                 .orderByDesc(ChatSession::getUpdateTime)
         );
-        return BeanUtil.copyToList(sessions, ChatSessionVO.class);
+        List<ChatSessionVO> voList = BeanUtil.copyToList(sessions, ChatSessionVO.class);
+        enrichSessionSummaries(voList);
+        return voList;
+    }
+
+    private void enrichSessionSummaries(List<ChatSessionVO> sessions) {
+        if (CollUtil.isEmpty(sessions)) {
+            return;
+        }
+
+        Set<Long> customerIds = sessions.stream().map(ChatSessionVO::getCustomerId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> employeeIds = sessions.stream().map(ChatSessionVO::getEmployeeId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> relationIds = sessions.stream().map(ChatSessionVO::getRelationId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> productIds = sessions.stream().map(ChatSessionVO::getProductId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> projectIds = sessions.stream().map(ChatSessionVO::getProjectId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> projectTaskIds = sessions.stream().map(ChatSessionVO::getProjectTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
+
+        Map<Long, Customer> customerMap = CollUtil.isEmpty(customerIds)
+                ? Collections.emptyMap()
+                : customerMapper.selectBatchIds(customerIds).stream().collect(Collectors.toMap(Customer::getCustomerId, item -> item, (a, b) -> a));
+        Map<Long, ManagerUser> employeeMap = CollUtil.isEmpty(employeeIds)
+                ? Collections.emptyMap()
+                : manageUserMapper.selectBatchIds(employeeIds).stream().collect(Collectors.toMap(ManagerUser::getUserId, item -> item, (a, b) -> a));
+        Map<Long, Relation> relationMap = CollUtil.isEmpty(relationIds)
+                ? Collections.emptyMap()
+                : relationMapper.selectBatchIds(relationIds).stream().collect(Collectors.toMap(Relation::getRelationId, item -> item, (a, b) -> a));
+        Map<Long, Product> productMap = CollUtil.isEmpty(productIds)
+                ? Collections.emptyMap()
+                : productMapper.selectBatchIds(productIds).stream().collect(Collectors.toMap(Product::getProductId, item -> item, (a, b) -> a));
+        Map<Long, Project> projectMap = CollUtil.isEmpty(projectIds)
+                ? Collections.emptyMap()
+                : projectMapper.selectBatchIds(projectIds).stream().collect(Collectors.toMap(Project::getProjectId, item -> item, (a, b) -> a));
+        Map<Long, ProjectTask> projectTaskMap = CollUtil.isEmpty(projectTaskIds)
+                ? Collections.emptyMap()
+                : projectTaskMapper.selectBatchIds(projectTaskIds).stream().collect(Collectors.toMap(ProjectTask::getTaskId, item -> item, (a, b) -> a));
+
+        for (ChatSessionVO session : sessions) {
+            Customer customer = customerMap.get(session.getCustomerId());
+            if (customer != null) {
+                session.setCustomerName(StrUtil.blankToDefault(session.getCustomerName(), customer.getCompanyName()));
+                session.setCustomerLogoUrl(resolveObjectUrl(customer.getLogo()));
+            }
+
+            ManagerUser employee = employeeMap.get(session.getEmployeeId());
+            if (employee != null) {
+                session.setEmployeeName(StrUtil.blankToDefault(employee.getRealname(), employee.getUsername()));
+                session.setEmployeeAvatarUrl(resolveObjectUrl(employee.getImg()));
+            }
+
+            Relation relation = relationMap.get(session.getRelationId());
+            if (relation != null) {
+                session.setRelationName(relation.getName());
+                session.setRelationAvatarUrl(resolveObjectUrl(relation.getAvatar()));
+            }
+
+            Product product = productMap.get(session.getProductId());
+            if (product != null) {
+                session.setProductName(product.getProductName());
+                session.setProductCode(product.getProductCode());
+                session.setProductImageUrl(resolveObjectUrl(product.getMainImage()));
+            }
+
+            Project project = projectMap.get(session.getProjectId());
+            if (project != null) {
+                session.setProjectName(project.getName());
+            }
+
+            ProjectTask projectTask = projectTaskMap.get(session.getProjectTaskId());
+            if (projectTask != null) {
+                session.setProjectTaskTitle(projectTask.getTitle());
+            }
+        }
+    }
+
+    private String resolveObjectUrl(String objectKey) {
+        if (StrUtil.isBlank(objectKey)) {
+            return "";
+        }
+        try {
+            return fileStorageService.getUrl(objectKey);
+        } catch (Exception e) {
+            log.debug("Resolve object url failed: {}", objectKey, e);
+            return "";
+        }
     }
 
     @Override

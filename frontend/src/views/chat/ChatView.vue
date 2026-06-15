@@ -963,7 +963,7 @@ const mobileChatHeaderTitle = computed(() => {
     return session?.customerName || session?.title || '客户对话'
   }
   if (chatObjectKind.value === 'employee') {
-    return employeeDetail.value?.realname || session?.title || '通讯录对话'
+    return employeeDetail.value?.realname || session?.employeeName || session?.title || '通讯录对话'
   }
   if (chatObjectKind.value === 'relation') {
     return relationDetail.value?.relation?.name || session?.relationName || session?.title || '关系对话'
@@ -974,9 +974,11 @@ const mobileChatHeaderTitle = computed(() => {
   return session?.title || 'AI 对话'
 })
 const mobileChatHeaderAvatarUrl = computed(() => {
-  if (chatObjectKind.value === 'employee') return employeeDetail.value?.imgUrl || employeeDetail.value?.img || ''
-  if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.avatarUrl || relationDetail.value?.relation?.avatar || ''
-  if (chatObjectKind.value === 'product') return productDetail.value?.mainImageUrl || ''
+  const session = currentChatSession.value
+  if (chatObjectKind.value === 'customer') return session?.customerLogoUrl || ''
+  if (chatObjectKind.value === 'employee') return employeeDetail.value?.imgUrl || session?.employeeAvatarUrl || employeeDetail.value?.img || ''
+  if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.avatarUrl || session?.relationAvatarUrl || relationDetail.value?.relation?.avatar || ''
+  if (chatObjectKind.value === 'product') return productDetail.value?.mainImageUrl || session?.productImageUrl || ''
   return ''
 })
 

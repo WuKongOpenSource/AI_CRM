@@ -201,13 +201,21 @@ export interface ChatSession {
   agentId?: string
   customerId?: string
   customerName?: string
+  customerLogoUrl?: string
   employeeId?: string
+  employeeName?: string
+  employeeAvatarUrl?: string
   relationId?: string
   relationName?: string
+  relationAvatarUrl?: string
   productId?: string
   productName?: string
+  productCode?: string
+  productImageUrl?: string
   projectId?: string
+  projectName?: string
   projectTaskId?: string
+  projectTaskTitle?: string
   appCode?: string
   pinned?: boolean
   pinnedTime?: string
