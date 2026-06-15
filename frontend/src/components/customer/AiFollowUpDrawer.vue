@@ -238,6 +238,32 @@
                 </div>
 
                 <div
+                  v-if="attachments.length > 0"
+                  class="space-y-3 rounded-xl border border-slate-200 bg-white p-4"
+                >
+                  <p class="text-xs font-bold uppercase tracking-widest text-slate-400">已上传附件</p>
+                  <div class="flex flex-wrap gap-3">
+                    <div
+                      v-for="item in attachments"
+                      :key="item.id"
+                      class="flex max-w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
+                    >
+                      <img
+                        v-if="item.preview"
+                        :src="item.preview"
+                        :alt="item.file.name"
+                        class="size-12 rounded-lg object-cover"
+                      />
+                      <span v-else class="material-symbols-outlined text-slate-400">description</span>
+                      <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-slate-700">{{ item.file.name }}</p>
+                        <p class="mt-1 text-xs text-slate-400">{{ formatAttachmentSize(item.file.size) }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
                   v-if="parsedData.summary"
                   class="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4"
                 >
@@ -524,6 +550,13 @@ function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0')
   const remainSeconds = (seconds % 60).toString().padStart(2, '0')
   return `${minutes}:${remainSeconds}`
+}
+
+function formatAttachmentSize(size: number): string {
+  if (!size || size <= 0) return '--'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function handleFileSelect(event: Event) {
