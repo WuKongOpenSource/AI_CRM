@@ -301,6 +301,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'summary-updated': [payload: { knowledgeId: string; summary: string }]
 }>()
 
 const { isMobile } = useResponsive()
@@ -411,6 +412,7 @@ async function loadDocument(id: string) {
   // Load AI analysis (non-blocking)
   try {
     analysis.value = await aiAnalyzeKnowledge(id)
+    notifySummaryUpdated(id, analysis.value?.coreHighlights)
   } catch (error) {
     console.error('AI analysis failed:', error)
     // Fallback: use existing summary
@@ -424,6 +426,18 @@ async function loadDocument(id: string) {
   } finally {
     loadingAnalysis.value = false
   }
+}
+
+function notifySummaryUpdated(knowledgeId: string, summary?: string) {
+  const normalizedSummary = summary?.trim()
+  if (!normalizedSummary) return
+  if (knowledge.value) {
+    knowledge.value.summary = normalizedSummary
+  }
+  emit('summary-updated', {
+    knowledgeId,
+    summary: normalizedSummary
+  })
 }
 
 async function handleSendQuestion() {

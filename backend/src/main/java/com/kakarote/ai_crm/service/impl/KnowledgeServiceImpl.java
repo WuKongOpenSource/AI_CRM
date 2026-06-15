@@ -968,6 +968,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
         KnowledgeAiAnalyzeVO cachedResult = readCachedAnalyzeResult(knowledge);
         if (cachedResult != null) {
+            persistKnowledgeSummaryIfNeeded(knowledge, cachedResult.getCoreHighlights());
             return cachedResult;
         }
 
@@ -1022,11 +1023,32 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             KnowledgeAiAnalyzeVO normalized = normalizeAnalyzeResult(result, knowledge);
             knowledge.setAiAnalysisSnapshot(objectMapper.writeValueAsString(normalized));
             knowledge.setAiAnalysisTime(new Date());
+            applyKnowledgeSummaryIfNeeded(knowledge, normalized.getCoreHighlights());
             updateById(knowledge);
         } catch (Exception e) {
             log.warn("保存知识库 AI 分析缓存失败: knowledgeId={}, error={}",
                     knowledge.getKnowledgeId(), e.getMessage());
         }
+    }
+
+    private void persistKnowledgeSummaryIfNeeded(Knowledge knowledge, String summary) {
+        if (!applyKnowledgeSummaryIfNeeded(knowledge, summary)) {
+            return;
+        }
+        lambdaUpdate()
+                .eq(Knowledge::getKnowledgeId, knowledge.getKnowledgeId())
+                .set(Knowledge::getSummary, knowledge.getSummary())
+                .update();
+    }
+
+    private boolean applyKnowledgeSummaryIfNeeded(Knowledge knowledge, String summary) {
+        String normalizedSummary = StrUtil.trim(summary);
+        if (StrUtil.isBlank(normalizedSummary)
+                || StrUtil.equals(normalizedSummary, StrUtil.trim(knowledge.getSummary()))) {
+            return false;
+        }
+        knowledge.setSummary(normalizedSummary);
+        return true;
     }
 
     private KnowledgeAiAnalyzeVO normalizeAnalyzeResult(KnowledgeAiAnalyzeVO source, Knowledge knowledge) {
