@@ -541,16 +541,17 @@
                   >
                     <span class="material-symbols-outlined">menu_book</span>
                   </button>
-                  <input
+                  <textarea
                     ref="chatInputRef"
                     v-model="inputText"
-                    type="text"
-                    class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-3 py-3 text-sm placeholder:text-slate-400"
+                    rows="1"
+                    class="max-h-32 min-h-10 flex-1 resize-none overflow-y-auto border-none bg-transparent px-3 py-2.5 text-sm leading-5 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0"
                     placeholder="输入指令，如：总结今天与张总的会议..."
                     :disabled="chatStore.currentSessionIsStreaming || isUploading"
+                    @input="resizeChatTextarea"
                     @keydown.enter.exact.prevent="handleSend"
                     @paste="handlePaste"
-                  />
+                  ></textarea>
                   <div class="flex items-center gap-2 pr-1">
                     <button
                       type="button"
@@ -795,7 +796,7 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const showScrollToBottomButton = ref(false)
 const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const chatInputRef = ref<HTMLInputElement | null>(null)
+const chatInputRef = ref<HTMLTextAreaElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
 const composerAttachmentPreviewItems = computed<ComposerAttachmentPreviewItem[]>(() => {
@@ -1308,6 +1309,7 @@ async function handleSend() {
   const selectedKnowledgeSnapshot = [...selectedKnowledgeItems.value]
   inputText.value = ''
   isPinnedToBottom.value = true
+  void nextTick(resizeChatTextarea)
 
   let attachmentDTOs: ChatAttachmentDTO[] | undefined
   let attachmentVOs: ChatAttachmentVO[] | undefined
@@ -1379,8 +1381,17 @@ async function refocusChatInputAfterSend() {
   chatInputRef.value?.focus()
 }
 
+function resizeChatTextarea() {
+  const el = chatInputRef.value
+  if (!el) return
+
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, 128)}px`
+}
+
 function sendQuickMessage(text: string) {
   inputText.value = text
+  void nextTick(resizeChatTextarea)
   handleSend()
 }
 
