@@ -2516,6 +2516,16 @@ function resolveChatAppIcon(code: string): string {
   margin: 0 0 0.85em;
 }
 
+.wk-chat-message :deep(.wk-markdown ul),
+.wk-chat-message :deep(.wk-markdown ol) {
+  margin: 0.85em 0;
+  padding-left: 1.5em;
+}
+
+.wk-chat-message :deep(.wk-markdown li) {
+  margin: 0.25em 0;
+}
+
 .wk-chat-message :deep(.wk-markdown pre) {
   margin: 1em 0;
   overflow-x: auto;
@@ -2523,6 +2533,11 @@ function resolveChatAppIcon(code: string): string {
   background: #1f1e1c;
   padding: 14px 16px;
   color: #f7f7f7;
+}
+
+:global(html.dark) .wk-chat-message :deep(.wk-markdown pre) {
+  background: #030712;
+  color: #e5edf8;
 }
 
 .wk-chat-message :deep(.wk-markdown code) {
