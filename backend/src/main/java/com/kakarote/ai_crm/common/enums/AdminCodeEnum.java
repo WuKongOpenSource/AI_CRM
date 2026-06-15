@@ -16,7 +16,7 @@ public enum AdminCodeEnum implements ResultCode {
     ADMIN_USER_NEEDS_AT_LEAST_ONE_ROLE(1303,"用户至少需要一个角色!"),
 
     ADMIN_GOODS_NOT_EXIST_ERROR(1304, "商品不存在"),
-    ADMIN_PAY_YEAR_NULL_OR_LESS_ZERO_ERROR(1305, "购买年份/数量不能为空或小于零"),
+    ADMIN_PAY_YEAR_NULL_OR_LESS_ZERO_ERROR(1305, "开通年份/数量不能为空或小于零"),
 
     ADMIN_ORDER_TYPE_ERROR(1306, "订单类型错误"),
 

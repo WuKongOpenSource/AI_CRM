@@ -550,7 +550,7 @@ public class ProjectServiceImpl implements IProjectService {
         getProjectEntity(projectId);
         String content = requireName(commandBO.getContent());
         appendProjectChat(projectId, "user", content);
-        appendProjectChat(projectId, "assistant", "已记录项目指令。当前单机版项目对话不会消耗额度，可继续在项目任务中跟进处理。");
+        appendProjectChat(projectId, "assistant", "已记录项目指令。请继续在项目任务中跟进处理。");
         return getProject(projectId);
     }
 
@@ -560,7 +560,7 @@ public class ProjectServiceImpl implements IProjectService {
         getProjectTask(projectId, taskId);
         String content = requireName(commandBO.getContent());
         appendTaskChat(projectId, taskId, "user", content);
-        appendTaskChat(projectId, taskId, "assistant", "已记录任务指令。当前单机版任务对话不会消耗额度。");
+        appendTaskChat(projectId, taskId, "assistant", "已记录任务指令。请继续在任务中跟进处理。");
         return getProject(projectId);
     }
 
