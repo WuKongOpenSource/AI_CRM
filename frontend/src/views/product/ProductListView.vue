@@ -45,6 +45,40 @@
         </button>
         <button
           type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          @click="openSettingsDialog"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">tune</span>
+          设置
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          @click="handleDownloadTemplate"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">file_download</span>
+          模板
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+          :disabled="importLoading"
+          @click="triggerImportFile"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">upload_file</span>
+          导入
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          @click="handleExport"
+        >
+          <span class="material-symbols-outlined text-[18px] leading-none">ios_share</span>
+          导出
+        </button>
+        <input ref="importInputRef" type="file" class="hidden" accept=".xlsx,.xls" @change="handleImportFileChange" />
+        <button
+          type="button"
           class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-sm transition hover:bg-primary/90"
           @click="openCreateDialog"
         >
@@ -235,6 +269,69 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="settingsVisible" title="产品设置" :width="isMobile ? '95%' : '420px'">
+      <div class="rounded-lg bg-slate-50 p-4">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <div class="text-sm font-bold text-slate-900">产品编码必填</div>
+            <div class="mt-1 text-xs text-slate-500">关闭后，新增和导入产品时可不填写编码。</div>
+          </div>
+          <el-switch v-model="settingsForm.codeRequired" />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <el-button @click="settingsVisible = false">取消</el-button>
+          <el-button type="primary" :loading="settingsSaving" @click="submitSettings">保存</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="importDialogVisible" title="产品导入预览" :width="isMobile ? '95%' : '860px'">
+      <div v-if="importPreview?.errors?.length" class="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-600">
+        <div v-for="error in importPreview.errors" :key="error">{{ error }}</div>
+      </div>
+      <div class="mb-3 flex flex-wrap gap-2 text-xs text-slate-500">
+        <span class="rounded-full bg-slate-100 px-2 py-1">总行数 {{ importPreview?.totalRows || 0 }}</span>
+        <span class="rounded-full bg-emerald-50 px-2 py-1 text-emerald-600">有效 {{ importPreview?.validRows || 0 }}</span>
+        <span class="rounded-full bg-amber-50 px-2 py-1 text-amber-600">重复 {{ importPreview?.duplicateRows || 0 }}</span>
+        <span class="rounded-full bg-rose-50 px-2 py-1 text-rose-600">错误 {{ importPreview?.errorRows || 0 }}</span>
+      </div>
+      <el-table :data="importRows" max-height="420" border size="small">
+        <el-table-column prop="rowNum" label="行" width="64" />
+        <el-table-column prop="productName" label="产品名称" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="productCode" label="编码" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="categoryPath" label="类目" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="ownerName" label="负责人" width="120" show-overflow-tooltip />
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.status === 'inactive' ? 'info' : 'success'">{{ statusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="重复处理" width="120">
+          <template #default="{ row }">
+            <el-select v-if="row.duplicate" v-model="row.handleMode" size="small">
+              <el-option label="更新" value="update" />
+              <el-option label="跳过" value="skip" />
+            </el-select>
+            <span v-else class="text-slate-400">新增</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="校验" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="!row.errors?.length" class="text-emerald-600">通过</span>
+            <span v-else class="text-rose-500">{{ row.errors.join('；') }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <el-button @click="importDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="importSubmitting" :disabled="!importRows.length" @click="submitImport">确认导入</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -244,15 +341,21 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addProduct,
   addProductCategory,
+  confirmProductImport,
   deleteProduct,
+  downloadProductImportTemplate,
+  exportProducts,
   getProductCategoryTree,
+  getProductSettings,
+  previewProductImport,
   queryProductList,
   updateProduct,
+  updateProductSettings,
   updateProductStatus
 } from '@/api/product'
 import { useResponsive } from '@/composables/useResponsive'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { ProductAddBO, ProductCategoryVO, ProductStatus, ProductVO } from '@/types/product'
+import type { ProductAddBO, ProductCategoryVO, ProductImportPreviewVO, ProductStatus, ProductVO } from '@/types/product'
 
 type Option = {
   label: string
@@ -272,6 +375,14 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const saving = ref(false)
 const editingProduct = ref<ProductVO | null>(null)
+const settingsVisible = ref(false)
+const settingsSaving = ref(false)
+const settingsForm = reactive({ codeRequired: true })
+const importInputRef = ref<HTMLInputElement | null>(null)
+const importDialogVisible = ref(false)
+const importLoading = ref(false)
+const importSubmitting = ref(false)
+const importPreview = ref<ProductImportPreviewVO | null>(null)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const form = reactive<ProductAddBO & { productId?: string }>({
@@ -287,6 +398,7 @@ const form = reactive<ProductAddBO & { productId?: string }>({
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
 const categoryOptions = computed<Option[]>(() => flattenCategories(categories.value))
+const importRows = computed(() => importPreview.value?.rows || [])
 
 onMounted(async () => {
   await loadCategories()
@@ -322,6 +434,106 @@ async function loadCategories() {
     if (!isRequestErrorHandled(error)) {
       ElMessage.error('加载产品类目失败')
     }
+  }
+}
+
+async function openSettingsDialog() {
+  try {
+    const settings = await getProductSettings()
+    settingsForm.codeRequired = settings.codeRequired !== false
+    settingsVisible.value = true
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('加载产品设置失败')
+    }
+  }
+}
+
+async function submitSettings() {
+  settingsSaving.value = true
+  try {
+    await updateProductSettings({ codeRequired: settingsForm.codeRequired })
+    ElMessage.success('产品设置已保存')
+    settingsVisible.value = false
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('保存产品设置失败')
+    }
+  } finally {
+    settingsSaving.value = false
+  }
+}
+
+async function handleExport() {
+  try {
+    await exportProducts({
+      keyword: keyword.value.trim() || undefined,
+      status: status.value,
+      categoryId: categoryId.value || undefined,
+      includeChildCategory: true
+    })
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('导出产品失败')
+    }
+  }
+}
+
+async function handleDownloadTemplate() {
+  try {
+    await downloadProductImportTemplate()
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('下载模板失败')
+    }
+  }
+}
+
+function triggerImportFile() {
+  if (importInputRef.value) {
+    importInputRef.value.value = ''
+    importInputRef.value.click()
+  }
+}
+
+async function handleImportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  importLoading.value = true
+  try {
+    importPreview.value = await previewProductImport(file)
+    importDialogVisible.value = true
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('解析导入文件失败')
+    }
+  } finally {
+    importLoading.value = false
+    input.value = ''
+  }
+}
+
+async function submitImport() {
+  if (!importRows.value.length) return
+  importSubmitting.value = true
+  try {
+    const result = await confirmProductImport(importRows.value)
+    const summary = `新增 ${result.imported}，更新 ${result.updated}，跳过 ${result.skipped}`
+    if (result.errors?.length) {
+      ElMessage.warning(`${summary}，${result.errors.length} 行失败`)
+    } else {
+      ElMessage.success(summary)
+    }
+    importDialogVisible.value = false
+    await loadProducts()
+  } catch (error) {
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.error('导入产品失败')
+    }
+  } finally {
+    importSubmitting.value = false
   }
 }
 
