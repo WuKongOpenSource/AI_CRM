@@ -338,13 +338,22 @@ const externalLoadingProvider = ref<ExternalAuthProviderCode | ''>('')
 const externalLoginTicketProcessing = ref(false)
 
 const LAST_LOGIN_USERNAME_STORAGE_KEY = 'wk_ai_crm:last_login_username:v1'
+const LOGIN_FORM_DRAFT_STORAGE_KEY = 'wk_ai_crm:login_form_draft:v1'
+const LOGIN_FORM_DRAFT_MAX_AGE_MS = 10 * 60 * 1000
 const AGREEMENT_ACCEPTED_STORAGE_KEY = 'wk_ai_crm:agreement_accepted:v1'
 const AGREEMENT_DIALOG_QUERY_KEY = 'agreementDialog'
 const prefersInstantStageHeight = prefersReducedMotion() || isWebKitWithoutChromium()
 
+type LoginFormDraft = {
+  username: string
+  password: string
+  savedAt: number
+}
+
+const initialLoginFormDraft = consumeLoginFormDraft()
 const loginForm = reactive({
-  username: readLastLoginUsername(),
-  password: ''
+  username: initialLoginFormDraft?.username ?? readLastLoginUsername(),
+  password: initialLoginFormDraft?.password ?? ''
 })
 
 const agreementAccepted = ref(readAgreementAccepted())
@@ -357,22 +366,39 @@ const privacyPolicyHref = computed(() => getLegalDocumentHref('privacy'))
 const agreementDialogUserAgreementHref = computed(() => getLegalDocumentHref('agreement', true))
 const agreementDialogPrivacyPolicyHref = computed(() => getLegalDocumentHref('privacy', true))
 
-function getLegalDocumentRoute(type: LegalDocumentType, returnToAgreementDialog = false) {
+function getLegalDocumentRoute(
+  type: LegalDocumentType,
+  returnToAgreementDialog = false,
+  inAppBrowser = false
+) {
+  const query: Record<string, string> = {}
+  if (returnToAgreementDialog) {
+    Object.assign(query, buildAgreementDialogReturnQuery())
+  }
+  if (inAppBrowser) {
+    query.inAppBrowser = '1'
+  }
+
   return {
     name: type === 'privacy' ? 'PrivacyPolicy' : 'UserAgreement',
-    query: returnToAgreementDialog ? buildAgreementDialogReturnQuery() : undefined
+    ...(Object.keys(query).length ? { query } : {})
   }
 }
 
-function getLegalDocumentHref(type: LegalDocumentType, returnToAgreementDialog = false): string {
-  return router.resolve(getLegalDocumentRoute(type, returnToAgreementDialog)).href
+function getLegalDocumentHref(
+  type: LegalDocumentType,
+  returnToAgreementDialog = false,
+  inAppBrowser = false
+): string {
+  return router.resolve(getLegalDocumentRoute(type, returnToAgreementDialog, inAppBrowser)).href
 }
 
 async function openLegalDocument(
   type: LegalDocumentType,
   options: { returnToAgreementDialog?: boolean } = {}
 ) {
-  const href = getLegalDocumentHref(type, options.returnToAgreementDialog)
+  persistLoginFormDraft()
+  const href = getLegalDocumentHref(type, options.returnToAgreementDialog, true)
   const openedInAppBrowser = await openLegalDocumentWithInAppBrowser(href)
   if (!openedInAppBrowser) {
     await router.push(getLegalDocumentRoute(type, options.returnToAgreementDialog))
@@ -426,6 +452,54 @@ function rememberSuccessfulLoginUsername() {
   if (!username || typeof window === 'undefined') return
   try {
     window.localStorage.setItem(LAST_LOGIN_USERNAME_STORAGE_KEY, username)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function clearLoginFormDraft() {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.removeItem(LOGIN_FORM_DRAFT_STORAGE_KEY)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function consumeLoginFormDraft(): LoginFormDraft | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.sessionStorage.getItem(LOGIN_FORM_DRAFT_STORAGE_KEY)
+    if (!raw) return null
+
+    window.sessionStorage.removeItem(LOGIN_FORM_DRAFT_STORAGE_KEY)
+    const draft = JSON.parse(raw) as Partial<LoginFormDraft>
+    const savedAt = typeof draft.savedAt === 'number' ? draft.savedAt : 0
+    if (!savedAt || Date.now() - savedAt > LOGIN_FORM_DRAFT_MAX_AGE_MS) {
+      return null
+    }
+
+    return {
+      username: typeof draft.username === 'string' ? draft.username : '',
+      password: typeof draft.password === 'string' ? draft.password : '',
+      savedAt
+    }
+  } catch {
+    clearLoginFormDraft()
+    return null
+  }
+}
+
+function persistLoginFormDraft() {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.sessionStorage.setItem(LOGIN_FORM_DRAFT_STORAGE_KEY, JSON.stringify({
+      username: loginForm.username,
+      password: loginForm.password,
+      savedAt: Date.now()
+    } satisfies LoginFormDraft))
   } catch {
     // Ignore storage failures.
   }
@@ -695,6 +769,7 @@ function reloadToHashRoute(redirect: string): void {
 }
 
 async function completeLoginRedirect(redirectValue: unknown) {
+  clearLoginFormDraft()
   rememberSuccessfulLoginUsername()
 
   let redirect = normalizeLoginRedirect(redirectValue)

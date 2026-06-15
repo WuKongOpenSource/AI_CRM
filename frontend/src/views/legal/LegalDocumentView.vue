@@ -22,14 +22,15 @@
         </div>
       </article>
 
-      <RouterLink class="legal-page__back" :to="backRoute">返回登录</RouterLink>
+      <button type="button" class="legal-page__back" @click="handleBackToLogin">返回登录</button>
     </section>
   </main>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { InAppBrowser } from '@capacitor/inappbrowser'
 import logoImg from '@/assets/images/logo.png'
 
 type LegalDocumentType = 'agreement' | 'privacy'
@@ -39,6 +40,8 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
+const IN_APP_BROWSER_QUERY_KEY = 'inAppBrowser'
 
 const LEGAL_DOCUMENT_URLS: Record<LegalDocumentType, string> = {
   agreement: 'https://file.72crm.com/static/law/72crm_ai_service.txt',
@@ -48,6 +51,7 @@ const LEGAL_DOCUMENT_URLS: Record<LegalDocumentType, string> = {
 const documentTitle = computed(() => (props.documentType === 'privacy' ? '隐私声明' : '用户协议'))
 const documentIntro = computed(() => `请仔细阅读以下${documentTitle.value}内容。`)
 const documentUrl = computed(() => LEGAL_DOCUMENT_URLS[props.documentType])
+const shouldCloseInAppBrowser = computed(() => route.query[IN_APP_BROWSER_QUERY_KEY] === '1')
 const backRoute = computed(() => {
   const query: Record<string, string> = {}
   if (route.query.agreementDialog === '1') {
@@ -79,6 +83,19 @@ async function loadDocument(): Promise<void> {
   } finally {
     isLoading.value = false
   }
+}
+
+async function handleBackToLogin(): Promise<void> {
+  if (shouldCloseInAppBrowser.value) {
+    try {
+      await InAppBrowser.close()
+      return
+    } catch (error) {
+      console.warn('Failed to close InAppBrowser:', error)
+    }
+  }
+
+  await router.push(backRoute.value)
 }
 
 watch(
@@ -260,7 +277,12 @@ watch(
 .legal-page__back {
   display: inline-flex;
   margin-top: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #137fec;
+  cursor: pointer;
+  font: inherit;
   font-size: 0.95rem;
   font-weight: 700;
   text-decoration: none;
