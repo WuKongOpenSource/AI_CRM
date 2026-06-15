@@ -662,11 +662,30 @@
                       </div>
                     </el-popover>
                     <button
-                      class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
-                      :disabled="(!inputText.trim() && selectedFiles.length === 0 && selectedKnowledgeItems.length === 0) || chatStore.currentSessionIsStreaming || isUploading"
-                      @click="handleSend"
+                      type="button"
+                      class="group/chat-send size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                      :class="sendActionButtonClass"
+                      :disabled="sendActionDisabled"
+                      :aria-label="sendActionTitle"
+                      :title="sendActionTitle"
+                      @click="handleSendAction"
                     >
-                      <span v-if="chatStore.currentSessionIsStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                      <span v-if="chatStore.currentSessionIsStreaming || isUploading || isTranscribing" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
+                      <span v-else-if="isRecording" class="wk-recording-indicator" aria-hidden="true">
+                        <span class="material-symbols-outlined wk-recording-indicator__stop">stop</span>
+                        <span class="wk-recording-indicator__bars">
+                          <span />
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      </span>
+                      <WkIcon
+                        v-else-if="!hasComposerSendPayload"
+                        name="voice"
+                        :box-size="20"
+                        class="text-[20px] leading-none"
+                      />
                       <span v-else class="material-symbols-outlined text-xl">send</span>
                     </button>
                   </div>
@@ -844,6 +863,7 @@ import { useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
+import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
@@ -865,6 +885,14 @@ import {
   extractClipboardFiles,
   mergeChatFiles
 } from '@/utils/chatAttachment'
+import {
+  canCaptureMobileAudioFile,
+  captureMobileAudioFile,
+  hasMobileAudioInputSupport,
+  requestMobileAudioStream,
+  shouldPreferMobileAudioFileCapture,
+  shouldUseMobileAudioFileCapture
+} from '@/utils/mobileAudioRecording'
 import type { ScheduleVO } from '@/api/schedule'
 import type { AddressBookDetail } from '@/types/addressBook'
 import type { ProductVO } from '@/types/product'
@@ -900,6 +928,8 @@ const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
 const chatModelPopoverVisible = ref(false)
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
+const isRecording = ref(false)
+const isTranscribing = ref(false)
 const composerAttachmentPreviewItems = computed<ComposerAttachmentPreviewItem[]>(() => {
   const items: ComposerAttachmentPreviewItem[] = []
 
@@ -930,6 +960,13 @@ const productDetail = ref<ProductVO | null>(null)
 const objectPanelLoading = ref(false)
 const objectPanelError = ref('')
 let objectDetailRequestId = 0
+let mediaRecorder: MediaRecorder | null = null
+let mediaStream: MediaStream | null = null
+let recordedChunks: Blob[] = []
+let recordedMimeType = ''
+let skipNextTranscription = false
+let transcriptionToken = 0
+let speechInputBase = ''
 
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 const DEFAULT_CHAT_AI_CONFIG: AiConfigUpdateBO = {
@@ -1035,6 +1072,27 @@ const composerModelLabel = computed(() => {
   return model ? modelOptionLabel(model) : '选择模型'
 })
 const selectedModelInitial = computed(() => composerModelLabel.value.slice(0, 1) || '?')
+const hasComposerSendPayload = computed(() =>
+  Boolean(inputText.value.trim())
+  || selectedFiles.value.length > 0
+  || selectedKnowledgeItems.value.length > 0
+)
+const sendActionButtonClass = computed(() => {
+  if (isRecording.value) return '!bg-red-500 hover:!bg-red-600'
+  if (isTranscribing.value || isUploading.value) return '!bg-slate-200 !text-slate-500 hover:!bg-slate-200'
+  return ''
+})
+const sendActionDisabled = computed(() =>
+  chatStore.currentSessionIsStreaming || isUploading.value || isTranscribing.value
+)
+const sendActionTitle = computed(() => {
+  if (chatStore.currentSessionIsStreaming) return '正在回复中'
+  if (isUploading.value) return '文件上传中'
+  if (isTranscribing.value) return '语音识别中'
+  if (isRecording.value) return '点击结束录音'
+  if (!hasComposerSendPayload.value) return '使用语音输入'
+  return '发送'
+})
 const aiStatusBadgeText = computed(() => {
   return aiReady.value ? '模型已就绪' : '待配置'
 })
@@ -1110,6 +1168,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   revokeAllSelectedFilePreviewUrls()
+  abortVoiceRecording()
   if (scrollTimer) {
     clearTimeout(scrollTimer)
     scrollTimer = null
@@ -1474,6 +1533,199 @@ function handleModelChange(modelKey: string) {
 function handleOpenMoreModels() {
   chatModelPopoverVisible.value = false
   openApiKeySetup()
+}
+
+function releaseMediaStream() {
+  mediaStream?.getTracks().forEach(track => track.stop())
+  mediaStream = null
+}
+
+function abortVoiceRecording() {
+  skipNextTranscription = true
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  mediaRecorder = null
+  releaseMediaStream()
+  recordedChunks = []
+  recordedMimeType = ''
+  isRecording.value = false
+}
+
+async function ensureAudioTranscriptionSupported(): Promise<boolean> {
+  const selectedCapabilities = chatStore.selectedModel?.capabilities
+  if (selectedCapabilities?.supportsAudioTranscription) {
+    return true
+  }
+  if (selectedCapabilities && !selectedCapabilities.supportsAudioTranscription) {
+    ElMessage.warning('当前模型不支持语音识别，请切换支持语音的模型')
+    return false
+  }
+
+  try {
+    const config = await getAiConfig()
+    if (config.capabilities?.supportsAudioTranscription) {
+      return true
+    }
+    ElMessage.warning('当前模型不支持语音识别，请配置支持的模型')
+    return false
+  } catch (error: unknown) {
+    console.error('Load AI config failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.warning('暂时无法获取语音识别能力，请稍后再试')
+    }
+    return false
+  }
+}
+
+function resolveRecordingMimeType(): string {
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return ''
+  }
+  return candidates.find(type => MediaRecorder.isTypeSupported(type)) || ''
+}
+
+function resolveAudioExtension(mimeType: string): string {
+  if (mimeType.includes('mp4')) return 'm4a'
+  if (mimeType.includes('mpeg')) return 'mp3'
+  if (mimeType.includes('wav')) return 'wav'
+  return 'webm'
+}
+
+function buildRecordedAudioFile(): File | null {
+  if (recordedChunks.length === 0) return null
+  const mimeType = recordedMimeType || recordedChunks[0]?.type || 'audio/webm'
+  const blob = new Blob(recordedChunks, { type: mimeType })
+  return new File([blob], `chat-recording.${resolveAudioExtension(mimeType)}`, { type: mimeType })
+}
+
+async function transcribeRecordedAudio(file: File | null) {
+  if (!file) {
+    ElMessage.warning('未采集到有效录音，请重试')
+    return
+  }
+  const currentToken = ++transcriptionToken
+  isTranscribing.value = true
+  try {
+    const transcript = (await transcribeFollowUpAudio(file)).trim()
+    if (currentToken !== transcriptionToken) return
+    if (!transcript) {
+      ElMessage.warning('未识别到有效语音内容，请重试')
+      return
+    }
+    inputText.value = speechInputBase ? `${speechInputBase}\n${transcript}` : transcript
+    void nextTick(() => {
+      resizeChatTextarea()
+      chatInputRef.value?.focus()
+    })
+    ElMessage.success('语音已转成文字，可继续编辑后发送')
+  } catch (error: unknown) {
+    console.error('Audio transcription failed:', error)
+    if (!isRequestErrorHandled(error)) {
+      ElMessage.warning('语音识别失败，请稍后重试')
+    }
+  } finally {
+    if (currentToken === transcriptionToken) {
+      isTranscribing.value = false
+    }
+  }
+}
+
+async function handleRecordedAudioStop() {
+  const shouldSkip = skipNextTranscription
+  skipNextTranscription = false
+  isRecording.value = false
+  const file = shouldSkip ? null : buildRecordedAudioFile()
+  mediaRecorder = null
+  releaseMediaStream()
+  recordedChunks = []
+  recordedMimeType = ''
+  if (shouldSkip) return
+  await transcribeRecordedAudio(file)
+}
+
+async function handleStartAudioRecording() {
+  if (isRecording.value || isTranscribing.value) return
+  const useMobileAudioApi = isMobile.value
+  const hasAudioInput = useMobileAudioApi
+    ? hasMobileAudioInputSupport()
+    : Boolean(navigator.mediaDevices?.getUserMedia)
+  const useMobileAudioFileCapture = shouldUseMobileAudioFileCapture({
+    useMobileAudioApi,
+    hasAudioInput,
+    hasMediaRecorder: typeof MediaRecorder !== 'undefined',
+    canCaptureAudioFile: canCaptureMobileAudioFile(),
+    preferFileCapture: shouldPreferMobileAudioFileCapture()
+  })
+
+  if (useMobileAudioFileCapture) {
+    speechInputBase = inputText.value.trim()
+    const capturedFile = await captureMobileAudioFile()
+    if (!capturedFile) return
+    if (!(await ensureAudioTranscriptionSupported())) return
+    await transcribeRecordedAudio(capturedFile)
+    return
+  }
+
+  if (!(await ensureAudioTranscriptionSupported())) return
+  if (!hasAudioInput || typeof MediaRecorder === 'undefined') {
+    ElMessage.warning('当前浏览器不支持录音，请改用文字输入')
+    return
+  }
+  try {
+    speechInputBase = inputText.value.trim()
+    skipNextTranscription = false
+    recordedChunks = []
+    mediaStream = useMobileAudioApi
+      ? await requestMobileAudioStream({ audio: true })
+      : await navigator.mediaDevices.getUserMedia({ audio: true })
+    const mimeType = resolveRecordingMimeType()
+    mediaRecorder = mimeType
+      ? new MediaRecorder(mediaStream, { mimeType })
+      : new MediaRecorder(mediaStream)
+    recordedMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm'
+    mediaRecorder.ondataavailable = (event: BlobEvent) => {
+      if (event.data && event.data.size > 0) {
+        recordedChunks.push(event.data)
+      }
+    }
+    mediaRecorder.onstop = () => {
+      void handleRecordedAudioStop()
+    }
+    mediaRecorder.onerror = (event: Event) => {
+      console.error('MediaRecorder error:', event)
+      ElMessage.warning('录音失败，请检查麦克风权限后重试')
+    }
+    mediaRecorder.start()
+    isRecording.value = true
+  } catch (error) {
+    console.error('Start recording failed:', error)
+    abortVoiceRecording()
+    ElMessage.warning('无法启动录音，请检查浏览器和麦克风权限')
+  }
+}
+
+function handleStopAudioRecording() {
+  if (!mediaRecorder) return
+  skipNextTranscription = false
+  if (mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop()
+  }
+  isRecording.value = false
+}
+
+function handleSendAction() {
+  if (sendActionDisabled.value) return
+  if (isRecording.value) {
+    handleStopAudioRecording()
+    return
+  }
+  if (hasComposerSendPayload.value) {
+    void handleSend()
+    return
+  }
+  void handleStartAudioRecording()
 }
 
 async function handleSend() {
@@ -2184,6 +2436,102 @@ function resolveChatAppIcon(code: string): string {
   color: #94a3b8;
   font-size: 13px;
   line-height: 1.6;
+}
+
+.wk-recording-indicator {
+  position: relative;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.wk-recording-indicator::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.18);
+  animation: wk-recording-pulse 1.2s ease-out infinite;
+}
+
+.wk-recording-indicator__stop {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.wk-recording-indicator__bars {
+  position: relative;
+  display: inline-flex;
+  height: 18px;
+  align-items: center;
+  gap: 2px;
+  transition: opacity 140ms ease;
+}
+
+.wk-recording-indicator__bars span {
+  display: block;
+  width: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: wk-recording-bar 0.72s ease-in-out infinite;
+}
+
+.wk-recording-indicator__bars span:nth-child(1) {
+  height: 8px;
+  animation-delay: 0s;
+}
+
+.wk-recording-indicator__bars span:nth-child(2) {
+  height: 15px;
+  animation-delay: 0.12s;
+}
+
+.wk-recording-indicator__bars span:nth-child(3) {
+  height: 11px;
+  animation-delay: 0.24s;
+}
+
+.wk-recording-indicator__bars span:nth-child(4) {
+  height: 17px;
+  animation-delay: 0.36s;
+}
+
+.group\/chat-send:hover .wk-recording-indicator__stop {
+  opacity: 1;
+}
+
+.group\/chat-send:hover .wk-recording-indicator__bars {
+  opacity: 0;
+}
+
+@keyframes wk-recording-pulse {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes wk-recording-bar {
+  0%, 100% {
+    transform: scaleY(0.68);
+  }
+  50% {
+    transform: scaleY(1);
+  }
 }
 
 @media (max-width: 640px) {
