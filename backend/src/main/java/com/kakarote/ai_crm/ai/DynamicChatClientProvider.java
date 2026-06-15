@@ -41,7 +41,6 @@ import java.util.stream.Collectors;
 @Component
 public class DynamicChatClientProvider {
 
-    private static final String AI_MODE_KEY = "ai_mode";
     private static final String AI_PROVIDER_KEY = "ai_provider";
     private static final String AI_API_URL_KEY = "ai_api_url";
     private static final String AI_API_KEY_KEY = "ai_api_key";
@@ -87,9 +86,6 @@ public class DynamicChatClientProvider {
     @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}")
     private String defaultBaseUrl;
 
-    @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
-    private String defaultApiKey;
-
     @Value("${spring.ai.openai.chat.options.model:qwen3.5-plus}")
     private String defaultModel;
 
@@ -98,15 +94,6 @@ public class DynamicChatClientProvider {
 
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
-
-    @Value("${weknora.init-models.chat.base-url:}")
-    private String giftBaseUrl;
-
-    @Value("${weknora.init-models.chat.api-key:}")
-    private String giftApiKey;
-
-    @Value("${weknora.init-models.chat.name:}")
-    private String giftModel;
 
     public ChatClient getChatClient() {
         ChatClient client = currentChatClient;
@@ -151,10 +138,6 @@ public class DynamicChatClientProvider {
 
     public AiMode getCurrentMode() {
         return resolveRuntimeConfig(loadAiConfigsFromDB()).mode();
-    }
-
-    public boolean isUsingGiftMode() {
-        return getCurrentMode() == AiMode.GIFT;
     }
 
     public void evictChatClient() {
@@ -294,9 +277,8 @@ public class DynamicChatClientProvider {
 
     private AiRuntimeConfig resolveRuntimeConfig(Map<String, String> configs) {
         Map<String, SavedProviderConfigSnapshot> savedProviderConfigs = loadSavedProviderConfigs(configs);
-        AiMode requestedMode = AiMode.resolve(configs.get(AI_MODE_KEY));
         SavedProviderConfigSnapshot selectedSavedProvider = resolveSelectedSavedProvider(configs, savedProviderConfigs);
-        if (requestedMode == AiMode.CUSTOM && selectedSavedProvider != null) {
+        if (selectedSavedProvider != null) {
             AiProviderDescriptor descriptor = AiProviderRegistry.resolve(
                     selectedSavedProvider.providerCode(),
                     selectedSavedProvider.apiUrl()
@@ -314,20 +296,21 @@ public class DynamicChatClientProvider {
             );
         }
 
-        String resolvedApiUrl = normalizeCompatibleBaseUrl(StrUtil.blankToDefault(giftBaseUrl, defaultBaseUrl));
-        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(null, resolvedApiUrl);
-        String resolvedApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
-        String resolvedModel = StrUtil.blankToDefault(giftModel, defaultModel);
+        String resolvedApiUrl = normalizeCompatibleBaseUrl(
+                StrUtil.blankToDefault(configs.get(AI_API_URL_KEY), defaultBaseUrl)
+        );
+        AiProviderDescriptor descriptor = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), resolvedApiUrl);
+        String resolvedModel = StrUtil.blankToDefault(configs.get(AI_MODEL_KEY), defaultModel);
         return new AiRuntimeConfig(
                 descriptor.getCode(),
                 resolvedApiUrl,
-                resolvedApiKey,
+                "",
                 resolvedModel,
                 defaultTemperature,
                 defaultMaxTokens,
                 null,
                 descriptor.resolveCapabilities(resolvedModel),
-                AiMode.GIFT
+                AiMode.CUSTOM
         );
     }
 

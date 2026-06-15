@@ -31,7 +31,7 @@ spring:
         speech: none
         transcription: none
     openai:
-      api-key: ${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}
+      api-key: ""
       base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
       chat:
         options:
@@ -79,19 +79,19 @@ oidc:
 weknora:
   enabled: true
   base-url: http://39.97.38.69/api/v1
-  api-key: sk-hNd0e76UZU7ep8a-B2lY-VgZ0AL4v9PwT0s1kdCD276Kq7NJ
+  api-key: ${WEKNORA_API_KEY:}
   init-models:
     chat:
       name: qwen-max
       source: remote
       provider: aliyun
-      api-key: ${DASHSCOPE_API_KEY:}
+      api-key: ${WEKNORA_CHAT_MODEL_API_KEY:}
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
     embedding:
       name: text-embedding-v3
       source: remote
       provider: aliyun
-      api-key: ${DASHSCOPE_API_KEY:}
+      api-key: ${WEKNORA_EMBEDDING_MODEL_API_KEY:}
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
       dimension: 1024
   search:

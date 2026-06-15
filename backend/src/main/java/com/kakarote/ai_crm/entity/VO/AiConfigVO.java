@@ -53,26 +53,14 @@ public class AiConfigVO implements Serializable {
     @Schema(description = "系统支持的服务商列表")
     private List<ProviderOptionVO> availableProviders;
 
-    @Schema(description = "当前 AI 使用模式：gift/custom")
+    @Schema(description = "当前 AI 使用模式：custom")
     private String mode;
 
-    @Schema(description = "是否已保存租户自定义配置")
+    @Schema(description = "是否已保存自建 AI 配置")
     private Boolean customConfigSaved;
 
     @Schema(description = "当前模式下 AI 是否可立即使用")
     private Boolean ready;
-
-    @Schema(description = "注册赠送 token 总量")
-    private Long giftTokenTotal;
-
-    @Schema(description = "注册赠送 token 已使用量")
-    private Long giftTokenUsed;
-
-    @Schema(description = "注册赠送 token 剩余额度")
-    private Long giftTokenRemaining;
-
-    @Schema(description = "赠送 token 是否仍可用")
-    private Boolean giftTokenAvailable;
 
     @Schema(description = "最后更新时间")
     private Date updateTime;
@@ -123,31 +111,31 @@ public class AiConfigVO implements Serializable {
         @Schema(description = "默认是否支持视觉输入")
         private Boolean supportsVision;
 
-        @Schema(description = "当前租户是否已保存该服务商配置")
+        @Schema(description = "是否已保存该服务商配置")
         private Boolean configured;
 
-        @Schema(description = "当前租户默认激活的自定义服务商是否为该项")
+        @Schema(description = "当前默认激活的服务商是否为该项")
         private Boolean active;
 
-        @Schema(description = "当前租户是否已保存该服务商的 API Key")
+        @Schema(description = "是否已保存该服务商的 API Key")
         private Boolean apiKeyConfigured;
 
-        @Schema(description = "当前租户已保存的 API URL")
+        @Schema(description = "已保存的 API URL")
         private String savedApiUrl;
 
-        @Schema(description = "当前租户已保存的模型名称")
+        @Schema(description = "已保存的模型名称")
         private String savedModel;
 
-        @Schema(description = "当前租户已保存的 Temperature")
+        @Schema(description = "已保存的 Temperature")
         private Double savedTemperature;
 
-        @Schema(description = "当前租户已保存的最大 Token 数")
+        @Schema(description = "已保存的最大 Token 数")
         private Integer savedMaxTokens;
 
-        @Schema(description = "当前租户是否已保存额外请求头")
+        @Schema(description = "是否已保存额外请求头")
         private Boolean savedExtraHeadersConfigured;
 
-        @Schema(description = "当前租户已保存的额外请求头 JSON，仅管理接口可见")
+        @Schema(description = "已保存的额外请求头 JSON，仅管理接口可见")
         private String savedExtraHeadersJson;
     }
 }

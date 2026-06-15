@@ -73,9 +73,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
     @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}")
     private String defaultApiUrl;
 
-    @Value("${spring.ai.openai.api-key:${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}}")
-    private String defaultApiKey;
-
     @Value("${spring.ai.openai.chat.options.model:qwen3.5-plus}")
     private String defaultModel;
 
@@ -84,15 +81,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Value("${spring.ai.openai.chat.options.max-tokens:2048}")
     private Integer defaultMaxTokens;
-
-    @Value("${weknora.init-models.chat.base-url:}")
-    private String giftApiUrl;
-
-    @Value("${weknora.init-models.chat.api-key:}")
-    private String giftApiKey;
-
-    @Value("${weknora.init-models.chat.name:}")
-    private String giftModel;
 
     private String buildCacheKey(String configKey) {
         return CACHE_KEY_PREFIX + configKey;
@@ -237,14 +225,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void useGiftAiConfig() {
-        updateConfig(AI_MODE_KEY, AiMode.GIFT.getCode());
-        chatClientProvider.refreshChatClient();
-        log.info("AI 模式已切换为赠送额度");
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
     public void useCustomAiConfig() {
         Map<String, String> configs = getConfigsByType(AI_CONFIG_TYPE);
         SavedProviderConfigSnapshot targetConfig = resolveProviderToActivate(configs, configs.get(AI_PROVIDER_KEY));
@@ -252,7 +232,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             targetConfig = resolveSelectedSavedProvider(configs, loadSavedProviderConfigs(configs));
         }
         if (targetConfig == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前租户还没有保存可用的自定义 AI 配置");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前系统还没有保存可用的自建 AI 配置");
         }
         updateConfigs(buildActivationConfigMap(targetConfig, true));
         chatClientProvider.refreshChatClient();
@@ -397,10 +377,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         AiProviderDescriptor descriptor = AiProviderRegistry.resolve(displaySnapshot.providerCode(), displaySnapshot.apiUrl());
         AiModelCapabilities capabilities = descriptor.resolveCapabilities(displaySnapshot.model());
 
-        long giftTokenTotal = 0L;
-        long giftTokenUsed = 0L;
-        long giftTokenRemaining = 0L;
-
         AiConfigVO vo = new AiConfigVO();
         vo.setProvider(descriptor.getCode());
         vo.setProviderLabel(descriptor.getDisplayName());
@@ -421,19 +397,14 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         ));
         vo.setMode(effectiveSnapshot.mode().getCode());
         vo.setCustomConfigSaved(customConfigSaved);
-        vo.setReady(isAiReady(effectiveSnapshot.mode(), effectiveSnapshot.apiKey(), giftTokenRemaining));
-        vo.setGiftTokenTotal(giftTokenTotal);
-        vo.setGiftTokenUsed(giftTokenUsed);
-        vo.setGiftTokenRemaining(giftTokenRemaining);
-        vo.setGiftTokenAvailable(giftTokenRemaining > 0);
+        vo.setReady(isAiReady(effectiveSnapshot.apiKey()));
         vo.setUpdateTime(getLatestAiConfigUpdateTime());
         return vo;
     }
 
     private EffectiveAiConfigSnapshot resolveEffectiveAiSnapshot(Map<String, String> configs,
                                                                  SavedProviderConfigSnapshot selectedSavedProvider) {
-        AiMode requestedMode = AiMode.resolve(configs.get(AI_MODE_KEY));
-        if (requestedMode == AiMode.CUSTOM && selectedSavedProvider != null) {
+        if (selectedSavedProvider != null) {
             return new EffectiveAiConfigSnapshot(
                     AiMode.CUSTOM,
                     selectedSavedProvider.providerCode(),
@@ -446,18 +417,17 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             );
         }
 
-        String normalizedDefaultApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(
-                StrUtil.blankToDefault(giftApiUrl, defaultApiUrl)
+        String normalizedApiUrl = DynamicChatClientProvider.normalizeCompatibleBaseUrl(
+                StrUtil.blankToDefault(configs.get(AI_API_URL_KEY), defaultApiUrl)
         );
-        String providerCode = AiProviderRegistry.resolve(null, normalizedDefaultApiUrl).getCode();
-        String resolvedGiftApiKey = StrUtil.blankToDefault(giftApiKey, defaultApiKey);
-        String resolvedGiftModel = StrUtil.blankToDefault(giftModel, defaultModel);
+        String providerCode = AiProviderRegistry.resolve(configs.get(AI_PROVIDER_KEY), normalizedApiUrl).getCode();
+        String resolvedModel = StrUtil.blankToDefault(configs.get(AI_MODEL_KEY), defaultModel);
         return new EffectiveAiConfigSnapshot(
-                AiMode.GIFT,
+                AiMode.CUSTOM,
                 providerCode,
-                normalizedDefaultApiUrl,
-                resolvedGiftApiKey,
-                resolvedGiftModel,
+                normalizedApiUrl,
+                "",
+                resolvedModel,
                 defaultTemperature,
                 defaultMaxTokens,
                 null
@@ -480,7 +450,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         return DisplayAiConfigSnapshot.fromEffective(effectiveSnapshot);
     }
 
-    private boolean isAiReady(AiMode mode, String apiKey, long giftTokenRemaining) {
+    private boolean isAiReady(String apiKey) {
         return StrUtil.isNotBlank(apiKey);
     }
 
@@ -590,10 +560,6 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID,
                     "额外请求头 JSON 格式不正确，请传入对象格式，例如 {\"appid\":\"your-app-id\"}");
         }
-    }
-
-    private boolean hasSavedCustomAiConfig(Map<String, String> configs) {
-        return !loadSavedProviderConfigs(configs).isEmpty();
     }
 
     private SavedProviderConfigSnapshot resolveProviderToActivate(Map<String, String> configs, String provider) {
@@ -841,16 +807,14 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
             String extraHeadersJson
     ) {
         private static DisplayAiConfigSnapshot fromEffective(EffectiveAiConfigSnapshot snapshot) {
-            String apiKey = snapshot.mode() == AiMode.CUSTOM ? snapshot.apiKey() : "";
-            String extraHeadersJson = snapshot.mode() == AiMode.CUSTOM ? snapshot.extraHeadersJson() : null;
             return new DisplayAiConfigSnapshot(
                     snapshot.providerCode(),
                     snapshot.apiUrl(),
-                    apiKey,
+                    snapshot.apiKey(),
                     snapshot.model(),
                     snapshot.temperature(),
                     snapshot.maxTokens(),
-                    extraHeadersJson
+                    snapshot.extraHeadersJson()
             );
         }
     }

@@ -141,13 +141,13 @@
         </template>
       </div>
 
-      <!-- AI Quota -->
+      <!-- AI Service Status -->
       <div class="p-4 border-t border-slate-100">
         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
           <div
             class="flex items-center justify-between gap-3 mb-3"
           >
-            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 额度</p>
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-400">AI 服务</p>
             <span
               class="inline-flex rounded-full px-2 py-1 text-[11px] font-bold"
               :class="aiStatusBadgeClass"
@@ -155,23 +155,6 @@
               {{ aiStatusBadgeText }}
             </span>
           </div>
-
-          <template v-if="currentAiMode === 'gift'">
-            <div class="mb-1 flex flex-wrap items-baseline gap-1">
-              <span class="text-xs font-semibold tabular-nums text-slate-900">{{ giftTokenRemainingWan }}</span>
-              <span class="text-xs font-medium text-slate-400">/ {{ giftTokenTotalWan }} 万 token</span>
-            </div>
-            <p v-if="giftTokenRemaining <= 0" class="mb-3 text-xs text-slate-500">
-              赠送额度已用完，可配置 AI 服务后继续使用。
-            </p>
-            <div class="mb-4 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div
-                class="h-full rounded-full transition-all"
-                :class="giftTokenProgressClass"
-                :style="{ width: `${giftTokenProgressPercent}%` }"
-              />
-            </div>
-          </template>
 
           <div class="flex gap-2">
             <button
@@ -188,7 +171,7 @@
               配置 AI 服务
             </button>
           </div>
-          <p class="text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
+          <p class="mt-3 text-xs font-bold text-primary uppercase tracking-wider mb-1">AI 模型状态</p>
           <div class="flex items-center gap-2">
             <div
               class="size-1.5 rounded-full"
@@ -551,7 +534,7 @@ import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
-import type { AiConfig, AiConfigUpdateBO, AiMode, AiProvider, AiProviderPreset } from '@/types/systemConfig'
+import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
 
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
@@ -654,37 +637,16 @@ const quickActions = [
   { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
 ]
 
-const currentAiMode = computed<AiMode>(() => aiConfig.value?.mode || 'gift')
 const aiReady = computed(() => Boolean(aiConfig.value?.ready))
 const hasAiApiKeyConfigured = computed(() => aiReady.value)
 const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
-const giftTokenTotal = computed(() => aiConfig.value?.giftTokenTotal ?? 0)
-const giftTokenRemaining = computed(() => aiConfig.value?.giftTokenRemaining ?? 0)
-const giftTokenProgressPercent = computed(() => {
-  if (giftTokenTotal.value <= 0) return 0
-  return Math.max(0, Math.min(100, Math.round((giftTokenRemaining.value / giftTokenTotal.value) * 100)))
-})
-const giftTokenRemainingWan = computed(() => formatWanToken(giftTokenRemaining.value))
-const giftTokenTotalWan = computed(() => formatWanToken(giftTokenTotal.value))
 const aiStatusBadgeText = computed(() => {
-  if (currentAiMode.value === 'gift') {
-    return giftTokenRemaining.value > 0 ? '赠送额度' : '已用完'
-  }
-  return aiReady.value ? '自定义模型已就绪' : '待配置'
+  return aiReady.value ? '模型已就绪' : '待配置'
 })
 const aiStatusBadgeClass = computed(() => {
-  if (currentAiMode.value === 'gift') {
-    return giftTokenRemaining.value > 0
-      ? 'bg-emerald-50 text-emerald-600'
-      : 'bg-amber-50 text-amber-600'
-  }
   return aiReady.value
     ? 'bg-blue-50 text-blue-600'
     : 'bg-slate-100 text-slate-500'
-})
-const giftTokenProgressClass = computed(() => {
-  if (giftTokenRemaining.value <= 0) return 'bg-amber-400'
-  return currentAiMode.value === 'gift' ? 'bg-primary' : 'bg-blue-500'
 })
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
@@ -741,14 +703,9 @@ function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO
     modelHint: (config as Partial<AiConfig> | null)?.modelHint,
     extraHeadersHint: (config as Partial<AiConfig> | null)?.extraHeadersHint,
     availableProviders: (config as Partial<AiConfig> | null)?.availableProviders,
-    mode: (config as Partial<AiConfig> | null)?.mode || 'gift',
+    mode: (config as Partial<AiConfig> | null)?.mode || 'custom',
     customConfigSaved: (config as Partial<AiConfig> | null)?.customConfigSaved ?? false,
     ready: (config as Partial<AiConfig> | null)?.ready ?? Boolean(config?.apiKey?.trim()),
-    giftTokenTotal: (config as Partial<AiConfig> | null)?.giftTokenTotal ?? 0,
-    giftTokenUsed: (config as Partial<AiConfig> | null)?.giftTokenUsed ?? 0,
-    giftTokenRemaining: (config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0,
-    giftTokenAvailable: (config as Partial<AiConfig> | null)?.giftTokenAvailable
-      ?? (((config as Partial<AiConfig> | null)?.giftTokenRemaining ?? 0) > 0),
     updateTime: config && 'updateTime' in config ? config.updateTime : undefined
   }
 }
@@ -782,11 +739,7 @@ async function ensureAiAvailable(): Promise<boolean> {
   }
 
   if (!canManageAiConfig.value) {
-    if (currentAiMode.value === 'gift' && giftTokenRemaining.value <= 0) {
-      ElMessage.warning('赠送 token 已用完，请联系管理员配置 AI 服务或购买套餐。')
-    } else {
-      ElMessage.warning('当前 AI 服务未就绪，请联系管理员处理。')
-    }
+    ElMessage.warning('当前 AI 服务未就绪，请联系管理员配置。')
     return false
   }
 
@@ -1010,10 +963,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-function formatWanToken(value: number): string {
-  return (value / 10000).toFixed(1)
 }
 
 async function handleNewSession() {

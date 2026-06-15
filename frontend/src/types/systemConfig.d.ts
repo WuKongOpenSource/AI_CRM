@@ -9,7 +9,7 @@ export type AiProvider =
   | 'zhipu'
   | 'custom'
 
-export type AiMode = 'gift' | 'custom'
+export type AiMode = 'custom'
 
 export interface AiModelCapabilities {
   supportsStream: boolean
@@ -56,10 +56,6 @@ export interface AiConfig {
   mode?: AiMode
   customConfigSaved?: boolean
   ready?: boolean
-  giftTokenTotal?: number
-  giftTokenUsed?: number
-  giftTokenRemaining?: number
-  giftTokenAvailable?: boolean
   updateTime?: string
 }
 

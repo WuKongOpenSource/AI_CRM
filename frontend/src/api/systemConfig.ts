@@ -25,10 +25,6 @@ export function activateAiProvider(data: AiProviderActivateBO): Promise<void> {
   return post('/systemConfig/ai/activate', data)
 }
 
-export function useGiftAiConfig(): Promise<void> {
-  return post('/systemConfig/ai/useGift')
-}
-
 export function useCustomAiConfig(): Promise<void> {
   return post('/systemConfig/ai/useCustom')
 }
