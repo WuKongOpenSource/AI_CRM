@@ -604,6 +604,7 @@ import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConf
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 import { renderMarkdown } from '@/utils/markdown'
+import { appEvents, APP_EVENT } from '@/utils/events'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge } from '@/types/common'
 import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
@@ -946,6 +947,7 @@ async function handleSend() {
   if ((!text && !hasFiles && !hasKnowledge) || chatStore.isStreaming || isUploading.value) return
   if (!(await ensureAiAvailable())) return
 
+  const effectiveAppCode = chatStore.currentAppCode
   const content = text || (hasKnowledge ? '请结合选中的知识库文件回答' : '请分析这些文件')
   const selectedKnowledgeSnapshot = [...selectedKnowledgeItems.value]
   inputText.value = ''
@@ -1007,6 +1009,9 @@ async function handleSend() {
   // Switch to chat view when sending
   currentView.value = 'chat'
   await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled || hasKnowledge, knowledgeIds)
+  if (effectiveAppCode === 'crm') {
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat' })
+  }
 }
 
 function sendQuickMessage(text: string) {
