@@ -1,4 +1,4 @@
-import { download, post, upload } from '@/utils/request'
+import { download, get, post, upload } from '@/utils/request'
 import type {
   FollowUp,
   FollowUpAddBO,
@@ -84,6 +84,10 @@ export function analyzeFollowUpAttachment(attachmentId: string): Promise<FollowU
 
 export function downloadFollowUpAttachment(attachmentId: string, fileName?: string): Promise<void> {
   return download(`/followup/attachment/${attachmentId}/download`, fileName)
+}
+
+export function getFollowUpAttachmentBlob(attachmentId: string): Promise<Blob> {
+  return get(`/followup/attachment/${attachmentId}/download`, { responseType: 'blob' })
 }
 
 export function deleteFollowUpAttachment(attachmentId: string): Promise<void> {

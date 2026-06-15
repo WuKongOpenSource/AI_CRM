@@ -473,16 +473,28 @@
                     </div>
                     <p class="text-sm text-slate-600 leading-relaxed">{{ item.content }}</p>
                     <div v-if="item.attachments?.length" class="mt-3 flex flex-wrap gap-2">
-                      <button
+                      <div
                         v-for="attachment in item.attachments"
                         :key="attachment.attachmentId"
-                        type="button"
-                        class="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-primary/30 hover:text-primary"
-                        @click="handleDownloadFollowUpAttachment(attachment)"
+                        class="inline-flex max-w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 transition-colors hover:border-primary/30 hover:text-primary"
                       >
-                        <span class="material-symbols-outlined text-sm">attach_file</span>
-                        <span class="truncate">{{ attachment.fileName }}</span>
-                      </button>
+                        <button
+                          type="button"
+                          class="inline-flex min-w-0 items-center gap-1.5 px-2.5 py-1.5"
+                          @click="handlePreviewFollowUpAttachment(attachment)"
+                        >
+                          <span class="material-symbols-outlined text-sm">attach_file</span>
+                          <span class="truncate">{{ attachment.fileName }}</span>
+                        </button>
+                        <button
+                          type="button"
+                          class="flex shrink-0 items-center border-l border-slate-200 px-2 text-slate-400 transition-colors hover:bg-white hover:text-primary"
+                          title="下载附件"
+                          @click="handleDownloadFollowUpAttachment(attachment)"
+                        >
+                          <span class="material-symbols-outlined text-sm">download</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div v-if="followUpIndex < followUps.length - 1" class="h-4 shrink-0" aria-hidden="true" />
@@ -844,6 +856,11 @@
       :customer="customer"
       @saved="handleAiFollowUpSaved"
     />
+
+    <FollowUpAttachmentPreviewModal
+      v-model="showFollowUpAttachmentPreview"
+      :attachment="previewingFollowUpAttachment"
+    />
   </div>
 </template>
 
@@ -864,6 +881,7 @@ import type { CustomerTag, FollowUp, Contact, FollowUpAttachment, FollowUpAttach
 import type { CustomField } from '@/types/customField'
 import { formatCustomFieldValue as formatCustomFieldDisplayValue } from '@/utils/customFieldDisplay'
 import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
+import FollowUpAttachmentPreviewModal from '@/components/customer/FollowUpAttachmentPreviewModal.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
 import ContactUpsertDialog from '@/views/contact/components/ContactUpsertDialog.vue'
 import ContactDetailDrawer from '@/views/contact/components/ContactDetailDrawer.vue'
@@ -891,6 +909,7 @@ const editingContact = ref<Contact | null>(null)
 const contactAiImagePickerToken = ref(0)
 const showEditDialog = ref(false)
 const showAiFollowUpDrawer = ref(false)
+const showFollowUpAttachmentPreview = ref(false)
 const showTerminalStageMenu = ref(false)
 const showTransferPopover = ref(false)
 const headerMoreButtonRef = ref<HTMLElement | null>(null)
@@ -902,6 +921,7 @@ const followUpPageSize = ref(CUSTOMER_DETAIL_REQUEST_LIMIT)
 const followUpLoading = ref(false)
 const followUpAttachmentInput = ref<HTMLInputElement | null>(null)
 const followUpAttachmentUploading = ref(false)
+const previewingFollowUpAttachment = ref<FollowUpAttachment | null>(null)
 const customerDocumentInput = ref<HTMLInputElement | null>(null)
 const customerDocumentUploading = ref(false)
 const contacts = ref<Contact[]>([])
@@ -1467,6 +1487,11 @@ function getKnowledgeTypeLabel(type?: string): string {
     contract: '合同'
   }
   return type ? labels[type] || type : '文档'
+}
+
+function handlePreviewFollowUpAttachment(attachment: FollowUpAttachment) {
+  previewingFollowUpAttachment.value = attachment
+  showFollowUpAttachmentPreview.value = true
 }
 
 async function handleDownloadFollowUpAttachment(attachment: FollowUpAttachment) {
