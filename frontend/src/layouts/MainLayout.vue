@@ -2044,7 +2044,7 @@ import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDial
 import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
-import { queryGlobalSearch } from '@/api/search'
+import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { queryCustomerList } from '@/api/customer'
 import { queryProductList } from '@/api/product'
 import { queryAddressBook } from '@/api/addressBook'
@@ -2074,23 +2074,11 @@ import type { ProductVO } from '@/types/product'
 import type { ProjectEntity } from '@/types/project'
 import type { AddressBookEmployee } from '@/types/addressBook'
 import type { RelationVO } from '@/types/relation'
-import type { GlobalSearchResultVO } from '@/types/search'
 
 const DEFAULT_CURRENT_VERSION = '1.0.0'
 
 type CapacitorUpdateModule = {
   checkForUpdates: () => Promise<'updated' | 'none' | 'unsupported' | 'failed'>
-}
-
-type GlobalSearchEntityType = GlobalSearchResultVO['type'] | 'relation' | 'product'
-
-type GlobalSearchResult = {
-  entityType: GlobalSearchEntityType
-  entityId: string
-  title: string
-  subtitle?: string
-  summary?: string
-  routePath: string
 }
 
 const route = useRoute()
@@ -4658,7 +4646,7 @@ async function runGlobalSearch(keyword: string) {
 
     if (requestId !== globalSearchRequestId) return
 
-    globalSearchResults.value = (result.list || []).map(normalizeGlobalSearchResult)
+    globalSearchResults.value = result.list || []
     globalSearchTotal.value = result.totalRow || 0
     activeSearchResultIndex.value = globalSearchResults.value.length > 0 ? 0 : -1
   } catch (error) {
@@ -4740,40 +4728,7 @@ function handleGlobalSearchEnter() {
 function navigateToSearchResult(result: GlobalSearchResult) {
   globalSearchKeyword.value = result.title || globalSearchKeyword.value
   closeGlobalSearchDropdown()
-  void router.push(result.routePath)
-}
-
-function normalizeGlobalSearchResult(result: GlobalSearchResultVO): GlobalSearchResult {
-  const entityType = result.type as GlobalSearchEntityType
-  const entityId = String(result.recordId)
-  return {
-    entityType,
-    entityId,
-    title: result.title,
-    subtitle: result.subtitle,
-    summary: result.content,
-    routePath: getGlobalSearchRoutePath(result)
-  }
-}
-
-function getGlobalSearchRoutePath(result: GlobalSearchResultVO): string {
-  const recordId = String(result.recordId)
-  if (result.type === 'customer') {
-    return `/customer/${recordId}`
-  }
-  if (result.type === 'contact' && result.customerId) {
-    return `/customer/${result.customerId}?contactId=${recordId}`
-  }
-  if (result.type === 'task') {
-    return `/task?taskId=${recordId}&keyword=${encodeURIComponent(result.title || '')}`
-  }
-  if (result.type === 'schedule') {
-    return `/calendar?scheduleId=${recordId}`
-  }
-  if (result.type === 'knowledge') {
-    return `/knowledge?knowledgeId=${recordId}&keyword=${encodeURIComponent(result.title || '')}`
-  }
-  return '/search'
+  void router.push(result.routePath || '/chat')
 }
 
 function getSearchResultIcon(entityType: GlobalSearchResult['entityType']): WkIconName {

@@ -15,4 +15,7 @@ public class GlobalSearchQueryBO extends PageEntity {
 
     @Schema(description = "搜索类型：all/customer/contact/task/schedule/knowledge")
     private String type;
+
+    @Schema(description = "Entity type: customer/contact/relation/product/task/schedule/knowledge")
+    private String entityType;
 }

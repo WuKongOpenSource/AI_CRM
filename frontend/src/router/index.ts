@@ -46,12 +46,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'AI 助手', icon: 'ai', permission: 'chat' }
       },
       {
-        path: 'search',
-        name: 'GlobalSearch',
-        component: () => import('@/views/search/GlobalSearchView.vue'),
-        meta: { title: '全局搜索', hidden: true }
-      },
-      {
         path: 'customer',
         name: 'CustomerList',
         component: () => import('@/views/customer/CustomerListView.vue'),

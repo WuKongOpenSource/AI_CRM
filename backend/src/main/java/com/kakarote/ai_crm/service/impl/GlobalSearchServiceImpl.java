@@ -45,7 +45,7 @@ public class GlobalSearchServiceImpl implements IGlobalSearchService {
             return page;
         }
 
-        List<String> searchableTypes = resolveSearchableTypes(safeQuery.getType());
+        List<String> searchableTypes = resolveSearchableTypes(resolveRequestedType(safeQuery));
         if (searchableTypes.isEmpty()) {
             page.setTotal(0);
             page.setRecords(List.of());
@@ -75,8 +75,20 @@ public class GlobalSearchServiceImpl implements IGlobalSearchService {
                 .skip(offset)
                 .limit(page.getSize())
                 .toList();
+        records.forEach(this::normalizeResult);
         page.setRecords(records);
         return page;
+    }
+
+    private String resolveRequestedType(GlobalSearchQueryBO queryBO) {
+        if (queryBO == null) {
+            return null;
+        }
+        String entityType = queryBO.getEntityType();
+        if (entityType != null && !entityType.isBlank()) {
+            return entityType;
+        }
+        return queryBO.getType();
     }
 
     private List<String> resolveSearchableTypes(String requestedType) {
@@ -108,6 +120,47 @@ public class GlobalSearchServiceImpl implements IGlobalSearchService {
         String leftTitle = left.getTitle() == null ? "" : left.getTitle();
         String rightTitle = right.getTitle() == null ? "" : right.getTitle();
         return leftTitle.compareToIgnoreCase(rightTitle);
+    }
+
+    private void normalizeResult(GlobalSearchResultVO result) {
+        if (result == null) {
+            return;
+        }
+        if (result.getEntityType() == null) {
+            result.setEntityType(result.getType());
+        }
+        if (result.getEntityId() == null) {
+            result.setEntityId(result.getRecordId());
+        }
+        if (result.getSummary() == null) {
+            result.setSummary(result.getContent());
+        }
+        if (result.getSortTime() == null) {
+            result.setSortTime(resolveSortTime(result));
+        }
+        if (result.getRoutePath() == null) {
+            result.setRoutePath(resolveRoutePath(result));
+        }
+    }
+
+    private String resolveRoutePath(GlobalSearchResultVO result) {
+        String type = result.getEntityType() == null ? result.getType() : result.getEntityType();
+        Long id = result.getEntityId() == null ? result.getRecordId() : result.getEntityId();
+        if (type == null || id == null) {
+            return "/chat";
+        }
+        return switch (type) {
+            case "customer" -> "/customer/" + id;
+            case "contact" -> result.getCustomerId() == null
+                    ? "/customer"
+                    : "/customer/" + result.getCustomerId() + "?openContactId=" + id;
+            case "task" -> "/task?openTaskId=" + id;
+            case "schedule" -> "/calendar?openScheduleId=" + id;
+            case "knowledge" -> "/knowledge?openKnowledgeId=" + id;
+            case "relation" -> "/relation?openRelationId=" + id;
+            case "product" -> "/product?openProductId=" + id;
+            default -> "/chat";
+        };
     }
 
     private LocalDateTime resolveSortTime(GlobalSearchResultVO result) {
