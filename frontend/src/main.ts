@@ -22,6 +22,25 @@ import './styles/iconfont.css'
 import './styles/main.css'
 import './styles/wk-crm-el-field-skin.css'
 
+if (typeof window !== 'undefined') {
+  const isMobile =
+    window.innerWidth < 768 ||
+    (typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches)
+
+  const capacitor = (window as any).Capacitor
+  const isNativePlatform =
+    !!capacitor &&
+    (typeof capacitor.isNativePlatform === 'function'
+      ? capacitor.isNativePlatform()
+      : typeof capacitor.getPlatform === 'function'
+        ? capacitor.getPlatform() !== 'web'
+        : false)
+
+  if (isMobile && isNativePlatform) {
+    document.documentElement.classList.add('wk-native-mobile')
+  }
+}
+
 const app = createApp(App)
 
 app.use(createPinia())

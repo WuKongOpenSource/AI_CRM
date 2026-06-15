@@ -27,6 +27,48 @@ html, body, #app {
   --wk-safe-left: var(--safe-area-inset-left);
 }
 
+html.wk-native-mobile,
+html.wk-native-mobile body,
+html.wk-native-mobile #app {
+  height: 100dvh;
+}
+
+html.wk-native-mobile #app {
+  box-sizing: border-box;
+  padding-top: var(--wk-safe-top);
+  padding-right: var(--wk-safe-right);
+  padding-left: var(--wk-safe-left);
+}
+
+.wk-screen {
+  height: 100vh;
+}
+
+html.wk-native-mobile .wk-screen {
+  height: 100dvh;
+}
+
+html.wk-native-mobile .wk-safe-bottom {
+  box-sizing: border-box;
+  padding-bottom: var(--wk-safe-bottom);
+}
+
+html,
+body {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select,
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: 16px;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

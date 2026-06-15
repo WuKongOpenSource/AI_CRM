@@ -1,7 +1,7 @@
 <template>
-  <div class="flex h-screen bg-background-light">
+  <div class="flex wk-screen bg-background-light">
     <!-- Desktop Sidebar -->
-    <aside v-if="!isMobile" class="relative w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col h-screen">
+    <aside v-if="!isMobile" class="relative w-64 flex-shrink-0 bg-white border-r border-slate-200 flex flex-col wk-screen">
       <!-- Logo -->
       <div class="p-6 flex items-center gap-3 ">
         <div v-if="enterpriseStore.hasLogo" class="size-10 flex-shrink-0 rounded-xl overflow-hidden bg-transparent border border-slate-200">
@@ -219,7 +219,7 @@
       </header>
 
       <!-- Page Content -->
-      <main class="flex-1 overflow-y-auto">
+      <main class="flex-1 overflow-y-auto wk-safe-bottom">
         <router-view v-slot="{ Component }">
           <Transition name="page-fade" mode="out-in">
             <component :is="Component" />
