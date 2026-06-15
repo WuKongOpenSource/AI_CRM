@@ -56,6 +56,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '客户详情', hidden: true, permission: 'customer' }
       },
       {
+        path: 'relation',
+        name: 'RelationList',
+        component: () => import('@/views/relation/RelationListView.vue'),
+        meta: { title: '关系', icon: 'profile' }
+      },
+      {
         path: 'task',
         name: 'TaskList',
         component: () => import('@/views/task/TaskListView.vue'),

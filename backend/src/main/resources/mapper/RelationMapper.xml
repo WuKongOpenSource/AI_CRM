@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.RelationMapper">
+
+    <sql id="relationBaseSelect">
+        r.relation_id,
+        r.name,
+        r.avatar,
+        r.phone,
+        r.wechat,
+        r.email,
+        r.relation_type,
+        r.company,
+        r.customer_id,
+        linked_customer.company_name AS customer_name,
+        r.remark,
+        r.source,
+        r.source_customer_id,
+        source_customer.company_name AS source_customer_name,
+        r.source_contact_id,
+        r.create_user_id,
+        r.create_time,
+        r.update_time
+    </sql>
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.RelationVO">
+        SELECT
+        <include refid="relationBaseSelect"/>
+        FROM crm_relation r
+        LEFT JOIN crm_customer linked_customer ON r.customer_id = linked_customer.customer_id
+        LEFT JOIN crm_customer source_customer ON r.source_customer_id = source_customer.customer_id
+        WHERE r.status = 1
+          AND r.create_user_id = #{ownerUserId}
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                LOWER(COALESCE(r.name, '')) LIKE LOWER(CONCAT('%', #{query.keyword}, '%'))
+                OR LOWER(COALESCE(r.phone, '')) LIKE LOWER(CONCAT('%', #{query.keyword}, '%'))
+                OR LOWER(COALESCE(r.wechat, '')) LIKE LOWER(CONCAT('%', #{query.keyword}, '%'))
+                OR LOWER(COALESCE(r.email, '')) LIKE LOWER(CONCAT('%', #{query.keyword}, '%'))
+                OR LOWER(COALESCE(linked_customer.company_name, '')) LIKE LOWER(CONCAT('%', #{query.keyword}, '%'))
+                OR LOWER(COALESCE(r.remark, '')) LIKE LOWER(CONCAT('%', #{query.keyword}, '%'))
+            )
+        </if>
+        <if test="query.relationType != null and query.relationType != ''">
+            AND r.relation_type = #{query.relationType}
+        </if>
+        <if test="query.source != null and query.source != ''">
+            AND r.source = #{query.source}
+        </if>
+        <if test="query.sourceCustomerId != null">
+            AND r.source_customer_id = #{query.sourceCustomerId}
+        </if>
+        <if test="query.customerId != null">
+            AND r.customer_id = #{query.customerId}
+        </if>
+        <if test="query.sourceContactId != null">
+            AND r.source_contact_id = #{query.sourceContactId}
+        </if>
+        ORDER BY r.update_time DESC NULLS LAST, r.create_time DESC NULLS LAST, r.relation_id DESC
+    </select>
+
+    <select id="getRelationById" resultType="com.kakarote.ai_crm.entity.VO.RelationVO">
+        SELECT
+        <include refid="relationBaseSelect"/>
+        FROM crm_relation r
+        LEFT JOIN crm_customer linked_customer ON r.customer_id = linked_customer.customer_id
+        LEFT JOIN crm_customer source_customer ON r.source_customer_id = source_customer.customer_id
+        WHERE r.relation_id = #{relationId}
+          AND r.create_user_id = #{ownerUserId}
+          AND r.status = 1
+    </select>
+
+</mapper>
