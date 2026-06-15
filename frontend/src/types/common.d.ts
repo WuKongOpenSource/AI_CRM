@@ -145,6 +145,15 @@ export interface ChatSession {
   updateTime: string
 }
 
+export interface ChatAppOption {
+  code: string
+  label: string
+  iconName?: string
+  description?: string
+  defaultRagEnabled?: boolean
+  recommendedQuestions?: string[]
+}
+
 export interface ChatMessage {
   messageId: string
   sessionId: string

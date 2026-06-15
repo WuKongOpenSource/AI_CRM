@@ -28,6 +28,18 @@ public class ChatSendBO {
     @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
     private Boolean ragEnabled;
 
+    @Schema(description = "Application code")
+    private String appCode;
+
+    @Schema(description = "Bound product ID")
+    private Long productId;
+
+    @Schema(description = "Bound project ID")
+    private Long projectId;
+
+    @Schema(description = "Bound project task ID")
+    private Long projectTaskId;
+
     @Data
     @Schema(description = "附件信息")
     public static class AttachmentDTO {

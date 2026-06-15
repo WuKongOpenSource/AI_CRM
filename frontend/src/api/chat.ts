@@ -1,5 +1,5 @@
 import { post, get, getToken, getApiBaseUrl } from '@/utils/request'
-import type { ChatSession, ChatMessage, ChatAttachmentDTO } from '@/types/common'
+import type { ChatSession, ChatMessage, ChatAttachmentDTO, ChatAppOption } from '@/types/common'
 
 /**
  * Create chat session
@@ -23,6 +23,10 @@ export function createSession(data: {
  */
 export function getSessionList(): Promise<ChatSession[]> {
   return get('/chat/session/list')
+}
+
+export function getChatApplications(): Promise<ChatAppOption[]> {
+  return get('/chat/applications')
 }
 
 /**
@@ -54,7 +58,8 @@ export async function sendMessageStream(
   onComplete?: () => void,
   onError?: (error: Error) => void,
   attachments?: ChatAttachmentDTO[],
-  ragEnabled?: boolean
+  ragEnabled?: boolean,
+  appCode?: string
 ): Promise<void> {
   const token = getToken()
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
@@ -79,7 +84,7 @@ export async function sendMessageStream(
         'Accept': 'text/event-stream',
         ...(token ? { 'Manager-Token': token } : {})
       },
-      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined, ragEnabled })
+      body: JSON.stringify({ sessionId, content, attachments: attachments || undefined, ragEnabled, appCode })
     })
 
     if (!response.ok) {
@@ -160,6 +165,12 @@ function parseSSEEvent(event: string): string | null {
 /**
  * Send message (sync)
  */
-export function sendMessageSync(sessionId: string, content: string, attachments?: ChatAttachmentDTO[], ragEnabled?: boolean): Promise<string> {
-  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined, ragEnabled })
+export function sendMessageSync(
+  sessionId: string,
+  content: string,
+  attachments?: ChatAttachmentDTO[],
+  ragEnabled?: boolean,
+  appCode?: string
+): Promise<string> {
+  return post('/chat/sendSync', { sessionId, content, attachments: attachments || undefined, ragEnabled, appCode })
 }

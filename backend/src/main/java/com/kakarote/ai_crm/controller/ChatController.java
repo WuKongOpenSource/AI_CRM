@@ -4,6 +4,7 @@ import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.BO.SessionPinBO;
+import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.service.IChatService;
@@ -40,6 +41,12 @@ public class ChatController {
     @Operation(summary = "获取会话列表")
     public Result<List<ChatSessionVO>> getSessionList() {
         return Result.ok(chatService.getSessionList());
+    }
+
+    @GetMapping("/applications")
+    @Operation(summary = "List chat applications")
+    public Result<List<ChatAppOptionVO>> listChatApplications() {
+        return Result.ok(chatService.listChatApplications());
     }
 
     @PostMapping("/session/delete/{id}")

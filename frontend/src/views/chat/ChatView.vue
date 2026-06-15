@@ -346,10 +346,29 @@
           <!-- Input Area -->
           <div class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
             <div class="max-w-4xl mx-auto space-y-4">
+              <div v-if="chatStore.applications.length > 0" class="flex flex-wrap gap-2 justify-center">
+                <button
+                  v-for="app in chatStore.applications"
+                  :key="app.code"
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
+                  :class="chatStore.currentAppCode === app.code
+                    ? 'border-primary/25 bg-primary/10 text-primary shadow-sm shadow-primary/10'
+                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+                  :title="app.description || app.label"
+                  @click="chatStore.setCurrentAppCode(app.code)"
+                >
+                  <span class="material-symbols-outlined text-[16px] leading-none">
+                    {{ resolveChatAppIcon(app.code) }}
+                  </span>
+                  <span>{{ app.label }}</span>
+                </button>
+              </div>
+
               <!-- Quick Action Chips -->
               <div v-if="chatStore.messages.length === 0" class="flex flex-wrap gap-2 justify-center">
                 <button
-                  v-for="action in quickActions"
+                  v-for="action in activeQuickActions"
                   :key="action.label"
                   class="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-sm text-slate-500 hover:border-primary hover:text-primary transition-all shadow-sm"
                   @click="sendQuickMessage(action.text)"
@@ -664,6 +683,14 @@ const quickActions = [
   { label: '分析本月销售目标', text: '分析本月销售目标的缺口' }
 ]
 
+const activeQuickActions = computed(() => {
+  const recommended = chatStore.currentApplication?.recommendedQuestions || []
+  if (recommended.length > 0) {
+    return recommended.map(text => ({ label: text, text }))
+  }
+  return quickActions
+})
+
 const aiReady = computed(() => Boolean(aiConfig.value?.ready))
 const hasAiApiKeyConfigured = computed(() => aiReady.value)
 const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
@@ -680,6 +707,7 @@ const userAvatarFallback = computed(() => (userStore.realname || userStore.usern
 
 onMounted(async () => {
   await Promise.all([
+    chatStore.fetchApplications(),
     chatStore.fetchSessions(),
     agentStore.fetchEnabledAgents(),
     loadAiConfig()
@@ -994,7 +1022,7 @@ function formatFileSize(bytes: number): string {
 
 async function handleNewSession() {
   chatStore.clearMessages()
-  await chatStore.startNewSession('新对话')
+  await chatStore.startNewSession('新对话', undefined, undefined, chatStore.currentAppCode)
   currentView.value = 'chat'
   if (isMobile.value) {
     mobilePanel.value = 'chat'
@@ -1057,6 +1085,19 @@ function formatTime(date: Date): string {
     hour: '2-digit',
     minute: '2-digit'
   }).format(date)
+}
+
+function resolveChatAppIcon(code: string): string {
+  const iconMap: Record<string, string> = {
+    general: 'auto_awesome',
+    crm: 'groups',
+    knowledge: 'menu_book',
+    address_book: 'badge',
+    relation: 'contacts',
+    product: 'inventory_2',
+    project: 'task_alt'
+  }
+  return iconMap[code] || 'auto_awesome'
 }
 
 </script>

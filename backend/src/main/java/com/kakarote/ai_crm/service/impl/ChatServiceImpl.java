@@ -6,6 +6,9 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
+import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
+import com.kakarote.ai_crm.ai.app.ChatApplicationDefinition;
+import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
@@ -18,6 +21,7 @@ import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.PO.ChatAttachment;
 import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
+import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
@@ -56,6 +60,9 @@ public class ChatServiceImpl implements IChatService {
 
     @Autowired
     private DynamicChatClientProvider chatClientProvider;
+
+    @Autowired
+    private ChatApplicationRegistry chatApplicationRegistry;
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -153,7 +160,37 @@ public class ChatServiceImpl implements IChatService {
     /**
      * 动态构建包含当前日期的 System Prompt
      */
-    private String buildSystemPrompt() {
+    private String buildSystemPrompt(ChatApplicationDefinition application) {
+        ChatApplicationDefinition resolved = application == null
+                ? chatApplicationRegistry.resolve(ChatApplicationCodes.GENERAL)
+                : application;
+        if (ChatApplicationCodes.CRM.equals(resolved.code())
+                || resolved.toolGroups().contains(ChatApplicationRegistry.TOOL_GROUP_CRM)) {
+            return buildCrmSystemPrompt() + "\n\n" + resolved.systemPrompt();
+        }
+        return buildBaseSystemPrompt() + "\n\n" + resolved.systemPrompt();
+    }
+
+    private String buildBaseSystemPrompt() {
+        LocalDate today = LocalDate.now();
+        String dayOfWeek = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINESE);
+        String weekCalendar = buildWeekCalendar(today);
+
+        return String.format("""
+            你是悟空 AI 的聊天助手。
+
+            **当前日期时间信息**
+            - 今天是：%s（%s）
+            - 本周日期对照：%s
+            - 日期格式统一使用：yyyy-MM-dd
+            - 时间格式统一使用：yyyy-MM-dd HH:mm
+
+            当用户提到“今天”“明天”“本周几”“下周”等时间时，请严格按照上述日期计算。
+            请用中文回答，保持专业友好，回复要简洁明了。
+            """, today, dayOfWeek, weekCalendar);
+    }
+
+    private String buildCrmSystemPrompt() {
         LocalDate today = LocalDate.now();
         String dayOfWeek = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.CHINESE);
         String weekCalendar = buildWeekCalendar(today);
@@ -207,7 +244,7 @@ public class ChatServiceImpl implements IChatService {
         session.setProductId(sessionCreateBO.getProductId());
         session.setProjectId(sessionCreateBO.getProjectId());
         session.setProjectTaskId(sessionCreateBO.getProjectTaskId());
-        session.setAppCode(StrUtil.blankToDefault(sessionCreateBO.getAppCode(), "general"));
+        session.setAppCode(resolveSessionAppCode(sessionCreateBO));
         session.setPinned(false);
         session.setUserId(UserUtil.getUserId());
         session.setCreateTime(new Date());
@@ -227,6 +264,11 @@ public class ChatServiceImpl implements IChatService {
                 .orderByDesc(ChatSession::getUpdateTime)
         );
         return BeanUtil.copyToList(sessions, ChatSessionVO.class);
+    }
+
+    @Override
+    public List<ChatAppOptionVO> listChatApplications() {
+        return chatApplicationRegistry.listOptions();
     }
 
     @Override
@@ -312,6 +354,8 @@ public class ChatServiceImpl implements IChatService {
 
         Long currentUserId = UserUtil.getUserIdOrNull();
         ChatSession session = chatSessionMapper.selectById(sessionId);
+        ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        persistSessionAppCodeIfNeeded(session, application.code());
         if (currentUserId != null) {
             setAiContext(session, sessionId, currentUserId);
             log.debug("设置 AI 上下文: sessionId={}, userId={}", sessionId, currentUserId);
@@ -323,7 +367,7 @@ public class ChatServiceImpl implements IChatService {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
         }
 
-        boolean ragEnabled = Boolean.TRUE.equals(sendBO.getRagEnabled());
+        boolean ragEnabled = resolveRagEnabled(sendBO, application);
         log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
 
         String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
@@ -336,10 +380,10 @@ public class ChatServiceImpl implements IChatService {
 
         List<Message> history = buildMessageHistory(sessionId);
 
-        String knowledgeToolPrompt = buildKnowledgeToolPrompt(ragEnabled);
+        String knowledgeToolPrompt = buildKnowledgeToolPrompt(application, ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
         // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
-        String enhancedSystemPrompt = buildSystemPrompt();
+        String enhancedSystemPrompt = buildSystemPrompt(application);
         if (StrUtil.isNotBlank(knowledgeToolPrompt)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + knowledgeToolPrompt;
         }
@@ -458,6 +502,8 @@ public class ChatServiceImpl implements IChatService {
 
         Long currentUserId = UserUtil.getUserIdOrNull();
         ChatSession session = chatSessionMapper.selectById(sessionId);
+        ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
+        persistSessionAppCodeIfNeeded(session, application.code());
         if (currentUserId != null) {
             setAiContext(session, sessionId, currentUserId);
             log.debug("设置 AI 上下文: sessionId={}, userId={}", sessionId, currentUserId);
@@ -469,7 +515,7 @@ public class ChatServiceImpl implements IChatService {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
         }
 
-        boolean ragEnabled = Boolean.TRUE.equals(sendBO.getRagEnabled());
+        boolean ragEnabled = resolveRagEnabled(sendBO, application);
         log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
 
         String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
@@ -481,10 +527,10 @@ public class ChatServiceImpl implements IChatService {
 
         List<Message> history = buildMessageHistory(sessionId);
 
-        String knowledgeToolPrompt = buildKnowledgeToolPrompt(ragEnabled);
+        String knowledgeToolPrompt = buildKnowledgeToolPrompt(application, ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
         // RAG 不再自动注入，改为由 KnowledgeTools 按需 Tool Calling 调用
-        String enhancedSystemPrompt = buildSystemPrompt();
+        String enhancedSystemPrompt = buildSystemPrompt(application);
         if (StrUtil.isNotBlank(knowledgeToolPrompt)) {
             enhancedSystemPrompt = enhancedSystemPrompt + "\n\n" + knowledgeToolPrompt;
         }
@@ -794,6 +840,77 @@ public class ChatServiceImpl implements IChatService {
             session.getProjectTaskId());
     }
 
+    private String resolveSessionAppCode(SessionCreateBO sessionCreateBO) {
+        if (sessionCreateBO == null) {
+            return ChatApplicationCodes.GENERAL;
+        }
+        String appCode = sessionCreateBO.getAppCode();
+        if (StrUtil.isBlank(appCode)) {
+            if (sessionCreateBO.getCustomerId() != null) {
+                appCode = ChatApplicationCodes.CRM;
+            } else if (sessionCreateBO.getEmployeeId() != null) {
+                appCode = ChatApplicationCodes.ADDRESS_BOOK;
+            } else if (sessionCreateBO.getRelationId() != null) {
+                appCode = ChatApplicationCodes.RELATION;
+            } else if (sessionCreateBO.getProductId() != null) {
+                appCode = ChatApplicationCodes.PRODUCT;
+            } else if (sessionCreateBO.getProjectId() != null || sessionCreateBO.getProjectTaskId() != null) {
+                appCode = ChatApplicationCodes.PROJECT;
+            }
+        }
+        return chatApplicationRegistry.normalize(appCode);
+    }
+
+    private ChatApplicationDefinition resolveChatApplication(ChatSendBO sendBO, ChatSession session) {
+        String appCode = sendBO == null ? null : sendBO.getAppCode();
+        if (StrUtil.isBlank(appCode) && Boolean.TRUE.equals(sendBO == null ? null : sendBO.getRagEnabled())) {
+            appCode = ChatApplicationCodes.KNOWLEDGE;
+        }
+        if (StrUtil.isBlank(appCode) && sendBO != null && sendBO.getProductId() != null) {
+            appCode = ChatApplicationCodes.PRODUCT;
+        }
+        if (StrUtil.isBlank(appCode) && sendBO != null
+                && (sendBO.getProjectId() != null || sendBO.getProjectTaskId() != null)) {
+            appCode = ChatApplicationCodes.PROJECT;
+        }
+        if (StrUtil.isBlank(appCode) && session != null && StrUtil.isNotBlank(session.getAppCode())) {
+            appCode = session.getAppCode();
+        }
+        if (StrUtil.isBlank(appCode) && session != null && session.getCustomerId() != null) {
+            appCode = ChatApplicationCodes.CRM;
+        }
+        if (StrUtil.isBlank(appCode) && session != null && session.getEmployeeId() != null) {
+            appCode = ChatApplicationCodes.ADDRESS_BOOK;
+        }
+        if (StrUtil.isBlank(appCode) && session != null && session.getRelationId() != null) {
+            appCode = ChatApplicationCodes.RELATION;
+        }
+        if (StrUtil.isBlank(appCode) && session != null && session.getProductId() != null) {
+            appCode = ChatApplicationCodes.PRODUCT;
+        }
+        if (StrUtil.isBlank(appCode) && session != null
+                && (session.getProjectId() != null || session.getProjectTaskId() != null)) {
+            appCode = ChatApplicationCodes.PROJECT;
+        }
+        return chatApplicationRegistry.resolve(appCode);
+    }
+
+    private void persistSessionAppCodeIfNeeded(ChatSession session, String appCode) {
+        if (session == null) {
+            return;
+        }
+        String normalizedAppCode = chatApplicationRegistry.normalize(appCode);
+        if (!normalizedAppCode.equals(chatApplicationRegistry.normalize(session.getAppCode()))) {
+            session.setAppCode(normalizedAppCode);
+            chatSessionMapper.updateById(session);
+        }
+    }
+
+    private boolean resolveRagEnabled(ChatSendBO sendBO, ChatApplicationDefinition application) {
+        return Boolean.TRUE.equals(sendBO == null ? null : sendBO.getRagEnabled())
+                || (application != null && application.defaultRagEnabled());
+    }
+
     private String tryHandleKnowledgeQuestion(String content, List<ChatSendBO.AttachmentDTO> attachments, boolean ragEnabled) {
         Long sessionId = AiContextHolder.getCurrentSessionId();
         log.debug("知识库前置路由检查: sessionId={}, ragEnabled={}, hasAttachments={}, content={}",
@@ -929,7 +1046,7 @@ public class ChatServiceImpl implements IChatService {
                 || script == Character.UnicodeScript.HANGUL;
     }
 
-    private String buildKnowledgeToolPrompt(boolean ragEnabled) {
+    private String buildKnowledgeToolPrompt(ChatApplicationDefinition application, boolean ragEnabled) {
         if (!ragEnabled) {
             log.debug("跳过知识库工具提示: RAG 开关未开启");
             return "";
