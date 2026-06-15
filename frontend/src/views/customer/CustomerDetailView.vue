@@ -704,8 +704,43 @@
                   </span>
                   文档中心
                 </h4>
+                <button
+                  v-if="canCreateKnowledge"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  :disabled="customerDocumentUploading"
+                  @click="triggerCustomerDocumentUpload"
+                >
+                  <span class="material-symbols-outlined text-[15px] leading-none">
+                    {{ customerDocumentUploading ? 'progress_activity' : 'upload_file' }}
+                  </span>
+                  上传文档
+                </button>
+                <input
+                  ref="customerDocumentInput"
+                  type="file"
+                  class="hidden"
+                  multiple
+                  @change="handleCustomerDocumentUpload"
+                />
               </div>
-              <div>
+              <div v-if="customer.documents?.length" class="space-y-2">
+                <div
+                  v-for="doc in customer.documents.slice(0, 5)"
+                  :key="doc.knowledgeId"
+                  class="rounded-xl border border-slate-100 bg-slate-50/70 p-3"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="truncate text-xs font-bold text-slate-900">{{ doc.name }}</p>
+                      <p class="mt-1 line-clamp-2 text-xs text-slate-500">{{ doc.summary || getKnowledgeTypeLabel(doc.type) }}</p>
+                    </div>
+                    <span class="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                      {{ getKnowledgeTypeLabel(doc.type) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div v-else>
                 <p class="py-4 text-center text-xs text-slate-400">暂无文档</p>
               </div>
             </section>
@@ -823,6 +858,7 @@ import { queryUserList } from '@/api/auth'
 import { addFollowUp, deleteFollowUp, downloadFollowUpAttachment, queryFollowUpPageList, uploadFollowUpAttachment } from '@/api/followup'
 import { deleteContact, setPrimaryContact, queryContactPageList } from '@/api/contact'
 import { getEnabledFieldsByEntity } from '@/api/customField'
+import { uploadKnowledge } from '@/api/knowledge'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { CustomerTag, FollowUp, Contact, FollowUpAttachment, FollowUpAttachmentDraft } from '@/types/customer'
 import type { CustomField } from '@/types/customField'
@@ -861,6 +897,8 @@ const followUpPageSize = ref(5)
 const followUpLoading = ref(false)
 const followUpAttachmentInput = ref<HTMLInputElement | null>(null)
 const followUpAttachmentUploading = ref(false)
+const customerDocumentInput = ref<HTMLInputElement | null>(null)
+const customerDocumentUploading = ref(false)
 const contacts = ref<Contact[]>([])
 const contactTotal = ref(0)
 const contactPage = ref(1)
@@ -998,6 +1036,7 @@ const canDeleteFollowUps = computed(() => userStore.hasPermission('followup:dele
 const canViewTasks = computed(() => userStore.hasPermission('task:view'))
 const canCreateTasks = computed(() => userStore.hasPermission('task:create'))
 const canViewKnowledge = computed(() => userStore.hasPermission('knowledge:view'))
+const canCreateKnowledge = computed(() => userStore.hasPermission('knowledge:create'))
 const filteredTransferUserList = computed(() => {
   const keyword = ownerSearch.value.trim().toLowerCase()
   if (!keyword) return transferUserList.value
@@ -1359,11 +1398,49 @@ function removeFollowUpAttachment(index: number) {
   followUpForm.attachments.splice(index, 1)
 }
 
+function triggerCustomerDocumentUpload() {
+  customerDocumentInput.value?.click()
+}
+
+async function handleCustomerDocumentUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  const currentCustomer = customer.value
+  if (!files.length || !currentCustomer?.customerId) return
+
+  customerDocumentUploading.value = true
+  try {
+    for (const file of files) {
+      await uploadKnowledge(file, 'document', String(currentCustomer.customerId))
+    }
+    await customerStore.fetchCustomerDetail(currentCustomer.customerId)
+    ElMessage.success(files.length > 1 ? '文档已上传' : '文档上传成功')
+  } catch (error) {
+    console.error('Upload customer document failed:', error)
+    ElMessage.error('文档上传失败')
+  } finally {
+    customerDocumentUploading.value = false
+    input.value = ''
+  }
+}
+
 function formatFileSize(size?: number): string {
   if (!size || size <= 0) return '-'
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function getKnowledgeTypeLabel(type?: string): string {
+  const labels: Record<string, string> = {
+    meeting: '会议记录',
+    email: '邮件',
+    recording: '录音',
+    document: '文档',
+    proposal: '方案',
+    contract: '合同'
+  }
+  return type ? labels[type] || type : '文档'
 }
 
 async function handleDownloadFollowUpAttachment(attachment: FollowUpAttachment) {
