@@ -270,16 +270,21 @@
           >
             <!-- Welcome Section (no messages) -->
             <template v-if="chatStore.messages.length === 0">
-              <div class="max-w-3xl mx-auto flex flex-col items-center text-center space-y-4 py-12">
-                <div class="size-16 bg-primary/5 rounded-2xl flex items-center justify-center text-primary mb-2 border border-primary/10">
-                  <WkIcon name="ai" class="text-4xl" />
+              <div class="wk-chat-empty-welcome mx-auto flex max-w-3xl flex-col items-center space-y-5 py-6 text-center">
+                <div class="flex flex-col items-center gap-4 sm:flex-row">
+                  <div
+                    v-if="enterpriseStore.hasLogo"
+                    class="size-10 shrink-0 overflow-hidden rounded-xl bg-transparent"
+                  >
+                    <img :src="enterpriseStore.logoUrl!" class="h-full w-full object-cover" alt="logo" />
+                  </div>
+                  <div v-else class="size-10 shrink-0 overflow-hidden rounded-xl bg-transparent">
+                    <img :src="defaultLogoImg" class="h-full w-full object-cover" alt="logo" />
+                  </div>
+                  <h1 class="text-[28px] font-semibold leading-tight tracking-normal text-[#0d0d0d] md:text-[32px]">
+                    今天有什么可以帮您的？
+                  </h1>
                 </div>
-                <h1 class="text-2xl font-bold tracking-tight text-slate-900">
-                  您好，{{ userStore.realname || '用户' }}。
-                </h1>
-                <p class="text-slate-400 text-base max-w-md">
-                  我是您的智能销售助手。今天想处理哪些客户或商机？
-                </p>
               </div>
             </template>
 
@@ -931,6 +936,7 @@
 import { ref, computed, onBeforeUnmount, onMounted, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
+import { useEnterpriseStore } from '@/stores/enterprise'
 import { useUserStore } from '@/stores/user'
 import { useRoute, useRouter } from 'vue-router'
 import { useResponsive } from '@/composables/useResponsive'
@@ -981,6 +987,7 @@ import arkBrandUrl from '@/assets/model-provider-brands/ark.svg?url'
 import hunyuanBrandUrl from '@/assets/model-provider-brands/hunyuan.svg?url'
 import minimaxBrandUrl from '@/assets/model-provider-brands/minimax.svg?url'
 import zhipuBrandUrl from '@/assets/model-provider-brands/zhipu.svg?url'
+import defaultLogoImg from '@/assets/images/logo.png'
 
 type ComposerAttachmentPreviewItem =
   | { kind: 'knowledge'; key: string; knowledge: Knowledge }
@@ -988,6 +995,7 @@ type ComposerAttachmentPreviewItem =
 
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
+const enterpriseStore = useEnterpriseStore()
 const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
@@ -1259,6 +1267,7 @@ onMounted(async () => {
     chatStore.fetchModelOptions(),
     chatStore.fetchSessions(),
     agentStore.fetchEnabledAgents(),
+    enterpriseStore.loadConfig(),
     loadAiConfig()
   ])
   await applyChatRouteQuery()
