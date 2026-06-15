@@ -29,6 +29,7 @@ export interface AiProviderPreset {
   supportsStream: boolean
   supportsToolCall: boolean
   supportsVision: boolean
+  supportsAudioTranscription?: boolean
   configured?: boolean
   active?: boolean
   apiKeyConfigured?: boolean

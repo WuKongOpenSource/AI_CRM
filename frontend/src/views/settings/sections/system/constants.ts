@@ -12,7 +12,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: true
+    supportsVision: true,
+    supportsAudioTranscription: true
   },
   {
     label: '阿里云百炼 / 通义千问',
@@ -24,7 +25,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: true
   },
   {
     label: 'Moonshot AI / Kimi',
@@ -36,7 +38,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   },
   {
     label: 'DeepSeek',
@@ -48,7 +51,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   },
   {
     label: '火山方舟 / 豆包',
@@ -68,7 +72,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   },
   {
     label: '腾讯混元',
@@ -80,7 +85,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: false,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   },
   {
     label: 'MiniMax',
@@ -92,7 +98,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   },
   {
     label: '智谱 AI',
@@ -104,7 +111,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   },
   {
     label: '自定义 OpenAI 兼容服务',
@@ -116,7 +124,8 @@ export const AI_PROVIDER_PRESETS: AiProviderPreset[] = [
     extraHeadersHint: '{"X-Your-Header":"value"}',
     supportsStream: true,
     supportsToolCall: true,
-    supportsVision: false
+    supportsVision: false,
+    supportsAudioTranscription: false
   }
 ]
 

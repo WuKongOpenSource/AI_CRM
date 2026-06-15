@@ -271,7 +271,7 @@ function normalizeRolePermissionConfig(raw: any): ProjectRolePermissionConfig {
 }
 
 export async function getProjectRolePermissionConfig(): Promise<ProjectRolePermissionConfigVO> {
-  const raw = await requestProjectRolePermissionConfig(path => get(path))
+  const raw = await requestProjectRolePermissionConfig(path => get(path, { silentError: true }))
   return {
     rolePermissions: normalizeRolePermissionConfig(raw)
   }
@@ -280,7 +280,7 @@ export async function getProjectRolePermissionConfig(): Promise<ProjectRolePermi
 export async function updateProjectRolePermissionConfig(
   payload: ProjectRolePermissionConfigPayload
 ): Promise<ProjectRolePermissionConfigVO> {
-  const raw = await requestProjectRolePermissionConfig(path => post(path, payload))
+  const raw = await requestProjectRolePermissionConfig(path => post(path, payload, { silentError: true }))
   return {
     rolePermissions: normalizeRolePermissionConfig(raw)
   }
