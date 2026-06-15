@@ -1678,13 +1678,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 .eq(Contact::getCustomerId, customerId)
                 .eq(Contact::getStatus, 1)
         );
-        lambdaUpdate()
+        Date updateTime = new Date();
+        var update = lambdaUpdate()
             .eq(Customer::getCustomerId, customerId)
             .set(Customer::getPrimaryContactName, primary != null ? primary.getName() : null)
             .set(Customer::getPrimaryContactPhone, primary != null ? primary.getPhone() : null)
             .set(Customer::getPrimaryContactPosition, primary != null ? primary.getPosition() : null)
             .set(Customer::getContactCount, count.intValue())
-            .update();
+            .set(Customer::getUpdateTime, updateTime);
+        Long updateUserId = getCurrentUserIdOrNull();
+        if (updateUserId != null) {
+            update.set(Customer::getUpdateUserId, updateUserId);
+        }
+        update.update();
     }
 
     /**
@@ -1697,13 +1703,27 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         String tagNames = tags.stream()
             .map(CustomerTag::getTagName)
             .collect(Collectors.joining(","));
-        lambdaUpdate()
+        Date updateTime = new Date();
+        var update = lambdaUpdate()
             .eq(Customer::getCustomerId, customerId)
             .set(Customer::getTagNames, tagNames)
-            .update();
+            .set(Customer::getUpdateTime, updateTime);
+        Long updateUserId = getCurrentUserIdOrNull();
+        if (updateUserId != null) {
+            update.set(Customer::getUpdateUserId, updateUserId);
+        }
+        update.update();
     }
 
     // ==================== AI 智能录入 ====================
+
+    private Long getCurrentUserIdOrNull() {
+        try {
+            return UserUtil.getUserId();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
 
     @Override
     public CustomerAiParseVO aiParseCustomer(CustomerAiParseBO parseBO) {
