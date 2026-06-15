@@ -64,3 +64,9 @@ export interface RelationForm {
 
 export type RelationPageResult = PageResult<Relation>
 export type RelationVO = Relation
+export type RelationAddBO = RelationForm
+export interface RelationUpdateBO extends RelationForm {
+  relationId: string
+}
+export type RelationDetailVO = RelationDetail
+export type RelationQueryBO = RelationQuery

@@ -176,9 +176,12 @@ export interface ChatSession {
   title?: string
   agentId?: string
   customerId?: string
+  customerName?: string
   employeeId?: string
   relationId?: string
+  relationName?: string
   productId?: string
+  productName?: string
   projectId?: string
   projectTaskId?: string
   appCode?: string

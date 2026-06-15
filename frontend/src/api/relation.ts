@@ -17,6 +17,10 @@ export function queryRelationPageList(query: RelationQuery = {}): Promise<Relati
   return post('/relation/queryPageList', { page: 1, limit: 20, ...query })
 }
 
+export function queryRelationList(query: RelationQuery = {}): Promise<RelationPageResult> {
+  return queryRelationPageList(query)
+}
+
 export function getRelationDetail(id: string): Promise<RelationDetail> {
   return post(`/relation/detail/${id}`)
 }

@@ -4,7 +4,7 @@
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[299]"
         @click="closeChatDrawer"
       />
     </Transition>
@@ -13,7 +13,7 @@
     <Transition name="slide-right">
       <div
         v-if="isOpen"
-        class="fixed inset-y-0 right-0 z-50 flex flex-col bg-white shadow-2xl"
+        class="fixed inset-y-0 right-0 z-[300] flex flex-col bg-white shadow-2xl"
         :class="isMobile ? 'w-full' : 'w-full max-w-lg'"
       >
         <!-- Header -->
@@ -105,22 +105,50 @@
                 :key="message.id"
                 class="message-enter"
               >
+                <div
+                  v-if="getDocumentAttachments(message).length > 0"
+                  class="mb-3 flex"
+                  :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                >
+                  <div class="flex flex-wrap gap-2" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
+                    <a
+                      v-for="att in getDocumentAttachments(message)"
+                      :key="att.id || att.fileName"
+                      :href="att.accessUrl"
+                      target="_blank"
+                      class="group flex max-w-[220px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md hover:shadow-slate-200/60"
+                    >
+                      <div class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <span class="material-symbols-outlined text-base">description</span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-xs font-semibold text-slate-800">{{ att.fileName }}</div>
+                        <div class="mt-0.5 text-[11px] text-slate-400">{{ formatFileSize(att.fileSize) }}</div>
+                      </div>
+                      <span class="material-symbols-outlined text-sm text-slate-300 transition-colors group-hover:text-primary">open_in_new</span>
+                    </a>
+                  </div>
+                </div>
+
                 <!-- AI Message -->
                 <div v-if="message.role !== 'user'" class="flex gap-3">
                   <div class="size-8 rounded-lg bg-primary flex items-center justify-center text-white shrink-0 shadow-sm shadow-primary/20">
                     <WkIcon name="ai" class="text-base" />
                   </div>
                   <div class="flex-1 space-y-2 min-w-0">
-                    <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-3 inline-block max-w-full text-sm leading-relaxed border border-slate-100">
+                    <div class="bg-slate-50 text-slate-700 rounded-2xl rounded-tl-none p-3 inline-block max-w-full text-left text-sm leading-relaxed border border-slate-100">
                       <div
                         class="wk-markdown"
-                        :class="{ 'streaming-cursor': message.isStreaming }"
-                        v-html="renderAssistantMessage(message.content || '...')"
+                        :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
+                        v-html="renderAssistantMessage(message.content, message.isStreaming, message.isThinking)"
                       />
+                      <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
+                        <p>思考中</p>
+                      </div>
                     </div>
                     <!-- Attachments -->
-                    <div v-if="message.attachments && message.attachments.length > 0" class="space-y-1">
-                      <div v-for="att in message.attachments" :key="att.id || att.fileName">
+                    <div v-if="getInlineAttachments(message).length > 0" class="space-y-1">
+                      <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
                         <template v-if="att.mimeType && att.mimeType.startsWith('image/')">
                           <el-image
                             :src="att.accessUrl"
@@ -142,7 +170,12 @@
                         </template>
                       </div>
                     </div>
-                    <div class="text-xs text-slate-400 font-medium">{{ formatTime(message.timestamp) }}</div>
+                    <div
+                      class="text-xs font-medium"
+                      :class="message.isStreaming ? 'text-primary/70' : 'text-slate-400'"
+                    >
+                      {{ getAssistantMessageStatus(message) }} · {{ formatTime(message.timestamp) }}
+                    </div>
                   </div>
                 </div>
 
@@ -165,8 +198,8 @@
                       <div class="whitespace-pre-wrap">{{ message.content || '...' }}</div>
                     </div>
                     <!-- User Attachments -->
-                    <div v-if="message.attachments && message.attachments.length > 0" class="space-y-1">
-                      <div v-for="att in message.attachments" :key="att.id || att.fileName">
+                    <div v-if="getInlineAttachments(message).length > 0" class="space-y-1">
+                      <div v-for="att in getInlineAttachments(message)" :key="att.id || att.fileName">
                         <template v-if="att.mimeType && att.mimeType.startsWith('image/')">
                           <el-image
                             :src="att.accessUrl"
@@ -216,7 +249,7 @@
             </div>
 
             <!-- Input Box -->
-            <div class="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:border-primary transition-all">
+            <div class="wk-native-input-shell flex flex-wrap items-center bg-slate-50 border border-slate-200 rounded-xl p-1 focus-within:border-primary transition-all">
               <input
                 ref="fileInputRef"
                 type="file"
@@ -241,9 +274,10 @@
                 @keydown.enter.exact.prevent="handleSend"
                 @paste="handlePaste"
               />
+              <div class="order-3 basis-full sm:hidden"></div>
               <button
                 type="button"
-                class="h-9 rounded-full border px-3 text-xs font-semibold shadow-sm transition-all"
+                class="order-4 mt-1 h-9 w-fit rounded-full border px-3 text-xs font-semibold shadow-sm transition-all sm:order-none sm:mt-0"
                 :class="chatStore.ragEnabled
                   ? 'border-primary/25 bg-primary/10 text-primary shadow-primary/10'
                   : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
@@ -259,7 +293,7 @@
                 </span>
               </button>
               <button
-                class="size-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all disabled:opacity-50"
+                class="order-5 mt-1 ml-auto size-9 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-sm shadow-primary/20 transition-all disabled:opacity-50 sm:order-none sm:mt-0 sm:ml-0"
                 :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.currentSessionIsStreaming || isUploading"
                 @click="handleSend"
               >
@@ -329,17 +363,24 @@ import { useChatDrawer } from '@/composables/useChatDrawer'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
+import { getAiConfig } from '@/api/systemConfig'
 import { useResponsive } from '@/composables/useResponsive'
 import { ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
-import { renderMarkdown } from '@/utils/markdown'
-import { isRequestErrorHandled } from '@/utils/requestError'
 import {
   CHAT_ATTACHMENT_ACCEPT,
-  MAX_CHAT_ATTACHMENT_COUNT,
   extractClipboardFiles,
+  MAX_CHAT_ATTACHMENT_COUNT,
+  MAX_CHAT_ATTACHMENT_SIZE,
   mergeChatFiles
 } from '@/utils/chatAttachment'
+import {
+  getAssistantMessagePlaceholder,
+  getAssistantMessageStatusLabel,
+  normalizeAssistantMessageContent
+} from '@/utils/chatMessage'
+import { renderMarkdown } from '@/utils/markdown'
+import { isRequestErrorHandled } from '@/utils/requestError'
 import type { ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
 
 const router = useRouter()
@@ -357,6 +398,7 @@ const isUploading = ref(false)
 const currentTab = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
 
+const MAX_FILE_SIZE = MAX_CHAT_ATTACHMENT_SIZE
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
@@ -415,7 +457,16 @@ watch(isOpen, async (open) => {
 
 // Auto scroll on new messages
 watch(
-  () => chatStore.messages.length,
+  () => {
+    const msgs = chatStore.messages
+    const last = msgs[msgs.length - 1]
+    return {
+      length: msgs.length,
+      content: last?.content?.length ?? 0,
+      isStreaming: Boolean(last?.isStreaming),
+      isThinking: Boolean(last?.isThinking)
+    }
+  },
   () => {
     nextTick(() => {
       if (messagesContainer.value) {
@@ -491,6 +542,7 @@ async function handleSend() {
   }
 
   await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
+  await getAiConfig()
 }
 
 function sendQuickMessage(text: string) {
@@ -498,49 +550,88 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
-function renderAssistantMessage(content: string): string {
-  return renderMarkdown(content)
+function renderAssistantMessage(content: string, isStreaming = false, isThinking = false): string {
+  const normalized = normalizeAssistantMessageContent(content, isStreaming)
+  return renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
+    streaming: isStreaming
+  })
+}
+
+function getAssistantMessageStatus(message: { isStreaming?: boolean }): string {
+  return getAssistantMessageStatusLabel(Boolean(message.isStreaming))
 }
 
 function handleUpload() {
-  if (selectedFiles.value.length >= MAX_FILE_COUNT) {
-    ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
-    return
-  }
   fileInputRef.value?.click()
 }
 
-function handleFileSelect(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (!input.files) return
-
-  const result = mergeChatFiles(selectedFiles.value, Array.from(input.files))
-  if (result.error) {
-    ElMessage.warning(result.error)
-    input.value = ''
-    return
-  }
-
-  selectedFiles.value = result.files
-  input.value = ''
-}
-
-function handlePaste(event: ClipboardEvent) {
-  const files = extractClipboardFiles(event)
-  if (files.length === 0) return
-
+function appendSelectedFiles(files: File[]) {
   const result = mergeChatFiles(selectedFiles.value, files)
   if (result.error) {
     ElMessage.warning(result.error)
     return
   }
 
-  event.preventDefault()
   selectedFiles.value = result.files
+}
+
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files) return
+
+  const newFiles = Array.from(input.files)
+
+  if (selectedFiles.value.length + newFiles.length > MAX_FILE_COUNT) {
+    ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
+    input.value = ''
+    return
+  }
+
+  for (const file of newFiles) {
+    if (file.size > MAX_FILE_SIZE) {
+      ElMessage.warning(`文件"${file.name}"超过50MB限制`)
+      input.value = ''
+      return
+    }
+  }
+
+  selectedFiles.value.push(...newFiles)
+  input.value = ''
+}
+
+function handlePaste(event: ClipboardEvent) {
+  const clipboardFiles = extractClipboardFiles(event)
+  if (clipboardFiles.length === 0) {
+    return
+  }
+
+  appendSelectedFiles(clipboardFiles)
 }
 
 function removeSelectedFile(index: number) {
   selectedFiles.value.splice(index, 1)
+}
+
+function isImageAttachment(attachment?: ChatAttachmentVO | null): boolean {
+  return Boolean(attachment?.mimeType?.startsWith('image/'))
+}
+
+function isDocumentAttachment(attachment?: ChatAttachmentVO | null): boolean {
+  return Boolean(attachment) && !isImageAttachment(attachment)
+}
+
+function getInlineAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
+  return (message.attachments || []).filter(isImageAttachment)
+}
+
+function getDocumentAttachments(message: { attachments?: ChatAttachmentVO[] }): ChatAttachmentVO[] {
+  return (message.attachments || []).filter(isDocumentAttachment)
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatTime(date: Date): string {
@@ -592,15 +683,4 @@ function formatTime(date: Date): string {
   }
 }
 
-/* Streaming cursor */
-.streaming-cursor::after {
-  content: '▊';
-  animation: blink 1s infinite;
-  margin-left: 2px;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
 </style>
