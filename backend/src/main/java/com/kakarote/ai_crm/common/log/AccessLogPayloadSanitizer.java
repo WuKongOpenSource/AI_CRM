@@ -1,52 +1,46 @@
 package com.kakarote.ai_crm.common.log;
 
 import cn.hutool.core.util.StrUtil;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 
-import java.net.URLDecoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
+/**
+ * Sanitizes HTTP payloads before they are stored as audit data.
+ */
 public final class AccessLogPayloadSanitizer {
 
-    public static final int REQUEST_BODY_LIMIT_BYTES = 64 * 1024;
-    private static final int TEXT_LIMIT_CHARS = 16 * 1024;
-    private static final String REDACTED = "***";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final Set<String> SENSITIVE_KEYS = Set.of(
-            "authorization",
-            "cookie",
-            "set-cookie",
-            "manager-token",
+    public static final int REQUEST_BODY_LIMIT_BYTES = 256 * 1024;
+    private static final int RESPONSE_SUMMARY_LIMIT_CHARS = 16 * 1024;
+    private static final int HEADER_VALUE_LIMIT_CHARS = 512;
+    private static final String MASK = "***";
+    private static final Set<String> EXACT_SENSITIVE_KEYS = Set.of(
+            "key",
             "token",
+            "authorization",
+            "manager-token"
+    );
+    private static final String[] SENSITIVE_KEY_PARTS = {
             "password",
-            "oldpassword",
-            "newpassword",
+            "passwd",
+            "secret",
             "apikey",
             "api_key",
-            "api-key",
-            "secret",
-            "client_secret",
             "captcha",
-            "captchaverification",
-            "verificationcode"
-    );
-    private static final Pattern JSON_SECRET_PATTERN = Pattern.compile(
-            "(?i)(\"(?:password|oldPassword|newPassword|token|apiKey|api_key|secret|clientSecret|client_secret|captcha|captchaVerification|verificationCode)\"\\s*:\\s*\")([^\"]*)(\")"
-    );
-    private static final Pattern FORM_SECRET_PATTERN = Pattern.compile(
-            "(?i)(^|[&?])((?:password|oldPassword|newPassword|token|apiKey|api_key|secret|clientSecret|client_secret|captcha|captchaVerification|verificationCode)=)([^&]*)"
-    );
+            "verification",
+            "verifycode",
+            "access_token",
+            "refresh_token",
+            "验证码"
+    };
 
     private AccessLogPayloadSanitizer() {
     }
@@ -56,125 +50,196 @@ public final class AccessLogPayloadSanitizer {
         Enumeration<String> names = request.getHeaderNames();
         while (names != null && names.hasMoreElements()) {
             String name = names.nextElement();
-            String value = isSensitiveKey(name)
-                    ? REDACTED
-                    : StrUtil.maxLength(request.getHeader(name), 500);
-            headers.put(name, value);
+            if (isSensitiveKey(name)) {
+                headers.put(name, MASK);
+                continue;
+            }
+            headers.put(name, truncateToChars(request.getHeader(name), HEADER_VALUE_LIMIT_CHARS).value());
         }
-        try {
-            return OBJECT_MAPPER.writeValueAsString(headers);
-        } catch (Exception ignored) {
-            return headers.toString();
-        }
+        return headers.isEmpty() ? null : JSON.toJSONString(headers);
     }
 
     public static SanitizedText sanitizeQueryString(String queryString) {
         if (StrUtil.isBlank(queryString)) {
             return new SanitizedText(null, false);
         }
-        String decoded = decodeUrl(queryString);
-        return truncateToChars(redactFormLikeText(decoded), TEXT_LIMIT_CHARS);
+        return truncateToChars(sanitizeFormLike(queryString), REQUEST_BODY_LIMIT_BYTES);
     }
 
     public static SanitizedText sanitizeRequestBody(String body, String contentType) {
         if (StrUtil.isBlank(body)) {
             return new SanitizedText(null, false);
         }
+        String sanitized = sanitizeByContentType(body, contentType);
+        return truncateToChars(sanitized, REQUEST_BODY_LIMIT_BYTES);
+    }
 
-        String normalizedContentType = StrUtil.nullToEmpty(contentType).toLowerCase(Locale.ROOT);
-        String sanitized = body;
-        if (normalizedContentType.contains("json")) {
-            sanitized = JSON_SECRET_PATTERN.matcher(sanitized).replaceAll("$1" + REDACTED + "$3");
-        } else if (normalizedContentType.contains(MediaType.APPLICATION_FORM_URLENCODED_VALUE)) {
-            sanitized = redactFormLikeText(sanitized);
+    public static String buildOmittedBodyMessage(String contentType, long contentLength) {
+        if (StrUtil.isBlank(contentType) && contentLength <= 0) {
+            return null;
         }
-        return truncateToChars(sanitized, TEXT_LIMIT_CHARS);
+        return "[request body omitted; contentType=%s; contentLength=%s]"
+                .formatted(StrUtil.blankToDefault(contentType, "unknown"), contentLength);
     }
 
     public static ResultResponseSummary summarizeResultResponse(String body) {
         if (StrUtil.isBlank(body)) {
             return new ResultResponseSummary(null, null, false, false);
         }
-
         try {
-            JsonNode root = OBJECT_MAPPER.readTree(body);
-            JsonNode codeNode = root.get("code");
-            JsonNode msgNode = root.get("msg");
-            if (codeNode == null || !codeNode.canConvertToInt()) {
+            Object parsed = JSON.parse(body);
+            if (!(parsed instanceof JSONObject jsonObject)
+                    || !jsonObject.containsKey("code")
+                    || !jsonObject.containsKey("msg")) {
                 return new ResultResponseSummary(null, null, false, false);
             }
-
-            Integer code = codeNode.asInt();
-            String msg = msgNode != null && !msgNode.isNull() ? msgNode.asText() : null;
-            String summary = OBJECT_MAPPER.writeValueAsString(Map.of(
-                    "code", code,
-                    "msg", StrUtil.blankToDefault(msg, "")
-            ));
-            SanitizedText truncated = truncateToChars(summary, TEXT_LIMIT_CHARS);
-            return new ResultResponseSummary(truncated.value(), code, truncated.truncated(), true);
+            JSONObject summary = new JSONObject();
+            Integer businessCode = jsonObject.getInteger("code");
+            summary.put("code", businessCode);
+            summary.put("msg", jsonObject.getString("msg"));
+            summary.put("dataSummary", summarizeData(jsonObject.get("data")));
+            SanitizedText sanitized = truncateToChars(JSON.toJSONString(summary), RESPONSE_SUMMARY_LIMIT_CHARS);
+            return new ResultResponseSummary(businessCode, sanitized.value(), sanitized.truncated(), true);
         } catch (Exception ignored) {
-            SanitizedText truncated = truncateToChars(body, TEXT_LIMIT_CHARS);
-            return new ResultResponseSummary(truncated.value(), null, truncated.truncated(), false);
+            return new ResultResponseSummary(null, null, false, false);
         }
     }
 
-    public static String decodeBody(byte[] bytes, String characterEncoding) {
-        Charset charset = StandardCharsets.UTF_8;
-        if (StrUtil.isNotBlank(characterEncoding)) {
-            try {
-                charset = Charset.forName(characterEncoding);
-            } catch (Exception ignored) {
-                charset = StandardCharsets.UTF_8;
+    public static SanitizedText truncateToChars(String value, int maxChars) {
+        if (value == null || value.length() <= maxChars) {
+            return new SanitizedText(value, false);
+        }
+        return new SanitizedText(value.substring(0, maxChars) + "...[truncated]", true);
+    }
+
+    private static String sanitizeByContentType(String body, String contentType) {
+        String normalized = StrUtil.nullToEmpty(contentType).toLowerCase(Locale.ROOT);
+        if (normalized.contains("json")) {
+            return sanitizeJson(body);
+        }
+        if (normalized.contains("x-www-form-urlencoded")) {
+            return sanitizeFormLike(body);
+        }
+        return sanitizeLooseText(body);
+    }
+
+    private static String sanitizeJson(String body) {
+        try {
+            Object parsed = JSON.parse(body);
+            return JSON.toJSONString(maskJsonValue(parsed, null));
+        } catch (Exception ignored) {
+            return sanitizeLooseText(body);
+        }
+    }
+
+    private static Object maskJsonValue(Object value, String key) {
+        if (isSensitiveKey(key)) {
+            return MASK;
+        }
+        if (value instanceof JSONObject object) {
+            JSONObject masked = new JSONObject();
+            for (Map.Entry<String, Object> entry : object.entrySet()) {
+                masked.put(entry.getKey(), maskJsonValue(entry.getValue(), entry.getKey()));
             }
+            return masked;
         }
-        return new String(bytes, charset);
+        if (value instanceof JSONArray array) {
+            JSONArray masked = new JSONArray();
+            for (Object item : array) {
+                masked.add(maskJsonValue(item, null));
+            }
+            return masked;
+        }
+        return value;
     }
 
-    public static SanitizedText truncateToChars(String text, int limit) {
-        if (text == null || limit <= 0 || text.length() <= limit) {
-            return new SanitizedText(text, false);
+    private static String sanitizeFormLike(String payload) {
+        String[] pairs = payload.split("&", -1);
+        StringBuilder builder = new StringBuilder(payload.length());
+        for (int i = 0; i < pairs.length; i++) {
+            if (i > 0) {
+                builder.append('&');
+            }
+            String pair = pairs[i];
+            int split = pair.indexOf('=');
+            if (split < 0) {
+                builder.append(isSensitiveKey(pair) ? MASK : pair);
+                continue;
+            }
+            String key = pair.substring(0, split);
+            builder.append(key).append('=').append(isSensitiveKey(key) ? MASK : pair.substring(split + 1));
         }
-        return new SanitizedText(text.substring(0, limit), true);
+        return builder.toString();
     }
 
-    public static String buildOmittedBodyMessage(String contentType, long contentLength) {
-        if (contentLength <= 0) {
+    private static String sanitizeLooseText(String body) {
+        String sanitized = body;
+        String[] names = {
+                "password", "passwd", "token", "authorization", "Manager-Token",
+                "apiKey", "api_key", "captcha", "verificationCode", "secret", "key"
+        };
+        for (String name : names) {
+            sanitized = sanitized.replaceAll("(?i)(\"" + name + "\"\\s*:\\s*)\"[^\"]*\"", "$1\"" + MASK + "\"");
+            sanitized = sanitized.replaceAll("(?i)(" + name + "\\s*=\\s*)[^&\\s]+", "$1" + MASK);
+        }
+        return sanitized;
+    }
+
+    private static String summarizeData(Object data) {
+        if (data == null) {
             return null;
         }
-        return "[request body omitted: contentType=" + StrUtil.blankToDefault(contentType, "unknown")
-                + ", contentLength=" + contentLength + "]";
-    }
-
-    private static String redactFormLikeText(String text) {
-        return FORM_SECRET_PATTERN.matcher(text).replaceAll("$1$2" + REDACTED);
-    }
-
-    private static String decodeUrl(String value) {
-        try {
-            return URLDecoder.decode(value, StandardCharsets.UTF_8);
-        } catch (Exception ignored) {
-            return value;
+        if (data instanceof JSONObject object) {
+            return "object(keys=%s)".formatted(String.join(",", object.keySet()));
         }
+        if (data instanceof JSONArray array) {
+            return "array(size=%d)".formatted(array.size());
+        }
+        if (data instanceof CharSequence text) {
+            return truncateToChars(sanitizeLooseText(text.toString()), 512).value();
+        }
+        return truncateToChars(String.valueOf(data), 512).value();
     }
 
     private static boolean isSensitiveKey(String key) {
         if (StrUtil.isBlank(key)) {
             return false;
         }
-        String normalized = key.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
-        return SENSITIVE_KEYS.contains(key.toLowerCase(Locale.ROOT))
-                || SENSITIVE_KEYS.contains(normalized)
-                || normalized.contains("token")
-                || normalized.contains("secret")
-                || normalized.contains("password");
+        String normalized = key.toLowerCase(Locale.ROOT).replace("_", "").replace("-", "");
+        if (EXACT_SENSITIVE_KEYS.contains(key.toLowerCase(Locale.ROOT))) {
+            return true;
+        }
+        if ("key".equals(normalized)) {
+            return true;
+        }
+        for (String part : SENSITIVE_KEY_PARTS) {
+            String normalizedPart = part.toLowerCase(Locale.ROOT).replace("_", "").replace("-", "");
+            if (normalized.contains(normalizedPart)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static String decodeBody(byte[] bytes, String encoding) {
+        if (bytes == null || bytes.length == 0) {
+            return null;
+        }
+        try {
+            return new String(bytes, StrUtil.isBlank(encoding)
+                    ? StandardCharsets.UTF_8
+                    : java.nio.charset.Charset.forName(encoding));
+        } catch (Exception ignored) {
+            return new String(bytes, StandardCharsets.UTF_8);
+        }
     }
 
     public record SanitizedText(String value, boolean truncated) {
     }
 
     public record ResultResponseSummary(
-            String responseBody,
             Integer businessCode,
+            String responseBody,
             boolean truncated,
             boolean resultResponse
     ) {
