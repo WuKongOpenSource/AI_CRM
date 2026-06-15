@@ -5,9 +5,9 @@ spring:
   application:
     name: manager
   datasource:
-    url: jdbc:postgresql://192.168.1.170:5432/wk_ai_crm_saas
-    username: postgres
-    password: postgres123!@#
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/wk_ai_crm}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 100
@@ -60,10 +60,10 @@ file:
 
 minio:
   enabled: true
-  endpoint: http://192.168.1.170:9000
-  public-endpoint: https://aicrm-saas.5kcrm.cn/s3/
-  access-key: minioadmin
-  secret-key: minioadmin
+  endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://127.0.0.1:9000/}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
   bucket: ai-crm
   use-presigned-url: true
   presigned-expiry: 3600
