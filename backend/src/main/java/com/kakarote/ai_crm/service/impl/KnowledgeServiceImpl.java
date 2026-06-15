@@ -1382,10 +1382,15 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         if (!applyKnowledgeSummaryIfNeeded(knowledge, summary)) {
             return;
         }
-        lambdaUpdate()
-                .eq(Knowledge::getKnowledgeId, knowledge.getKnowledgeId())
-                .set(Knowledge::getSummary, knowledge.getSummary())
-                .update();
+        try {
+            lambdaUpdate()
+                    .eq(Knowledge::getKnowledgeId, knowledge.getKnowledgeId())
+                    .set(Knowledge::getSummary, knowledge.getSummary())
+                    .update();
+        } catch (Exception e) {
+            log.warn("同步知识库 AI 摘要失败: knowledgeId={}, error={}",
+                    knowledge.getKnowledgeId(), e.getMessage());
+        }
     }
 
     private boolean applyKnowledgeSummaryIfNeeded(Knowledge knowledge, String summary) {
