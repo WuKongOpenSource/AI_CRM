@@ -550,22 +550,22 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         }
 
         StringBuilder prompt = new StringBuilder();
-        prompt.append("You are a CRM knowledge assistant. Answer in Simplified Chinese.\n");
-        prompt.append("Use only the reference documents below. If evidence is insufficient, say so clearly.\n\n");
-        prompt.append("Question: ").append(keyword).append("\n\n");
-        prompt.append("References:\n");
+        prompt.append("你是 CRM 知识库助手，请使用简体中文回答。\n");
+        prompt.append("只能基于下方参考资料作答；如果证据不足，请明确说明信息不足。\n\n");
+        prompt.append("用户问题：").append(keyword).append("\n\n");
+        prompt.append("参考资料：\n");
         for (int i = 0; i < references.size(); i++) {
             KnowledgeAiSearchVO.ReferenceItem reference = references.get(i);
             prompt.append(i + 1)
-                    .append(". Title: ").append(StrUtil.blankToDefault(reference.getName(), "-"))
-                    .append("\n   Type: ").append(StrUtil.blankToDefault(reference.getType(), "-"))
-                    .append("\n   Customer: ").append(StrUtil.blankToDefault(reference.getCustomerName(), "-"))
-                    .append("\n   Summary: ").append(StrUtil.blankToDefault(reference.getSummary(), "-"))
-                    .append("\n   Excerpt: ").append(StrUtil.blankToDefault(
+                    .append(". 标题：").append(StrUtil.blankToDefault(reference.getName(), "-"))
+                    .append("\n   类型：").append(StrUtil.blankToDefault(reference.getType(), "-"))
+                    .append("\n   客户：").append(StrUtil.blankToDefault(reference.getCustomerName(), "-"))
+                    .append("\n   摘要：").append(StrUtil.blankToDefault(reference.getSummary(), "-"))
+                    .append("\n   命中片段：").append(StrUtil.blankToDefault(
                             abbreviate(reference.getExcerpt(), MAX_AI_SEARCH_CONTEXT_LENGTH), "-"))
                     .append("\n");
         }
-        prompt.append("\nReturn a concise answer with key points and mention the most relevant documents.");
+        prompt.append("\n请输出简洁答案，包含关键信息，并提及最相关的参考资料。所有标题、分节名和标签都必须使用中文。");
 
         try {
             String answer = chatClientProvider.getChatClient()
