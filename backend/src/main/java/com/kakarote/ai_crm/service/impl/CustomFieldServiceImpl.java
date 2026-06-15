@@ -75,19 +75,15 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                     option("C", "C级客户")
             ),
             optionKey("relation", "relation_type"), List.of(
-                    option("friend", "朋友"),
-                    option("family", "家人"),
-                    option("relative", "亲戚"),
+                    option("decision_maker", "决策人"),
+                    option("influencer", "影响人"),
                     option("partner", "合作伙伴"),
                     option("customer_contact", "客户联系人"),
-                    option("supplier", "供应商"),
-                    option("investor", "投资人"),
                     option("other", "其他")
             ),
             optionKey("relation", "source"), List.of(
                     option("manual", "手动创建"),
-                    option("customer", "客户转化"),
-                    option("import", "导入"),
+                    option("customer_contact", "客户联系人"),
                     option("other", "其他")
             )
     );

@@ -20,13 +20,13 @@ import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.IRelationService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -40,15 +40,18 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
     private final ContactMapper contactMapper;
     private final CustomerMapper customerMapper;
     private final FileStorageService fileStorageService;
+    private final ICustomFieldService customFieldService;
 
     public RelationServiceImpl(RelationMapper relationMapper,
                                ContactMapper contactMapper,
                                CustomerMapper customerMapper,
-                               FileStorageService fileStorageService) {
+                               FileStorageService fileStorageService,
+                               ICustomFieldService customFieldService) {
         this.relationMapper = relationMapper;
         this.contactMapper = contactMapper;
         this.customerMapper = customerMapper;
         this.fileStorageService = fileStorageService;
+        this.customFieldService = customFieldService;
     }
 
     @Override
@@ -202,27 +205,16 @@ public class RelationServiceImpl extends ServiceImpl<RelationMapper, Relation> i
 
     private String resolveRelationTypeName(String relationType) {
         if (StrUtil.isBlank(relationType)) {
-            return "Other";
+            return "其他";
         }
-        Map<String, String> labels = Map.of(
-                SOURCE_CUSTOMER_CONTACT, "Customer contact",
-                "decision_maker", "Decision maker",
-                "influencer", "Influencer",
-                "partner", "Partner",
-                RELATION_TYPE_OTHER, "Other"
-        );
-        return labels.getOrDefault(relationType, relationType);
+        return customFieldService.resolveOptionLabel("relation", "relation_type", relationType);
     }
 
     private String resolveSourceName(String source) {
         if (StrUtil.isBlank(source)) {
             return source;
         }
-        Map<String, String> labels = Map.of(
-                SOURCE_MANUAL, "Manual",
-                SOURCE_CUSTOMER_CONTACT, "Customer contact"
-        );
-        return labels.getOrDefault(source, source);
+        return customFieldService.resolveOptionLabel("relation", "source", source);
     }
 
     private void normalizeLinkedCustomer(Relation relation) {

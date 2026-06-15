@@ -252,6 +252,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { addRelation, deleteRelation, getRelationDetail, queryRelationPageList, updateRelation } from '@/api/relation'
 import { queryCustomerList } from '@/api/customer'
 import { useResponsive } from '@/composables/useResponsive'
+import { useEnumStore } from '@/stores/enums'
 import { useUserStore } from '@/stores/user'
 import { isRequestErrorHandled } from '@/utils/requestError'
 import type { CustomerListVO } from '@/types/customer'
@@ -262,7 +263,7 @@ type Option = {
   value: string
 }
 
-const relationTypeOptions: Option[] = [
+const fallbackRelationTypeOptions: Option[] = [
   { label: '决策人', value: 'decision_maker' },
   { label: '影响人', value: 'influencer' },
   { label: '合作伙伴', value: 'partner' },
@@ -270,12 +271,14 @@ const relationTypeOptions: Option[] = [
   { label: '其他', value: 'other' }
 ]
 
-const sourceLabels: Record<string, string> = {
-  manual: '手动创建',
-  customer_contact: '客户联系人'
-}
+const fallbackRelationSourceOptions: Option[] = [
+  { label: '手动创建', value: 'manual' },
+  { label: '客户联系人', value: 'customer_contact' },
+  { label: '其他', value: 'other' }
+]
 
 const { isMobile } = useResponsive()
+const enumStore = useEnumStore()
 const userStore = useUserStore()
 const relations = ref<Relation[]>([])
 const loading = ref(false)
@@ -305,6 +308,12 @@ const form = reactive<RelationForm>({
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
+const relationTypeOptions = computed<Option[]>(() =>
+  enumStore.relationType.length > 0 ? enumStore.relationType : fallbackRelationTypeOptions
+)
+const relationSourceOptions = computed<Option[]>(() =>
+  enumStore.relationSource.length > 0 ? enumStore.relationSource : fallbackRelationSourceOptions
+)
 const canQueryCustomers = computed(() => userStore.hasPermission('customer:view'))
 const customerSelectPlaceholder = computed(() => canQueryCustomers.value ? '搜索客户' : '暂无客户权限')
 const detailRows = computed(() => {
@@ -321,6 +330,8 @@ const detailRows = computed(() => {
 })
 
 onMounted(() => {
+  void enumStore.ensureRelationType()
+  void enumStore.ensureRelationSource()
   loadRelations()
 })
 
@@ -503,12 +514,12 @@ function relationInitial(relation: Relation) {
 
 function relationTypeLabel(relation: Relation) {
   if (relation.relationTypeName) return relation.relationTypeName
-  return relationTypeOptions.find(item => item.value === relation.relationType)?.label || relation.relationType || '其他'
+  return relationTypeOptions.value.find(item => item.value === relation.relationType)?.label || relation.relationType || '其他'
 }
 
 function sourceLabel(relation: Relation) {
   if (relation.sourceName) return relation.sourceName
-  return sourceLabels[relation.source || ''] || relation.source || '-'
+  return relationSourceOptions.value.find(item => item.value === relation.source)?.label || relation.source || '-'
 }
 
 function formatDateTime(value?: string) {
