@@ -3,7 +3,7 @@ const REQUEST_ERROR_HANDLED_FLAG = Symbol('wk-request-error-handled')
 export function markRequestErrorHandled<T>(error: T): T {
   if (error && (typeof error === 'object' || typeof error === 'function')) {
     try {
-      ;(error as Record<PropertyKey, unknown>)[REQUEST_ERROR_HANDLED_FLAG] = true
+      (error as Record<PropertyKey, unknown>)[REQUEST_ERROR_HANDLED_FLAG] = true
     } catch {
       // ignore non-extensible errors
     }
