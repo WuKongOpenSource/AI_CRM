@@ -303,7 +303,7 @@ type ConfigNavItem = {
 
 const allMainNavItems: MainNavItem[] = [
   { icon: 'ai', label: 'AI 助手', route: '/chat', permission: 'chat' },
-  { icon: 'customer', label: '客户管理', route: '/customer', permission: 'customer' },
+  { icon: 'customer', label: '客户管理', route: '/customer', permission: 'customer:view' },
   { icon: 'profile', label: '通讯录', route: '/addressBook' },
   { icon: 'task', label: '任务管理', route: '/task', permission: 'task' },
   { icon: 'meetingRecord', label: '日程安排', route: '/calendar', permission: 'schedule' },
