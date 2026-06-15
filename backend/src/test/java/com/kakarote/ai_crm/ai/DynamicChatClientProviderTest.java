@@ -26,6 +26,19 @@ class DynamicChatClientProviderTest {
     }
 
     @Test
+    void buildChatOptionsDisablesEnableThinkingForCustomQwenModels() {
+        OpenAiChatOptions options = provider.buildChatOptions(
+                "custom",
+                "https://example.com/v1",
+                "qwen3.5-plus",
+                0.7,
+                2048
+        );
+
+        assertThat(options.getExtraBody()).containsEntry("enable_thinking", Boolean.FALSE);
+    }
+
+    @Test
     void buildChatOptionsDisablesThinkingObjectForDeepSeekModels() {
         OpenAiChatOptions options = provider.buildChatOptions(
                 "deepseek",
@@ -36,6 +49,47 @@ class DynamicChatClientProviderTest {
         );
 
         assertThat(options.getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+    }
+
+    @Test
+    void buildChatOptionsDisablesThinkingObjectForCustomDeepSeekUrls() {
+        OpenAiChatOptions options = provider.buildChatOptions(
+                "custom",
+                "https://api.deepseek.com",
+                "deepseek-chat",
+                0.7,
+                2048
+        );
+
+        assertThat(options.getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
+    }
+
+    @Test
+    void buildChatOptionsDisablesThinkingObjectForKnownCompatibleThinkingModels() {
+        assertThat(provider.buildChatOptions(
+                        "ark",
+                        "https://ark.cn-beijing.volces.com/api/v3",
+                        "doubao-seed-2-0-pro-260215",
+                        0.7,
+                        2048
+                ).getExtraBody())
+                .containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(provider.buildChatOptions(
+                        "zhipu",
+                        "https://open.bigmodel.cn/api/paas/v4",
+                        "glm-5",
+                        0.7,
+                        2048
+                ).getExtraBody())
+                .containsEntry("thinking", Map.of("type", "disabled"));
+        assertThat(provider.buildChatOptions(
+                        "hunyuan",
+                        "https://api.hunyuan.cloud.tencent.com/v1",
+                        "hunyuan-t1-latest",
+                        0.7,
+                        2048
+                ).getExtraBody())
+                .containsEntry("thinking", Map.of("type", "disabled"));
     }
 
     @Test
@@ -62,5 +116,6 @@ class DynamicChatClientProviderTest {
         );
 
         assertThat(options.getTemperature()).isEqualTo(0.6D);
+        assertThat(options.getExtraBody()).containsEntry("thinking", Map.of("type", "disabled"));
     }
 }
