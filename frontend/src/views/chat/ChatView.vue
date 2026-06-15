@@ -436,6 +436,7 @@
                     <span class="material-symbols-outlined">menu_book</span>
                   </button>
                   <input
+                    ref="chatInputRef"
                     v-model="inputText"
                     type="text"
                     class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-900 px-3 py-3 text-sm placeholder:text-slate-400"
@@ -607,6 +608,7 @@ import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal
 import { renderMarkdown } from '@/utils/markdown'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { isRequestErrorHandled } from '@/utils/requestError'
+import { shouldRefocusChatComposerAfterSend } from '@/utils/chatComposerFocus'
 import {
   CHAT_ATTACHMENT_ACCEPT,
   MAX_CHAT_ATTACHMENT_COUNT,
@@ -626,6 +628,7 @@ const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const chatInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
 const chatKnowledgePickerVisible = ref(false)
@@ -1018,6 +1021,13 @@ async function handleSend() {
   if (effectiveAppCode === 'crm') {
     appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat' })
   }
+  await refocusChatInputAfterSend()
+}
+
+async function refocusChatInputAfterSend() {
+  if (!shouldRefocusChatComposerAfterSend(isMobile.value)) return
+  await nextTick()
+  chatInputRef.value?.focus()
 }
 
 function sendQuickMessage(text: string) {
