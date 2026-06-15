@@ -11,7 +11,7 @@
             v-model="keyword"
             clearable
             class="mail-search-input"
-            placeholder="搜索主题、收件人、发件人或正文"
+            :placeholder="searchPlaceholder"
             :prefix-icon="Search"
             @clear="loadActiveTab"
             @keyup.enter="loadActiveTab"
@@ -27,8 +27,7 @@
           <el-button v-if="activeTab === 'templates'" @click="openTemplate()">新建模板</el-button>
           <el-dropdown v-if="authStatus.authorized" trigger="click" @command="handleAccountCommand">
             <el-button>
-              <span class="material-symbols-outlined mr-1 text-[18px]">alternate_email</span>
-              <span class="max-w-[180px] truncate">{{ authStatus.currentAccount?.emailAddress || '邮箱账号' }}</span>
+              <span class="max-w-[220px] truncate">{{ currentAccountEmailLabel }}</span>
               <span class="material-symbols-outlined ml-1 text-[18px]">expand_more</span>
             </el-button>
             <template #dropdown>
@@ -111,8 +110,11 @@
           empty-text="暂无已发送邮件"
           @row-click="openMessage"
         >
+          <el-table-column prop="fromAddress" label="发件邮箱" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.fromAddress || '-' }}</template>
+          </el-table-column>
           <el-table-column prop="toAddresses" label="收件人" min-width="220" show-overflow-tooltip />
-          <el-table-column prop="subject" label="主题" min-width="280" show-overflow-tooltip />
+          <el-table-column prop="subject" label="主题" min-width="260" show-overflow-tooltip />
           <el-table-column label="发送时间" width="180">
             <template #default="{ row }">{{ formatDate(row.sentTime || row.receivedTime || row.createTime) }}</template>
           </el-table-column>
@@ -123,7 +125,7 @@
           </el-table-column>
           <el-table-column label="操作" width="190" fixed="right" align="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click.stop="openMessage(row)">详情</el-button>
+              <el-button class="mail-table-action-primary" link type="primary" @click.stop="openMessage(row)">详情</el-button>
               <el-button link @click.stop="reuseMessage(row)">转发</el-button>
               <el-button link type="danger" @click.stop="removeMessage(row)">删除</el-button>
             </template>
@@ -148,14 +150,20 @@
               </button>
             </template>
           </el-table-column>
-          <el-table-column label="发件人" min-width="190" show-overflow-tooltip>
+          <el-table-column label="发件人" min-width="210" show-overflow-tooltip>
             <template #default="{ row }">
-              <span :class="row.readStatus !== 'read' ? 'font-semibold text-slate-950' : 'text-slate-700'">
-                {{ row.fromName || row.fromAddress || '-' }}
-              </span>
+              <div class="min-w-0">
+                <p :class="row.readStatus !== 'read' ? 'font-semibold text-slate-950' : 'text-slate-700'">
+                  {{ row.fromName || row.fromAddress || '-' }}
+                </p>
+                <p v-if="row.fromAddress && row.fromName" class="mt-0.5 truncate text-xs text-slate-400">{{ row.fromAddress }}</p>
+              </div>
             </template>
           </el-table-column>
-          <el-table-column label="标题与摘要" min-width="380" show-overflow-tooltip>
+          <el-table-column label="收件邮箱" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.toAddresses || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="标题与摘要" min-width="320">
             <template #default="{ row }">
               <div class="min-w-0">
                 <p :class="row.readStatus !== 'read' ? 'font-semibold text-slate-950' : 'text-slate-800'">{{ row.subject || '(无主题)' }}</p>
@@ -173,7 +181,7 @@
           </el-table-column>
           <el-table-column label="操作" width="230" fixed="right" align="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click.stop="replyMessage(row, false)">回复</el-button>
+              <el-button class="mail-table-action-primary" link type="primary" @click.stop="replyMessage(row, false)">回复</el-button>
               <el-button link @click.stop="replyMessage(row, true)">全部回复</el-button>
               <el-button link @click.stop="reuseMessage(row)">转发</el-button>
               <el-button link type="danger" @click.stop="removeMessage(row)">删除</el-button>
@@ -220,25 +228,59 @@
           v-model:page-size="pagination.limit"
           small
           background
-          layout="prev, pager, next"
+          :page-sizes="[15, 30, 50, 100]"
+          :layout="isMobile ? 'prev, pager, next' : 'sizes, prev, pager, next, jumper'"
           :total="totalRow"
+          @size-change="handlePageSizeChange"
           @current-change="loadActiveTab"
         />
       </div>
     </div>
 
-    <el-drawer v-model="detailDrawerVisible" :size="isMobile ? '100%' : '560px'" title="邮件详情">
-      <div v-if="selectedMessage" class="space-y-5">
-        <div>
-          <h3 class="text-lg font-semibold text-slate-950">{{ selectedMessage.subject || '(无主题)' }}</h3>
-          <p class="mt-2 text-sm text-slate-500">
-            {{ selectedMessage.direction === 'sent' ? '发送至' : '来自' }}
-            {{ selectedMessage.direction === 'sent' ? selectedMessage.toAddresses : selectedMessage.fromName || selectedMessage.fromAddress }}
-          </p>
-          <p class="mt-1 text-sm text-slate-400">{{ formatDate(selectedMessage.receivedTime || selectedMessage.sentTime || selectedMessage.createTime) }}</p>
+    <el-drawer v-model="detailDrawerVisible" :size="isMobile ? '100%' : '600px'" title="邮件详情" class="mail-detail-drawer">
+      <div v-if="selectedMessage" class="mail-detail">
+        <div class="mail-detail-head">
+          <h3 class="mail-detail-subject">{{ selectedMessage.subject || '(无主题)' }}</h3>
+          <div class="mail-detail-meta">
+            <div class="mail-detail-meta-row">
+              <span class="mail-detail-meta-label">发件人</span>
+              <span class="mail-detail-meta-value">{{ formatAddressLabel(selectedMessage.fromName, selectedMessage.fromAddress) }}</span>
+            </div>
+            <div class="mail-detail-meta-row">
+              <span class="mail-detail-meta-label">收件人</span>
+              <span class="mail-detail-meta-value">{{ selectedMessage.toAddresses || '-' }}</span>
+            </div>
+            <div v-if="selectedMessage.ccAddresses" class="mail-detail-meta-row">
+              <span class="mail-detail-meta-label">抄送</span>
+              <span class="mail-detail-meta-value">{{ selectedMessage.ccAddresses }}</span>
+            </div>
+            <div class="mail-detail-meta-row">
+              <span class="mail-detail-meta-label">时间</span>
+              <span class="mail-detail-meta-value">{{ formatDate(selectedMessage.receivedTime || selectedMessage.sentTime || selectedMessage.createTime) }}</span>
+            </div>
+          </div>
+          <div v-if="messageHasRemoteImages" class="mail-detail-image-tip">
+            <span class="material-symbols-outlined">image</span>
+            <span>{{ showRemoteImages ? '已显示邮件中的远程图片' : '已屏蔽远程图片' }}</span>
+            <el-button link type="primary" @click="showRemoteImages = !showRemoteImages">
+              {{ showRemoteImages ? '隐藏' : '显示' }}
+            </el-button>
+          </div>
         </div>
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700" v-html="messageBodyHtml" />
-        <div class="flex flex-wrap gap-2">
+        <div class="mail-detail-body">
+          <div v-if="detailLoading" class="mail-detail-loading">
+            <span class="material-symbols-outlined animate-spin">progress_activity</span>
+            正在加载邮件内容...
+          </div>
+          <iframe
+            v-else
+            :srcdoc="messageFrameSrcDoc"
+            sandbox="allow-popups allow-popups-to-escape-sandbox"
+            referrerpolicy="no-referrer"
+            class="mail-detail-frame"
+          />
+        </div>
+        <div class="mail-detail-actions">
           <el-button v-if="selectedMessage.direction !== 'sent'" type="primary" @click="replyMessage(selectedMessage, false)">回复</el-button>
           <el-button @click="reuseMessage(selectedMessage)">转发</el-button>
           <el-button @click="toggleRead(selectedMessage)">{{ selectedMessage.readStatus === 'read' ? '标为未读' : '标为已读' }}</el-button>
@@ -511,6 +553,8 @@ const savingTemplate = ref(false)
 const composeVisible = ref(false)
 const connectDialogVisible = ref(false)
 const detailDrawerVisible = ref(false)
+const detailLoading = ref(false)
+const showRemoteImages = ref(true)
 const templateDialogVisible = ref(false)
 const previewVisible = ref(false)
 const editorRef = ref<HTMLDivElement | null>(null)
@@ -670,6 +714,12 @@ const mailProviderPresets: MailProviderPreset[] = [
 
 const enabledAccounts = computed(() => authStatus.accounts.filter(account => account.enabled))
 
+const currentAccountEmailLabel = computed(() => normalizeAccountEmailLabel(authStatus.currentAccount?.emailAddress) || '邮箱账号')
+
+const searchPlaceholder = computed(() =>
+  activeTab.value === 'templates' ? '搜索模板名称' : '搜索主题、收件人、发件人或正文'
+)
+
 const currentMailboxLabel = computed(() => {
   if (authLoading.value) return '正在检查邮箱授权状态'
   if (!authStatus.authorized) return '尚未连接邮箱账号'
@@ -690,11 +740,28 @@ const canPersistDraft = computed(() =>
   Boolean(composeForm.toAddresses.trim() && composeForm.subject.trim() && stripHtml(composeForm.bodyText).trim())
 )
 
-const messageBodyHtml = computed(() => {
+const messageInnerHtml = computed(() => {
   const message = selectedMessage.value
   if (!message) return ''
-  if (message.bodyHtml) return message.bodyHtml
-  return escapeHtml(message.bodyText || message.summary || '').replace(/\n/g, '<br>')
+  if (message.bodyHtml && message.bodyHtml.trim()) return message.bodyHtml
+  return plainTextToHtml(message.bodyText || message.summary || '')
+})
+
+const messageHasRemoteImages = computed(() => {
+  const html = selectedMessage.value?.bodyHtml
+  return Boolean(html && /<img[^>]+src=["']?https?:/i.test(html))
+})
+
+const messageFrameSrcDoc = computed(() => {
+  const imgSrc = showRemoteImages.value ? 'img-src http: https: data: cid:;' : 'img-src data:;'
+  const csp = `default-src 'none'; style-src 'unsafe-inline'; ${imgSrc} font-src data: http: https:; media-src 'none'; frame-src 'none'; script-src 'none';`
+  return [
+    '<!doctype html><html><head><meta charset="utf-8">',
+    `<meta http-equiv="Content-Security-Policy" content="${csp}">`,
+    '<base target="_blank">',
+    `<style>${MAIL_FRAME_STYLE}</style>`,
+    `</head><body>${messageInnerHtml.value}</body></html>`,
+  ].join('')
 })
 
 watch(
@@ -768,6 +835,11 @@ async function loadActiveTab() {
 }
 
 function handleTabChange() {
+  pagination.page = 1
+  void loadActiveTab()
+}
+
+function handlePageSizeChange() {
   pagination.page = 1
   void loadActiveTab()
 }
@@ -903,13 +975,22 @@ async function sendCurrentDraft() {
     }
     await sendMail(composeForm.draftId ? { draftId: composeForm.draftId } : { draft: buildDraftPayload() })
     ElMessage.success('邮件已发送')
-    composeVisible.value = false
+    closeComposeAfterSent()
     activeTab.value = 'sent'
     pagination.page = 1
     await loadActiveTab()
   } finally {
     sending.value = false
   }
+}
+
+function closeComposeAfterSent() {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer)
+    autoSaveTimer = null
+  }
+  previewVisible.value = false
+  composeVisible.value = false
 }
 
 async function sendDraft(draft: MailDraft) {
@@ -927,13 +1008,20 @@ async function removeDraft(draft: MailDraft) {
 }
 
 async function openMessage(row: MailMessage) {
-  const detail = await getMailMessage(row.messageId)
-  selectedMessage.value = detail
+  selectedMessage.value = row
+  showRemoteImages.value = true
   detailDrawerVisible.value = true
-  if (detail.direction !== 'sent' && detail.readStatus !== 'read') {
-    await markMailRead(detail.messageId, true)
-    detail.readStatus = 'read'
-    row.readStatus = 'read'
+  detailLoading.value = true
+  try {
+    const detail = await getMailMessage(row.messageId)
+    selectedMessage.value = detail
+    if (detail.direction !== 'sent' && detail.readStatus !== 'read') {
+      await markMailRead(detail.messageId, true)
+      detail.readStatus = 'read'
+      row.readStatus = 'read'
+    }
+  } finally {
+    detailLoading.value = false
   }
 }
 
@@ -1248,6 +1336,36 @@ function stripHtml(value: string) {
   return value.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ')
 }
 
+function formatAddressLabel(name?: string, address?: string) {
+  const trimmedName = name?.trim()
+  const trimmedAddress = address?.trim()
+  if (trimmedName && trimmedAddress) return `${trimmedName} <${trimmedAddress}>`
+  return trimmedAddress || trimmedName || '-'
+}
+
+function normalizeAccountEmailLabel(email?: string) {
+  return (email || '').trim().replace(/^@+/, '')
+}
+
+function plainTextToHtml(raw: string) {
+  const cleaned = raw.replace(/\[image:[^\]]*\]/gi, '')
+  const urlPattern = /<?(https?:\/\/[^\s<>]+)>?/g
+  let html = ''
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = urlPattern.exec(cleaned)) !== null) {
+    html += escapeHtml(cleaned.slice(lastIndex, match.index))
+    const safeUrl = escapeHtml(match[1])
+    html += `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`
+    lastIndex = match.index + match[0].length
+  }
+  html += escapeHtml(cleaned.slice(lastIndex))
+  return html
+    .split(/\n{2,}/)
+    .map(block => `<p>${block.replace(/\n/g, '<br>')}</p>`)
+    .join('')
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -1256,6 +1374,13 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;')
 }
+
+const MAIL_FRAME_STYLE =
+  "html,body{margin:0;padding:16px;color:#1f2933;background:#ffffff;" +
+  "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'PingFang SC','Microsoft YaHei',sans-serif;" +
+  "font-size:14px;line-height:1.7;word-break:break-word;overflow-wrap:anywhere;}" +
+  "img{max-width:100%;height:auto;}a{color:#2563eb;}table{max-width:100%;border-collapse:collapse;}" +
+  "blockquote{margin:0 0 0 8px;padding-left:12px;border-left:3px solid #e2e8f0;color:#475569;}"
 </script>
 
 <style scoped>
@@ -1361,5 +1486,115 @@ function escapeHtml(value: string) {
 
 .mail-connect-advanced :deep(.el-collapse-item__content) {
   padding: 0 16px 16px;
+}
+
+.mail-table-action-primary {
+  border-radius: 7px !important;
+  background: #171717 !important;
+  padding: 6px 12px !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.mail-detail-drawer :deep(.el-drawer__body) {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mail-detail {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+}
+
+.mail-detail-head {
+  flex-shrink: 0;
+  padding: 4px 20px 16px;
+  border-bottom: 1px solid #ebe6dd;
+}
+
+.mail-detail-subject {
+  margin: 0 0 12px;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.mail-detail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mail-detail-meta-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mail-detail-meta-label {
+  flex-shrink: 0;
+  width: 44px;
+  color: #94a3b8;
+}
+
+.mail-detail-meta-value {
+  min-width: 0;
+  color: #334155;
+  word-break: break-all;
+}
+
+.mail-detail-image-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.mail-detail-image-tip .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.mail-detail-body {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  background: #ffffff;
+}
+
+.mail-detail-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.mail-detail-loading {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.mail-detail-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid #ebe6dd;
 }
 </style>
