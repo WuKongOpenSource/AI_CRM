@@ -315,32 +315,98 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="connectDialogVisible" title="连接邮箱账号" :width="isMobile ? '92%' : '560px'">
+    <el-dialog v-model="connectDialogVisible" class="mail-connect-dialog" :width="isMobile ? '92%' : '760px'">
+      <template #header>
+        <div>
+          <h3 class="m-0 text-lg font-bold text-slate-950">绑定邮箱账号</h3>
+          <p class="mt-1 text-xs text-slate-500">绑定后可在系统内同步、查看和发送客户邮件</p>
+        </div>
+      </template>
+
       <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <el-button class="h-11" @click="handleOAuth('gmail')">Gmail OAuth</el-button>
-        <el-button class="h-11" @click="handleOAuth('outlook')">Outlook / M365</el-button>
+        <el-button class="h-11" @click="handleOAuth('gmail')">
+          <span class="flex items-center gap-2">
+            <span class="text-lg font-bold text-blue-500">G</span>
+            Gmail 一键授权
+          </span>
+        </el-button>
+        <el-button class="h-11" @click="handleOAuth('outlook')">
+          <span class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-base text-blue-600">mail</span>
+            Outlook / Microsoft 365
+          </span>
+        </el-button>
       </div>
-      <el-form label-position="top">
+
+      <div class="mb-4 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+        <span class="material-symbols-outlined text-base">verified_user</span>
+        推荐使用 OAuth 授权；其他邮箱请填写客户端授权码并确认已开启 IMAP/SMTP 服务。
+      </div>
+
+      <el-form class="mail-connect-form" label-position="top">
+        <el-form-item label="邮箱类型">
+          <el-select
+            v-model="selectedMailProviderPreset"
+            class="w-full"
+            placeholder="选择常用邮箱厂商"
+            filterable
+            @change="applyMailProviderPreset"
+          >
+            <el-option
+              v-for="preset in mailProviderPresets"
+              :key="preset.value"
+              :label="preset.label"
+              :value="preset.value"
+            >
+              <div class="mail-provider-option">
+                <span>{{ preset.label }}</span>
+                <span v-if="preset.domainHint" class="text-xs text-slate-400">{{ preset.domainHint }}</span>
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <el-form-item label="邮箱地址"><el-input v-model="imapForm.emailAddress" /></el-form-item>
-          <el-form-item label="显示名称"><el-input v-model="imapForm.displayName" /></el-form-item>
-          <el-form-item label="IMAP 主机"><el-input v-model="imapForm.imapHost" placeholder="imap.example.com" /></el-form-item>
-          <el-form-item label="IMAP 端口"><el-input-number v-model="imapForm.imapPort" class="w-full" :min="1" :max="65535" /></el-form-item>
-          <el-form-item label="SMTP 主机"><el-input v-model="imapForm.smtpHost" placeholder="smtp.example.com" /></el-form-item>
-          <el-form-item label="SMTP 端口"><el-input-number v-model="imapForm.smtpPort" class="w-full" :min="1" :max="65535" /></el-form-item>
+          <el-form-item label="邮箱地址">
+            <el-input v-model="imapForm.emailAddress" placeholder="example@163.com" @blur="syncUsernameFromEmail" />
+          </el-form-item>
+          <el-form-item label="授权码 / 邮箱密码">
+            <el-input v-model="imapForm.password" type="password" show-password />
+          </el-form-item>
         </div>
-        <el-form-item label="登录账号"><el-input v-model="imapForm.username" /></el-form-item>
-        <el-form-item label="授权码 / 密码"><el-input v-model="imapForm.password" type="password" show-password /></el-form-item>
-        <div class="flex gap-4">
-          <el-checkbox v-model="imapForm.imapSsl">IMAP SSL</el-checkbox>
-          <el-checkbox v-model="imapForm.smtpSsl">SMTP SSL</el-checkbox>
-          <el-checkbox v-model="imapForm.testConnection">连接测试</el-checkbox>
+        <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <span>登录账号默认使用邮箱地址。</span>
+          <el-link type="primary" :underline="false" @click="showAuthCodeHelp">如何获取授权码?</el-link>
         </div>
+
+        <el-collapse v-model="connectAdvancedPanels" class="mail-connect-advanced">
+          <el-collapse-item name="advanced">
+            <template #title>
+              <span class="inline-flex items-center gap-2 font-semibold text-slate-700">
+                <span class="material-symbols-outlined text-base">settings</span>
+                高级设置
+              </span>
+            </template>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <el-form-item label="显示名称"><el-input v-model="imapForm.displayName" /></el-form-item>
+              <el-form-item label="登录账号"><el-input v-model="imapForm.username" /></el-form-item>
+              <el-form-item label="IMAP 主机"><el-input v-model="imapForm.imapHost" placeholder="imap.example.com" /></el-form-item>
+              <el-form-item label="IMAP 端口"><el-input-number v-model="imapForm.imapPort" class="w-full" :min="1" :max="65535" /></el-form-item>
+              <el-form-item label="SMTP 主机"><el-input v-model="imapForm.smtpHost" placeholder="smtp.example.com" /></el-form-item>
+              <el-form-item label="SMTP 端口"><el-input-number v-model="imapForm.smtpPort" class="w-full" :min="1" :max="65535" /></el-form-item>
+            </div>
+            <div class="flex flex-wrap gap-4">
+              <el-checkbox v-model="imapForm.imapSsl">开启 IMAP SSL</el-checkbox>
+              <el-checkbox v-model="imapForm.smtpSsl">开启 SMTP SSL</el-checkbox>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </el-form>
       <template #footer>
-        <el-button @click="connectDialogVisible = false">取消</el-button>
-        <el-button :loading="testingConnection" @click="testImapConnect">测试连接</el-button>
-        <el-button type="primary" :loading="connecting" @click="connectImap">连接</el-button>
+        <div class="mail-connect-footer">
+          <el-button @click="connectDialogVisible = false">取消</el-button>
+          <el-button :loading="testingConnection" @click="testImapConnect">测试连接</el-button>
+          <el-button type="primary" :loading="connecting" @click="connectImap">保存并连接</el-button>
+        </div>
       </template>
     </el-dialog>
 
@@ -417,6 +483,18 @@ type MailTab = 'drafts' | 'sent' | 'inbox' | 'templates'
 type AutoSaveState = 'idle' | 'saving' | 'saved' | 'failed'
 const SYNC_STATUS_MAX_LOGS = 5
 
+type MailProviderPreset = {
+  value: string
+  label: string
+  domainHint?: string
+  imapHost?: string
+  imapPort?: number
+  imapSsl?: boolean
+  smtpHost?: string
+  smtpPort?: number
+  smtpSsl?: boolean
+}
+
 const { isMobile } = useResponsive()
 
 const activeTab = ref<MailTab>('drafts')
@@ -444,6 +522,8 @@ const templates = ref<MailTemplate[]>([])
 const totalRow = ref(0)
 const aiIntent = ref('followup')
 const autoSaveState = ref<AutoSaveState>('idle')
+const selectedMailProviderPreset = ref('custom')
+const connectAdvancedPanels = ref(['advanced'])
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 let suppressAutoSave = false
 
@@ -506,6 +586,87 @@ const categoryOptions = [
 ]
 
 const variableHints = '{{客户姓名}} {{公司名称}} {{销售姓名}} {{当前日期}}'
+
+const mailProviderPresets: MailProviderPreset[] = [
+  {
+    value: 'qq',
+    label: 'QQ邮箱',
+    domainHint: '@qq.com',
+    imapHost: 'imap.qq.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.qq.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'netease-163',
+    label: '网易163邮箱',
+    domainHint: '@163.com',
+    imapHost: 'imap.163.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.163.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'netease-126',
+    label: '网易126邮箱',
+    domainHint: '@126.com',
+    imapHost: 'imap.126.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.126.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'netease-yeah',
+    label: '网易Yeah邮箱',
+    domainHint: '@yeah.net',
+    imapHost: 'imap.yeah.net',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.yeah.net',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'tencent-exmail',
+    label: '腾讯企业邮箱',
+    domainHint: '企业域名',
+    imapHost: 'imap.exmail.qq.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.exmail.qq.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'aliyun',
+    label: '阿里邮箱',
+    domainHint: '企业域名',
+    imapHost: 'imap.qiye.aliyun.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.qiye.aliyun.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  {
+    value: 'sina',
+    label: '新浪邮箱',
+    domainHint: '@sina.com',
+    imapHost: 'imap.sina.com',
+    imapPort: 993,
+    imapSsl: true,
+    smtpHost: 'smtp.sina.com',
+    smtpPort: 465,
+    smtpSsl: true,
+  },
+  { value: 'custom', label: '自定义', domainHint: '手动填写' },
+]
 
 const enabledAccounts = computed(() => authStatus.accounts.filter(account => account.enabled))
 
@@ -867,11 +1028,49 @@ async function handleOAuth(provider: 'gmail' | 'outlook') {
   ElMessage.info('授权完成后请回到本页面刷新邮箱状态')
 }
 
-async function testImapConnect() {
+function applyMailProviderPreset(value: string) {
+  const preset = mailProviderPresets.find(item => item.value === value)
+  if (!preset || preset.value === 'custom') return
+
+  imapForm.imapHost = preset.imapHost || ''
+  imapForm.imapPort = preset.imapPort || 993
+  imapForm.imapSsl = preset.imapSsl ?? true
+  imapForm.smtpHost = preset.smtpHost || ''
+  imapForm.smtpPort = preset.smtpPort || 465
+  imapForm.smtpSsl = preset.smtpSsl ?? true
+  syncUsernameFromEmail()
+}
+
+function syncUsernameFromEmail() {
+  const email = imapForm.emailAddress.trim()
+  if (email) {
+    imapForm.username = email
+  }
+}
+
+function showAuthCodeHelp() {
+  ElMessage.info('请在邮箱设置中开启 IMAP/SMTP 服务，并生成客户端授权码或专用密码。')
+}
+
+function validateImapConnectForm() {
+  syncUsernameFromEmail()
   if (!imapForm.emailAddress || !imapForm.imapHost || !imapForm.smtpHost || !imapForm.password) {
     ElMessage.warning('请填写邮箱地址、IMAP/SMTP 主机和授权码')
-    return
+    return false
   }
+  const imapPort = Number(imapForm.imapPort)
+  const smtpPort = Number(imapForm.smtpPort)
+  if (!Number.isInteger(imapPort) || !Number.isInteger(smtpPort) || imapPort < 1 || imapPort > 65535 || smtpPort < 1 || smtpPort > 65535) {
+    ElMessage.warning('请填写有效的 IMAP/SMTP 端口')
+    return false
+  }
+  imapForm.imapPort = imapPort
+  imapForm.smtpPort = smtpPort
+  return true
+}
+
+async function testImapConnect() {
+  if (!validateImapConnectForm()) return
   testingConnection.value = true
   try {
     await testImapMailbox(imapForm)
@@ -882,10 +1081,7 @@ async function testImapConnect() {
 }
 
 async function connectImap() {
-  if (!imapForm.emailAddress || !imapForm.imapHost || !imapForm.smtpHost || !imapForm.password) {
-    ElMessage.warning('请填写邮箱地址、IMAP/SMTP 主机和授权码')
-    return
-  }
+  if (!validateImapConnectForm()) return
   connecting.value = true
   try {
     await connectImapMailbox(imapForm)
@@ -1128,5 +1324,37 @@ function escapeHtml(value: string) {
 .mail-editor :deep(th) {
   border: 1px solid #cbd5e1;
   padding: 8px;
+}
+
+.mail-provider-option,
+.mail-connect-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mail-connect-footer {
+  justify-content: flex-end;
+}
+
+.mail-connect-dialog :deep(.el-dialog__body) {
+  padding-top: 8px;
+}
+
+.mail-connect-advanced {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.mail-connect-advanced :deep(.el-collapse-item__header),
+.mail-connect-advanced :deep(.el-collapse-item__wrap) {
+  border: 0;
+  background: transparent;
+}
+
+.mail-connect-advanced :deep(.el-collapse-item__content) {
+  padding: 0 16px 16px;
 }
 </style>
