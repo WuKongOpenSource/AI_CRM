@@ -489,7 +489,7 @@ const modelOptionGroups = computed(() => {
   ].filter(group => group.options.length > 0)
 })
 
-const canManageAiConfig = computed(() => userStore.hasPermission('config'))
+const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
 
 const composerModelLabel = computed(() => {
   if (chatStore.modelOptionsLoading) return '加载模型...'
