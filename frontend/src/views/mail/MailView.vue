@@ -796,6 +796,11 @@ async function syncCurrentMailbox(notifyNoNew: boolean) {
   const savedCount = latestLog?.savedCount ?? result.savedCount ?? 0
   const errorMessage = latestLog?.errorMessage || result.errorMessage
 
+  if (status === 'running') {
+    ElMessage.info('邮箱同步已开始，稍后刷新可查看结果')
+    return true
+  }
+
   if (status === 'failed') {
     ElMessage.error(errorMessage || '邮箱同步失败，请稍后重试')
     return false
