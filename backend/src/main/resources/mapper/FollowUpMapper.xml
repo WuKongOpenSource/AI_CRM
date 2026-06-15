@@ -7,6 +7,8 @@
             f.follow_up_id,
             f.customer_id,
             c.company_name AS customer_name,
+            f.relation_id,
+            r.name AS relation_name,
             f.contact_id,
             ct.name AS contact_name,
             f.type,
@@ -21,11 +23,15 @@
             f.create_time
         FROM crm_follow_up f
         LEFT JOIN crm_customer c ON f.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON f.relation_id = r.relation_id
         LEFT JOIN crm_contact ct ON f.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON f.create_user_id = u.user_id
         WHERE 1=1
         <if test="query.customerId != null">
             AND f.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND f.relation_id = #{query.relationId}
         </if>
         <if test="query.contactId != null">
             AND f.contact_id = #{query.contactId}
@@ -46,6 +52,8 @@
         SELECT
             f.follow_up_id,
             f.customer_id,
+            f.relation_id,
+            r.name AS relation_name,
             f.contact_id,
             ct.name AS contact_name,
             f.type,
@@ -59,6 +67,7 @@
             u.realname AS create_user_name,
             f.create_time
         FROM crm_follow_up f
+        LEFT JOIN crm_relation r ON f.relation_id = r.relation_id
         LEFT JOIN crm_contact ct ON f.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON f.create_user_id = u.user_id
         WHERE f.customer_id = #{customerId}

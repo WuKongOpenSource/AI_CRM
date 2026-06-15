@@ -7,26 +7,26 @@ import lombok.EqualsAndHashCode;
 
 import java.util.Date;
 
-/**
- * 跟进记录查询参数
- */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@Schema(name = "FollowUpQueryBO", description = "跟进记录查询参数")
+@Schema(name = "FollowUpQueryBO", description = "Follow-up query payload")
 public class FollowUpQueryBO extends PageEntity {
 
-    @Schema(description = "客户ID")
+    @Schema(description = "Customer ID")
     private Long customerId;
 
-    @Schema(description = "联系人ID")
+    @Schema(description = "Relation ID")
+    private Long relationId;
+
+    @Schema(description = "Contact ID")
     private Long contactId;
 
-    @Schema(description = "类型")
+    @Schema(description = "Type")
     private String type;
 
-    @Schema(description = "开始时间")
+    @Schema(description = "Start time")
     private Date startTime;
 
-    @Schema(description = "结束时间")
+    @Schema(description = "End time")
     private Date endTime;
 }

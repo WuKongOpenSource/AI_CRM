@@ -19,7 +19,8 @@ $$ LANGUAGE plpgsql;
 -- ============================================
 DROP TABLE IF EXISTS crm_customer CASCADE;
 CREATE TABLE crm_customer (
-    customer_id BIGINT NOT NULL,
+    customer_id BIGINT,
+    relation_id BIGINT,
     company_name VARCHAR(255) NOT NULL,
     industry VARCHAR(100),
     stage VARCHAR(50) NOT NULL DEFAULT 'lead',
@@ -686,6 +687,7 @@ CREATE TABLE crm_follow_up (
 );
 
 CREATE INDEX idx_follow_up_customer_id ON crm_follow_up (customer_id);
+CREATE INDEX idx_follow_up_relation_id ON crm_follow_up (relation_id);
 CREATE INDEX idx_follow_up_follow_time ON crm_follow_up (follow_time);
 
 COMMENT ON TABLE crm_follow_up IS '跟进记录表';

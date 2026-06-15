@@ -240,7 +240,11 @@ export interface ContactQueryBO {
 // FollowUp types
 export interface FollowUp {
   followUpId: string
-  customerId: string
+  customerId?: string
+  relationId?: string
+  relationName?: string
+  contactId?: string
+  contactName?: string
   type: FollowUpType
   content: string
   summary?: string
@@ -279,7 +283,8 @@ export interface FollowUpAttachmentDraft {
 export type FollowUpType = 'call' | 'meeting' | 'email' | 'visit' | 'other'
 
 export interface FollowUpAddBO {
-  customerId: string
+  customerId?: string
+  relationId?: string
   type: string
   content: string
   followTime: string
@@ -291,8 +296,22 @@ export interface FollowUpAddBO {
   attachments?: FollowUpAttachmentDraft[]
 }
 
+export interface FollowUpUpdateBO {
+  followUpId: string
+  relationId?: string
+  contactId?: string
+  type: string
+  content: string
+  followTime: string
+  nextFollowTime?: string
+  summary?: string
+  sceneType?: string
+  aiGenerated?: number
+}
+
 export interface FollowUpQueryBO {
   customerId?: string
+  relationId?: string
   contactId?: string
   type?: string
   startTime?: string

@@ -1,5 +1,5 @@
 import { download, post, upload } from '@/utils/request'
-import type { FollowUp, FollowUpAddBO, FollowUpAttachmentDraft, FollowUpQueryBO } from '@/types/customer'
+import type { FollowUp, FollowUpAddBO, FollowUpAttachmentDraft, FollowUpQueryBO, FollowUpUpdateBO } from '@/types/customer'
 import type { PageResult } from '@/types/api'
 
 /**
@@ -7,6 +7,13 @@ import type { PageResult } from '@/types/api'
  */
 export function addFollowUp(data: FollowUpAddBO): Promise<string> {
   return post('/followup/add', data)
+}
+
+/**
+ * Update follow-up record
+ */
+export function updateFollowUp(data: FollowUpUpdateBO): Promise<void> {
+  return post('/followup/update', data)
 }
 
 /**
@@ -60,4 +67,8 @@ export function uploadFollowUpAttachment(file: File): Promise<FollowUpAttachment
 
 export function downloadFollowUpAttachment(attachmentId: string, fileName?: string): Promise<void> {
   return download(`/followup/attachment/${attachmentId}/download`, fileName)
+}
+
+export function deleteFollowUpAttachment(attachmentId: string): Promise<void> {
+  return post(`/followup/attachment/${attachmentId}/delete`)
 }

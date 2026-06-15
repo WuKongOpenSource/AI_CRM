@@ -15,17 +15,21 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
 import com.kakarote.ai_crm.entity.PO.FollowUpAttachment;
+import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.FollowUpAttachmentMapper;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
+import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -42,6 +46,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -82,6 +87,9 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     private CustomerMapper customerMapper;
 
     @Autowired
+    private RelationMapper relationMapper;
+
+    @Autowired
     private FollowUpAttachmentMapper followUpAttachmentMapper;
 
     @Autowired
@@ -96,6 +104,14 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addFollowUp(FollowUpAddBO followUpAddBO) {
+        Relation relation = validateRelation(followUpAddBO.getRelationId());
+        if (followUpAddBO.getCustomerId() == null && relation != null) {
+            followUpAddBO.setCustomerId(relation.getCustomerId());
+        }
+        if (followUpAddBO.getCustomerId() == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer or relation is required");
+        }
+
         Customer customer = customerMapper.selectById(followUpAddBO.getCustomerId());
         if (ObjectUtil.isNull(customer)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
@@ -118,6 +134,36 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
         customerMapper.updateById(customer);
 
         return followUp.getFollowUpId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateFollowUp(FollowUpUpdateBO followUpUpdateBO) {
+        FollowUp followUp = getById(followUpUpdateBO.getFollowUpId());
+        if (ObjectUtil.isNull(followUp)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Follow-up record does not exist");
+        }
+        validateRelation(followUpUpdateBO.getRelationId());
+
+        followUp.setRelationId(followUpUpdateBO.getRelationId());
+        followUp.setContactId(followUpUpdateBO.getContactId());
+        followUp.setType(followUpUpdateBO.getType());
+        followUp.setContent(followUpUpdateBO.getContent());
+        followUp.setSummary(followUpUpdateBO.getSummary());
+        followUp.setSceneType(followUpUpdateBO.getSceneType());
+        followUp.setAiGenerated(followUpUpdateBO.getAiGenerated());
+        followUp.setFollowTime(followUpUpdateBO.getFollowTime());
+        followUp.setNextFollowTime(followUpUpdateBO.getNextFollowTime());
+        updateById(followUp);
+
+        if (followUp.getCustomerId() != null) {
+            Customer customer = customerMapper.selectById(followUp.getCustomerId());
+            if (customer != null) {
+                customer.setLastContactTime(followUp.getFollowTime());
+                customer.setNextFollowTime(followUp.getNextFollowTime());
+                customerMapper.updateById(customer);
+            }
+        }
     }
 
     @Override
@@ -196,6 +242,22 @@ public class FollowUpServiceImpl extends ServiceImpl<FollowUpMapper, FollowUp> i
             log.error("AI 跟进解析失败，返回默认值", e);
             return buildFallbackResult(parseBO.getContent(), now);
         }
+    }
+
+    private Relation validateRelation(Long relationId) {
+        if (relationId == null) {
+            return null;
+        }
+        Relation relation = relationMapper.selectById(relationId);
+        if (relation == null || Objects.equals(relation.getStatus(), 0)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Relation does not exist");
+        }
+        Long currentUserId = UserUtil.getUserIdOrNull();
+        if (currentUserId != null && relation.getCreateUserId() != null
+            && !Objects.equals(currentUserId, relation.getCreateUserId())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Relation does not exist");
+        }
+        return relation;
     }
 
     private void saveAttachments(Long followUpId, List<com.kakarote.ai_crm.entity.BO.ChatSendBO.AttachmentDTO> attachments) {

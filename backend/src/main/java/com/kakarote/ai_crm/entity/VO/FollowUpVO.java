@@ -22,6 +22,12 @@ public class FollowUpVO {
     @Schema(description = "客户名称")
     private String customerName;
 
+    @Schema(description = "Relation ID")
+    private Long relationId;
+
+    @Schema(description = "Relation name")
+    private String relationName;
+
     @Schema(description = "联系人ID")
     private Long contactId;
 

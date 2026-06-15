@@ -5,6 +5,7 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
+import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
 import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
@@ -21,6 +22,11 @@ public interface IFollowUpService extends IService<FollowUp> {
      * 添加跟进记录
      */
     Long addFollowUp(FollowUpAddBO followUpAddBO);
+
+    /**
+     * Update follow-up record.
+     */
+    void updateFollowUp(FollowUpUpdateBO followUpUpdateBO);
 
     /**
      * 删除跟进记录

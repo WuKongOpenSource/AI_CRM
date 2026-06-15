@@ -6,14 +6,14 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.Date;
-import java.util.List;
 
 @Data
-@Schema(name = "FollowUpAddBO", description = "Follow-up create payload")
-public class FollowUpAddBO {
+@Schema(name = "FollowUpUpdateBO", description = "Follow-up update payload")
+public class FollowUpUpdateBO {
 
-    @Schema(description = "Customer ID")
-    private Long customerId;
+    @NotNull(message = "Follow-up ID cannot be empty")
+    @Schema(description = "Follow-up ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Long followUpId;
 
     @Schema(description = "Relation ID")
     private Long relationId;
@@ -44,7 +44,4 @@ public class FollowUpAddBO {
 
     @Schema(description = "Next follow-up time")
     private Date nextFollowTime;
-
-    @Schema(description = "Attachments")
-    private List<ChatSendBO.AttachmentDTO> attachments;
 }
