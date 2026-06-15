@@ -436,7 +436,27 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteByIds(Long[] userIds) {
+        if (userIds == null || userIds.length == 0) {
+            return;
+        }
         List<Long> userIdList = Arrays.asList(userIds);
+        List<Long> protectedRoleIds = roleService.lambdaQuery()
+                .select(ManagerRole::getRoleId)
+                .eq(ManagerRole::getRealm, "super_admin")
+                .list()
+                .stream()
+                .map(ManagerRole::getRoleId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (CollUtil.isNotEmpty(protectedRoleIds)) {
+            long protectedUserCount = userRoleService.lambdaQuery()
+                    .in(ManagerUserRole::getUserId, userIdList)
+                    .in(ManagerUserRole::getRoleId, protectedRoleIds)
+                    .count();
+            if (protectedUserCount > 0) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "主账号不允许删除");
+            }
+        }
         removeByIds(userIdList);
         List<ManagerUserRole> list = userRoleService.lambdaQuery().in(ManagerUserRole::getUserId, userIdList).list();
         if(CollUtil.isNotEmpty(list)){
