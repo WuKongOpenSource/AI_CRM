@@ -55,6 +55,7 @@ public class DynamicChatClientProvider {
     private static final String AI_PROVIDER_CONFIGS_KEY = "ai_provider_configs";
     private static final String OPENAI_PUBLIC_BASE_URL = "https://api.openai.com";
     private static final String OPENAI_PROXY_BASE_URL = "http://52.198.150.151";
+    private static final double MOONSHOT_K2_NON_THINKING_TEMPERATURE = 0.6D;
 
     private volatile ChatClient currentChatClient;
     private final Object lock = new Object();
@@ -196,13 +197,12 @@ public class DynamicChatClientProvider {
                                        boolean registerTools) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
 
-        String resolvedModel = AiProviderRegistry.normalizeModelName(providerCode, model);
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(resolvedModel)
-                .temperature(temperature)
-                .maxCompletionTokens(maxTokens)
-                .build();
-        options.setStreamUsage(Boolean.TRUE);
+        OpenAiChatOptions options = buildChatOptions(providerCode, baseUrl, model, temperature, maxTokens);
+        boolean toolCallingEnabled = registerTools && capabilities != null && capabilities.isSupportsToolCall();
+        Object[] defaultTools = toolCallingEnabled ? resolveDefaultTools() : new Object[0];
+        if (shouldEnableParallelToolCalls(toolCallingEnabled, defaultTools, providerCode, baseUrl)) {
+            options.setParallelToolCalls(Boolean.TRUE);
+        }
 
         ObservationRegistry obsRegistry = observationRegistry != null
                 ? observationRegistry
@@ -216,11 +216,87 @@ public class DynamicChatClientProvider {
         );
 
         ChatClient.Builder builder = ChatClient.builder(chatModel);
-        if (registerTools && capabilities != null && capabilities.isSupportsToolCall()) {
-            builder.defaultTools(customerTools, taskTools, projectTools, productTools, knowledgeTools,
-                    contactTools, followupTools, scheduleTools, relationTools, mailTools);
+        if (defaultTools.length > 0) {
+            builder.defaultTools(defaultTools);
         }
         return builder.build();
+    }
+
+    OpenAiChatOptions buildChatOptions(String providerCode, String baseUrl, String model,
+                                       Double temperature, Integer maxTokens) {
+        String resolvedModel = AiProviderRegistry.normalizeModelName(providerCode, model);
+        Double requestTemperature = resolveRequestTemperature(providerCode, resolvedModel, temperature);
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
+                .model(resolvedModel)
+                .temperature(requestTemperature)
+                .maxCompletionTokens(maxTokens)
+                .streamUsage(true);
+
+        return builder.build();
+    }
+
+    private Object[] resolveDefaultTools() {
+        return new Object[] {
+                customerTools, taskTools, projectTools, productTools, knowledgeTools,
+                contactTools, followupTools, scheduleTools, relationTools, mailTools
+        };
+    }
+
+    boolean shouldEnableParallelToolCalls(boolean toolCallingEnabled, Object[] defaultTools,
+                                          String providerCode, String baseUrl) {
+        return toolCallingEnabled
+                && defaultTools != null
+                && defaultTools.length > 0
+                && supportsParallelToolCalls(providerCode, baseUrl);
+    }
+
+    private boolean supportsParallelToolCalls(String providerCode, String baseUrl) {
+        String normalizedBaseUrl = normalizeCompatibleBaseUrl(baseUrl);
+        String resolvedProviderCode = AiProviderRegistry.resolve(providerCode, normalizedBaseUrl).getCode();
+        return "openai".equals(resolvedProviderCode) || "dashscope".equals(resolvedProviderCode);
+    }
+
+    private Double resolveRequestTemperature(String providerCode, String model, Double temperature) {
+        if (isMoonshotK2FixedTemperatureModel(providerCode, model)) {
+            if (temperature == null || Double.compare(temperature, MOONSHOT_K2_NON_THINKING_TEMPERATURE) != 0) {
+                log.info("Moonshot model {} requires temperature {}, override configured temperature {}",
+                        model, MOONSHOT_K2_NON_THINKING_TEMPERATURE, temperature);
+            }
+            return MOONSHOT_K2_NON_THINKING_TEMPERATURE;
+        }
+        return temperature;
+    }
+
+    private boolean isMoonshotK2FixedTemperatureModel(String providerCode, String model) {
+        String provider = normalizeProviderCodeForThinking(providerCode);
+        String normalizedModel = normalizeForMatching(model);
+        if (!"moonshot".equals(provider) && !normalizedModel.contains("kimi-k2")) {
+            return false;
+        }
+        return isKimiK2SwitchableThinkingModel(normalizedModel);
+    }
+
+    private boolean isKimiK2SwitchableThinkingModel(String normalizedModel) {
+        return normalizedModel.startsWith("kimi-k2.5")
+                || normalizedModel.startsWith("kimi-k2.6")
+                || normalizedModel.startsWith("kimi-k2-5")
+                || normalizedModel.startsWith("kimi-k2-6")
+                || normalizedModel.contains("/kimi-k2.5")
+                || normalizedModel.contains("/kimi-k2.6")
+                || normalizedModel.contains("/kimi-k2-5")
+                || normalizedModel.contains("/kimi-k2-6");
+    }
+
+    private String normalizeProviderCodeForThinking(String providerCode) {
+        String normalized = normalizeForMatching(providerCode);
+        if ("kimi".equals(normalized) || "moonshot-ai".equals(normalized)) {
+            return "moonshot";
+        }
+        return normalized;
+    }
+
+    private String normalizeForMatching(String value) {
+        return StrUtil.nullToEmpty(value).trim().toLowerCase();
     }
 
     public ChatClient createTestChatClient(String providerCode, String baseUrl, String apiKey, String model,
