@@ -688,7 +688,7 @@ const { isMobile } = useResponsive()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
-const mobilePanel = ref<'sessions' | 'chat'>('sessions')
+const mobilePanel = ref<'sessions' | 'chat'>('chat')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
