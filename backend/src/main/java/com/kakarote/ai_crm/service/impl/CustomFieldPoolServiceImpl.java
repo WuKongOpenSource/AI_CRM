@@ -61,7 +61,7 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的字段类型: " + fieldType);
         }
 
-        // 1. 查当前租户已使用的 columnName 集合（自动租户过滤）
+        // 1. 查当前实体已使用的 columnName 集合
         List<CustomField> usedFields = customFieldMapper.selectList(
                 new LambdaQueryWrapper<CustomField>()
                         .eq(CustomField::getEntityType, entityType)
@@ -70,7 +70,7 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
                 .map(CustomField::getColumnName)
                 .collect(Collectors.toSet());
 
-        // 2. 查池中同 entityType + fieldType 且未被当前租户使用的记录
+        // 2. 查池中同 entityType + fieldType 且未被当前实体使用的记录
         List<CustomFieldPool> candidates = list(new LambdaQueryWrapper<CustomFieldPool>()
                 .eq(CustomFieldPool::getEntityType, entityType)
                 .eq(CustomFieldPool::getFieldType, fieldType)

@@ -205,7 +205,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "字段不存在");
         }
 
-        // 仅删除元数据，物理列保留在字段池中供其他租户或未来复用
+        // 仅删除元数据，物理列保留在字段池中供未来复用
         removeById(fieldId);
         evictOptionsCache();
 

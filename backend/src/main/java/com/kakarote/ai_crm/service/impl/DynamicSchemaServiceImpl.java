@@ -56,7 +56,7 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         validateColumnName(columnName);
 
         if (columnExists(tableName, columnName)) {
-            // 幂等：池模式下多租户共用同一物理列，列已存在时跳过
+            // 幂等：字段池复用同一物理列，列已存在时跳过
             return;
         }
 

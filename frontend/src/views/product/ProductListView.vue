@@ -317,7 +317,7 @@
             <el-input v-model="form.productName" maxlength="100" show-word-limit size="large" class="wk-crm-el-field-input" placeholder="请输入产品名称" />
           </el-form-item>
           <el-form-item label="产品编码" prop="productCode" class="md:col-span-2">
-            <el-input v-model="form.productCode" maxlength="100" placeholder="租户内唯一" size="large" class="wk-crm-el-field-input" />
+            <el-input v-model="form.productCode" maxlength="100" placeholder="系统内唯一" size="large" class="wk-crm-el-field-input" />
           </el-form-item>
           <el-form-item label="产品主图" class="md:col-span-2">
             <div class="product-main-image-field">

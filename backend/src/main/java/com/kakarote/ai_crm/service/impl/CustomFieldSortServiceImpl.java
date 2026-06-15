@@ -85,7 +85,7 @@ public class CustomFieldSortServiceImpl extends ServiceImpl<CustomFieldSortMappe
     private List<CustomFieldVO> buildMergedConfig(String entityType) {
         Long userId = UserUtil.getUserId();
 
-        // 1. 获取当前租户所有启用字段
+        // 1. 获取当前实体所有启用字段
         List<CustomFieldVO> enabledFields = customFieldService.getEnabledFieldsByEntity(entityType);
         if (enabledFields.isEmpty()) {
             return Collections.emptyList();

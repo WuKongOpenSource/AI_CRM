@@ -1,6 +1,5 @@
 package com.kakarote.ai_crm.mapper;
 
-import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
@@ -33,7 +32,7 @@ public interface ManageUserMapper extends BaseMapper<ManagerUser> {
     ManagerUser getUserId(@Param("userId") Long userId);
 
     /**
-     * 通过用户名查询员工（登录认证用，跳过租户过滤）
+     * 通过用户名查询员工（登录认证用）
      * @param username 用户名
      * @return ManageUserEntity 员工
      */
