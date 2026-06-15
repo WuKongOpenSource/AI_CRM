@@ -216,9 +216,6 @@
                     </div>
                   </div>
 
-                  <p class="mt-5 text-center text-xs font-medium text-slate-400">
-                    测试账号: admin / 123456a
-                  </p>
                 </div>
               </div>
             </div>
