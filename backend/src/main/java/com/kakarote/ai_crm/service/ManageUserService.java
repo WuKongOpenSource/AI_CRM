@@ -2,6 +2,7 @@ package com.kakarote.ai_crm.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
@@ -47,6 +48,12 @@ public interface ManageUserService extends IService<ManagerUser> {
      * @param updateBO data
      */
     void updateUser(UserUpdateBO updateBO);
+
+    /**
+     * 重置用户名
+     * @param resetUsernameBO data
+     */
+    void resetUsername(ResetUsernameBO resetUsernameBO);
 
     /**
      * 设置用户状态

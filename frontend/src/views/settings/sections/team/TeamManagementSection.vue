@@ -30,6 +30,7 @@
         @row-click="handleMemberRowClick"
         @edit-member="handleEditMember"
         @toggle-status="handleToggleStatus"
+        @reset-username="handleResetUsername"
       />
     </div>
 
@@ -78,6 +79,17 @@
       @edit="handleEditMember"
       @delete="handleDeleteMember"
     />
+
+    <ResetUsernameDialog
+      :visible="showResetUsernameDialog"
+      :is-mobile="isMobile"
+      :member="resetUsernameMember"
+      :form="resetUsernameForm"
+      :submitting="resettingUsername"
+      :requires-password="resetUsernameRequiresPassword"
+      @update:visible="showResetUsernameDialog = $event"
+      @save="handleSaveResetUsername"
+    />
   </div>
 </template>
 
@@ -87,6 +99,7 @@ import DepartmentTreePanel from './components/DepartmentTreePanel.vue'
 import MemberDialog from './components/MemberDialog.vue'
 import MemberDetailDrawer from './components/MemberDetailDrawer.vue'
 import MemberListPanel from './components/MemberListPanel.vue'
+import ResetUsernameDialog from './components/ResetUsernameDialog.vue'
 import { useTeamManagement } from './useTeamManagement'
 
 const {
@@ -109,6 +122,11 @@ const {
   submittingMember,
   editingMember,
   memberForm,
+  showResetUsernameDialog,
+  resettingUsername,
+  resetUsernameMember,
+  resetUsernameForm,
+  resetUsernameRequiresPassword,
   allRoleOptions,
   parentOptions,
   showMemberDetailDrawer,
@@ -123,6 +141,8 @@ const {
   handleSaveMember,
   handleMemberRowClick,
   handleToggleStatus,
+  handleResetUsername,
+  handleSaveResetUsername,
   handleDeleteMember
 } = useTeamManagement()
 </script>

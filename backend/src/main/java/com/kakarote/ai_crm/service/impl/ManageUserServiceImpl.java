@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
+import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
 import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
@@ -236,6 +237,64 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
                     userRoleService.saveBatch(newRoles, Const.BATCH_SAVE_SIZE);
                 }
             }
+        }
+    }
+
+    /**
+     * 重置用户名。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetUsername(ResetUsernameBO resetUsernameBO) {
+        if (resetUsernameBO == null || resetUsernameBO.getUserId() == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        ManagerUser userEntity = baseMapper.getUserId(resetUsernameBO.getUserId());
+        if (ObjectUtil.isNull(userEntity)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+
+        String oldUsername = StrUtil.trim(userEntity.getUsername());
+        String newUsername = StrUtil.trim(resetUsernameBO.getUsername());
+        if (StrUtil.isBlank(newUsername)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请输入新用户名");
+        }
+        if (StrUtil.equals(oldUsername, newUsername)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "新用户名不能与当前用户名相同");
+        }
+
+        Long currentUserId = UserUtil.getUserId();
+        if (Objects.equals(currentUserId, userEntity.getUserId())) {
+            validateCurrentPassword(resetUsernameBO.getCurrentPassword());
+        }
+
+        long duplicateCount = lambdaQuery()
+                .eq(ManagerUser::getUsername, newUsername)
+                .ne(ManagerUser::getUserId, userEntity.getUserId())
+                .count();
+        if (duplicateCount > 0) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "用户名已存在");
+        }
+
+        userEntity.setUsername(newUsername);
+        updateById(userEntity);
+    }
+
+    /**
+     * 验证当前登录密码。
+     */
+    private void validateCurrentPassword(String currentPassword) {
+        if (StrUtil.isBlank(currentPassword)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请输入当前登录密码");
+        }
+        ManagerUser currentUser = baseMapper.getUserId(UserUtil.getUserId());
+        if (currentUser == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_USER_DOES_NOT_EXIST);
+        }
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        if (!bCryptPasswordEncoder.matches(currentPassword, currentUser.getPassword())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_OLD_PASSWORD_ERROR);
         }
     }
 

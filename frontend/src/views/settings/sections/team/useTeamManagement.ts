@@ -1,15 +1,17 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useResponsive } from '@/composables/useResponsive'
-import { queryUserList, addUser, updateUserInfo, deleteUsers } from '@/api/auth'
+import { queryUserList, addUser, updateUserInfo, deleteUsers, resetUsername } from '@/api/auth'
 import { queryDeptTree as fetchDeptTree, addDept, updateDept, deleteDept } from '@/api/dept'
 import { queryRoleList } from '@/api/role'
+import { useUserStore } from '@/stores/user'
 import type { DeptVO } from '@/types/dept'
 import type { RoleVO } from '@/types/role'
 import { TEAM_AVATAR_COLORS } from './constants'
 
 export function useTeamManagement() {
   const { isMobile } = useResponsive()
+  const userStore = useUserStore()
 
   const deptTree = ref<DeptVO[]>([])
   const selectedDept = ref<DeptVO | null>(null)
@@ -31,6 +33,9 @@ export function useTeamManagement() {
   const allUserListForParent = ref<any[]>([])
   const showMemberDetailDrawer = ref(false)
   const detailMember = ref<any>(null)
+  const showResetUsernameDialog = ref(false)
+  const resettingUsername = ref(false)
+  const resetUsernameMember = ref<any>(null)
   let memberListRequestId = 0
 
   const deptForm = reactive({
@@ -50,6 +55,15 @@ export function useTeamManagement() {
     status: 1 as number,
     roleIds: [] as string[]
   })
+
+  const resetUsernameForm = reactive({
+    username: '',
+    currentPassword: ''
+  })
+
+  const resetUsernameRequiresPassword = computed(() =>
+    String(resetUsernameMember.value?.userId || '') === String(userStore.userId || '')
+  )
 
   const filteredMembers = computed(() => {
     const list = memberList.value || []
@@ -374,6 +388,54 @@ export function useTeamManagement() {
     }
   }
 
+  function handleResetUsername(member: any) {
+    resetUsernameMember.value = member
+    Object.assign(resetUsernameForm, {
+      username: member.username || '',
+      currentPassword: ''
+    })
+    showResetUsernameDialog.value = true
+  }
+
+  async function handleSaveResetUsername() {
+    const member = resetUsernameMember.value
+    if (!member) return
+
+    const username = resetUsernameForm.username.trim()
+    if (!username) {
+      ElMessage.warning('请输入新用户名')
+      return
+    }
+    if (username === String(member.username || '').trim()) {
+      ElMessage.warning('新用户名不能与当前用户名相同')
+      return
+    }
+    if (resetUsernameRequiresPassword.value && !resetUsernameForm.currentPassword.trim()) {
+      ElMessage.warning('请输入当前登录密码')
+      return
+    }
+
+    resettingUsername.value = true
+    try {
+      await resetUsername({
+        userId: member.userId,
+        username,
+        currentPassword: resetUsernameRequiresPassword.value ? resetUsernameForm.currentPassword : undefined
+      })
+      ElMessage.success('用户名已重置')
+      showResetUsernameDialog.value = false
+      resetUsernameMember.value = null
+      await loadMembers()
+      if (String(member.userId) === String(userStore.userId)) {
+        await userStore.fetchUserInfo()
+      }
+    } catch {
+      // Error handled by interceptor
+    } finally {
+      resettingUsername.value = false
+    }
+  }
+
   async function handleDeleteMember(member: any) {
     try {
       await ElMessageBox.confirm(
@@ -412,6 +474,11 @@ export function useTeamManagement() {
     submittingMember,
     editingMember,
     memberForm,
+    showResetUsernameDialog,
+    resettingUsername,
+    resetUsernameMember,
+    resetUsernameForm,
+    resetUsernameRequiresPassword,
     allRoleOptions,
     parentOptions,
     showMemberDetailDrawer,
@@ -427,6 +494,8 @@ export function useTeamManagement() {
     handleSaveMember,
     handleMemberRowClick,
     handleToggleStatus,
+    handleResetUsername,
+    handleSaveResetUsername,
     handleDeleteMember
   }
 }

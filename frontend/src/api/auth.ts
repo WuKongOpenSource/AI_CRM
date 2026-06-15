@@ -104,6 +104,17 @@ export function updateUserInfo(data: {
 }
 
 /**
+ * Reset username
+ */
+export function resetUsername(data: {
+  userId: number | string
+  username: string
+  currentPassword?: string
+}): Promise<void> {
+  return post('/managerUser/resetUsername', data)
+}
+
+/**
  * Delete users
  */
 export function deleteUsers(userIds: (number | string)[]): Promise<void> {
