@@ -356,6 +356,7 @@ public class ChatServiceImpl implements IChatService {
         Long sessionId = sendBO.getSessionId();
         String content = sendBO.getContent();
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
+        List<Long> knowledgeIds = sendBO.getKnowledgeIds();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
         ChatSession session = chatSessionMapper.selectById(sessionId);
@@ -375,7 +376,7 @@ public class ChatServiceImpl implements IChatService {
         boolean ragEnabled = resolveRagEnabled(sendBO, application);
         log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
 
-        String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
+        String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled, knowledgeIds);
         if (routedKnowledgeResponse != null) {
             saveMessage(sessionId, "assistant", routedKnowledgeResponse);
             updateSessionTime(sessionId);
@@ -396,6 +397,10 @@ public class ChatServiceImpl implements IChatService {
         String enhancedContent = content;
         if (StrUtil.isNotBlank(attachmentContext)) {
             enhancedContent = enhancedContent + "\n\n" + attachmentContext;
+        }
+        String knowledgeSelectionContext = buildKnowledgeSelectionContext(knowledgeIds);
+        if (StrUtil.isNotBlank(knowledgeSelectionContext)) {
+            enhancedContent = enhancedContent + "\n\n" + knowledgeSelectionContext;
         }
 
         AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
@@ -528,6 +533,7 @@ public class ChatServiceImpl implements IChatService {
         Long sessionId = sendBO.getSessionId();
         String content = sendBO.getContent();
         List<ChatSendBO.AttachmentDTO> attachments = sendBO.getAttachments();
+        List<Long> knowledgeIds = sendBO.getKnowledgeIds();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
         ChatSession session = chatSessionMapper.selectById(sessionId);
@@ -547,10 +553,11 @@ public class ChatServiceImpl implements IChatService {
         boolean ragEnabled = resolveRagEnabled(sendBO, application);
         log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
 
-        String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled);
+        String routedKnowledgeResponse = tryHandleKnowledgeQuestion(content, attachments, ragEnabled, knowledgeIds);
         if (routedKnowledgeResponse != null) {
             saveMessage(sessionId, "assistant", routedKnowledgeResponse);
             updateSessionTime(sessionId);
+            AiContextHolder.clear();
             return routedKnowledgeResponse;
         }
 
@@ -568,6 +575,10 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isNotBlank(attachmentContext)) {
             enhancedContent = enhancedContent + "\n\n" + attachmentContext;
         }
+        String knowledgeSelectionContext = buildKnowledgeSelectionContext(knowledgeIds);
+        if (StrUtil.isNotBlank(knowledgeSelectionContext)) {
+            enhancedContent = enhancedContent + "\n\n" + knowledgeSelectionContext;
+        }
 
         AiModelCapabilities capabilities = chatClientProvider.getCurrentCapabilities();
         if (containsImageAttachment(attachments) && !capabilities.isSupportsVision()) {
@@ -579,6 +590,7 @@ public class ChatServiceImpl implements IChatService {
         String unavailableTip = resolveAiUnavailableTip();
         if (unavailableTip != null) {
             saveMessage(sessionId, "assistant", unavailableTip);
+            AiContextHolder.clear();
             return unavailableTip;
         }
 
@@ -943,7 +955,8 @@ public class ChatServiceImpl implements IChatService {
                 || (application != null && application.defaultRagEnabled());
     }
 
-    private String tryHandleKnowledgeQuestion(String content, List<ChatSendBO.AttachmentDTO> attachments, boolean ragEnabled) {
+    private String tryHandleKnowledgeQuestion(String content, List<ChatSendBO.AttachmentDTO> attachments,
+                                              boolean ragEnabled, List<Long> knowledgeIds) {
         Long sessionId = AiContextHolder.getCurrentSessionId();
         log.debug("知识库前置路由检查: sessionId={}, ragEnabled={}, hasAttachments={}, content={}",
                 sessionId, ragEnabled, CollUtil.isNotEmpty(attachments), abbreviateForLog(content));
@@ -959,6 +972,18 @@ public class ChatServiceImpl implements IChatService {
         }
 
         try {
+            String knowledgeIdsStr = joinKnowledgeIds(knowledgeIds);
+            if (StrUtil.isNotBlank(knowledgeIdsStr)) {
+                String scopedResponse = knowledgeTools.askKnowledgeQuestion(content, knowledgeIdsStr);
+                if (StrUtil.isBlank(scopedResponse)) {
+                    log.debug("Knowledge scoped route returned empty response: sessionId={}", sessionId);
+                    return null;
+                }
+                log.debug("Knowledge scoped route handled: sessionId={}, responseLength={}",
+                        sessionId, scopedResponse.length());
+                return scopedResponse;
+            }
+
             String searchResponse = knowledgeTools.searchKnowledgeContent(content);
             if (isUsableKnowledgeSearchResponse(searchResponse)) {
                 log.debug("知识库问题优先由 searchKnowledgeContent 命中: sessionId={}, responseLength={}",
@@ -980,6 +1005,27 @@ public class ChatServiceImpl implements IChatService {
                     sessionId, e.getMessage(), e);
             return null;
         }
+    }
+
+    private String buildKnowledgeSelectionContext(List<Long> knowledgeIds) {
+        String ids = joinKnowledgeIds(knowledgeIds);
+        if (StrUtil.isBlank(ids)) {
+            return "";
+        }
+        return "[Selected knowledge files]\n"
+                + "- knowledgeIds: " + ids + "\n"
+                + "- When answering with the knowledge base, pass these IDs to askKnowledgeQuestion.";
+    }
+
+    private String joinKnowledgeIds(List<Long> knowledgeIds) {
+        if (CollUtil.isEmpty(knowledgeIds)) {
+            return "";
+        }
+        return knowledgeIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .distinct()
+                .collect(Collectors.joining(","));
     }
 
     private boolean isUsableKnowledgeSearchResponse(String response) {

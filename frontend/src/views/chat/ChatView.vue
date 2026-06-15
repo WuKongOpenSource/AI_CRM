@@ -377,8 +377,20 @@
                 </button>
               </div>
 
-              <!-- Selected Files Preview -->
-              <div v-if="selectedFiles.length > 0" class="flex flex-wrap gap-2">
+              <!-- Selected Attachments Preview -->
+              <div v-if="selectedFiles.length > 0 || selectedKnowledgeItems.length > 0" class="flex flex-wrap gap-2">
+                <div
+                  v-for="item in selectedKnowledgeItems"
+                  :key="item.knowledgeId"
+                  class="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-xl text-sm text-emerald-700 border border-emerald-100"
+                >
+                  <span class="material-symbols-outlined text-sm text-emerald-500">menu_book</span>
+                  <span class="truncate max-w-[140px]">{{ item.name }}</span>
+                  <span
+                    class="material-symbols-outlined text-sm text-emerald-400 hover:text-red-500 cursor-pointer"
+                    @click="removeSelectedKnowledge(item.knowledgeId)"
+                  >close</span>
+                </div>
                 <div
                   v-for="(file, index) in selectedFiles"
                   :key="index"
@@ -415,6 +427,14 @@
                   >
                     <span class="material-symbols-outlined">attach_file</span>
                   </button>
+                  <button
+                    class="size-10 flex items-center justify-center text-slate-400 hover:text-primary transition-colors disabled:opacity-50"
+                    :disabled="isUploading || selectedFiles.length + selectedKnowledgeItems.length >= MAX_FILE_COUNT"
+                    title="选择知识库文件"
+                    @click="openKnowledgePicker"
+                  >
+                    <span class="material-symbols-outlined">menu_book</span>
+                  </button>
                   <input
                     v-model="inputText"
                     type="text"
@@ -443,7 +463,7 @@
                     </button>
                     <button
                       class="size-10 rounded-xl bg-primary text-white flex items-center justify-center hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
-                      :disabled="(!inputText.trim() && selectedFiles.length === 0) || chatStore.isStreaming || isUploading"
+                      :disabled="(!inputText.trim() && selectedFiles.length === 0 && selectedKnowledgeItems.length === 0) || chatStore.isStreaming || isUploading"
                       @click="handleSend"
                     >
                       <span v-if="chatStore.isStreaming || isUploading" class="material-symbols-outlined text-xl animate-spin">progress_activity</span>
@@ -563,6 +583,11 @@
       @update:model-value="handleApiKeyModalVisibleChange"
       @save="handleSaveApiKey"
     />
+    <ChatKnowledgePickerModal
+      v-model="chatKnowledgePickerVisible"
+      :remaining-slots="Math.max(0, MAX_FILE_COUNT - selectedFiles.length - selectedKnowledgeItems.length)"
+      @confirm="handleKnowledgePickerConfirm"
+    />
   </div>
 </template>
 
@@ -577,9 +602,10 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { getPresignedUploadUrl, uploadToMinIO } from '@/api/file'
 import { getAiConfig, getAiConfigDetail, updateAiConfig } from '@/api/systemConfig'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
+import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import { isRequestErrorHandled } from '@/utils/requestError'
-import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO } from '@/types/common'
+import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, Knowledge } from '@/types/common'
 import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset } from '@/types/systemConfig'
 
 const chatStore = useChatStore()
@@ -593,6 +619,8 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const mobilePanel = ref<'sessions' | 'chat'>('sessions')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFiles = ref<File[]>([])
+const selectedKnowledgeItems = ref<Knowledge[]>([])
+const chatKnowledgePickerVisible = ref(false)
 const isUploading = ref(false)
 const currentView = ref<'chat' | 'notifications'>('chat')
 const userAvatarLoadFailed = ref(false)
@@ -914,10 +942,12 @@ function openApiKeySetup() {
 async function handleSend() {
   const text = inputText.value.trim()
   const hasFiles = selectedFiles.value.length > 0
-  if ((!text && !hasFiles) || chatStore.isStreaming || isUploading.value) return
+  const hasKnowledge = selectedKnowledgeItems.value.length > 0
+  if ((!text && !hasFiles && !hasKnowledge) || chatStore.isStreaming || isUploading.value) return
   if (!(await ensureAiAvailable())) return
 
-  const content = text || '请分析这些文件'
+  const content = text || (hasKnowledge ? '请结合选中的知识库文件回答' : '请分析这些文件')
+  const selectedKnowledgeSnapshot = [...selectedKnowledgeItems.value]
   inputText.value = ''
 
   let attachmentDTOs: ChatAttachmentDTO[] | undefined
@@ -966,9 +996,17 @@ async function handleSend() {
     isUploading.value = false
   }
 
+  const knowledgeIds = hasKnowledge ? selectedKnowledgeSnapshot.map(item => item.knowledgeId) : undefined
+  if (hasKnowledge) {
+    selectedKnowledgeItems.value = []
+    if (chatStore.currentAppCode === 'general') {
+      chatStore.setCurrentAppCode('knowledge')
+    }
+  }
+
   // Switch to chat view when sending
   currentView.value = 'chat'
-  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled)
+  await chatStore.sendMessage(content, attachmentDTOs, attachmentVOs, chatStore.ragEnabled || hasKnowledge, knowledgeIds)
 }
 
 function sendQuickMessage(text: string) {
@@ -981,7 +1019,43 @@ function renderAssistantMessage(content: string): string {
 }
 
 function handleUpload() {
+  if (selectedFiles.value.length + selectedKnowledgeItems.value.length >= MAX_FILE_COUNT) {
+    ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
+    return
+  }
   fileInputRef.value?.click()
+}
+
+function openKnowledgePicker() {
+  if (selectedFiles.value.length + selectedKnowledgeItems.value.length >= MAX_FILE_COUNT) {
+    ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
+    return
+  }
+  chatKnowledgePickerVisible.value = true
+}
+
+function handleKnowledgePickerConfirm(items: Knowledge[]) {
+  const room = MAX_FILE_COUNT - selectedFiles.value.length - selectedKnowledgeItems.value.length
+  if (room <= 0) {
+    ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
+    return
+  }
+  const existingIds = new Set(selectedKnowledgeItems.value.map(item => item.knowledgeId))
+  const toAppend: Knowledge[] = []
+  for (const item of items) {
+    if (toAppend.length >= room) break
+    if (existingIds.has(item.knowledgeId)) continue
+    existingIds.add(item.knowledgeId)
+    toAppend.push(item)
+  }
+  if (toAppend.length === 0) {
+    ElMessage.warning('所选文件已在列表中')
+    return
+  }
+  selectedKnowledgeItems.value = [...selectedKnowledgeItems.value, ...toAppend]
+  if (chatStore.currentAppCode === 'general') {
+    chatStore.setCurrentAppCode('knowledge')
+  }
 }
 
 function handleFileSelect(event: Event) {
@@ -991,7 +1065,7 @@ function handleFileSelect(event: Event) {
   const newFiles = Array.from(input.files)
 
   // Validate file count
-  if (selectedFiles.value.length + newFiles.length > MAX_FILE_COUNT) {
+  if (selectedFiles.value.length + selectedKnowledgeItems.value.length + newFiles.length > MAX_FILE_COUNT) {
     ElMessage.warning(`最多只能上传${MAX_FILE_COUNT}个文件`)
     input.value = ''
     return
@@ -1012,6 +1086,10 @@ function handleFileSelect(event: Event) {
 
 function removeSelectedFile(index: number) {
   selectedFiles.value.splice(index, 1)
+}
+
+function removeSelectedKnowledge(knowledgeId: string) {
+  selectedKnowledgeItems.value = selectedKnowledgeItems.value.filter(item => item.knowledgeId !== knowledgeId)
 }
 
 function formatFileSize(bytes: number): string {

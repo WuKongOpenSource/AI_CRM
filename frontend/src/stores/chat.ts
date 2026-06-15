@@ -117,7 +117,8 @@ export const useChatStore = defineStore('chat', () => {
     content: string,
     attachments?: ChatAttachmentDTO[],
     attachmentVOs?: ChatAttachmentVO[],
-    useRag?: boolean
+    useRag?: boolean,
+    knowledgeIds?: string[]
   ): Promise<void> {
     if (!currentSessionId.value) {
       // Create new session if none exists
@@ -148,6 +149,7 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming.value = true
 
     try {
+      const effectiveRagEnabled = (useRag ?? ragEnabled.value) || Boolean(knowledgeIds?.length)
       await sendMessageStream(
         currentSessionId.value!,
         content,
@@ -178,8 +180,9 @@ export const useChatStore = defineStore('chat', () => {
           }
         },
         attachments,
-        useRag ?? ragEnabled.value,
-        currentAppCode.value
+        effectiveRagEnabled,
+        currentAppCode.value,
+        knowledgeIds
       )
     } catch (error) {
       // Error already handled by onError callback, but ensure message is marked as complete
@@ -195,7 +198,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessageWithSync(content: string, useRag?: boolean): Promise<string> {
+  async function sendMessageWithSync(content: string, useRag?: boolean, knowledgeIds?: string[]): Promise<string> {
     if (!currentSessionId.value) {
       await startNewSession('新对话')
     }
@@ -215,8 +218,9 @@ export const useChatStore = defineStore('chat', () => {
         currentSessionId.value!,
         content,
         undefined,
-        useRag ?? ragEnabled.value,
-        currentAppCode.value
+        (useRag ?? ragEnabled.value) || Boolean(knowledgeIds?.length),
+        currentAppCode.value,
+        knowledgeIds
       )
 
       const assistantMessage: LocalMessage = {

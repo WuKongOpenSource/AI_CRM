@@ -40,6 +40,9 @@ public class ChatSendBO {
     @Schema(description = "Bound project task ID")
     private Long projectTaskId;
 
+    @Schema(description = "Knowledge file IDs used to limit RAG answers")
+    private List<Long> knowledgeIds;
+
     @Data
     @Schema(description = "附件信息")
     public static class AttachmentDTO {

@@ -58,15 +58,18 @@ export interface Knowledge {
   customerName?: string
   filePath?: string
   fileSize?: number
+  fileSizeFormatted?: string
+  mimeType?: string
   summary?: string
   contentText?: string
+  typeName?: string
   weKnoraParseStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'unsupported'
   createUserId: string
   createUserName?: string
   createTime: string
 }
 
-export type KnowledgeType = 'MEETING' | 'EMAIL' | 'RECORDING' | 'DOCUMENT' | 'PROPOSAL' | 'CONTRACT'
+export type KnowledgeType = 'meeting' | 'email' | 'recording' | 'document' | 'proposal' | 'contract'
 
 export interface KnowledgeAddBO {
   name: string
@@ -194,6 +197,7 @@ export interface ChatSendBO {
   productId?: string
   projectId?: string
   projectTaskId?: string
+  knowledgeIds?: string[]
 }
 
 // Enum types
