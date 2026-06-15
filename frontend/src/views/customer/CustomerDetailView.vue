@@ -401,6 +401,22 @@
                 最近活动 - AI时间轴
               </h3>
               <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    v-for="option in followUpTypeFilters"
+                    :key="option.value || 'all'"
+                    type="button"
+                    :class="[
+                      'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                      selectedFollowUpType === option.value
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    ]"
+                    @click="handleFollowUpTypeFilterChange(option.value)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </div>
                 <!-- <div class="flex bg-slate-100 p-1 rounded-lg">
                   <button class="px-3 py-1 text-xs font-bold rounded bg-white shadow-sm">全部</button>
                   <button class="px-3 py-1 text-xs font-medium text-slate-500">会议摘要</button>
@@ -919,6 +935,7 @@ const followUpTotal = ref(0)
 const followUpPage = ref(1)
 const followUpPageSize = ref(CUSTOMER_DETAIL_REQUEST_LIMIT)
 const followUpLoading = ref(false)
+const selectedFollowUpType = ref('')
 const followUpAttachmentInput = ref<HTMLInputElement | null>(null)
 const followUpAttachmentUploading = ref(false)
 const previewingFollowUpAttachment = ref<FollowUpAttachment | null>(null)
@@ -954,6 +971,15 @@ const sectionIconBgColors = {
   todoTasks: '#00875A',
   documentCenter: '#0052CC',
 } as const
+
+const followUpTypeFilters = [
+  { value: '', label: '全部' },
+  { value: 'call', label: '电话' },
+  { value: 'meeting', label: '会议' },
+  { value: 'email', label: '邮件' },
+  { value: 'visit', label: '拜访' },
+  { value: 'other', label: '其他' }
+] as const
 
 type SectionIconKey = keyof typeof sectionIconBgColors
 
@@ -1139,7 +1165,12 @@ async function fetchFollowUps(customerId: string, reset = false) {
   if (reset) followUpPage.value = 1
   followUpLoading.value = true
   try {
-    const result = await queryFollowUpPageList({ customerId, page: followUpPage.value, limit: followUpPageSize.value })
+    const result = await queryFollowUpPageList({
+      customerId,
+      page: followUpPage.value,
+      limit: followUpPageSize.value,
+      type: selectedFollowUpType.value || undefined
+    })
     followUps.value = result.list
     followUpTotal.value = result.totalRow
   } catch (err) {
@@ -1148,6 +1179,14 @@ async function fetchFollowUps(customerId: string, reset = false) {
     followUpTotal.value = 0
   } finally {
     followUpLoading.value = false
+  }
+}
+
+function handleFollowUpTypeFilterChange(type: string) {
+  if (selectedFollowUpType.value === type) return
+  selectedFollowUpType.value = type
+  if (customer.value) {
+    void fetchFollowUps(customer.value.customerId, true)
   }
 }
 
