@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
@@ -19,6 +20,7 @@ import com.kakarote.ai_crm.service.WeKnoraClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
@@ -87,6 +89,16 @@ public class KnowledgeController {
     @RequirePermission("knowledge:view")
     public Result<KnowledgeAiSearchVO> aiSearch(@RequestBody KnowledgeAiSearchBO searchBO) {
         return Result.ok(knowledgeService.aiSearch(searchBO));
+    }
+
+    @PostMapping(value = "/targeted-script/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Stream targeted sales script")
+    @RequirePermission("knowledge:view")
+    public Flux<ServerSentEvent<String>> streamTargetedScript(
+            @Valid @RequestBody KnowledgeTargetedScriptBO scriptBO) {
+        return knowledgeService.streamTargetedScript(scriptBO)
+                .filter(chunk -> chunk != null && !chunk.isEmpty())
+                .map(chunk -> ServerSentEvent.<String>builder().data(chunk).build());
     }
 
     @GetMapping("/detail/{id}")

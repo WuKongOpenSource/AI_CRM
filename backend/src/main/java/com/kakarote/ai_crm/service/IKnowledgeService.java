@@ -5,6 +5,7 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
@@ -33,6 +34,8 @@ public interface IKnowledgeService extends IService<Knowledge> {
     BasePage<KnowledgeVO> queryPageList(KnowledgeQueryBO queryBO);
 
     KnowledgeAiSearchVO aiSearch(KnowledgeAiSearchBO searchBO);
+
+    Flux<String> streamTargetedScript(KnowledgeTargetedScriptBO scriptBO);
 
     /**
      * 获取知识库详情

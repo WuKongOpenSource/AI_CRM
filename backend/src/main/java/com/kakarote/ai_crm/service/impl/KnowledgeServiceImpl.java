@@ -17,18 +17,23 @@ import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
+import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
+import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiSearchVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
+import com.kakarote.ai_crm.mapper.FollowUpMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -48,6 +53,7 @@ import reactor.core.publisher.Flux;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
@@ -77,6 +83,12 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private CustomerMapper customerMapper;
 
     @Autowired
+    private FollowUpMapper followUpMapper;
+
+    @Autowired
+    private ICustomerService customerService;
+
+    @Autowired
     private WeKnoraClient weKnoraClient;
 
     @Autowired
@@ -95,6 +107,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     private static final int DEFAULT_AI_SEARCH_LIMIT = 5;
     private static final int MAX_AI_SEARCH_LIMIT = 8;
     private static final int MAX_AI_SEARCH_CONTEXT_LENGTH = 1200;
+    private static final int MAX_TARGETED_SCRIPT_DOC_COUNT = 4;
+    private static final int MAX_TARGETED_SCRIPT_DOC_CONTENT_LENGTH = 1000;
+    private static final int MAX_TARGETED_SCRIPT_FOLLOWUP_COUNT = 3;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -272,6 +287,71 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             return DEFAULT_AI_SEARCH_LIMIT;
         }
         return Math.min(limit, MAX_AI_SEARCH_LIMIT);
+    }
+
+    @Override
+    public Flux<String> streamTargetedScript(KnowledgeTargetedScriptBO scriptBO) {
+        if (scriptBO == null || scriptBO.getCustomerId() == null
+                || scriptBO.getKnowledgeIds() == null || scriptBO.getKnowledgeIds().isEmpty()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Generation parameters are incomplete");
+        }
+
+        List<Long> requestedIds = scriptBO.getKnowledgeIds().stream()
+                .filter(ObjectUtil::isNotNull)
+                .distinct()
+                .limit(MAX_TARGETED_SCRIPT_DOC_COUNT)
+                .toList();
+        if (requestedIds.isEmpty()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Please select at least one reference document");
+        }
+
+        List<Knowledge> fetchedKnowledges = lambdaQuery()
+                .in(Knowledge::getKnowledgeId, requestedIds)
+                .ne(Knowledge::getStatus, 2)
+                .list();
+        Map<Long, Knowledge> knowledgeMap = new LinkedHashMap<>();
+        for (Knowledge knowledge : fetchedKnowledges) {
+            knowledgeMap.put(knowledge.getKnowledgeId(), knowledge);
+        }
+
+        List<Knowledge> knowledges = new ArrayList<>();
+        for (Long knowledgeId : requestedIds) {
+            Knowledge knowledge = knowledgeMap.get(knowledgeId);
+            if (knowledge != null) {
+                knowledges.add(knowledge);
+            }
+        }
+        if (knowledges.size() != requestedIds.size()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Some reference documents do not exist");
+        }
+
+        CustomerDetailVO customerDetail = customerService.getCustomerDetail(scriptBO.getCustomerId());
+        List<FollowUpVO> recentFollowUps = followUpMapper.getRecentByCustomerId(
+                scriptBO.getCustomerId(), MAX_TARGETED_SCRIPT_FOLLOWUP_COUNT
+        );
+        String fallback = buildTargetedScriptFallback(customerDetail, recentFollowUps, knowledges);
+
+        if (!chatClientProvider.isApiKeyConfigured()) {
+            return Flux.just(fallback);
+        }
+
+        String prompt = buildTargetedScriptPrompt(customerDetail, recentFollowUps, knowledges);
+        return chatClientProvider.getChatClient()
+                .prompt()
+                .user(prompt)
+                .stream()
+                .chatResponse()
+                .mapNotNull(chatResponse -> {
+                    if (chatResponse.getResult() != null && chatResponse.getResult().getOutput() != null) {
+                        return chatResponse.getResult().getOutput().getText();
+                    }
+                    return null;
+                })
+                .onErrorResume(error -> {
+                    log.warn("Targeted sales script generation failed: customerId={}, knowledgeIds={}, error={}",
+                            scriptBO.getCustomerId(), requestedIds, error.getMessage());
+                    return Flux.just(fallback);
+                });
     }
 
     private List<KnowledgeAiSearchVO.ReferenceItem> buildSemanticReferences(String keyword, String type, int limit) {
@@ -471,6 +551,141 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         }
         answer.append("\n配置自建 AI Key 后，可以获得更完整的归纳和建议。");
         return answer.toString();
+    }
+
+    private String buildTargetedScriptPrompt(CustomerDetailVO customerDetail,
+                                             List<FollowUpVO> recentFollowUps,
+                                             List<Knowledge> knowledges) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("你是资深 B2B CRM 销售顾问。请基于客户上下文和参考资料，生成一份可直接执行的销售话术和跟进 SOP。\n");
+        prompt.append("要求：用简体中文输出；不要编造资料中不存在的事实；话术要贴近客户当前阶段；包含开场、需求探查、价值呈现、异议处理、推进收口和 SOP。\n\n");
+        prompt.append("【客户上下文】\n").append(buildTargetedCustomerContext(customerDetail, recentFollowUps)).append("\n\n");
+        prompt.append("【参考资料】\n").append(buildTargetedKnowledgeContext(knowledges)).append("\n\n");
+        prompt.append("请用 Markdown 输出，结构清晰，方便销售直接复制使用。");
+        return prompt.toString();
+    }
+
+    private String buildTargetedCustomerContext(CustomerDetailVO detail, List<FollowUpVO> recentFollowUps) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("公司名称: ").append(StrUtil.blankToDefault(detail.getCompanyName(), "未提供")).append('\n');
+        builder.append("行业: ").append(StrUtil.blankToDefault(detail.getIndustry(), "未提供")).append('\n');
+        builder.append("商机阶段: ").append(StrUtil.blankToDefault(detail.getStageName(), detail.getStage())).append('\n');
+        builder.append("客户级别: ").append(StrUtil.blankToDefault(detail.getLevel(), "未提供")).append('\n');
+        builder.append("客户来源: ").append(StrUtil.blankToDefault(detail.getSource(), "未提供")).append('\n');
+        builder.append("最后联系时间: ").append(formatDateTime(detail.getLastContactTime())).append('\n');
+        builder.append("下次跟进时间: ").append(formatDateTime(detail.getNextFollowTime())).append('\n');
+        builder.append("备注: ").append(StrUtil.blankToDefault(detail.getRemark(), "未提供")).append('\n');
+        builder.append("最近跟进记录:\n").append(formatFollowUpSummary(recentFollowUps));
+        return builder.toString().trim();
+    }
+
+    private String buildTargetedKnowledgeContext(List<Knowledge> knowledges) {
+        StringBuilder builder = new StringBuilder();
+        Map<Long, String> customerNameMap = loadCustomerNameMap(knowledges);
+        for (int i = 0; i < knowledges.size(); i++) {
+            Knowledge knowledge = knowledges.get(i);
+            builder.append("资料").append(i + 1).append('\n');
+            builder.append("名称: ").append(StrUtil.blankToDefault(knowledge.getName(), "未命名文档")).append('\n');
+            builder.append("类型: ").append(StrUtil.blankToDefault(knowledge.getType(), "document")).append('\n');
+            builder.append("关联客户: ")
+                    .append(StrUtil.blankToDefault(customerNameMap.get(knowledge.getCustomerId()), "未关联"))
+                    .append('\n');
+            builder.append("摘要: ").append(StrUtil.blankToDefault(knowledge.getSummary(), "未提供")).append('\n');
+            builder.append("核心片段: ").append(extractTargetedScriptSnippet(knowledge)).append("\n\n");
+        }
+        return builder.toString().trim();
+    }
+
+    private String extractTargetedScriptSnippet(Knowledge knowledge) {
+        String content = normalizeSearchableContent(knowledge.getContentText());
+        if (StrUtil.isBlank(content)) {
+            return StrUtil.blankToDefault(knowledge.getSummary(), "暂无可用正文片段");
+        }
+        return abbreviate(content, MAX_TARGETED_SCRIPT_DOC_CONTENT_LENGTH);
+    }
+
+    private String buildTargetedScriptFallback(CustomerDetailVO detail,
+                                               List<FollowUpVO> recentFollowUps,
+                                               List<Knowledge> knowledges) {
+        String customerName = StrUtil.blankToDefault(detail.getCompanyName(), "该客户");
+        String industry = StrUtil.blankToDefault(detail.getIndustry(), "所在行业");
+        String stage = StrUtil.blankToDefault(detail.getStageName(), StrUtil.blankToDefault(detail.getStage(), "当前阶段"));
+        String openingHook = StrUtil.firstNonBlank(
+                detail.getRemark(),
+                recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0).getContent()
+        );
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("## 客户判断\n\n");
+        builder.append(customerName).append("当前处于**").append(stage).append("**阶段，所属行业为**").append(industry)
+                .append("**。建议围绕客户业务目标、当前推进节点和参考资料中的关键价值点展开沟通，避免直接堆砌产品能力。\n\n");
+
+        builder.append("## 参考依据\n\n");
+        for (Knowledge knowledge : knowledges) {
+            builder.append("- **").append(StrUtil.blankToDefault(knowledge.getName(), "未命名文档")).append("**：")
+                    .append(StrUtil.blankToDefault(
+                            StrUtil.firstNonBlank(knowledge.getSummary(), extractTargetedScriptSnippet(knowledge)),
+                            "暂无摘要"))
+                    .append('\n');
+        }
+        builder.append('\n');
+
+        builder.append("### 1. 开场白（建立连接与专业度）\n\n");
+        builder.append("> 您好，我这边结合贵司目前的业务推进情况和我们整理的参考资料，特别关注到")
+                .append(StrUtil.blankToDefault(openingHook, "当前项目推进效率与服务协同的提升空间"))
+                .append("。今天想先和您确认一下，现阶段最希望优先解决的是流程效率、协同响应，还是业务增长相关的问题？\n\n");
+
+        builder.append("### 2. 需求探查（识别真实诉求）\n\n");
+        builder.append("> 从目前信息看，贵司已经进入").append(stage)
+                .append("阶段。为了让后续方案更贴合实际，我想先确认三个点：第一，当前内部最需要优化的业务环节是什么；第二，项目推进时最担心的风险点是什么；第三，决策时更看重上线速度、落地效果还是整体投入产出？\n\n");
+
+        builder.append("### 3. 价值呈现（把方案与客户场景绑定）\n\n");
+        builder.append("> 我们这次不是单纯介绍产品功能，而是希望结合您当前的业务目标，把资料里提到的关键策略和落地经验，转成更适合贵司现阶段的推进方案。这样既能缩短内部沟通成本，也能让后续决策更聚焦在实际收益上。\n\n");
+
+        builder.append("### 4. 异议处理（提前化解顾虑）\n\n");
+        builder.append("> 如果您担心实施复杂度、投入产出或内部协同成本，我们建议先从最核心、最容易验证价值的环节切入，先跑通一个小范围场景，再逐步扩展。这样既能控制风险，也更方便内部形成共识。\n\n");
+
+        builder.append("### 5. 收口推进（推动下一步）\n\n");
+        builder.append("> 如果方向上您认可，我们可以下一步一起把关键需求、当前流程痛点和预期目标梳理清楚，再输出一版更贴合贵司实际情况的推进建议，帮助您内部更快评估和决策。\n\n");
+
+        builder.append("## SOP 建议\n\n");
+        builder.append("1. 沟通前先统一内部口径，明确本次要验证的 2-3 个核心问题。\n");
+        builder.append("2. 结合参考资料中的重点信息，准备与客户场景直接相关的案例、政策或产品价值表达。\n");
+        builder.append("3. 会中优先确认客户当前阶段、推进阻力、关键决策人和时间节点，再展开方案说明。\n");
+        builder.append("4. 若客户表达顾虑，先复述问题并给出可落地的分阶段方案，不急于一次性覆盖全部诉求。\n");
+        builder.append("5. 会后 24 小时内发送沟通纪要，明确下一步动作、责任人和时间安排。\n\n");
+
+        builder.append("## 风险提醒\n\n");
+        builder.append("- 若客户内部目标和决策链尚不清晰，建议先补齐关键信息，再推进正式方案。\n");
+        builder.append("- 当前参考资料更多提供方向性支撑，具体预算、周期和交付边界仍需进一步确认。\n");
+        builder.append("- 如果最近跟进已中断较久，建议先用低压沟通方式重新建立互动，再推进深入交流。\n");
+        builder.append("\n配置自建 AI Key 后，可以获得更贴近上下文的定制话术。");
+
+        return builder.toString().trim();
+    }
+
+    private String formatFollowUpSummary(List<FollowUpVO> recentFollowUps) {
+        if (recentFollowUps == null || recentFollowUps.isEmpty()) {
+            return "暂无最近跟进记录";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (FollowUpVO followUp : recentFollowUps) {
+            builder.append("- ")
+                    .append(formatDateTime(followUp.getFollowTime()))
+                    .append(" / ")
+                    .append(StrUtil.blankToDefault(followUp.getTypeName(), followUp.getType()))
+                    .append(" / ")
+                    .append(abbreviate(followUp.getContent(), 220))
+                    .append('\n');
+        }
+        return builder.toString().trim();
+    }
+
+    private String formatDateTime(Date date) {
+        if (date == null) {
+            return "未提供";
+        }
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm").format(date);
     }
 
     private String extractSnippet(Knowledge knowledge, String keyword) {

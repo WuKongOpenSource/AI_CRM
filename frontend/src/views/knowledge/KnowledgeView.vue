@@ -307,7 +307,7 @@
               <button
                 type="button"
                 class="relative z-10 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white transition-all hover:bg-primary/90"
-                @click="queryParams.keyword = '销售话术'"
+                @click="openScriptGenerator"
               >
                 立即开始
               </button>
@@ -711,6 +711,7 @@
 
     <!-- Document Detail Modal -->
     <KnowledgeDetailModal v-model="showDetailModal" :knowledge-id="selectedKnowledgeId" />
+    <KnowledgeScriptGeneratorDialog v-model="showScriptDialog" />
   </div>
 </template>
 
@@ -722,6 +723,7 @@ import { queryKnowledgeList, uploadKnowledge, deleteKnowledge, downloadKnowledge
 import { ElMessage, ElMessageBox, UploadInstance, UploadRequestOptions } from 'element-plus'
 import type { Knowledge, KnowledgeAiSearchVO, KnowledgeQueryBO, KnowledgeType } from '@/types/common'
 import KnowledgeDetailModal from '@/components/knowledge/KnowledgeDetailModal.vue'
+import KnowledgeScriptGeneratorDialog from '@/components/knowledge/KnowledgeScriptGeneratorDialog.vue'
 import { renderMarkdown } from '@/utils/markdown'
 
 const { isMobile } = useResponsive()
@@ -737,6 +739,7 @@ const aiSearchLoading = ref(false)
 const uploading = ref(false)
 const showUploadDialog = ref(false)
 const showDetailModal = ref(false)
+const showScriptDialog = ref(false)
 const selectedKnowledgeId = ref('')
 const knowledgeList = ref<Knowledge[]>([])
 const totalCount = ref(0)
@@ -945,6 +948,14 @@ function openDetail(item: Knowledge) {
 function openKnowledgeById(knowledgeId: string) {
   selectedKnowledgeId.value = String(knowledgeId)
   showDetailModal.value = true
+}
+
+function openScriptGenerator() {
+  if (totalCount.value === 0) {
+    ElMessage.warning('请先上传知识库文档')
+    return
+  }
+  showScriptDialog.value = true
 }
 
 function applyRouteQuery() {

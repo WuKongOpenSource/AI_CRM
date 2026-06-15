@@ -113,6 +113,11 @@ export interface KnowledgeAiSearchVO {
   references: KnowledgeAiSearchReferenceItem[]
 }
 
+export interface KnowledgeTargetedScriptBO {
+  knowledgeIds: string[]
+  customerId: string
+}
+
 export interface KnowledgeAiAnalyzeVO {
   coreHighlights: string
   talkingPoints: string[]
