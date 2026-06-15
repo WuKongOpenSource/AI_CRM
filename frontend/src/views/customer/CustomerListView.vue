@@ -432,6 +432,12 @@ import AiFollowUpDrawer from '@/components/customer/AiFollowUpDrawer.vue'
 import CustomerImportDialog from '@/views/customer/components/CustomerImportDialog.vue'
 import CustomerInsightSidebar from '@/views/customer/components/CustomerInsightSidebar.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import {
+  CUSTOMER_DETAIL_LIST_PAGE_QUERY_KEY,
+  CUSTOMER_LIST_PAGE_QUERY_KEY,
+  CUSTOMER_ROUTE_ACTION_CREATE,
+  CUSTOMER_ROUTE_ACTION_QUERY_KEY
+} from '@/views/customer/constants'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { formatCustomFieldValue, getCustomFieldCheckboxState } from '@/utils/customFieldDisplay'
 
@@ -515,11 +521,51 @@ function buildExportPayload(): CustomerExportBO {
   }
 }
 
+function parsePositivePageQuery(value: unknown): number | null {
+  if (typeof value !== 'string') return null
+  const page = Number(value)
+  if (!Number.isInteger(page) || page < 1) return null
+  return page
+}
+
+function getCustomerListPageFromRouteQuery(): number {
+  return parsePositivePageQuery(route.query[CUSTOMER_LIST_PAGE_QUERY_KEY]) || 1
+}
+
+async function syncCustomerListPageQuery(page: number) {
+  const normalizedPage = Number.isInteger(page) && page > 1 ? String(page) : undefined
+  const currentPage = typeof route.query[CUSTOMER_LIST_PAGE_QUERY_KEY] === 'string'
+    ? route.query[CUSTOMER_LIST_PAGE_QUERY_KEY]
+    : undefined
+
+  if (currentPage === normalizedPage) return
+
+  const nextQuery = { ...route.query }
+  if (normalizedPage) {
+    nextQuery[CUSTOMER_LIST_PAGE_QUERY_KEY] = normalizedPage
+  } else {
+    delete nextQuery[CUSTOMER_LIST_PAGE_QUERY_KEY]
+  }
+
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
+function buildCustomerDetailRoute(customerId: string) {
+  const listPage = customerStore.queryParams.page || 1
+  return {
+    path: `/customer/${customerId}`,
+    query: listPage > 1
+      ? { [CUSTOMER_DETAIL_LIST_PAGE_QUERY_KEY]: String(listPage) }
+      : {}
+  }
+}
+
 async function applyAiSearchResult(result: CustomerAiSearchParseVO) {
   aiSearchState.value = result
   aiSearchInput.value = result.normalizedQuery || result.originalQuery || aiSearchInput.value
   const normalizedQuery = normalizeCustomerQuery(result.parsedQuery || {})
   customerStore.replaceQueryParams(normalizedQuery)
+  await syncCustomerListPageQuery(customerStore.queryParams.page || 1)
   await customerStore.fetchCustomerList(true)
   showAiSearchPopover.value = false
 }
@@ -564,6 +610,7 @@ async function clearAiSearch() {
   aiSearchState.value = null
   aiSearchInput.value = ''
   customerStore.resetQueryParams()
+  await syncCustomerListPageQuery(customerStore.queryParams.page || 1)
   await customerStore.fetchCustomerList(true)
 }
 
@@ -652,12 +699,13 @@ async function handleRemoveAiChip(key: string) {
   }
 
   customerStore.replaceQueryParams(normalizeCustomerQuery(parsedQuery))
+  await syncCustomerListPageQuery(customerStore.queryParams.page || 1)
   await customerStore.fetchCustomerList(true)
 }
 
 function handleUpsertSuccess(payload: { mode: 'create' | 'edit'; customerId?: string }) {
-  // keep original behavior: refresh list after submit
-  customerStore.fetchCustomerList(true)
+  customerStore.queryParams.page = getCustomerListPageFromRouteQuery()
+  customerStore.fetchCustomerList(false)
   if (payload.mode === 'edit') {
     editingCustomer.value = null
   }
@@ -728,7 +776,7 @@ function handleAiFollowUp(customer: CustomerListVO) {
 }
 
 function handleAiFollowUpSaved() {
-  customerStore.fetchCustomerList(true)
+  customerStore.fetchCustomerList(false)
 }
 
 // Owner transfer
@@ -805,18 +853,23 @@ onMounted(async () => {
 
   if (pageRootRef.value) layoutObserver.observe(pageRootRef.value)
   if (tableCardRef.value) layoutObserver.observe(tableCardRef.value)
+  customerStore.queryParams.page = getCustomerListPageFromRouteQuery()
 
   await Promise.all([
     loadListCustomFields(),
-    customerStore.fetchCustomerList(true)
+    customerStore.fetchCustomerList(false)
   ])
 
   await nextTick()
   queueTableHeightUpdate()
 
-  if (route.query.action === 'create') {
+  const routeAction = route.query[CUSTOMER_ROUTE_ACTION_QUERY_KEY] || route.query.action
+  if (routeAction === CUSTOMER_ROUTE_ACTION_CREATE || routeAction === 'create') {
     showAddDialog.value = true
-    router.replace({ path: route.path, query: {} })
+    const nextQuery = { ...route.query }
+    delete nextQuery[CUSTOMER_ROUTE_ACTION_QUERY_KEY]
+    delete nextQuery.action
+    void router.replace({ path: route.path, query: nextQuery })
   }
 })
 
@@ -832,17 +885,29 @@ watch(() => [customerStore.totalCount, customerStore.customerList.length], async
   queueTableHeightUpdate()
 })
 
+watch(
+  () => route.query[CUSTOMER_LIST_PAGE_QUERY_KEY],
+  (pageQuery, previousPageQuery) => {
+    if (pageQuery === previousPageQuery) return
+    const nextPage = getCustomerListPageFromRouteQuery()
+    if ((customerStore.queryParams.page || 1) === nextPage) return
+    customerStore.queryParams.page = nextPage
+    void customerStore.fetchCustomerList(false)
+  }
+)
+
 const offCustomerListRefresh = appEvents.on(APP_EVENT.CUSTOMER_LIST_REFRESH, () => {
-  customerStore.fetchCustomerList(true)
+  customerStore.fetchCustomerList(false)
 })
 
 onBeforeUnmount(() => {
   offCustomerListRefresh()
 })
 
-function handleSearch() {
+async function handleSearch() {
   syncAiKeywordChip((customerStore.queryParams.keyword || '').trim())
   customerStore.queryParams.page = 1
+  await syncCustomerListPageQuery(customerStore.queryParams.page || 1)
   customerStore.fetchCustomerList(true)
 }
 
@@ -856,6 +921,7 @@ function handlePageChange(page: number) {
   if (page < 1 || page > totalPages.value) return
   if (customerStore.queryParams.page === page) return
   customerStore.queryParams.page = page
+  void syncCustomerListPageQuery(page)
   customerStore.fetchCustomerList(false)
 }
 
@@ -866,7 +932,7 @@ function handleCustomerRowClick(row: CustomerListVO, _column: unknown, event: Ev
 }
 
 function handleRowClick(row: CustomerListVO) {
-  router.push(`/customer/${row.customerId}`)
+  router.push(buildCustomerDetailRoute(row.customerId))
 }
 
 function getStageLabel(stage: string): string {
@@ -940,7 +1006,7 @@ async function handleTransfer(customer: CustomerListVO, user: any) {
     )
     await transferCustomer([customer.customerId], String(user.userId))
     ElMessage.success('负责人变更成功')
-    await customerStore.fetchCustomerList(true)
+    await customerStore.fetchCustomerList(false)
   } catch {
     // Cancelled or error handled
   }
@@ -970,6 +1036,7 @@ async function handleExport() {
 }
 
 async function handleImportSuccess(_result: CustomerImportResult) {
+  await syncCustomerListPageQuery(1)
   await customerStore.fetchCustomerList(true)
 }
 </script>
