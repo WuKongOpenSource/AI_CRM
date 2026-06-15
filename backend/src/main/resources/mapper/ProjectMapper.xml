@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ProjectMapper">
+
+    <sql id="projectConditions">
+        1 = 1
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                p.name ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(p.description, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(p.customer_name, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.status != null and query.status != ''">
+            AND p.status = #{query.status}
+        </if>
+    </sql>
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.ProjectVO">
+        SELECT
+            p.project_id,
+            p.name,
+            p.description,
+            p.customer_id,
+            p.customer_name,
+            p.owner_id,
+            u.realname AS owner_name,
+            p.start_date,
+            p.due_date,
+            p.status,
+            p.create_time,
+            p.update_time,
+            COALESCE(task_stats.task_count, 0) AS task_count,
+            COALESCE(task_stats.incomplete_task_count, 0) AS incomplete_task_count
+        FROM crm_project p
+        LEFT JOIN manager_user u ON p.owner_id = u.user_id
+        LEFT JOIN (
+            SELECT
+                project_id,
+                COUNT(*) AS task_count,
+                COUNT(*) FILTER (WHERE status <> 'COMPLETED') AS incomplete_task_count
+            FROM crm_project_task
+            GROUP BY project_id
+        ) task_stats ON p.project_id = task_stats.project_id
+        WHERE <include refid="projectConditions"/>
+        ORDER BY p.update_time DESC NULLS LAST, p.create_time DESC NULLS LAST, p.project_id DESC
+    </select>
+
+    <select id="getProjectById" resultType="com.kakarote.ai_crm.entity.VO.ProjectVO">
+        SELECT
+            p.project_id,
+            p.name,
+            p.description,
+            p.customer_id,
+            p.customer_name,
+            p.owner_id,
+            u.realname AS owner_name,
+            p.start_date,
+            p.due_date,
+            p.status,
+            p.create_time,
+            p.update_time,
+            COALESCE(task_stats.task_count, 0) AS task_count,
+            COALESCE(task_stats.incomplete_task_count, 0) AS incomplete_task_count
+        FROM crm_project p
+        LEFT JOIN manager_user u ON p.owner_id = u.user_id
+        LEFT JOIN (
+            SELECT
+                project_id,
+                COUNT(*) AS task_count,
+                COUNT(*) FILTER (WHERE status <> 'COMPLETED') AS incomplete_task_count
+            FROM crm_project_task
+            GROUP BY project_id
+        ) task_stats ON p.project_id = task_stats.project_id
+        WHERE p.project_id = #{projectId}
+    </select>
+
+</mapper>

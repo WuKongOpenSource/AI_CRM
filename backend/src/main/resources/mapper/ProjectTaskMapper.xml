@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ProjectTaskMapper">
+
+    <select id="selectProjectTasks" resultType="com.kakarote.ai_crm.entity.VO.ProjectVO$ProjectTaskVO">
+        SELECT
+            t.task_id,
+            t.project_id,
+            t.lane_id,
+            t.title,
+            t.description,
+            t.status,
+            t.due_date,
+            t.owner_id,
+            COALESCE(t.owner_name, u.realname) AS owner_name,
+            t.priority,
+            t.customer_id,
+            COALESCE(t.customer_name, c.company_name) AS customer_name,
+            t.generated_by_ai,
+            t.ai_source_text,
+            t.create_time,
+            t.update_time
+        FROM crm_project_task t
+        LEFT JOIN manager_user u ON t.owner_id = u.user_id
+        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        WHERE t.project_id = #{projectId}
+        <if test="keyword != null and keyword != ''">
+            AND (
+                t.title ILIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(t.description, '') ILIKE CONCAT('%', #{keyword}, '%')
+                OR COALESCE(t.customer_name, '') ILIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+        ORDER BY t.create_time DESC NULLS LAST, t.task_id DESC
+    </select>
+
+</mapper>

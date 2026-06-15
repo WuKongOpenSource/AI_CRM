@@ -310,6 +310,7 @@ const allMainNavItems: MainNavItem[] = [
   { icon: 'knowledge', label: '知识库', route: '/knowledge', permission: 'knowledge' },
   { icon: 'profile', label: '关系', route: '/relation' },
   { icon: 'contract', label: '产品管理', route: '/product' },
+  { icon: 'task', label: '项目管理', route: '/project' },
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
@@ -333,6 +334,7 @@ const activeMenu = computed(() => {
   if (path.startsWith('/addressBook')) return '/addressBook'
   if (path.startsWith('/relation')) return '/relation'
   if (path.startsWith('/product')) return '/product'
+  if (path.startsWith('/project')) return '/project'
   if (path.startsWith('/settings')) return '/settings'
   return path
 })
