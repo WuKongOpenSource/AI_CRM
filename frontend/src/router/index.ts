@@ -77,13 +77,13 @@ const routes: RouteRecordRaw[] = [
         path: 'relation',
         name: 'RelationList',
         component: () => import('@/views/relation/RelationListView.vue'),
-        meta: { title: '关系', icon: 'profile' }
+        meta: { title: '关系', icon: 'contacts' }
       },
       {
         path: 'product',
         name: 'ProductList',
         component: () => import('@/views/product/ProductListView.vue'),
-        meta: { title: '产品管理', icon: 'contract', permission: 'product:view' }
+        meta: { title: '产品管理', icon: 'inventory_2', permission: 'product:view' }
       },
       {
         path: 'project',
@@ -101,7 +101,7 @@ const routes: RouteRecordRaw[] = [
         path: 'mail',
         name: 'Mail',
         component: () => import('@/views/mail/MailView.vue'),
-        meta: { title: '邮件', icon: 'mail', permission: 'mail:view' }
+        meta: { title: '邮箱', icon: 'mail', permission: 'mail:view' }
       },
       {
         path: 'task',

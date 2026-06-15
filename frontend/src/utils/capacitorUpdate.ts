@@ -48,7 +48,7 @@ type DownloadBundleOptions = {
 
 type LiveUpdateModule = {
   LiveUpdate: {
-    ready(): Promise<unknown>
+    ready(): Promise<void>
     downloadBundle(options: DownloadBundleOptions): Promise<void>
     setNextBundle(options: { bundleId: string }): Promise<void>
     reload(): Promise<void>
