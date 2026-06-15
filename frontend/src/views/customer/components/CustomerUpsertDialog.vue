@@ -8,17 +8,17 @@
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="modelValue" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div v-if="modelValue" class="wk-customer-upsert-modal-shell fixed inset-0 z-[3600] flex items-center justify-center p-4 sm:p-6">
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="handleClose" />
 
         <!-- Modal Container -->
         <div :class="[
-          'relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
+          'wk-customer-upsert-modal relative w-full bg-slate-50 shadow-2xl overflow-hidden flex flex-col wk-crm-el-field-scope',
           isMobile ? 'max-w-full max-h-full rounded-none inset-0' : 'max-w-5xl max-h-[90vh] rounded-[2.5rem]'
         ]">
           <!-- Header -->
-          <div class="bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
+          <div class="wk-customer-upsert-modal__header bg-white border-b border-slate-200 px-6 sm:px-8 py-4 sm:py-5 flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3 sm:gap-4">
               <div class="size-10 sm:size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
                 <span class="material-symbols-outlined">{{ isEdit ? 'edit' : 'person_add' }}</span>
@@ -50,7 +50,7 @@
           </div>
 
           <!-- Content -->
-          <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div class="wk-customer-upsert-modal__body flex-1 overflow-y-auto p-4 sm:p-6">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <!-- Left Column -->
               <div :class="[isEdit ? 'lg:col-span-12' : 'lg:col-span-7', 'space-y-5']">
@@ -537,3 +537,30 @@ async function handleSubmit() {
   }
 }
 </script>
+
+<style scoped>
+@media (max-width: 767px) {
+  .wk-customer-upsert-modal-shell {
+    box-sizing: border-box;
+    padding:
+      calc(1rem + var(--wk-safe-top))
+      calc(1rem + var(--wk-safe-right))
+      calc(1rem + var(--wk-safe-bottom))
+      calc(1rem + var(--wk-safe-left));
+  }
+
+  .wk-customer-upsert-modal {
+    max-height: calc(100dvh - 2rem - var(--wk-safe-top) - var(--wk-safe-bottom));
+  }
+
+  .wk-customer-upsert-modal__header {
+    padding-right: max(1.5rem, calc(1.5rem + var(--wk-safe-right)));
+    padding-left: max(1.5rem, calc(1.5rem + var(--wk-safe-left)));
+  }
+
+  .wk-customer-upsert-modal__body {
+    overscroll-behavior: contain;
+    padding-bottom: calc(1rem + var(--wk-safe-bottom));
+  }
+}
+</style>

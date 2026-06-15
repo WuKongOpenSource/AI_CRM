@@ -261,6 +261,18 @@ body {
   border-radius: 0.5rem !important;
 }
 
+html.wk-native-mobile .el-message {
+  right: auto !important;
+  left: 50% !important;
+  max-width: calc(100vw - 2rem - var(--wk-safe-left) - var(--wk-safe-right));
+  transform: translate3d(-50%, var(--wk-safe-top), 0);
+}
+
+html.wk-native-mobile .el-message.el-message-fade-enter-from,
+html.wk-native-mobile .el-message.el-message-fade-leave-to {
+  transform: translate3d(-50%, calc(var(--wk-safe-top) - 100%), 0);
+}
+
 .el-dialog {
   border-radius: 1rem !important;
 }
