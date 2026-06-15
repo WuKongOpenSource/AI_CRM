@@ -22,7 +22,7 @@
         <maven.compiler.target>21</maven.compiler.target>
         <lombok.version>1.18.34</lombok.version>
         <jwt.version>0.9.1</jwt.version>
-        <spring-ai.version>1.0.0</spring-ai.version>
+        <spring-ai.version>1.1.6</spring-ai.version>
     </properties>
 
     <dependencyManagement>

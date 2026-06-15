@@ -34,6 +34,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -232,6 +233,12 @@ public class DynamicChatClientProvider {
                 .maxCompletionTokens(maxTokens)
                 .streamUsage(true);
 
+        Map<String, Object> extraBody = new LinkedHashMap<>();
+        applyThinkingDisabledOptions(extraBody, providerCode, baseUrl, resolvedModel);
+        if (!extraBody.isEmpty()) {
+            builder.extraBody(extraBody);
+        }
+
         return builder.build();
     }
 
@@ -267,6 +274,43 @@ public class DynamicChatClientProvider {
         return temperature;
     }
 
+    private void applyThinkingDisabledOptions(Map<String, Object> extraBody,
+                                              String providerCode, String baseUrl, String model) {
+        if (shouldDisableEnableThinking(providerCode, baseUrl, model)) {
+            extraBody.put("enable_thinking", Boolean.FALSE);
+        }
+        if (shouldDisableThinkingObject(providerCode, baseUrl, model)) {
+            extraBody.put("thinking", Map.of("type", "disabled"));
+        }
+    }
+
+    private boolean shouldDisableEnableThinking(String providerCode, String baseUrl, String model) {
+        String provider = normalizeProviderCodeForThinking(providerCode);
+        String normalizedBaseUrl = normalizeForMatching(baseUrl);
+        String normalizedModel = normalizeForMatching(model);
+        return "dashscope".equals(provider)
+                || normalizedBaseUrl.contains("dashscope")
+                || normalizedModel.contains("qwen");
+    }
+
+    private boolean shouldDisableThinkingObject(String providerCode, String baseUrl, String model) {
+        String normalizedModel = normalizeForMatching(model);
+        return shouldDisableDeepSeekThinking(providerCode, baseUrl)
+                || isDeepSeekThinkingModel(normalizedModel)
+                || isKimiK2SwitchableThinkingModel(normalizedModel)
+                || isDoubaoThinkingModel(normalizedModel)
+                || isGlmThinkingModel(normalizedModel)
+                || isHunyuanThinkingModel(normalizedModel);
+    }
+
+    private boolean shouldDisableDeepSeekThinking(String providerCode, String baseUrl) {
+        if ("deepseek".equals(normalizeProviderCodeForThinking(providerCode))) {
+            return true;
+        }
+        String normalizedBaseUrl = normalizeForMatching(baseUrl);
+        return normalizedBaseUrl.contains("api.deepseek.com") || normalizedBaseUrl.contains("deepseek.com");
+    }
+
     private boolean isMoonshotK2FixedTemperatureModel(String providerCode, String model) {
         String provider = normalizeProviderCodeForThinking(providerCode);
         String normalizedModel = normalizeForMatching(model);
@@ -285,6 +329,32 @@ public class DynamicChatClientProvider {
                 || normalizedModel.contains("/kimi-k2.6")
                 || normalizedModel.contains("/kimi-k2-5")
                 || normalizedModel.contains("/kimi-k2-6");
+    }
+
+    private boolean isDeepSeekThinkingModel(String normalizedModel) {
+        return normalizedModel.contains("deepseek");
+    }
+
+    private boolean isDoubaoThinkingModel(String normalizedModel) {
+        return normalizedModel.contains("doubao-seed");
+    }
+
+    private boolean isGlmThinkingModel(String normalizedModel) {
+        return normalizedModel.startsWith("glm-5")
+                || normalizedModel.startsWith("glm-4.7")
+                || normalizedModel.startsWith("glm-4.6")
+                || normalizedModel.contains("/glm-5")
+                || normalizedModel.contains("/glm-4.7")
+                || normalizedModel.contains("/glm-4.6");
+    }
+
+    private boolean isHunyuanThinkingModel(String normalizedModel) {
+        return normalizedModel.startsWith("hy3")
+                || normalizedModel.startsWith("hunyuan-2")
+                || normalizedModel.startsWith("hunyuan-t1")
+                || normalizedModel.contains("/hy3")
+                || normalizedModel.contains("/hunyuan-2")
+                || normalizedModel.contains("/hunyuan-t1");
     }
 
     private String normalizeProviderCodeForThinking(String providerCode) {
