@@ -395,17 +395,17 @@
           <!-- Input Area -->
           <div class="shrink-0 p-4 md:p-8 bg-gradient-to-t from-white via-white to-transparent">
             <div class="max-w-4xl mx-auto space-y-4">
-              <div v-if="chatStore.applications.length > 0" class="flex flex-wrap gap-2 justify-center">
+              <div v-if="chatStore.appOptions.length > 0" class="flex flex-wrap gap-2 justify-center">
                 <button
-                  v-for="app in chatStore.applications"
+                  v-for="app in chatStore.appOptions"
                   :key="app.code"
                   type="button"
                   class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
-                  :class="chatStore.currentAppCode === app.code
+                  :class="chatStore.selectedAppCode === app.code
                     ? 'border-primary/25 bg-primary/10 text-primary shadow-sm shadow-primary/10'
                     : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
                   :title="app.description || app.label"
-                  @click="chatStore.setCurrentAppCode(app.code)"
+                  @click="chatStore.setSelectedAppCode(app.code)"
                 >
                   <span class="material-symbols-outlined text-[16px] leading-none">
                     {{ resolveChatAppIcon(app.code) }}
@@ -1090,7 +1090,7 @@ const quickActions = [
 ]
 
 const activeQuickActions = computed(() => {
-  const recommended = chatStore.currentApplication?.recommendedQuestions || []
+  const recommended = chatStore.selectedApp?.recommendedQuestions || []
   if (recommended.length > 0) {
     return recommended.map(text => ({ label: text, text }))
   }
@@ -1200,7 +1200,7 @@ const mobileChatHeaderAvatarUrl = computed(() => {
 
 onMounted(async () => {
   await Promise.all([
-    chatStore.fetchApplications(),
+    chatStore.fetchAppOptions(),
     chatStore.fetchModelOptions(),
     chatStore.fetchSessions(),
     agentStore.fetchEnabledAgents(),
@@ -1785,7 +1785,7 @@ async function handleSend() {
   if ((!text && !hasFiles && !hasKnowledge) || chatStore.currentSessionIsStreaming || isUploading.value) return
   if (!(await ensureAiAvailable())) return
 
-  const effectiveAppCode = chatStore.currentAppCode
+  const effectiveAppCode = chatStore.selectedAppCode
   const content = text || (hasKnowledge ? '请结合选中的知识库文件回答' : '请分析这些文件')
   const selectedKnowledgeSnapshot = [...selectedKnowledgeItems.value]
   inputText.value = ''
@@ -1842,8 +1842,8 @@ async function handleSend() {
   const knowledgeIds = hasKnowledge ? selectedKnowledgeSnapshot.map(item => item.knowledgeId) : undefined
   if (hasKnowledge) {
     selectedKnowledgeItems.value = []
-    if (chatStore.currentAppCode === 'general') {
-      chatStore.setCurrentAppCode('knowledge')
+    if (chatStore.selectedAppCode === 'general') {
+      chatStore.setSelectedAppCode('knowledge')
     }
   }
 
@@ -1970,8 +1970,8 @@ function handleKnowledgePickerConfirm(items: Knowledge[]) {
     return
   }
   selectedKnowledgeItems.value = [...selectedKnowledgeItems.value, ...toAppend]
-  if (chatStore.currentAppCode === 'general') {
-    chatStore.setCurrentAppCode('knowledge')
+  if (chatStore.selectedAppCode === 'general') {
+    chatStore.setSelectedAppCode('knowledge')
   }
 }
 
@@ -2113,7 +2113,7 @@ async function handleNewSession() {
   isPinnedToBottom.value = true
   showScrollToBottomButton.value = false
   chatStore.clearMessages()
-  await chatStore.startNewSession('新对话', undefined, undefined, chatStore.currentAppCode)
+  await chatStore.startNewSession('新对话', undefined, undefined, chatStore.selectedAppCode)
   currentView.value = 'chat'
   if (isMobile.value) {
     mobilePanel.value = 'chat'

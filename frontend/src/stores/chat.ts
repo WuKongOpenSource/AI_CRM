@@ -25,8 +25,6 @@ interface LocalMessage {
   timestamp: Date
   isStreaming?: boolean
   isThinking?: boolean
-  tokensUsed?: number
-  modelName?: string
   attachments?: ChatAttachmentVO[]
 }
 
@@ -1011,8 +1009,6 @@ export const useChatStore = defineStore('chat', () => {
       content: message.content,
       timestamp: new Date(message.createTime),
       isStreaming: false,
-      tokensUsed: message.tokensUsed ?? message.tokens,
-      modelName: message.modelName,
       attachments: message.attachments
     }
   }
@@ -1095,20 +1091,16 @@ export const useChatStore = defineStore('chat', () => {
     appOptionsLoading,
     modelOptions,
     appOptions,
-    applications: appOptions,
     selectedModelKey,
     selectedModel,
     selectedAppCode,
-    currentAppCode: selectedAppCode,
     selectedApp,
-    currentApplication: selectedApp,
     ragEnabled,
     crmContextEnabled,
     currentSession,
     fetchSessions,
     fetchModelOptions,
     fetchAppOptions,
-    fetchApplications: fetchAppOptions,
     startNewSession,
     beginNewSessionDraft,
     startNewSessionIfNeeded,
@@ -1128,7 +1120,6 @@ export const useChatStore = defineStore('chat', () => {
     setRagEnabled,
     setSelectedModelKey,
     setSelectedAppCode,
-    setCurrentAppCode: setSelectedAppCode,
     toModelKey,
     setCrmContextEnabled,
     setComposerDraft,
