@@ -8,6 +8,7 @@ import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IProjectService;
+import com.kakarote.ai_crm.utils.DocToHtmlConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,6 +30,7 @@ import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/project")
@@ -192,8 +194,23 @@ public class ProjectController {
     public Result<String> previewTaskAttachmentHtml(@PathVariable Long projectId,
                                                     @PathVariable Long taskId,
                                                     @PathVariable Long attachmentId) {
-        projectService.getTaskAttachment(projectId, taskId, attachmentId);
-        return Result.ok("<p>当前单机版暂不支持该文件在线预览，请下载后查看。</p>");
+        ProjectVO.ProjectTaskAttachmentVO attachment = projectService.getTaskAttachment(projectId, taskId, attachmentId);
+        String fileName = attachment.getName() == null ? "" : attachment.getName();
+        String lowerName = fileName.toLowerCase(Locale.ROOT);
+        if (!lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Only .doc files support HTML preview");
+        }
+        if (attachment.getFilePath() == null || attachment.getFilePath().isBlank()) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment file path is empty");
+        }
+
+        try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
+            return Result.ok(DocToHtmlConverter.convertToHtml(inputStream));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Document conversion failed");
+        }
     }
 
     @GetMapping("/{projectId}/task/{taskId}/attachment/{attachmentId}/download")

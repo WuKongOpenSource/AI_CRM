@@ -5,7 +5,9 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
+import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
+import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
@@ -17,6 +19,7 @@ import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IFollowUpService;
+import com.kakarote.ai_crm.utils.DocToHtmlConverter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 跟进记录控制器
@@ -132,6 +136,29 @@ public class FollowUpController {
         dto.setFileSize(file.getSize());
         dto.setMimeType(file.getContentType());
         return Result.ok(dto);
+    }
+
+    @GetMapping("/attachment/{attachmentId}/preview-html")
+    @Operation(summary = "Preview follow-up attachment as HTML")
+    @RequirePermission("followup:view")
+    public Result<String> previewAttachmentHtml(@PathVariable Long attachmentId) {
+        FollowUpAttachmentVO attachment = followUpService.getAttachment(attachmentId);
+        String fileName = StrUtil.blankToDefault(attachment.getFileName(), "");
+        String lowerName = fileName.toLowerCase(Locale.ROOT);
+        if (!lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Only .doc files support HTML preview");
+        }
+        if (StrUtil.isBlank(attachment.getFilePath())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment file path is empty");
+        }
+
+        try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
+            return Result.ok(DocToHtmlConverter.convertToHtml(inputStream));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Document conversion failed");
+        }
     }
 
     @GetMapping("/attachment/{attachmentId}/download")
