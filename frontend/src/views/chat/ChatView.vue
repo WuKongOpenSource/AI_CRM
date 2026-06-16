@@ -3359,28 +3359,11 @@ function handleFileSelect(event: Event) {
   const input = event.target as HTMLInputElement
   if (!input.files) return
 
-  const result = mergeChatFiles(
-    selectedFiles.value,
-    Array.from(input.files),
-    selectedKnowledgeItems.value.length
-  )
-  if (result.error) {
-    ElMessage.warning(result.error)
-    input.value = ''
-    return
-  }
-
-  selectedFiles.value = result.files
-  if (result.files.length > 0) {
-    showKnowledgeFollowUpChips.value = true
-  }
+  appendSelectedFiles(Array.from(input.files))
   input.value = '' // Reset input for re-selecting same file
 }
 
-function handlePaste(event: ClipboardEvent) {
-  const files = extractClipboardFiles(event)
-  if (files.length === 0) return
-
+function appendSelectedFiles(files: File[]) {
   const slotsLeft = MAX_CHAT_ATTACHMENT_COUNT - selectedKnowledgeItems.value.length - selectedFiles.value.length
   if (slotsLeft <= 0) {
     ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
@@ -3397,6 +3380,13 @@ function handlePaste(event: ClipboardEvent) {
   if (result.files.length > 0) {
     showKnowledgeFollowUpChips.value = true
   }
+}
+
+function handlePaste(event: ClipboardEvent) {
+  const files = extractClipboardFiles(event)
+  if (files.length === 0) return
+
+  appendSelectedFiles(files)
 }
 
 function removeSelectedFile(index: number) {
