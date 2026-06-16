@@ -245,7 +245,7 @@ const avatarInitials = computed(() => {
   return name.trim().slice(0, 2).toUpperCase() || 'U'
 })
 
-watch(() => props.modelValue, async (visible) => {
+watch(() => props.modelValue, async visible => {
   if (visible) {
     await loadProfile()
     return
