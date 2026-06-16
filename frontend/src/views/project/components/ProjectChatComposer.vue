@@ -726,18 +726,14 @@ function handleUploadMenuChooseKnowledge() {
   chatKnowledgePickerVisible.value = true
 }
 
-function appendSelectedFiles(files: File[]) {
-  const slotsLeft = MAX_CHAT_ATTACHMENT_COUNT - selectedKnowledgeItems.value.length - selectedFiles.value.length
-  if (slotsLeft <= 0) {
-    ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
-    return
-  }
-  const result = mergeChatFiles(selectedFiles.value, files.slice(0, slotsLeft))
+function appendSelectedFiles(files: File[]): boolean {
+  const result = mergeChatFiles(selectedFiles.value, files, selectedKnowledgeItems.value.length)
   if (result.error) {
     ElMessage.warning(result.error)
-    return
+    return false
   }
   selectedFiles.value = result.files
+  return true
 }
 
 function handleFileSelect(event: Event) {
@@ -750,7 +746,9 @@ function handleFileSelect(event: Event) {
 function handlePaste(event: ClipboardEvent) {
   const clipboardFiles = extractClipboardFiles(event)
   if (clipboardFiles.length === 0) return
-  appendSelectedFiles(clipboardFiles)
+  if (appendSelectedFiles(clipboardFiles)) {
+    event.preventDefault()
+  }
 }
 
 function onKnowledgePickerConfirm(items: Knowledge[]) {
