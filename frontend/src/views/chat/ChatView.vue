@@ -464,9 +464,12 @@
                     <div class="max-w-full text-left text-[16px] leading-7 text-[#0d0d0d]">
                       <div
                         class="wk-markdown"
-                        :class="{ 'streaming-cursor': message.isStreaming }"
-                        v-html="renderAssistantMessage(message.content || '...', Boolean(message.isStreaming))"
+                        :class="{ 'wk-thinking-shimmer': message.isThinking && message.content.length === 0 }"
+                        v-html="renderAssistantMessage(message.content, Boolean(message.isStreaming), Boolean(message.isThinking))"
                       />
+                      <div v-if="message.isThinking && message.content.length > 0" class="wk-thinking-shimmer mt-1 text-sm">
+                        <p>思考中</p>
+                      </div>
                     </div>
                     <!-- Attachments -->
                     <div v-if="getInlineAttachments(message).length > 0" class="space-y-2">
@@ -1287,6 +1290,7 @@ import MobileChatTopHeader from './components/MobileChatTopHeader.vue'
 import ProductChatInfoPanel from './components/ProductChatInfoPanel.vue'
 import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
 import { renderMarkdown } from '@/utils/markdown'
+import { getAssistantMessagePlaceholder, normalizeAssistantMessageContent } from '@/utils/chatMessage'
 import { appEvents, APP_EVENT } from '@/utils/events'
 import { resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
 import { isRequestErrorHandled } from '@/utils/requestError'
@@ -2755,8 +2759,11 @@ function sendQuickMessage(text: string) {
   handleSend()
 }
 
-function renderAssistantMessage(content: string, isStreaming = false): string {
-  return renderMarkdown(content, { streaming: isStreaming })
+function renderAssistantMessage(content: string, isStreaming = false, isThinking = false): string {
+  const normalized = normalizeAssistantMessageContent(content, isStreaming)
+  return renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
+    streaming: isStreaming
+  })
 }
 
 function htmlToPlainText(html: string): string {
