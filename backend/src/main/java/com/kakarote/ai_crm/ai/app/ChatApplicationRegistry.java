@@ -22,10 +22,14 @@ public class ChatApplicationRegistry {
                 ChatApplicationCodes.GENERAL,
                 "通用助手",
                 "sparkles",
-                "普通 AI 对话，不主动调用 CRM 业务工具。",
+                "普通 AI 对话，不调用 CRM 或知识库业务工具。",
                 """
-                当前应用是通用助手。请用中文回答，表达清晰、准确、克制。
-                不要声称已经查询、创建、更新或删除 CRM 数据；如果用户需要管理业务数据，请提醒其切换到对应应用。
+                你是通用 AI 助手。请用中文回答，表达清晰、准确、克制。
+                当前没有进入任何业务应用，不要声称已经查询或修改 CRM、知识库等系统数据。
+                如果用户需要查看或管理客户、联系人、普通任务、日程或跟进记录，回复《请先在下方输入框左下角点击+号，勾选“悟空技能”中的“CRM管理”》。
+                如果用户需要查看、创建、更新、停用或管理产品、产品资料库、产品类目，或提到“创建某某产品/新增产品/修改产品/停用产品”，回复《目前无法直接创建或修改产品，因为尚未启用产品技能。请在下方输入框左下角点击+号，勾选“悟空技能”中的“产品”，然后再发送需求。》。
+                如果用户需要查看、创建或管理项目、项目泳道、项目任务，或要求“在某个项目下创建任务”，回复《目前无法直接创建或修改项目/项目任务，因为尚未启用项目技能。请在下方输入框左下角点击+号，勾选“悟空技能”中的“项目”，然后再发送需求。》。
+                如果用户需要基于文档或知识库回答，引导其选择知识库应用。
                 """,
                 false,
                 List.of(),
@@ -35,79 +39,90 @@ public class ChatApplicationRegistry {
                 ChatApplicationCodes.CRM,
                 "CRM管理",
                 "customer",
-                "管理客户、联系人、任务、日程和跟进记录。",
+                "管理客户、联系人、任务、日程、跟进记录，并可参考客户相关知识库内容。",
                 """
-                当前应用是 CRM 管理。你可以围绕客户、联系人、任务、日程和跟进记录提供帮助。
+                当前应用是 CRM 管理。你可以围绕客户、联系人、任务、日程、跟进记录和客户相关知识库内容提供帮助。
                 只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
                 """,
                 false,
                 List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
-                List.of("把今天新增但还没跟进的客户列出来", "筛选出高意向客户", "总结本周的销售情况")
-        ));
-        register(new ChatApplicationDefinition(
-                ChatApplicationCodes.KNOWLEDGE,
-                "知识库",
-                "knowledge",
-                "基于知识库文档进行问答、检索和总结。",
-                """
-                当前应用是知识库问答检索。请优先基于知识库内容回答问题，并在可用时给出参考文件或依据。
-                如果知识库中没有相关信息，请如实说明，不要编造结论。
-                """,
-                true,
-                List.of(TOOL_GROUP_KNOWLEDGE),
-                List.of("总结选中文档的重点", "这些资料里提到哪些风险？", "合同付款条款是什么？")
-        ));
-        register(new ChatApplicationDefinition(
-                ChatApplicationCodes.ADDRESS_BOOK,
-                "通讯录",
-                "customer",
-                "围绕员工做任务安排、日程记录和资料归档。",
-                """
-                当前应用是通讯录员工对象助手。你是在围绕当前员工做工作安排、任务记录、日程记录和资料归档。
-                当用户说“他/她/这个员工/该员工”且当前会话绑定了员工时，默认指当前员工。
-                """,
-                false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
-                List.of("明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会")
-        ));
-        register(new ChatApplicationDefinition(
-                ChatApplicationCodes.RELATION,
-                "关系",
-                "contacts",
-                "围绕外部关系人创建任务、日程和历史记录。",
-                """
-                当前应用是关系人对象助手。你是在围绕当前关系人做任务、日程、历史记录和资料归档。
-                当用户说“他/她/这个人/该关系人”且当前会话绑定了关系人时，默认指当前关系人。
-                """,
-                false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
-                List.of("下周三提醒我去拜访他", "记录一下他对新产品比较感兴趣")
+                List.of("把今天新增但还没跟进的客户列出来", "找出快丢单的客户", "筛选出高意向客户", "总结本周的销售情况")
         ));
         register(new ChatApplicationDefinition(
                 ChatApplicationCodes.PRODUCT,
                 "产品",
                 "box",
-                "围绕产品资料库进行查询、创建、更新和停用。",
+                "围绕产品资料库进行查询、创建、更新、停用，并可参考知识库内容。",
                 """
-                当前应用是产品助手。你可以围绕产品资料库提供帮助，包括查询产品、创建产品、更新产品资料和停用产品。
-                当用户说“这个产品”“当前产品”“该产品”且当前会话绑定了产品时，默认使用当前产品。
+                当前应用是产品助手。你可以围绕产品资料库提供帮助，包括查询产品、创建产品、更新产品资料、停用产品，以及基于知识库内容回答产品相关问题。
+                当用户说“这个产品”“当前产品”“该产品”且当前会话绑定了产品时，默认使用当前 productId。
+                新增或修改产品必须调用 ProductTools，并且只有工具结果确认成功后才能回复创建、更新或停用成功。
                 """,
                 false,
                 List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
-                List.of("列出启用中的产品", "帮我新建一个产品", "更新这个产品的标准价")
+                List.of("列出启用中的产品", "帮我新建一个产品", "更新这个产品的标准价", "停用当前产品")
         ));
         register(new ChatApplicationDefinition(
                 ChatApplicationCodes.PROJECT,
                 "项目",
                 "task",
-                "管理项目、项目泳道和项目任务。",
+                "管理项目、项目泳道和项目任务，并可参考项目关联客户与知识库内容。",
                 """
-                当前应用是项目助手。你可以围绕项目和项目任务提供帮助。
-                当用户要求管理项目或项目任务时，优先使用项目工具，不要把项目任务误当作普通个人任务。
+                当前应用是项目助手。你可以围绕项目和项目任务提供帮助，包括查询项目、创建项目、更新项目、删除项目，以及创建、更新、移动、删除项目内任务。
+                当用户要求管理项目或项目任务时，优先调用 ProjectTools 中的项目工具，不要把项目任务误当作普通个人任务。
+                创建或修改项目、项目任务后，只有在工具结果确认成功后，才能说数据已创建、更新、移动或删除成功。
+                如果用户只说“任务”但上下文明确是在项目技能中，请先判断是否指项目任务；缺少项目ID或任务ID且无法从上下文确认时，请先询问。
                 """,
                 false,
                 List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
-                List.of("列出进行中的项目", "帮我新建一个项目", "给某个项目新增一个任务")
+                List.of("列出进行中的项目", "帮我新建一个项目", "查看这个项目的任务", "给某个项目新增一个任务")
+        ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.KNOWLEDGE,
+                "知识库",
+                "knowledge-1",
+                "基于知识库文档进行问答、检索、总结和引用来源。",
+                """
+                当前应用是知识库问答检索。请优先基于知识库内容回答问题，并在可用时给出参考文件或依据。
+                如果知识库中没有相关信息，请如实说明，不要编造结论。
+                不要创建、修改或删除 CRM 数据；如果用户提出 CRM 数据操作，请提示其切换到 CRM 管理应用。
+                """,
+                true,
+                List.of(TOOL_GROUP_KNOWLEDGE),
+                List.of("总结选中文档的重点", "合同付款条款是什么？", "找出会议里的待办事项", "这些资料里提到哪些风险？")
+        ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.ADDRESS_BOOK,
+                "通讯录",
+                "customer",
+                "围绕企业员工做任务安排、日程记录、附件归档和知识库检索。",
+                """
+                当前应用是通讯录员工对象助手。你是在围绕当前员工做工作安排、任务记录、日程记录和附件归档，不是在给员工发送即时消息。
+                当用户说“他/她/这个员工/该员工”且当前会话绑定了员工时，默认指当前员工。
+                没有具体执行时间点、只有截止或待办语义时创建任务；出现具体执行时间点时创建日程。
+                创建任务时默认负责人是当前员工；创建日程时默认把当前员工加入参与人。
+                只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
+                """,
+                false,
+                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of("明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会", "总结这个员工最近的任务和附件")
+        ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.RELATION,
+                "关系",
+                "contacts",
+                "围绕外部关系人创建任务、日程、历史记录、附件归档和知识库检索。",
+                """
+                当前应用是关系人对象助手。你是在围绕当前关系人做任务、日程、历史记录和附件归档。
+                当用户说“他/她/这个人/这个关系人/该关系人”且当前会话绑定了关系人时，默认指当前关系人。
+                没有具体执行时间点、只有截止或待办语义时创建任务；出现具体执行时间点时创建日程。
+                当用户说“记录一下”“帮我记一下”或描述已经发生的偏好、兴趣、沟通结论时，默认调用 createFollowUp 创建历史记录，不要直接修改备注；只有用户明确要求“更新备注/改备注/写到备注”时才更新备注。
+                关系人附件默认归档到该关系人的知识库资料。
+                只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
+                """,
+                false,
+                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of("下周三提醒我去拜访他", "记录一下，他对我们的新产品比较感兴趣", "总结这个关系人的任务和附件")
         ));
     }
 
@@ -122,17 +137,25 @@ public class ChatApplicationRegistry {
 
     public List<ChatAppOptionVO> listOptions() {
         List<ChatAppOptionVO> options = new ArrayList<>();
-        applications.values().forEach(application -> {
-            ChatAppOptionVO option = new ChatAppOptionVO();
-            option.setCode(application.code());
-            option.setLabel(application.label());
-            option.setIconName(application.iconName());
-            option.setDescription(application.description());
-            option.setDefaultRagEnabled(application.defaultRagEnabled());
-            option.setRecommendedQuestions(application.recommendedQuestions());
-            options.add(option);
+        applications.values().forEach(app -> {
+            ChatAppOptionVO vo = new ChatAppOptionVO();
+            vo.setCode(app.code());
+            vo.setLabel(app.label());
+            vo.setIconName(app.iconName());
+            vo.setDescription(app.description());
+            vo.setDefaultRagEnabled(app.defaultRagEnabled());
+            vo.setRecommendedQuestions(app.recommendedQuestions());
+            options.add(vo);
         });
         return options;
+    }
+
+    public boolean hasToolGroup(String appCode, String toolGroup) {
+        return resolve(appCode).toolGroups().contains(toolGroup);
+    }
+
+    public boolean isKnowledgeApp(String appCode) {
+        return ChatApplicationCodes.KNOWLEDGE.equals(resolve(appCode).code());
     }
 
     private void register(ChatApplicationDefinition application) {
