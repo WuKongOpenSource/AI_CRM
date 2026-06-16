@@ -786,11 +786,11 @@
               </div>
 
               <!-- Input Box -->
-              <div class="relative group">
+              <div class="relative group min-w-0">
                 <div class="absolute inset-0 bg-primary/5 blur-xl rounded-2xl group-focus-within:bg-primary/10 transition-all opacity-0 group-focus-within:opacity-100"></div>
                 <div
                   v-if="!isMobile"
-                  class="relative flex items-center bg-white border border-slate-200 rounded-2xl p-2 shadow-xl shadow-slate-200/40 focus-within:border-primary transition-all"
+                  class="wk-chat-composer relative flex items-center rounded-2xl p-2 transition-all"
                 >
                   <input
                     ref="fileInputRef"
@@ -4120,6 +4120,21 @@ function resolveChatAppIcon(code: string): string {
   }
 }
 
+.wk-chat-composer {
+  border: 1px solid var(--wk-border-subtle);
+  background: var(--wk-bg-surface);
+  box-shadow:
+    0 20px 70px rgb(var(--wk-shadow-color) / 0.08),
+    0 2px 8px rgb(var(--wk-shadow-color) / 0.05);
+}
+
+.wk-chat-composer:focus-within {
+  border-color: var(--wk-border-muted);
+  box-shadow:
+    0 22px 78px rgb(var(--wk-shadow-color) / 0.11),
+    0 0 0 1px rgb(var(--wk-primary-rgb) / 0.12);
+}
+
 .wk-mobile-chat-floating-bar {
   display: flex;
   position: fixed;
@@ -4325,15 +4340,6 @@ function resolveChatAppIcon(code: string): string {
   transform: translateY(100%);
 }
 
-.wk-scroll-to-bottom-button {
-  width: 44px;
-  height: 44px;
-  border-color: #d4d4d8;
-  box-shadow:
-    0 12px 34px rgb(15 23 42 / 0.11),
-    0 0 18px 8px rgb(203 213 225 / 0.12);
-}
-
 .wk-chat-model-trigger {
   display: inline-flex;
   width: min(190px, 28vw);
@@ -4499,18 +4505,19 @@ function resolveChatAppIcon(code: string): string {
 
 .wk-mobile-composer-row {
   min-height: 40px;
+  align-items: center;
 }
 
 .wk-mobile-composer-icon-button {
   display: inline-flex;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 9999px;
   color: #0d0d0d;
-  transition: background-color 140ms ease, transform 140ms ease;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
 .wk-mobile-composer-icon-button:hover {
@@ -4527,7 +4534,8 @@ function resolveChatAppIcon(code: string): string {
 }
 
 .wk-mobile-model-trigger--icon {
-  border: 1px solid var(--wk-border-subtle);
+  border-width: 1px;
+  border-style: solid;
   background: #fff;
   padding: 0;
 }
@@ -4543,9 +4551,11 @@ function resolveChatAppIcon(code: string): string {
 
 .wk-mobile-composer-textarea {
   box-sizing: border-box;
-  max-height: 120px;
   min-height: 40px;
+  max-height: 184px;
+  line-height: 24px;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .wk-mobile-composer-textarea::placeholder {
