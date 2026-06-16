@@ -418,6 +418,45 @@
             </div>
           </div>
 
+          <div
+            v-else-if="showDesktopObjectHeader"
+            class="wk-chat-customer-header relative z-20 shrink-0 border-b border-[#ececec] bg-white py-2 pl-4 pr-4 md:pl-8"
+          >
+            <div class="flex h-9 w-full items-center justify-between gap-3">
+              <div class="flex min-w-0 flex-1 items-center gap-2">
+                <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                  <img
+                    v-if="desktopObjectHeaderAvatarUrl"
+                    :src="desktopObjectHeaderAvatarUrl"
+                    :alt="desktopObjectHeaderTitle"
+                    :class="desktopObjectHeaderImageClass"
+                  />
+                  <span
+                    v-else-if="desktopObjectHeaderIcon"
+                    class="material-symbols-outlined text-[17px] leading-none text-slate-400"
+                  >
+                    {{ desktopObjectHeaderIcon }}
+                  </span>
+                  <span v-else class="text-xs font-bold text-slate-400">
+                    {{ desktopObjectHeaderTitle.charAt(0) || '?' }}
+                  </span>
+                </div>
+                <h2
+                  class="min-w-[80px] max-w-[220px] truncate text-[15px] font-semibold leading-5 text-[#0d0d0d]"
+                  :title="desktopObjectHeaderTitle"
+                >
+                  {{ desktopObjectHeaderTitle }}
+                </h2>
+                <span class="inline-flex h-6 shrink-0 items-center rounded-lg bg-[var(--wk-bg-surface-muted)] px-2 text-[11px] font-medium text-[var(--wk-text-secondary)]">
+                  {{ desktopObjectHeaderBadge }}
+                </span>
+                <span v-if="desktopObjectHeaderMeta" class="hidden min-w-0 truncate text-xs text-slate-400 md:inline">
+                  {{ desktopObjectHeaderMeta }}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <!-- Messages Area -->
           <div
             ref="messagesContainer"
@@ -1513,6 +1552,12 @@ const currentObjectId = computed(() => {
 const showDesktopCustomerHeader = computed(() =>
   !isMobile.value && currentView.value === 'chat' && chatObjectKind.value === 'customer' && Boolean(currentObjectId.value)
 )
+const showDesktopObjectHeader = computed(() =>
+  !isMobile.value
+  && currentView.value === 'chat'
+  && Boolean(currentObjectId.value)
+  && (chatObjectKind.value === 'employee' || chatObjectKind.value === 'relation' || chatObjectKind.value === 'product')
+)
 const showDesktopObjectPanel = computed(() =>
   !isMobile.value && currentView.value === 'chat' && Boolean(chatObjectKind.value && currentObjectId.value)
 )
@@ -1611,6 +1656,30 @@ const canChangeSelectedCustomerStage = computed(() => userStore.hasPermission('c
 const canEditSelectedCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
 const selectedCustomerVisibleTags = computed(() => selectedCustomer.value?.tags?.slice(0, 3) || [])
 const selectedCustomerHiddenTags = computed(() => selectedCustomer.value?.tags?.slice(3) || [])
+const desktopObjectHeaderTitle = computed(() => mobileChatHeaderTitle.value)
+const desktopObjectHeaderAvatarUrl = computed(() => mobileChatHeaderAvatarUrl.value)
+const desktopObjectHeaderImageClass = computed(() =>
+  chatObjectKind.value === 'employee'
+    ? 'size-full bg-white object-cover'
+    : 'size-full bg-white object-contain'
+)
+const desktopObjectHeaderIcon = computed(() => {
+  if (chatObjectKind.value === 'product') return 'inventory_2'
+  if (chatObjectKind.value === 'relation') return 'diversity_3'
+  return ''
+})
+const desktopObjectHeaderBadge = computed(() => {
+  if (chatObjectKind.value === 'employee') return employeeDetail.value?.post || '员工'
+  if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.relationTypeName || relationDetail.value?.relation?.relationType || '关系'
+  if (chatObjectKind.value === 'product') return productDetail.value?.productCode || '无编码'
+  return '对象'
+})
+const desktopObjectHeaderMeta = computed(() => {
+  if (chatObjectKind.value === 'employee') return employeeDetail.value?.deptName || ''
+  if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.company || relationDetail.value?.relation?.customerName || ''
+  if (chatObjectKind.value === 'product') return productDetail.value?.categoryPath || productDetail.value?.categoryName || productDetail.value?.productType || ''
+  return ''
+})
 const mobileObjectDetailTitle = computed(() => {
   if (chatObjectKind.value === 'customer') return '客户详情'
   if (chatObjectKind.value === 'employee') return '通讯录详情'
