@@ -6,24 +6,24 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-@Schema(name = "ChatAppOptionVO", description = "Chat application option")
+@Schema(name = "ChatAppOptionVO", description = "聊天应用选项")
 public class ChatAppOptionVO {
 
-    @Schema(description = "Application code")
+    @Schema(description = "应用编码")
     private String code;
 
-    @Schema(description = "Display label")
+    @Schema(description = "显示名称")
     private String label;
 
-    @Schema(description = "Icon name")
+    @Schema(description = "图标名称")
     private String iconName;
 
-    @Schema(description = "Description")
+    @Schema(description = "应用说明")
     private String description;
 
-    @Schema(description = "Default RAG enabled")
+    @Schema(description = "是否默认启用知识库 RAG")
     private Boolean defaultRagEnabled;
 
-    @Schema(description = "Recommended questions")
+    @Schema(description = "推荐问题")
     private List<String> recommendedQuestions;
 }
