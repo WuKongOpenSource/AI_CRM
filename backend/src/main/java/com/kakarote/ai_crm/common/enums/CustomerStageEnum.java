@@ -22,6 +22,9 @@ public enum CustomerStageEnum {
         this.name = name;
     }
 
+    /**
+     * 处理fromCode方法逻辑。
+     */
     public static CustomerStageEnum fromCode(String code) {
         for (CustomerStageEnum stage : values()) {
             if (stage.getCode().equals(code)) {
@@ -31,6 +34,9 @@ public enum CustomerStageEnum {
         return null;
     }
 
+    /**
+     * 获取名称按验证码。
+     */
     public static String getNameByCode(String code) {
         CustomerStageEnum stage = fromCode(code);
         return stage != null ? stage.getName() : code;

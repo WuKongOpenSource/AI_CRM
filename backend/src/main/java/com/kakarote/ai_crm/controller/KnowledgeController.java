@@ -283,8 +283,9 @@ public class KnowledgeController {
     @PostMapping("/{id}/ai-analyze")
     @Operation(summary = "AI analyze knowledge document")
     @RequirePermission("knowledge:view")
-    public Result<KnowledgeAiAnalyzeVO> aiAnalyze(@PathVariable("id") Long id) {
-        return Result.ok(knowledgeService.aiAnalyzeDocument(id));
+    public Result<KnowledgeAiAnalyzeVO> aiAnalyze(@PathVariable("id") Long id,
+                                                  @RequestParam(defaultValue = "false") boolean forceRefresh) {
+        return Result.ok(knowledgeService.aiAnalyzeDocument(id, forceRefresh));
     }
 
     @PostMapping(value = "/{id}/ask", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

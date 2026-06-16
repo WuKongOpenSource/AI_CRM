@@ -20,21 +20,33 @@ public class BusinessException extends RuntimeException implements ResultCode {
      */
     private final String message;
 
+    /**
+     * 初始化Business异常实例。
+     */
     public BusinessException(Integer code, String message) {
         this.code = code;
         this.message = message;
     }
 
+    /**
+     * 初始化Business异常实例。
+     */
     public BusinessException(ResultCode resultCode) {
         this.code = resultCode.getCode();
         this.message = resultCode.getMsg();
     }
 
+    /**
+     * 初始化Business异常实例。
+     */
     public BusinessException(ResultCode resultCode, String message) {
         this.code = resultCode.getCode();
         this.message = message;
     }
 
+    /**
+     * 初始化Business异常实例。
+     */
     public BusinessException() {
         super("参数验证错误", null, false, false);
         this.code = SystemCodeEnum.SYSTEM_NO_VALID.getCode();

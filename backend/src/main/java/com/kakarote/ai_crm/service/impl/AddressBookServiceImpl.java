@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.Const;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
 import com.kakarote.ai_crm.common.enums.EmployeeStatusEnum;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -20,13 +21,14 @@ import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.AddressBookMapper;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
+import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IAddressBookService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.IScheduleService;
 import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.service.PermissionService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -38,33 +40,51 @@ import java.util.Objects;
 import java.util.Set;
 
 @Service
-@RequiredArgsConstructor
 public class AddressBookServiceImpl implements IAddressBookService {
 
     private static final int RELATED_LIMIT = 8;
 
-    private final AddressBookMapper addressBookMapper;
-    private final ManagerDeptMapper deptMapper;
-    private final FileStorageService fileStorageService;
-    private final PermissionService permissionService;
-    private final ITaskService taskService;
-    private final IScheduleService scheduleService;
-    private final IKnowledgeService knowledgeService;
+    @Autowired
+    private AddressBookMapper addressBookMapper;
+
+    @Autowired
+    private ManagerDeptMapper deptMapper;
+
+    @Autowired
+    private DataPermissionService dataPermissionService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @Autowired
+    private PermissionService permissionService;
+
+    @Autowired
+    private ITaskService taskService;
+
+    @Autowired
+    private IScheduleService scheduleService;
+
+    @Autowired
+    private IKnowledgeService knowledgeService;
 
     @Override
     public BasePage<AddressBookEmployeeVO> queryPageList(AddressBookQueryBO queryBO) {
-        AddressBookQueryBO safeQuery = queryBO == null ? new AddressBookQueryBO() : queryBO;
-        prepareQuery(safeQuery);
-        BasePage<AddressBookEmployeeVO> page = addressBookMapper.queryPageList(safeQuery.parse(), safeQuery);
+        if (queryBO == null) {
+            queryBO = new AddressBookQueryBO();
+        }
+        prepareQuery(queryBO, "addressBook:list");
+        BasePage<AddressBookEmployeeVO> page = addressBookMapper.queryPageList(queryBO.parse(), queryBO);
         fillEmployeePresentation(page.getList());
         return page;
     }
 
     @Override
     public AddressBookDetailVO getDetail(Long userId) {
+        dataPermissionService.assertUserDataAccessByPermission("addressBook:detail", userId);
         AddressBookDetailVO detail = addressBookMapper.getDetail(userId);
         if (detail == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "员工不存在");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "员工不存在或无权限访问");
         }
         fillEmployeePresentation(List.of(detail));
         detail.setRelatedTasks(loadRelatedTasks(userId));
@@ -74,7 +94,10 @@ public class AddressBookServiceImpl implements IAddressBookService {
         return detail;
     }
 
-    private void prepareQuery(AddressBookQueryBO queryBO) {
+    private void prepareQuery(AddressBookQueryBO queryBO, String permission) {
+        if (queryBO == null) {
+            return;
+        }
         if (StrUtil.isNotBlank(queryBO.getEmployeeStatus())) {
             queryBO.setEmployeeStatus(EmployeeStatusEnum.normalize(queryBO.getEmployeeStatus()));
         }
@@ -84,6 +107,9 @@ public class AddressBookServiceImpl implements IAddressBookService {
             collectChildDeptIds(allDepts, queryBO.getDeptId(), deptIds, Const.AUTH_DATA_RECURSION_NUM);
             queryBO.setDeptIds(new ArrayList<>(deptIds));
         }
+        DataPermissionContext context = dataPermissionService.createContextByPermission(permission);
+        queryBO.setAllData(context.isAllData());
+        queryBO.setUserIds(context.getUserIds());
     }
 
     private void collectChildDeptIds(List<ManagerDept> allDepts, Long parentId, Set<Long> result, int depth) {
@@ -109,7 +135,6 @@ public class AddressBookServiceImpl implements IAddressBookService {
                 try {
                     employee.setImgUrl(fileStorageService.getUrl(employee.getImg()));
                 } catch (Exception ignored) {
-                    employee.setImgUrl(null);
                 }
             }
         }
@@ -144,7 +169,7 @@ public class AddressBookServiceImpl implements IAddressBookService {
         KnowledgeQueryBO queryBO = new KnowledgeQueryBO();
         queryBO.setPage(1);
         queryBO.setLimit(RELATED_LIMIT);
-        queryBO.setUploadUserId(userId);
+        queryBO.setEmployeeId(userId);
         return knowledgeService.queryPageList(queryBO).getList();
     }
 

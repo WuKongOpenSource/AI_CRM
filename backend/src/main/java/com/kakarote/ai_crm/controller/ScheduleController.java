@@ -30,6 +30,9 @@ public class ScheduleController {
     @Autowired
     private IScheduleService scheduleService;
 
+    /**
+     * 创建日程。
+     */
     @PostMapping("/add")
     @Operation(summary = "创建日程")
     @RequirePermission("schedule:create")
@@ -38,6 +41,9 @@ public class ScheduleController {
         return Result.ok(scheduleId);
     }
 
+    /**
+     * 更新日程。
+     */
     @PostMapping("/update")
     @Operation(summary = "更新日程")
     @RequirePermission("schedule:edit")
@@ -46,6 +52,9 @@ public class ScheduleController {
         return Result.ok();
     }
 
+    /**
+     * 删除日程。
+     */
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除日程")
     @RequirePermission("schedule:delete")
@@ -54,6 +63,9 @@ public class ScheduleController {
         return Result.ok();
     }
 
+    /**
+     * 分页查询日程。
+     */
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询日程")
     @RequirePermission("schedule:view")
@@ -61,6 +73,9 @@ public class ScheduleController {
         return Result.ok(scheduleService.queryPageList(queryBO));
     }
 
+    /**
+     * 查询我的日程。
+     */
     @GetMapping("/mySchedules")
     @Operation(summary = "查询我的日程")
     @RequirePermission("schedule:view")
@@ -69,6 +84,9 @@ public class ScheduleController {
         return Result.ok(scheduleService.getMySchedules(filter));
     }
 
+    /**
+     * AI智能解析日程。
+     */
     @PostMapping("/ai-parse")
     @Operation(summary = "AI智能解析日程")
     @RequirePermission("schedule:create")

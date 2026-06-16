@@ -10,7 +10,7 @@
   >
     <div class="space-y-4">
       <p class="text-sm text-slate-500">
-        拖动滑块到拼图缺口处，验证通过后继续登录。
+        拖动滑块到拼图缺口处，验证通过后继续发送邮箱验证码。
       </p>
 
       <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">

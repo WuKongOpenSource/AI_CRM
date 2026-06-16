@@ -15,7 +15,7 @@ CREATE TABLE `crm_customer` (
     `industry` VARCHAR(100) COMMENT '行业',
     `stage` VARCHAR(50) NOT NULL DEFAULT 'lead' COMMENT '阶段: lead, qualified, proposal, negotiation, closed, lost',
     `owner_id` BIGINT NOT NULL COMMENT '负责人ID',
-    `level` CHAR(1) DEFAULT 'C' COMMENT '客户等级: A, B, C',
+    `level` CHAR(1) COMMENT '客户等级: A, B, C',
     `source` VARCHAR(100) COMMENT '客户来源',
     `address` VARCHAR(500) COMMENT '地址',
     `website` VARCHAR(255) COMMENT '网站',
@@ -141,6 +141,8 @@ CREATE TABLE `crm_knowledge` (
     `upload_user_id` BIGINT NOT NULL COMMENT '上传人ID',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `ai_analysis_snapshot` LONGTEXT COMMENT 'AI analysis snapshot',
+    `ai_analysis_time` DATETIME COMMENT 'AI analysis time',
     PRIMARY KEY (`knowledge_id`),
     INDEX `idx_customer_id` (`customer_id`),
     INDEX `idx_type` (`type`),
@@ -185,6 +187,10 @@ CREATE TABLE `crm_task` (
     `update_user_id` BIGINT COMMENT '修改人ID',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `value_priority_score` INT COMMENT '高价值优先分数',
+    `value_priority_tier` VARCHAR(20) COMMENT '高价值优先分层: HIGH/MEDIUM/LOW',
+    `value_priority_reason` TEXT COMMENT '高价值优先原因说明',
+    `high_value` TINYINT(1) DEFAULT 0 COMMENT '是否高价值优先任务',
     PRIMARY KEY (`task_id`),
     INDEX `idx_assigned_to` (`assigned_to`),
     INDEX `idx_customer_id` (`customer_id`),
@@ -225,13 +231,15 @@ CREATE TABLE `crm_chat_session` (
     `agent_id` BIGINT COMMENT '智能体ID',
     `customer_id` BIGINT COMMENT '关联客户ID',
     `title` VARCHAR(255) COMMENT '会话标题',
+    `app_code` VARCHAR(50) NOT NULL DEFAULT 'general' COMMENT '聊天应用编码',
     `status` TINYINT DEFAULT 1 COMMENT '状态: 0-已归档, 1-活跃',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     PRIMARY KEY (`session_id`),
     INDEX `idx_user_id` (`user_id`),
     INDEX `idx_agent_id` (`agent_id`),
-    INDEX `idx_customer_id` (`customer_id`)
+    INDEX `idx_customer_id` (`customer_id`),
+    INDEX `idx_app_code` (`app_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话表';
 
 -- ============================================
@@ -366,7 +374,7 @@ INSERT INTO `crm_knowledge` (`knowledge_id`, `name`, `type`, `file_path`, `file_
 (4001, '北京科技产品演示会议记录.docx', 'meeting', '/uploads/2024/01/meeting_bjtech_20240120.docx', 52480, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 1001, 'AI产品演示会议记录，客户对智能分析和自动化功能表现出浓厚兴趣，计划安排技术团队深入测试。', '会议时间：2024年1月20日\n参会人：张明、李华、我方销售团队\n会议内容：产品功能演示、技术架构介绍、商务初步沟通', 1, 1, NOW()),
 (4002, '上海金融技术方案.pdf', 'proposal', '/uploads/2024/01/proposal_shfinance_v1.pdf', 1048576, 'application/pdf', 1002, '为上海金融集团定制的AI解决方案，包含数据分析、风控预警、智能报表等模块。', '上海金融集团AI解决方案\n1. 项目背景\n2. 解决方案\n3. 实施计划\n4. 商务报价', 1, 1, NOW()),
 (4003, '广州制造现场调研录音.mp3', 'recording', '/uploads/2024/01/visit_gzmfg_20240115.mp3', 15728640, 'audio/mpeg', 1003, '工厂现场调研录音，记录了生产线自动化需求和MES系统升级诉求。', NULL, 1, 1, NOW()),
-(4004, '杭州电商项目合同.pdf', 'contract', '/uploads/2024/01/contract_hzecom_2024.pdf', 524288, 'application/pdf', 1005, '与杭州电商平台签订的年度服务合同，合同金额58万元，服务期1年。', '服务合同\n甲方：杭州电商平台\n乙方：我司\n合同金额：580,000元\n服务期限：2024年1月1日至2024年12月31日', 1, 1, NOW());
+(4004, '杭州电商项目合同.pdf', 'contract', '/uploads/2024/01/contract_hzecom_2024.pdf', 524288, 'application/pdf', 1005, '与杭州电商平台签订的年度服务合同，项目金额58万元，服务期1年。', '服务合同\n甲方：杭州电商平台\n乙方：我司\n项目金额：580,000元\n服务期限：2024年1月1日至2024年12月31日', 1, 1, NOW());
 
 -- 插入知识库标签
 INSERT INTO `crm_knowledge_tag` (`id`, `knowledge_id`, `tag_name`, `create_time`) VALUES

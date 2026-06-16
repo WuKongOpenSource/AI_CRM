@@ -11,21 +11,21 @@ import java.util.Date;
 @Schema(name = "FollowUpUpdateBO", description = "Follow-up update payload")
 public class FollowUpUpdateBO {
 
-    @NotNull(message = "Follow-up ID cannot be empty")
+    @NotNull(message = "跟进ID不能为空")
     @Schema(description = "Follow-up ID", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long followUpId;
-
-    @Schema(description = "Relation ID")
-    private Long relationId;
 
     @Schema(description = "Contact ID")
     private Long contactId;
 
-    @NotBlank(message = "Type cannot be empty")
+    @Schema(description = "Relation ID")
+    private Long relationId;
+
+    @NotBlank(message = "类型不能为空")
     @Schema(description = "Type: call, meeting, email, visit, other", requiredMode = Schema.RequiredMode.REQUIRED)
     private String type;
 
-    @NotBlank(message = "Content cannot be empty")
+    @NotBlank(message = "跟进内容不能为空")
     @Schema(description = "Follow-up content", requiredMode = Schema.RequiredMode.REQUIRED)
     private String content;
 
@@ -35,10 +35,10 @@ public class FollowUpUpdateBO {
     @Schema(description = "Scene type")
     private String sceneType;
 
-    @Schema(description = "AI generated flag")
+    @Schema(description = "AI generated flag: 0 no, 1 yes")
     private Integer aiGenerated;
 
-    @NotNull(message = "Follow-up time cannot be empty")
+    @NotNull(message = "跟进时间不能为空")
     @Schema(description = "Follow-up time", requiredMode = Schema.RequiredMode.REQUIRED)
     private Date followTime;
 

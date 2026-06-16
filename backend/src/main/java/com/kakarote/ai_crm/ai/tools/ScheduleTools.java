@@ -37,6 +37,9 @@ public class ScheduleTools {
 
     private final SimpleDateFormat dateTimeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
+    /**
+     * 创建日程。
+     */
     @Tool(description = "创建日程安排。仅当用户提到具体时间点时调用。没有具体执行时间点、只有截止日期的应使用 createTask。客户解析优先级：显式customerIdStr > 显式客户名称 > 当前客户对话绑定客户。当前客户对话中，如果用户只说“这个客户/当前客户/他们”等，不要把代词作为customerName，留空即可让工具默认关联当前客户。如果传入客户名称但系统中不存在该客户，工具会中止创建并提示先创建客户。")
     @AiToolPermission(value = "schedule:create", action = "创建日程")
     public String createSchedule(
@@ -143,6 +146,9 @@ public class ScheduleTools {
         }
     }
 
+    /**
+     * 查询日程。
+     */
     @Tool(description = "查询我的日程安排。当用户要查看日程、今天的安排、本周日程时调用。")
     @AiToolPermission(value = "schedule:view", action = "查看日程")
     public String querySchedules(
@@ -193,6 +199,9 @@ public class ScheduleTools {
         }
     }
 
+    /**
+     * 查找联系人ID按名称。
+     */
     private Long findContactIdByName(String name, Long customerId) {
         if (StrUtil.isBlank(name) || customerId == null) {
             return null;
@@ -221,10 +230,16 @@ public class ScheduleTools {
         return null;
     }
 
+    /**
+     * 判断是否存在文本值。
+     */
     private boolean hasTextValue(String value) {
         return StrUtil.isNotBlank(value) && !"null".equalsIgnoreCase(StrUtil.trim(value));
     }
 
+    /**
+     * 获取类型名称。
+     */
     private String getTypeName(String type) {
         if (type == null) {
             return "会议";

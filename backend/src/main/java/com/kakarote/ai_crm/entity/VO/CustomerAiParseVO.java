@@ -24,6 +24,9 @@ public class CustomerAiParseVO {
     @Schema(description = "客户来源")
     private String source;
 
+    @Schema(description = "网站")
+    private String website;
+
     @Schema(description = "备注信息")
     private String remark;
 

@@ -233,6 +233,46 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
     }
 
     @Override
+    public List<CustomFieldVO> getListFieldsByEntity(String entityType) {
+        return getEnabledFieldsByEntity(entityType).stream()
+                .filter(field -> Boolean.TRUE.equals(field.getIsShowInList()))
+                .toList();
+    }
+
+    @Override
+    public List<CustomFieldVO> getFormFieldsByEntity(String entityType) {
+        return getEnabledFieldsByEntity(entityType);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void initializeSystemFields(String entityType) {
+        String normalizedEntity = StrUtil.trimToEmpty(entityType).toLowerCase(Locale.ROOT);
+        if (!"product".equals(normalizedEntity)) {
+            return;
+        }
+        List<CustomField> fields = list(new LambdaQueryWrapper<CustomField>()
+                .eq(CustomField::getEntityType, normalizedEntity)
+                .eq(CustomField::getFieldName, "unit"));
+        if (fields.isEmpty()) {
+            return;
+        }
+        String unitOptions = JSON.toJSONString(List.of(
+                option("piece", "Piece"),
+                option("set", "Set"),
+                option("box", "Box")
+        ));
+        for (CustomField field : fields) {
+            field.setFieldType("select");
+            field.setColumnType("VARCHAR(50)");
+            field.setPlaceholder("Select unit");
+            field.setOptions(unitOptions);
+            updateById(field);
+        }
+        evictOptionsCache();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateSortOrder(List<FieldSortBO> sortList) {
         if (sortList == null || sortList.isEmpty()) {
@@ -326,6 +366,31 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             return;
         }
 
+        baseMapper.updateCustomFieldValues(tableName, idColumn, entityId, columnValues);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateCustomFieldValue(String entityType, Long entityId, String fieldName, Object value) {
+        if (entityId == null || StrUtil.isBlank(fieldName)) {
+            return;
+        }
+
+        CustomFieldVO field = getEnabledFieldsByEntity(entityType).stream()
+                .filter(item -> fieldName.equals(item.getFieldName()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Custom field not found"));
+
+        String tableName = dynamicSchemaService.getTableName(entityType);
+        String idColumn = dynamicSchemaService.getIdColumnName(entityType);
+        if (StrUtil.isBlank(field.getColumnName()) || !dynamicSchemaService.columnExists(tableName, field.getColumnName())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Custom field column not found");
+        }
+
+        Object jdbcValue = "".equals(value) ? null : convertValueForJdbc(field.getFieldType(), value, fieldName);
+        validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, jdbcValue);
+        Map<String, Object> columnValues = new HashMap<>();
+        columnValues.put(field.getColumnName(), jdbcValue);
         baseMapper.updateCustomFieldValues(tableName, idColumn, entityId, columnValues);
     }
 

@@ -37,14 +37,19 @@ public class CustomerAddBO {
     @Schema(description = "网站")
     private String website;
 
-    @Schema(description = "Logo")
+    @Schema(description = "公司 Logo")
     private String logo;
 
     @Schema(description = "预计成交金额")
     private BigDecimal quotation;
 
+    private String nextFollowTime;
+
     @Schema(description = "备注")
     private String remark;
+
+    @Schema(description = "新增时保存的 AI 分析快照(JSON)")
+    private String aiParseSnapshot;
 
     @Schema(description = "标签列表")
     private List<String> tags;

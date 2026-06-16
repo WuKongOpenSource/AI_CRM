@@ -19,6 +19,9 @@ public enum CustomerLevelEnum {
         this.name = name;
     }
 
+    /**
+     * 处理fromCode方法逻辑。
+     */
     public static CustomerLevelEnum fromCode(String code) {
         for (CustomerLevelEnum level : values()) {
             if (level.getCode().equals(code)) {
@@ -28,6 +31,9 @@ public enum CustomerLevelEnum {
         return null;
     }
 
+    /**
+     * 获取名称按验证码。
+     */
     public static String getNameByCode(String code) {
         CustomerLevelEnum level = fromCode(code);
         return level != null ? level.getName() : code;

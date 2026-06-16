@@ -50,4 +50,6 @@ public interface IProductService extends IService<Product> {
     ProductImportPreviewVO importPreview(MultipartFile file);
 
     ProductImportResultVO confirmImport(List<ProductImportBO> rows);
+
+    void refreshProductSearchIndex(Long productId);
 }

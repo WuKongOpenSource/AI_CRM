@@ -19,6 +19,9 @@ import java.util.List;
 public class ChatAttachmentServiceImpl extends ServiceImpl<ChatAttachmentMapper, ChatAttachment>
         implements IChatAttachmentService {
 
+    /**
+     * 保存批量附件。
+     */
     @Override
     public void saveBatchAttachments(Long messageId, List<ChatSendBO.AttachmentDTO> attachments) {
         if (attachments == null || attachments.isEmpty()) {
@@ -37,6 +40,9 @@ public class ChatAttachmentServiceImpl extends ServiceImpl<ChatAttachmentMapper,
         saveBatch(entities);
     }
 
+    /**
+     * 获取按消息ID。
+     */
     @Override
     public List<ChatAttachment> getByMessageIds(List<Long> messageIds) {
         if (messageIds == null || messageIds.isEmpty()) {

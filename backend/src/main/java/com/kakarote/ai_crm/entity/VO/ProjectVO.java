@@ -2,15 +2,18 @@ package com.kakarote.ai_crm.entity.VO;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
+@Schema(description = "项目详情")
 public class ProjectVO {
-
     @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
     private String name;
@@ -28,9 +31,6 @@ public class ProjectVO {
     private Date updateTime;
     private Integer taskCount;
     private Integer incompleteTaskCount;
-    private List<String> currentUserPermissions = new ArrayList<>();
-    private String currentUserRole;
-    private Boolean systemAdmin = false;
     private List<ProjectLaneVO> lanes = new ArrayList<>();
     private List<ProjectTaskVO> tasks = new ArrayList<>();
     private List<ProjectAttachmentVO> attachments = new ArrayList<>();
@@ -38,6 +38,9 @@ public class ProjectVO {
     private List<ProjectChatMessageVO> chatMessages = new ArrayList<>();
     private List<ProjectMemberVO> members = new ArrayList<>();
     private List<ProjectMemberLogVO> memberLogs = new ArrayList<>();
+    private List<String> currentUserPermissions = new ArrayList<>();
+    private String currentUserRole;
+    private Boolean systemAdmin;
 
     @Data
     public static class ProjectLaneVO {
@@ -46,6 +49,7 @@ public class ProjectVO {
         private String name;
         private String code;
         private Integer sortOrder;
+        private Integer order;
         private Boolean system;
     }
 
@@ -55,15 +59,16 @@ public class ProjectVO {
         private Long taskId;
         @JsonSerialize(using = ToStringSerializer.class)
         private Long projectId;
-        @JsonSerialize(using = ToStringSerializer.class)
-        private Long laneId;
         private String title;
         private String description;
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long laneId;
         private String status;
         private Date dueDate;
         @JsonSerialize(using = ToStringSerializer.class)
         private Long ownerId;
         private String ownerName;
+        @JsonSerialize(contentUsing = ToStringSerializer.class)
         private List<Long> participantIds = new ArrayList<>();
         private List<String> participantNames = new ArrayList<>();
         private String priority;
@@ -97,6 +102,25 @@ public class ProjectVO {
     }
 
     @Data
+    public static class ProjectTaskScheduleVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long scheduleId;
+        private String title;
+        private Date scheduleTime;
+        private Date createTime;
+        private String createdByName;
+    }
+
+    @Data
+    public static class ProjectTaskNoteVO {
+        @JsonSerialize(using = ToStringSerializer.class)
+        private Long noteId;
+        private String content;
+        private Date createTime;
+        private String createdByName;
+    }
+
+    @Data
     public static class ProjectAttachmentVO {
         @JsonSerialize(using = ToStringSerializer.class)
         private Long attachmentId;
@@ -117,26 +141,16 @@ public class ProjectVO {
     }
 
     @Data
-    public static class ProjectTaskScheduleVO {
+    public static class ProjectChatMessageVO {
         @JsonSerialize(using = ToStringSerializer.class)
-        private Long scheduleId;
-        private String title;
-        private Date scheduleTime;
-        private Date createTime;
-        private String createdByName;
-    }
-
-    @Data
-    public static class ProjectTaskNoteVO {
-        @JsonSerialize(using = ToStringSerializer.class)
-        private Long noteId;
+        private Long messageId;
+        private String role;
         private String content;
         private Date createTime;
-        private String createdByName;
     }
 
     @Data
-    public static class ProjectChatMessageVO {
+    public static class ProjectTaskChatMessageVO {
         @JsonSerialize(using = ToStringSerializer.class)
         private Long messageId;
         private String role;
@@ -179,6 +193,6 @@ public class ProjectVO {
 
     @Data
     public static class ProjectRolePermissionConfigVO {
-        private java.util.Map<String, List<String>> rolePermissions = new java.util.LinkedHashMap<>();
+        private Map<String, List<String>> rolePermissions = new LinkedHashMap<>();
     }
 }

@@ -25,6 +25,9 @@ public class IndexController {
     @Autowired
     private TokenService tokenService;
 
+    /**
+     * 跳转到系统首页。
+     */
     @GetMapping(path = {"/", "/index"})
     public void index(HttpServletResponse response) throws Exception {
         String basePath = SystemUtil.get("BASE_PATH", "/");
@@ -32,7 +35,7 @@ public class IndexController {
     }
 
     /**
-     * 调用spring-security退出方法
+     * 调用 spring-security 退出方法
      */
     @PostMapping("/logout")
     @Operation(summary = "退出")

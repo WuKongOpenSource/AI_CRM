@@ -213,6 +213,7 @@ CREATE TABLE "public"."crm_custom_field" (
   "is_required" int2 DEFAULT 0,
   "is_searchable" int2 DEFAULT 0,
   "is_show_in_list" int2 DEFAULT 1,
+  "is_unique" int2 DEFAULT 0,
   "options" text COLLATE "pg_catalog"."default",
   "validation_rules" text COLLATE "pg_catalog"."default",
   "sort_order" int4 DEFAULT 0,
@@ -234,6 +235,7 @@ COMMENT ON COLUMN "public"."crm_custom_field"."placeholder" IS '输入框占位�
 COMMENT ON COLUMN "public"."crm_custom_field"."is_required" IS '是否必填: 0否 1是';
 COMMENT ON COLUMN "public"."crm_custom_field"."is_searchable" IS '是否可搜索: 0否 1是';
 COMMENT ON COLUMN "public"."crm_custom_field"."is_show_in_list" IS '是否在列表显示: 0否 1是';
+COMMENT ON COLUMN "public"."crm_custom_field"."is_unique" IS '是否唯一: 0否 1是';
 COMMENT ON COLUMN "public"."crm_custom_field"."options" IS '选项列表(JSON数组): [{"value":"v1","label":"选项1"}]';
 COMMENT ON COLUMN "public"."crm_custom_field"."validation_rules" IS '验证规则(JSON): {"min":0,"max":100,"pattern":""}';
 COMMENT ON COLUMN "public"."crm_custom_field"."sort_order" IS '排序序号';
@@ -535,7 +537,11 @@ CREATE TABLE "public"."crm_task" (
   "create_user_id" int8,
   "update_user_id" int8,
   "create_time" timestamp(6),
-  "update_time" timestamp(6)
+  "update_time" timestamp(6),
+  "value_priority_score" int4,
+  "value_priority_tier" varchar(20) COLLATE "pg_catalog"."default",
+  "value_priority_reason" text COLLATE "pg_catalog"."default",
+  "high_value" bool DEFAULT false
 )
 ;
 COMMENT ON COLUMN "public"."crm_task"."task_id" IS '任务ID';
@@ -553,6 +559,10 @@ COMMENT ON COLUMN "public"."crm_task"."create_user_id" IS '创建人ID';
 COMMENT ON COLUMN "public"."crm_task"."update_user_id" IS '修改人ID';
 COMMENT ON COLUMN "public"."crm_task"."create_time" IS '创建时间';
 COMMENT ON COLUMN "public"."crm_task"."update_time" IS '修改时间';
+COMMENT ON COLUMN "public"."crm_task"."value_priority_score" IS 'High-value priority score';
+COMMENT ON COLUMN "public"."crm_task"."value_priority_tier" IS 'High-value priority tier: HIGH/MEDIUM/LOW';
+COMMENT ON COLUMN "public"."crm_task"."value_priority_reason" IS 'Reason for the high-value priority score';
+COMMENT ON COLUMN "public"."crm_task"."high_value" IS 'Whether the task is in the high-value bucket';
 COMMENT ON TABLE "public"."crm_task" IS '任务表';
 
 -- ----------------------------

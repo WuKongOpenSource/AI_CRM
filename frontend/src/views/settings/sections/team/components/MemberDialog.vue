@@ -179,6 +179,7 @@ const dialogVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit('update:visible', value)
 })
+
 </script>
 
 <style>

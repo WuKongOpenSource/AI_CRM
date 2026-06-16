@@ -69,6 +69,23 @@ public interface ICustomFieldService extends IService<CustomField> {
     List<CustomFieldVO> getEnabledFieldsByEntity(String entityType);
 
     /**
+     * 获取列表字段按Entity。
+     */
+    List<CustomFieldVO> getListFieldsByEntity(String entityType);
+
+    /**
+     * 获取表单字段按Entity。
+     */
+    List<CustomFieldVO> getFormFieldsByEntity(String entityType);
+
+    /**
+     * Ensure system field metadata exists for the local installation.
+     *
+     * @param entityType entity type
+     */
+    void initializeSystemFields(String entityType);
+
+    /**
      * 调整字段排序
      *
      * @param sortList 排序列表
@@ -93,13 +110,34 @@ public interface ICustomFieldService extends IService<CustomField> {
      */
     void updateCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
 
+    /**
+     * Validate unique field values before saving a record.
+     *
+     * @param entityType entity type
+     * @param entityId   current entity ID, excluded from duplicate checks when not null
+     * @param values     system and custom field values
+     */
     void validateUniqueCustomFieldValues(String entityType, Long entityId, Map<String, Object> values);
 
+    /**
+     * Validate a single unique field value.
+     *
+     * @param entityType entity type
+     * @param entityId   current entity ID, excluded from duplicate checks when not null
+     * @param fieldName  field name
+     * @param value      field value
+     */
     void validateUniqueFieldValue(String entityType, Long entityId, String fieldName, Object value);
 
-    List<FieldOption> getFieldOptions(String entityType, String fieldName);
-
-    String resolveOptionLabel(String entityType, String fieldName, String value);
+    /**
+     * Update one custom field value. Unlike batch update, this method supports clearing a value.
+     *
+     * @param entityType entity type
+     * @param entityId   entity ID
+     * @param fieldName  custom field name
+     * @param value      custom field value
+     */
+    void updateCustomFieldValue(String entityType, Long entityId, String fieldName, Object value);
 
     /**
      * 批量获取实体的自定义字段值
@@ -109,4 +147,24 @@ public interface ICustomFieldService extends IService<CustomField> {
      * @return entityId -> (fieldName -> value)
      */
     Map<Long, Map<String, Object>> getBatchCustomFieldValues(String entityType, List<Long> entityIds);
+
+    /**
+     * 获取某个字段当前系统的选项列表（单一真相源：crm_custom_field.options，带缓存）。
+     * 无数据时回退到系统内置定义。
+     *
+     * @param entityType 实体类型
+     * @param fieldName  字段标识（如 stage / level / relationType）
+     * @return 选项列表，永不为 null
+     */
+    List<FieldOption> getFieldOptions(String entityType, String fieldName);
+
+    /**
+     * 把某个选项字段的"值"解析为"显示标签"。找不到时原样返回该值。
+     *
+     * @param entityType 实体类型
+     * @param fieldName  字段标识
+     * @param value      选项值
+     * @return 显示标签
+     */
+    String resolveOptionLabel(String entityType, String fieldName, String value);
 }

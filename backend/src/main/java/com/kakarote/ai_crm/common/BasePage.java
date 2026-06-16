@@ -67,6 +67,9 @@ public class BasePage<T> implements IPage<T>, Serializable {
     private Object extraData;
 
 
+    /**
+     * 初始化基础分页实例。
+     */
     public BasePage() {
 
     }
@@ -81,6 +84,9 @@ public class BasePage<T> implements IPage<T>, Serializable {
         this(current, size, 0);
     }
 
+    /**
+     * 初始化基础分页实例。
+     */
     public BasePage(long current, long size, long total) {
         if (current > 1) {
             this.pageNumber = current;
@@ -90,12 +96,18 @@ public class BasePage<T> implements IPage<T>, Serializable {
     }
 
 
+    /**
+     * 获取Records。
+     */
     @Override
     @JsonIgnore
     public List<T> getRecords() {
         return this.list;
     }
 
+    /**
+     * 获取Total分页。
+     */
     public long getTotalPage() {
         if (getSize() == 0) {
             return 0L;
@@ -108,58 +120,91 @@ public class BasePage<T> implements IPage<T>, Serializable {
     }
 
 
+    /**
+     * 判断是否首个分页。
+     */
     public boolean isFirstPage() {
         return this.pageNumber == 1L;
     }
 
+    /**
+     * 判断是否Last分页。
+     */
     public boolean isLastPage() {
         return getTotal() == 0 || this.pageNumber == getTotalPage();
     }
 
+    /**
+     * 设置分页Number。
+     */
     public void setPageNumber(long pageNumber) {
         this.pageNumber = pageNumber;
     }
 
+    /**
+     * 设置列表。
+     */
     public void setList(List<T> list) {
         this.list = list;
     }
 
+    /**
+     * 设置Records。
+     */
     @Override
     public BasePage<T> setRecords(List<T> records) {
         this.list = records;
         return this;
     }
 
+    /**
+     * 获取Total。
+     */
     @Override
     @JsonIgnore
     public long getTotal() {
         return this.totalRow;
     }
 
+    /**
+     * 设置Total。
+     */
     @Override
     public BasePage<T> setTotal(long total) {
         this.totalRow = total;
         return this;
     }
 
+    /**
+     * 获取Size。
+     */
     @Override
     @JsonIgnore
     public long getSize() {
         return this.pageSize;
     }
 
+    /**
+     * 设置Size。
+     */
     @Override
     public BasePage<T> setSize(long size) {
         this.pageSize = size;
         return this;
     }
 
+    /**
+     * 获取当前。
+     */
     @Override
     @JsonIgnore
     public long getCurrent() {
         return this.pageNumber;
     }
 
+    /**
+     * 设置当前。
+     */
     @Override
     public BasePage<T> setCurrent(long current) {
         this.pageNumber = current;
@@ -178,50 +223,77 @@ public class BasePage<T> implements IPage<T>, Serializable {
         return this;
     }
 
+    /**
+     * 处理orders方法逻辑。
+     */
     @Override
     public List<OrderItem> orders() {
         return orders;
     }
 
+    /**
+     * 搜索Count。
+     */
     @Override
     @JsonIgnore
     public boolean searchCount() {
         return searchCount;
     }
 
+    /**
+     * 设置搜索Count。
+     */
     public BasePage<T> setSearchCount(boolean searchCount) {
         this.searchCount = searchCount;
         return this;
     }
 
+    /**
+     * 处理optimizeCountSql方法逻辑。
+     */
     @Override
     @JsonIgnore
     public boolean optimizeCountSql() {
         return optimizeCountSql;
     }
 
+    /**
+     * 设置OptimizeCountSQL。
+     */
     public BasePage<T> setOptimizeCountSql(boolean optimizeCountSql) {
         this.optimizeCountSql = optimizeCountSql;
         return this;
     }
 
+    /**
+     * 处理optimizeJoinOfCountSql方法逻辑。
+     */
     @Override
     @JsonIgnore
     public boolean optimizeJoinOfCountSql() {
         return optimizeJoinOfCountSql;
     }
 
+    /**
+     * 设置OptimizeJoinOFCountSQL。
+     */
     public BasePage<T> setOptimizeJoinOfCountSql(boolean optimizeJoinOfCountSql) {
         this.optimizeJoinOfCountSql = optimizeJoinOfCountSql;
         return this;
     }
 
+    /**
+     * 处理countId方法逻辑。
+     */
     @Override
     @JsonIgnore
     public String countId() {
         return countId;
     }
 
+    /**
+     * 设置CountID。
+     */
     public BasePage<T> setCountId(String countId) {
         this.countId = countId;
         return this;
@@ -252,6 +324,9 @@ public class BasePage<T> implements IPage<T>, Serializable {
         return basePage;
     }
 
+    /**
+     * 获取Pages。
+     */
     @Override
     @JsonIgnore
     public long getPages() {

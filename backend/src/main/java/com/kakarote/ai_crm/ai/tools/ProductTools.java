@@ -10,6 +10,7 @@ import com.kakarote.ai_crm.entity.BO.ProductStatusUpdateBO;
 import com.kakarote.ai_crm.entity.BO.ProductUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Product;
 import com.kakarote.ai_crm.entity.VO.ProductVO;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.IProductCategoryService;
 import com.kakarote.ai_crm.service.IProductService;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -32,12 +33,15 @@ public class ProductTools {
     @Autowired
     private IProductCategoryService productCategoryService;
 
+    @Autowired
+    private ICustomFieldService customFieldService;
+
     @Tool(description = "查询产品资料库。可按关键词、产品编码、状态查询当前用户有权限查看的产品。")
     @AiToolPermission(value = "product:view", action = "查询产品")
     public String queryProducts(
             @ToolParam(description = "关键词，可匹配产品名称、编码、类型、单位、描述", required = false) String keyword,
             @ToolParam(description = "产品编码，精确或关键词查询均可", required = false) String productCode,
-            @ToolParam(description = "状态：enabled/disabled/active/inactive，留空查全部", required = false) String status) {
+            @ToolParam(description = "状态：enabled/disabled，留空查全部", required = false) String status) {
         try {
             ProductQueryBO queryBO = new ProductQueryBO();
             queryBO.setKeyword(firstNonBlank(productCode, keyword));
@@ -49,11 +53,11 @@ public class ProductTools {
             if (records == null || records.isEmpty()) {
                 return "未找到匹配的产品。";
             }
-            StringBuilder builder = new StringBuilder("找到 ").append(page.getTotal())
-                .append(" 个匹配产品，前 ").append(records.size()).append(" 个如下：\n");
+            StringBuilder builder = new StringBuilder("找到 ").append(page.getTotal()).append(" 个匹配产品，前 ")
+                    .append(records.size()).append(" 个如下：\n");
             for (ProductVO product : records) {
                 builder.append("- productId=").append(product.getProductId())
-                    .append(", 名称=").append(StrUtil.blankToDefault(product.getProductName(), "未命名产品"));
+                        .append(", 名称=").append(StrUtil.blankToDefault(product.getProductName(), "未命名产品"));
                 appendInline(builder, "编码", product.getProductCode());
                 appendInline(builder, "类目", product.getCategoryPath());
                 appendInline(builder, "类型", productTypeLabel(product.getProductType()));
@@ -65,17 +69,17 @@ public class ProductTools {
             }
             return builder.toString();
         } catch (Exception exception) {
-            log.error("Product tool queryProducts failed: {}", exception.getMessage(), exception);
+            log.error("[Tool调用] queryProducts failed: {}", exception.getMessage(), exception);
             return "查询产品失败: " + exception.getMessage();
         }
     }
 
-    @Tool(description = "新增产品。默认创建为启用状态；没有提供类目时归入默认类目。")
+    @Tool(description = "新增产品。默认创建为启用状态；没有提供类目时归入未分类。")
     @AiToolPermission(value = "product:create", action = "新增产品")
     public String createProduct(
             @ToolParam(description = "产品名称，必填") String productName,
-            @ToolParam(description = "产品编码；是否必填由系统产品设置控制", required = false) String productCode,
-            @ToolParam(description = "类目路径，例如 硬件/终端/平板；留空归入默认类目", required = false) String categoryPath,
+            @ToolParam(description = "产品编码；是否必填由产品设置控制", required = false) String productCode,
+            @ToolParam(description = "类目路径，例如 硬件/终端/平板；留空归入未分类", required = false) String categoryPath,
             @ToolParam(description = "产品类型", required = false) String productType,
             @ToolParam(description = "单位", required = false) String unit,
             @ToolParam(description = "标准价", required = false) String standardPrice,
@@ -96,19 +100,20 @@ public class ProductTools {
             bo.setDescription(trimToNull(description));
             bo.setOwnerId(UserUtil.getUserIdOrNull());
             Long productId = productService.addProduct(bo);
-            return "产品新增成功。\n" + formatProduct(productService.getVisibleProduct(productId));
+            Product product = productService.getVisibleProduct(productId);
+            return "产品新增成功。\n" + formatProduct(product);
         } catch (Exception exception) {
-            log.error("Product tool createProduct failed: {}", exception.getMessage(), exception);
+            log.error("[Tool调用] createProduct failed: {}", exception.getMessage(), exception);
             return "新增产品失败: " + exception.getMessage();
         }
     }
 
-    @Tool(description = "更新产品资料。productIdOrCode 可传产品ID或产品编码；留空时默认更新当前产品会话绑定的产品。")
+    @Tool(description = "更新产品资料。productIdOrCode 可传产品ID或产品编码；留空时默认更新当前产品会话绑定的产品。空编码产品不能按编码更新。")
     @AiToolPermission(value = "product:edit", action = "更新产品")
     public String updateProduct(
             @ToolParam(description = "产品ID或产品编码；留空默认当前产品", required = false) String productIdOrCode,
             @ToolParam(description = "产品名称", required = false) String productName,
-            @ToolParam(description = "产品编码", required = false) String productCode,
+            @ToolParam(description = "产品编码；传空不修改", required = false) String productCode,
             @ToolParam(description = "类目路径，例如 硬件/终端/平板", required = false) String categoryPath,
             @ToolParam(description = "产品类型", required = false) String productType,
             @ToolParam(description = "单位", required = false) String unit,
@@ -133,9 +138,10 @@ public class ProductTools {
             bo.setCostPrice(parseMoney(costPrice, "成本价"));
             bo.setDescription(trimToNull(description));
             productService.updateProduct(bo);
-            return "产品更新成功。\n" + formatProduct(productService.getVisibleProduct(product.getProductId()));
+            Product updated = productService.getVisibleProduct(product.getProductId());
+            return "产品更新成功。\n" + formatProduct(updated);
         } catch (Exception exception) {
-            log.error("Product tool updateProduct failed: {}", exception.getMessage(), exception);
+            log.error("[Tool调用] updateProduct failed: {}", exception.getMessage(), exception);
             return "更新产品失败: " + exception.getMessage();
         }
     }
@@ -155,7 +161,7 @@ public class ProductTools {
             productService.updateStatus(bo);
             return "产品已停用。\n" + formatProduct(productService.getVisibleProduct(product.getProductId()));
         } catch (Exception exception) {
-            log.error("Product tool deactivateProduct failed: {}", exception.getMessage(), exception);
+            log.error("[Tool调用] deactivateProduct failed: {}", exception.getMessage(), exception);
             return "停用产品失败: " + exception.getMessage();
         }
     }
@@ -169,7 +175,8 @@ public class ProductTools {
         try {
             return productService.getVisibleProduct(Long.parseLong(key));
         } catch (NumberFormatException ignored) {
-            return productService.findVisibleProductByCode(key);
+            Product product = productService.findVisibleProductByCode(key);
+            return product == null ? null : productService.getVisibleProduct(product.getProductId());
         }
     }
 
@@ -215,8 +222,8 @@ public class ProductTools {
             return "";
         }
         StringBuilder builder = new StringBuilder()
-            .append("- productId: ").append(product.getProductId()).append("\n")
-            .append("- 产品名称: ").append(StrUtil.blankToDefault(product.getProductName(), "未命名产品")).append("\n");
+                .append("- productId: ").append(product.getProductId()).append("\n")
+                .append("- 产品名称: ").append(StrUtil.blankToDefault(product.getProductName(), "未命名产品")).append("\n");
         appendLine(builder, "产品编码", product.getProductCode());
         appendLine(builder, "产品类型", productTypeLabel(product.getProductType()));
         appendLine(builder, "单位", product.getUnit());
@@ -232,18 +239,33 @@ public class ProductTools {
         if (text == null) {
             return null;
         }
-        return switch (text.toLowerCase()) {
-            case "goods" -> "商品";
-            case "service" -> "服务";
-            case "subscription" -> "订阅";
-            default -> text;
-        };
+        String label = customFieldService.resolveOptionLabel("product", "productType", text);
+        if (!StrUtil.equals(label, text)) {
+            return label;
+        }
+        if ("goods".equalsIgnoreCase(text)) {
+            return "商品";
+        }
+        if ("service".equalsIgnoreCase(text)) {
+            return "服务";
+        }
+        if ("subscription".equalsIgnoreCase(text)) {
+            return "订阅";
+        }
+        if ("other".equalsIgnoreCase(text)) {
+            return "其他";
+        }
+        return text;
     }
 
     private String productStatusLabel(String value) {
         String text = trimToNull(value);
         if (text == null) {
             return null;
+        }
+        String label = customFieldService.resolveOptionLabel("product", "status", text);
+        if (!StrUtil.equals(label, text)) {
+            return label;
         }
         if ("active".equalsIgnoreCase(text)) {
             return "启用";

@@ -20,6 +20,9 @@ public class AiToolPermissionAspect {
     @Autowired
     private PermissionService permissionService;
 
+    /**
+     * 检查权限。
+     */
     @Around("@annotation(com.kakarote.ai_crm.ai.tools.support.AiToolPermission)")
     public Object checkPermission(ProceedingJoinPoint joinPoint) throws Throwable {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();

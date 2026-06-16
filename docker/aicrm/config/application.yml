@@ -25,12 +25,16 @@ spring:
       max-file-size: 100MB
       max-request-size: 100MB
   ai:
+    model:
+      audio:
+        speech: none
+        transcription: none
     openai:
-      api-key: ${OPENAI_API_KEY:sk-111111}
-      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/}
+      api-key: ${DASHSCOPE_API_KEY:${OPENAI_API_KEY:}}
+      base-url: ${OPENAI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
       chat:
         options:
-          model: qwen-max
+          model: qwen3.5-plus
           temperature: 0.7
           max-tokens: 2048
 logging:
@@ -43,12 +47,34 @@ token:
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期（默认30分钟）
   expireTime: 10080
+  # 是否允许同一账号多端同时登录
+  multi-login-enabled: false
 knife4j:
   enable: true
 
 # 文件上传配置
 file:
   upload-path: ./uploads
+
+mail:
+  integration:
+    encryption-key: ${MAIL_CREDENTIAL_ENCRYPTION_KEY:}
+
+external-auth:
+  proxy:
+    enabled: ${EXTERNAL_AUTH_PROXY_ENABLED:false}
+    url: ${EXTERNAL_AUTH_PROXY_URL:}
+  google:
+    enabled: ${EXTERNAL_AUTH_GOOGLE_ENABLED:false}
+    client-id: ${EXTERNAL_AUTH_GOOGLE_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${EXTERNAL_AUTH_GOOGLE_REDIRECT_URI:}
+  outlook:
+    enabled: ${EXTERNAL_AUTH_OUTLOOK_ENABLED:false}
+    client-id: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_SECRET:}
+    tenant: ${EXTERNAL_AUTH_OUTLOOK_TENANT:common}
+    redirect-uri: ${EXTERNAL_AUTH_OUTLOOK_REDIRECT_URI:}
 
 # MinIO 对象存储配置 (S3 兼容，同时支持 RustFS)
 minio:
@@ -86,6 +112,39 @@ oidc:
   # Session Cookie 名称
   session-cookie: CRM_SESSION
 
+token-purchase:
+  enabled: ${TOKEN_PURCHASE_ENABLED:true}
+  order-expire-minutes: ${TOKEN_PURCHASE_ORDER_EXPIRE_MINUTES:30}
+  plans:
+    - id: starter-100w
+      name: 1,000,000 积分加油包
+      description: 1,000,000 积分
+      credit-amount: 1000000
+      price-fen: 6000
+      sort: 1
+      enabled: true
+  wechat:
+    enabled: ${TOKEN_PURCHASE_WECHAT_ENABLED:false}
+    gateway: ${TOKEN_PURCHASE_WECHAT_GATEWAY:https://api.mch.weixin.qq.com}
+    app-id: ${TOKEN_PURCHASE_WECHAT_APP_ID:}
+    merchant-id: ${TOKEN_PURCHASE_WECHAT_MERCHANT_ID:1607069185}
+    merchant-serial-no: ${TOKEN_PURCHASE_WECHAT_MERCHANT_SERIAL_NO:770eda7aa17cc5c21c9cc7e9c852ef5ca4f785d9}
+    # 商户私钥支持直接填写 PEM 内容，或通过 *_PATH 指向文件；默认目录为当前路径下 src/main/resources/cert
+    key-path: ${TOKEN_PURCHASE_WECHAT_KEY_PATH:src/main/resources/cert}
+    private-key: ${TOKEN_PURCHASE_WECHAT_PRIVATE_KEY:}
+    private-key-path: ${TOKEN_PURCHASE_WECHAT_PRIVATE_KEY_PATH:apiclient_key.pem}
+    api-v3-key: ${TOKEN_PURCHASE_WECHAT_API_V3_KEY:}
+    notify-url: ${TOKEN_PURCHASE_WECHAT_NOTIFY_URL:}
+  alipay:
+    enabled: ${TOKEN_PURCHASE_ALIPAY_ENABLED:false}
+    gateway: ${TOKEN_PURCHASE_ALIPAY_GATEWAY:https://openapi.alipay.com/gateway.do}
+    app-id: ${TOKEN_PURCHASE_ALIPAY_APP_ID:}
+    private-key: ${TOKEN_PURCHASE_ALIPAY_PRIVATE_KEY:}
+    alipay-public-key: ${TOKEN_PURCHASE_ALIPAY_PUBLIC_KEY:}
+    seller-id: ${TOKEN_PURCHASE_ALIPAY_SELLER_ID:}
+    qrcode-width: ${TOKEN_PURCHASE_ALIPAY_QRCODE_WIDTH:200}
+    notify-url: ${TOKEN_PURCHASE_ALIPAY_NOTIFY_URL:}
+
 # WeKnora 知识库服务配置
 weknora:
   # 是否启用 WeKnora 集成（设为 false 可禁用，仅使用本地存储）
@@ -94,6 +153,20 @@ weknora:
   base-url: http://frontend/api/v1
   # WeKnora API Key（从 WeKnora 管理界面获取）
   api-key: sk-NgkVLxONp7oNgyG3lm-EBGSLdDlGBCgJrEUW4ncowLRNlaLc
+  init-models:
+    chat:
+      name: qwen3.5-plus
+      source: remote
+      provider: aliyun
+      api-key: ${DASHSCOPE_API_KEY:sk-111111}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    embedding:
+      name: text-embedding-v3
+      source: remote
+      provider: aliyun
+      api-key: ${DASHSCOPE_API_KEY:sk-111111}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      dimension: 1024
   # 默认知识库 ID（CRM 文档将上传到此知识库）
   knowledge-base-id: 398435ff-1a23-49ab-8571-91fa89f0f8e3
   # 搜索配置

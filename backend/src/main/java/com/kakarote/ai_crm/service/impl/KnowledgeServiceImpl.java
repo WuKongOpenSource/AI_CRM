@@ -178,6 +178,31 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId, String summary) {
+        return uploadFile(file, type, customerId, employeeId, null, summary);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId, Long relationId, String summary) {
+        Long knowledgeId = uploadFile(file, type, customerId, summary);
+        Knowledge knowledge = getById(knowledgeId);
+        if (knowledge != null) {
+            knowledge.setEmployeeId(employeeId);
+            knowledge.setRelationId(relationId);
+            updateById(knowledge);
+        }
+        return knowledgeId;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long archiveExistingFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary) {
+        return archiveExistingStandaloneFile(fileName, filePath, fileSize, mimeType, customerId, summary);
+    }
+
+    @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public Long archiveExistingStandaloneFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary) {
         if (customerId != null) {
@@ -216,6 +241,54 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName);
         }
 
+        return knowledge.getKnowledgeId();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long archiveExistingEmployeeFile(String fileName, String filePath, Long fileSize, String mimeType, Long employeeId, String summary) {
+        Long knowledgeId = archiveExistingStandaloneFile(fileName, filePath, fileSize, mimeType, null, summary);
+        Knowledge knowledge = getById(knowledgeId);
+        if (knowledge != null) {
+            knowledge.setEmployeeId(employeeId);
+            updateById(knowledge);
+        }
+        return knowledgeId;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long archiveExistingRelationFile(String fileName, String filePath, Long fileSize, String mimeType, Long relationId, String summary) {
+        Long knowledgeId = archiveExistingStandaloneFile(fileName, filePath, fileSize, mimeType, null, summary);
+        Knowledge knowledge = getById(knowledgeId);
+        if (knowledge != null) {
+            knowledge.setRelationId(relationId);
+            updateById(knowledge);
+        }
+        return knowledgeId;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long archiveText(String fileName, String contentText, String type, Long customerId, String summary) {
+        if (customerId != null) {
+            Customer customer = customerMapper.selectById(customerId);
+            if (ObjectUtil.isNull(customer)) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+            }
+        }
+        Knowledge knowledge = new Knowledge();
+        knowledge.setName(StrUtil.blankToDefault(StrUtil.trim(fileName), "knowledge-text.txt"));
+        knowledge.setType(StrUtil.blankToDefault(StrUtil.trim(type), "document"));
+        knowledge.setCustomerId(customerId);
+        knowledge.setFileSize(contentText == null ? 0L : (long) contentText.getBytes(StandardCharsets.UTF_8).length);
+        knowledge.setMimeType("text/plain");
+        knowledge.setSummary(summary);
+        knowledge.setContentText(contentText);
+        knowledge.setStatus(1);
+        knowledge.setWeKnoraParseStatus("unsupported");
+        knowledge.setUploadUserId(UserUtil.getUserId());
+        save(knowledge);
         return knowledge.getKnowledgeId();
     }
 
@@ -835,14 +908,18 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     }
 
     private String normalizeSearchableContent(String text) {
-        if (StrUtil.isBlank(text)) {
-            return "";
+        if (text == null) {
+            return null;
         }
-        return text.replaceAll("\\s+", " ").trim();
+        String normalized = text
+                .replaceAll("[\\p{Cntrl}&&[^\r\n\t]]", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return StrUtil.isBlank(normalized) ? null : normalized;
     }
 
     private String abbreviate(String text, int maxLength) {
-        String normalized = normalizeSearchableContent(text);
+        String normalized = StrUtil.blankToDefault(normalizeSearchableContent(text), "");
         if (normalized.length() <= maxLength) {
             return normalized;
         }
@@ -1230,14 +1307,14 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         """;
 
     @Override
-    public KnowledgeAiAnalyzeVO aiAnalyzeDocument(Long knowledgeId) {
+    public KnowledgeAiAnalyzeVO aiAnalyzeDocument(Long knowledgeId, boolean forceRefresh) {
         Knowledge knowledge = getById(knowledgeId);
         if (ObjectUtil.isNull(knowledge)) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识库文件不存在");
         }
 
         KnowledgeAiAnalyzeVO cachedResult = readCachedAnalyzeResult(knowledge);
-        if (cachedResult != null) {
+        if (!forceRefresh && cachedResult != null) {
             persistKnowledgeSummaryIfNeeded(knowledge, cachedResult.getCoreHighlights());
             return cachedResult;
         }

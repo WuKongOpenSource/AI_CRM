@@ -3,7 +3,7 @@ package com.kakarote.ai_crm.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
@@ -15,6 +15,8 @@ import com.kakarote.ai_crm.entity.VO.ProductCategoryVO;
 import com.kakarote.ai_crm.mapper.ProductCategoryMapper;
 import com.kakarote.ai_crm.mapper.ProductMapper;
 import com.kakarote.ai_crm.service.IProductCategoryService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,35 +27,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Service
 public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMapper, ProductCategory>
         implements IProductCategoryService {
 
-    private static final String DEFAULT_CATEGORY_NAME = "未分类";
+    public static final String DEFAULT_CATEGORY_NAME = "未分类";
     private static final int MAX_LEVEL = 3;
 
-    private final ProductCategoryMapper productCategoryMapper;
-    private final ProductMapper productMapper;
-
-    public ProductCategoryServiceImpl(ProductCategoryMapper productCategoryMapper,
-                                      ProductMapper productMapper) {
-        this.productCategoryMapper = productCategoryMapper;
-        this.productMapper = productMapper;
-    }
+    @Autowired
+    private ProductMapper productMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long ensureDefaultCategoryId() {
-        ProductCategory existing = productCategoryMapper.selectOne(Wrappers.<ProductCategory>lambdaQuery()
+        ProductCategory existing = getOne(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getParentId, 0L)
                 .eq(ProductCategory::getCategoryName, DEFAULT_CATEGORY_NAME)
                 .eq(ProductCategory::getDelFlag, 0)
-                .last("LIMIT 1"));
+                .last("LIMIT 1"), false);
         if (existing != null) {
             return existing.getCategoryId();
         }
 
         ProductCategory category = new ProductCategory();
+        category.setCategoryId(IdWorker.getId());
         category.setParentId(0L);
         category.setCategoryName(DEFAULT_CATEGORY_NAME);
         category.setCategoryPath(DEFAULT_CATEGORY_NAME);
@@ -61,7 +59,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         category.setSortOrder(0);
         category.setStatus(1);
         category.setDelFlag(0);
-        productCategoryMapper.insert(category);
+        save(category);
         return category.getCategoryId();
     }
 
@@ -70,19 +68,21 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     public Long addCategory(ProductCategoryAddBO bo) {
         String name = normalizeName(bo.getCategoryName());
         Long parentId = bo.getParentId() == null ? 0L : bo.getParentId();
+        ProductCategory parent = null;
         int level = 1;
         String path = name;
         if (parentId > 0) {
-            ProductCategory parent = getActiveCategory(parentId);
+            parent = getActiveCategory(parentId);
             level = parent.getLevel() + 1;
             if (level > MAX_LEVEL) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product category supports at most 3 levels");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品类目最多支持三级");
             }
             path = parent.getCategoryPath() + "/" + name;
         }
         assertCategoryNameUnique(parentId, name, null);
 
         ProductCategory category = new ProductCategory();
+        category.setCategoryId(IdWorker.getId());
         category.setParentId(parentId);
         category.setCategoryName(name);
         category.setCategoryPath(path);
@@ -90,7 +90,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         category.setSortOrder(bo.getSortOrder() == null ? nextSortOrder(parentId) : bo.getSortOrder());
         category.setStatus(1);
         category.setDelFlag(0);
-        productCategoryMapper.insert(category);
+        save(category);
         return category.getCategoryId();
     }
 
@@ -103,7 +103,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         category.setCategoryName(name);
         category.setSortOrder(bo.getSortOrder() == null ? category.getSortOrder() : bo.getSortOrder());
         category.setCategoryPath(buildCategoryPath(category.getParentId(), name));
-        productCategoryMapper.updateById(category);
+        updateById(category);
         refreshChildrenPath(category);
     }
 
@@ -113,14 +113,14 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         ProductCategory category = getActiveCategory(bo.getCategoryId());
         Long parentId = bo.getParentId() == null ? 0L : bo.getParentId();
         if (Objects.equals(category.getCategoryId(), parentId)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Cannot move category under itself");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不能移动到自身下级");
         }
         int level = 1;
         if (parentId > 0) {
             ProductCategory parent = getActiveCategory(parentId);
             level = parent.getLevel() + 1;
             if (level > MAX_LEVEL || maxChildDepth(category.getCategoryId()) + level - 1 > MAX_LEVEL) {
-                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product category supports at most 3 levels");
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品类目最多支持三级");
             }
         }
         assertCategoryNameUnique(parentId, category.getCategoryName(), category.getCategoryId());
@@ -128,7 +128,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         category.setLevel(level);
         category.setSortOrder(bo.getSortOrder() == null ? category.getSortOrder() : bo.getSortOrder());
         category.setCategoryPath(buildCategoryPath(parentId, category.getCategoryName()));
-        productCategoryMapper.updateById(category);
+        updateById(category);
         refreshChildrenPath(category);
     }
 
@@ -137,26 +137,26 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     public void deleteCategory(Long categoryId) {
         ProductCategory category = getActiveCategory(categoryId);
         if (isDefaultCategory(category)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Default category cannot be deleted");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "默认类目不能删除");
         }
-        Long childCount = productCategoryMapper.selectCount(Wrappers.<ProductCategory>lambdaQuery()
+        Long childCount = count(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getParentId, categoryId)
                 .eq(ProductCategory::getDelFlag, 0));
         if (childCount != null && childCount > 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Category has children");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "存在子类目，不能删除");
         }
-        Long productCount = productMapper.countByCategoryId(categoryId);
+        Long productCount = productMapper.countByCategoryIdIgnoreDataPermission(categoryId);
         if (productCount != null && productCount > 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Category has products");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "该类目下存在产品，不能删除");
         }
         category.setDelFlag(1);
-        productCategoryMapper.updateById(category);
+        updateById(category);
     }
 
     @Override
     public List<ProductCategoryVO> tree() {
         ensureDefaultCategoryId();
-        List<ProductCategory> categories = productCategoryMapper.selectList(Wrappers.<ProductCategory>lambdaQuery()
+        List<ProductCategory> categories = list(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getDelFlag, 0)
                 .orderByAsc(ProductCategory::getLevel)
                 .orderByAsc(ProductCategory::getSortOrder)
@@ -189,48 +189,48 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
             return null;
         }
         String normalized = categoryPath.trim().replace("\\", "/").replaceAll("/+", "/");
-        ProductCategory category = productCategoryMapper.selectOne(Wrappers.<ProductCategory>lambdaQuery()
+        ProductCategory category = getOne(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getCategoryPath, normalized)
                 .eq(ProductCategory::getDelFlag, 0)
-                .last("LIMIT 1"));
+                .last("LIMIT 1"), false);
         return category == null ? null : category.getCategoryId();
     }
 
     private ProductCategory getActiveCategory(Long categoryId) {
-        ProductCategory category = productCategoryMapper.selectById(categoryId);
+        ProductCategory category = getById(categoryId);
         if (category == null || Integer.valueOf(1).equals(category.getDelFlag())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product category does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品类目不存在");
         }
         return category;
     }
 
     private String normalizeName(String name) {
         if (StrUtil.isBlank(name)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Category name is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "类目名称不能为空");
         }
         return name.trim();
     }
 
     private void assertCategoryNameUnique(Long parentId, String name, Long excludeId) {
-        LambdaQueryWrapper<ProductCategory> wrapper = Wrappers.<ProductCategory>lambdaQuery()
+        LambdaQueryWrapper<ProductCategory> wrapper = new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getParentId, parentId == null ? 0L : parentId)
                 .eq(ProductCategory::getCategoryName, name)
                 .eq(ProductCategory::getDelFlag, 0);
         if (excludeId != null) {
             wrapper.ne(ProductCategory::getCategoryId, excludeId);
         }
-        Long count = productCategoryMapper.selectCount(wrapper);
+        Long count = count(wrapper);
         if (count != null && count > 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Category name already exists");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "同级类目名称已存在");
         }
     }
 
     private int nextSortOrder(Long parentId) {
-        ProductCategory latest = productCategoryMapper.selectOne(Wrappers.<ProductCategory>lambdaQuery()
+        ProductCategory latest = getOne(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getParentId, parentId == null ? 0L : parentId)
                 .eq(ProductCategory::getDelFlag, 0)
                 .orderByDesc(ProductCategory::getSortOrder)
-                .last("LIMIT 1"));
+                .last("LIMIT 1"), false);
         return latest == null || latest.getSortOrder() == null ? 10 : latest.getSortOrder() + 10;
     }
 
@@ -243,19 +243,19 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     }
 
     private void refreshChildrenPath(ProductCategory parent) {
-        List<ProductCategory> children = productCategoryMapper.selectList(Wrappers.<ProductCategory>lambdaQuery()
+        List<ProductCategory> children = list(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getParentId, parent.getCategoryId())
                 .eq(ProductCategory::getDelFlag, 0));
         for (ProductCategory child : children) {
             child.setLevel(parent.getLevel() + 1);
             child.setCategoryPath(parent.getCategoryPath() + "/" + child.getCategoryName());
-            productCategoryMapper.updateById(child);
+            updateById(child);
             refreshChildrenPath(child);
         }
     }
 
     private int maxChildDepth(Long categoryId) {
-        List<ProductCategory> all = productCategoryMapper.selectList(Wrappers.<ProductCategory>lambdaQuery()
+        List<ProductCategory> all = list(new LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getDelFlag, 0));
         return maxChildDepth(categoryId, all);
     }

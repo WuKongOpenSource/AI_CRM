@@ -13,7 +13,7 @@ public class CustomerFieldFilterBO {
     @Schema(description = "字段名")
     private String fieldName;
 
-    @Schema(description = "字段来源: system/custom，缺省为 system")
+    @Schema(description = "字段来源: system/custom，缺省为system")
     private String fieldSource;
 
     @Schema(description = "操作符: isEmpty/isNotEmpty")

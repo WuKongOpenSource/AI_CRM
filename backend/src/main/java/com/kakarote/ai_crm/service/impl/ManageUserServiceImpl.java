@@ -73,6 +73,14 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         return managerUser;
     }
 
+    @Override
+    public List<ManagerUser> queryUsersByUsername(String username) {
+        if (StrUtil.isBlank(username)) {
+            return Collections.emptyList();
+        }
+        return baseMapper.queryUsersByUsername(StrUtil.trim(username));
+    }
+
     /**
      * 添加用户
      *

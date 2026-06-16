@@ -7,39 +7,42 @@ import lombok.Data;
 
 import java.util.Map;
 
+/**
+ * 关系人更新参数。
+ */
 @Data
-@Schema(name = "RelationUpdateBO", description = "Relation update request")
+@Schema(name = "RelationUpdateBO", description = "关系人更新参数")
 public class RelationUpdateBO {
 
-    @NotNull(message = "Relation ID is required")
-    @Schema(description = "Relation ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "关系人ID不能为空")
+    @Schema(description = "关系人ID", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long relationId;
 
-    @NotBlank(message = "Name is required")
-    @Schema(description = "Name", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "姓名不能为空")
+    @Schema(description = "姓名", requiredMode = Schema.RequiredMode.REQUIRED)
     private String name;
 
-    @Schema(description = "Avatar object key")
+    @Schema(description = "头像")
     private String avatar;
 
-    @Schema(description = "Phone")
+    @Schema(description = "手机号")
     private String phone;
 
-    @Schema(description = "Wechat")
+    @Schema(description = "微信号")
     private String wechat;
 
-    @Schema(description = "Email")
+    @Schema(description = "邮箱")
     private String email;
 
-    @Schema(description = "Relation type")
+    @Schema(description = "关系类型")
     private String relationType;
 
-    @Schema(description = "Linked customer ID")
+    @Schema(description = "关联客户ID")
     private Long customerId;
 
-    @Schema(description = "Remark")
+    @Schema(description = "备注")
     private String remark;
 
-    @Schema(description = "Custom field values")
+    @Schema(description = "自定义字段值")
     private Map<String, Object> customFields;
 }

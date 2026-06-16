@@ -19,6 +19,9 @@ public enum TaskPriorityEnum {
         this.name = name;
     }
 
+    /**
+     * 处理fromCode方法逻辑。
+     */
     public static TaskPriorityEnum fromCode(String code) {
         for (TaskPriorityEnum priority : values()) {
             if (priority.getCode().equals(code)) {
@@ -28,6 +31,9 @@ public enum TaskPriorityEnum {
         return null;
     }
 
+    /**
+     * 获取名称按验证码。
+     */
     public static String getNameByCode(String code) {
         TaskPriorityEnum priority = fromCode(code);
         return priority != null ? priority.getName() : code;

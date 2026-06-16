@@ -90,6 +90,18 @@ public class AiContextHolder {
             sessionId, customerId, employeeId, relationId, productId, projectId, projectTaskId);
     }
 
+    public static void setContext(Long sessionId, Long userId, Long customerId) {
+        setContext(sessionId, userId, customerId, null, null, null, null, null);
+    }
+
+    public static void setContext(Long sessionId, Long userId, Long ignoredContextId, Long customerId) {
+        setContext(sessionId, userId, customerId, null, null, null, null, null);
+    }
+
+    public static void bindThreadContext(Long sessionId, Long userId) {
+        setContext(sessionId, userId);
+    }
+
     /**
      * 直接设置 sessionId（供 context-propagation 使用）
      * 优化：如果当前线程已有相同的 sessionId，跳过设置避免重复操作
@@ -200,6 +212,10 @@ public class AiContextHolder {
         CURRENT_PRODUCT_ID.remove();
         CURRENT_PROJECT_ID.remove();
         CURRENT_PROJECT_TASK_ID.remove();
+    }
+
+    public static void clearThreadContext() {
+        clear();
     }
 
     /**

@@ -4,11 +4,10 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.GlobalSearchQueryBO;
 import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
-import com.kakarote.ai_crm.service.IGlobalSearchService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,15 +15,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/search")
-@RequiredArgsConstructor
-@Tag(name = "全局搜索")
-public class GlobalSearchController {
+@Tag(name = "Global Search")
+public class SearchController {
 
-    private final IGlobalSearchService globalSearchService;
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
 
+    /**
+     * 处理globalSearch方法逻辑。
+     */
     @PostMapping("/global")
-    @Operation(summary = "全局搜索")
-    public Result<BasePage<GlobalSearchResultVO>> search(@Valid @RequestBody GlobalSearchQueryBO queryBO) {
-        return Result.ok(globalSearchService.search(queryBO));
+    @Operation(summary = "Global search across CRM modules")
+    public Result<BasePage<GlobalSearchResultVO>> globalSearch(@RequestBody GlobalSearchQueryBO queryBO) {
+        return Result.ok(globalSearchIndexService.queryPageList(queryBO));
     }
 }

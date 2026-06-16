@@ -204,16 +204,30 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
                 .thenComparing(task -> task.getCreateTime() == null ? Long.MAX_VALUE : task.getCreateTime().getTime());
     }
 
-    private void refreshValuePriority(Long taskId) {
+    @Override
+    public void refreshValuePriority(Long taskId) {
         if (taskId == null) {
             return;
         }
-        Task task = getById(taskId);
+        Task task = baseMapper.selectByIdIgnoreDataPermission(taskId);
         if (task == null) {
             return;
         }
-        Customer customer = task.getCustomerId() == null ? null : customerMapper.selectById(task.getCustomerId());
+        Customer customer = task.getCustomerId() == null ? null : customerMapper.selectByIdIgnoreDataPermission(task.getCustomerId());
         persistValuePriority(task, customer);
+    }
+
+    @Override
+    public void refreshValuePriorityByCustomerId(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+        Customer customer = customerMapper.selectByIdIgnoreDataPermission(customerId);
+        List<Task> tasks = baseMapper.selectByCustomerIdIgnoreDataPermission(customerId);
+        if (tasks == null || tasks.isEmpty()) {
+            return;
+        }
+        tasks.forEach(task -> persistValuePriority(task, customer));
     }
 
     private void hydrateValuePriority(List<TaskVO> tasks, boolean persistMissing) {

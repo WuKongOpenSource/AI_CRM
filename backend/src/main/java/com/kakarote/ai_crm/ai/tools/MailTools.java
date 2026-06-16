@@ -1,6 +1,7 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import cn.hutool.core.util.StrUtil;
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.MailDraftCreateBO;
@@ -38,6 +39,9 @@ public class MailTools {
             queryBO.setLimit(resolveLimit(limitStr));
             queryBO.setPage(1);
             Long customerId = parseLong(customerIdStr);
+            if (customerId == null) {
+                customerId = AiContextHolder.getCurrentCustomerId();
+            }
             queryBO.setCustomerId(customerId);
             BasePage<MailMessageVO> page = mailService.queryMessages(queryBO);
             return renderMailList(page.getList());
@@ -86,7 +90,11 @@ public class MailTools {
         try {
             MailDraftCreateBO draftBO = new MailDraftCreateBO();
             draftBO.setAccountId(parseLong(accountIdStr));
-            draftBO.setCustomerId(parseLong(customerIdStr));
+            Long customerId = parseLong(customerIdStr);
+            if (customerId == null) {
+                customerId = AiContextHolder.getCurrentCustomerId();
+            }
+            draftBO.setCustomerId(customerId);
             draftBO.setSourceMessageId(parseLong(sourceMessageIdStr));
             draftBO.setToAddresses(toAddresses);
             draftBO.setCcAddresses(StrUtil.trimToNull(ccAddresses));

@@ -2,10 +2,12 @@ package com.kakarote.ai_crm.service.impl;
 
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
 import com.kakarote.ai_crm.entity.BO.AddressBookQueryBO;
 import com.kakarote.ai_crm.entity.VO.AddressBookEmployeeVO;
 import com.kakarote.ai_crm.mapper.AddressBookMapper;
 import com.kakarote.ai_crm.mapper.ManagerDeptMapper;
+import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.IScheduleService;
@@ -17,10 +19,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +36,9 @@ class AddressBookServiceImplTest {
 
     @Mock
     private ManagerDeptMapper deptMapper;
+
+    @Mock
+    private DataPermissionService dataPermissionService;
 
     @Mock
     private FileStorageService fileStorageService;
@@ -52,15 +59,16 @@ class AddressBookServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        addressBookService = new AddressBookServiceImpl(
-                addressBookMapper,
-                deptMapper,
-                fileStorageService,
-                permissionService,
-                taskService,
-                scheduleService,
-                knowledgeService
-        );
+        addressBookService = new AddressBookServiceImpl();
+        ReflectionTestUtils.setField(addressBookService, "addressBookMapper", addressBookMapper);
+        ReflectionTestUtils.setField(addressBookService, "deptMapper", deptMapper);
+        ReflectionTestUtils.setField(addressBookService, "dataPermissionService", dataPermissionService);
+        ReflectionTestUtils.setField(addressBookService, "fileStorageService", fileStorageService);
+        ReflectionTestUtils.setField(addressBookService, "permissionService", permissionService);
+        ReflectionTestUtils.setField(addressBookService, "taskService", taskService);
+        ReflectionTestUtils.setField(addressBookService, "scheduleService", scheduleService);
+        ReflectionTestUtils.setField(addressBookService, "knowledgeService", knowledgeService);
+        lenient().when(dataPermissionService.createContextByPermission(any())).thenReturn(DataPermissionContext.all());
     }
 
     @Test

@@ -8,6 +8,10 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Records AI tool executions for one chat turn so actual tool exceptions can be
+ * surfaced without inferring success or failure from natural-language text.
+ */
 @Component
 public class AiToolExecutionRecorder {
 
@@ -15,9 +19,10 @@ public class AiToolExecutionRecorder {
             new ConcurrentHashMap<>();
 
     public void begin(Long sessionId) {
-        if (sessionId != null) {
-            EXECUTIONS.put(sessionId, new CopyOnWriteArrayList<>());
+        if (sessionId == null) {
+            return;
         }
+        EXECUTIONS.put(sessionId, new CopyOnWriteArrayList<>());
     }
 
     public void record(String toolName, String methodName, Object result, Throwable throwable) {
@@ -25,19 +30,20 @@ public class AiToolExecutionRecorder {
         if (sessionId == null) {
             return;
         }
-        EXECUTIONS.computeIfAbsent(sessionId, ignored -> new CopyOnWriteArrayList<>())
-                .add(new ToolExecution(
-                        toolName,
-                        methodName,
-                        result instanceof String text ? StrUtil.trim(text) : null,
-                        resolveErrorReason(throwable)
-                ));
+
+        String resultText = result instanceof String text ? StrUtil.trim(text) : null;
+        String errorReason = resolveErrorReason(throwable);
+        ToolExecution execution = new ToolExecution(
+                toolName,
+                methodName,
+                resultText,
+                errorReason
+        );
+        EXECUTIONS.computeIfAbsent(sessionId, ignored -> new CopyOnWriteArrayList<>()).add(execution);
     }
 
     public ToolExecution getLatestFailure(Long sessionId) {
-        List<ToolExecution> executions = sessionId == null
-                ? List.of()
-                : EXECUTIONS.getOrDefault(sessionId, new CopyOnWriteArrayList<>());
+        List<ToolExecution> executions = getExecutions(sessionId);
         for (int i = executions.size() - 1; i >= 0; i--) {
             ToolExecution execution = executions.get(i);
             if (execution.failed()) {
@@ -53,11 +59,18 @@ public class AiToolExecutionRecorder {
         }
     }
 
-    private String resolveErrorReason(Throwable throwable) {
-        if (throwable == null) {
-            return null;
+    private List<ToolExecution> getExecutions(Long sessionId) {
+        if (sessionId == null) {
+            return List.of();
         }
-        return StrUtil.blankToDefault(throwable.getMessage(), throwable.getClass().getSimpleName());
+        return EXECUTIONS.getOrDefault(sessionId, new CopyOnWriteArrayList<>());
+    }
+
+    private String resolveErrorReason(Throwable throwable) {
+        if (throwable != null) {
+            return StrUtil.blankToDefault(throwable.getMessage(), throwable.getClass().getSimpleName());
+        }
+        return null;
     }
 
     public record ToolExecution(

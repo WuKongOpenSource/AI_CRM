@@ -8,43 +8,46 @@ import lombok.Data;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * 日程更新参数
+ */
 @Data
-@Schema(name = "ScheduleUpdateBO", description = "Schedule update request")
+@Schema(name = "ScheduleUpdateBO", description = "日程更新参数")
 public class ScheduleUpdateBO {
 
-    @NotNull(message = "Schedule ID is required")
-    @Schema(description = "Schedule ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "日程ID不能为空")
+    @Schema(description = "日程ID", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long scheduleId;
 
-    @NotBlank(message = "Title is required")
-    @Schema(description = "Title", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "标题不能为空")
+    @Schema(description = "标题", requiredMode = Schema.RequiredMode.REQUIRED)
     private String title;
 
-    @Schema(description = "Description")
+    @Schema(description = "描述")
     private String description;
 
-    @NotNull(message = "Start time is required")
-    @Schema(description = "Start time", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "开始时间不能为空")
+    @Schema(description = "开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private Date startTime;
 
-    @Schema(description = "End time")
+    @Schema(description = "结束时间")
     private Date endTime;
 
-    @Schema(description = "Type: meeting, call, visit, other")
+    @Schema(description = "类型: meeting, call, visit, other")
     private String type;
 
-    @Schema(description = "Customer ID")
+    @Schema(description = "关联客户ID")
     private Long customerId;
 
-    @Schema(description = "Relation ID")
+    @Schema(description = "关系人ID")
     private Long relationId;
 
-    @Schema(description = "Contact ID")
+    @Schema(description = "联系人ID")
     private Long contactId;
 
-    @Schema(description = "Location")
+    @Schema(description = "地点")
     private String location;
 
-    @Schema(description = "Participant user IDs")
+    @Schema(description = "参与人员工ID列表")
     private List<Long> participantUserIds;
 }

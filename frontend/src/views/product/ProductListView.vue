@@ -83,7 +83,7 @@
               :props="{ label: 'categoryName', children: 'children' }"
               :expand-on-click-node="false"
               class="product-category-tree"
-              @node-click="node => selectCategory(String(node.categoryId))"
+              @node-click="handleCategoryNodeClick"
             >
               <template #default="{ data }">
                 <div
@@ -843,6 +843,10 @@ function selectCategory(categoryId?: string) {
   query.categoryId = categoryId
   page.value = 1
   void loadProducts()
+}
+
+function handleCategoryNodeClick(node: ProductCategoryVO) {
+  selectCategory(String(node.categoryId))
 }
 
 function applyFilters() {

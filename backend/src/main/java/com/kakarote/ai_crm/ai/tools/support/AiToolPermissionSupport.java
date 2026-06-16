@@ -14,6 +14,9 @@ public class AiToolPermissionSupport {
     @Autowired
     private PermissionService permissionService;
 
+    /**
+     * 处理denyMessage方法逻辑。
+     */
     public String denyMessage(String permission, String actionLabel) {
         if (permissionService.hasPermission(permission)) {
             return null;

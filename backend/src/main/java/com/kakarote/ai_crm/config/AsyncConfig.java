@@ -17,6 +17,22 @@ import java.util.concurrent.Executor;
 @EnableScheduling
 public class AsyncConfig {
 
+    /**
+     * 处理customerAiAnalysisExecutor方法逻辑。
+     */
+    @Bean(name = "customerAiAnalysisExecutor")
+    public Executor customerAiAnalysisExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
+        executor.setKeepAliveSeconds(60);
+        executor.setThreadNamePrefix("customer-ai-analysis-");
+        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.initialize();
+        return executor;
+    }
+
     @Bean(name = "accessLogExecutor")
     public Executor accessLogExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -29,4 +45,5 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
 }

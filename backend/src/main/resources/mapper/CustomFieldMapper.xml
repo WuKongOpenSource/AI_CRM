@@ -36,12 +36,13 @@
         WHERE ${idColumn} = #{entityId}
     </update>
 
-    <select id="countDuplicateCustomFieldValue" resultType="java.lang.Long">
+    <select id="countByCustomFieldValue" resultType="long">
         SELECT COUNT(1)
         FROM ${tableName}
         WHERE ${columnName} = #{value}
+          AND status = 1
         <if test="entityId != null">
-            AND ${idColumn} != #{entityId}
+          AND ${idColumn} != #{entityId}
         </if>
     </select>
 

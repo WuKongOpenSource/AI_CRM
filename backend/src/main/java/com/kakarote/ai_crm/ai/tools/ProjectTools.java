@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+/**
+ * Project and project-task AI tools.
+ */
 @Slf4j
 @Component
 public class ProjectTools {
@@ -29,7 +32,7 @@ public class ProjectTools {
     @Autowired
     private IProjectService projectService;
 
-    @Tool(description = "查询项目列表。当用户要查看、搜索、筛选项目时调用。支持按项目名称、描述、客户名称模糊搜索，也可按状态筛选。")
+    @Tool(description = "查询项目列表。当用户在“项目”技能下要查看、搜索、筛选项目时调用。支持按项目名称、描述、客户名称模糊搜索，也可按状态筛选。")
     public String listProjects(
             @ToolParam(description = "搜索关键词，可搜索项目名称、描述或客户名称", required = false) String keyword,
             @ToolParam(description = "项目状态：all/not_started/in_progress/completed/paused/archived 或中文状态", required = false) String status,
@@ -42,7 +45,7 @@ public class ProjectTools {
             query.setLimit(parseLimit(limit));
             BasePage<ProjectVO> page = projectService.queryPageList(query);
             List<ProjectVO> projects = page.getRecords();
-            if (projects == null || projects.isEmpty()) {
+            if (projects.isEmpty()) {
                 return "未找到符合条件的项目。";
             }
             StringBuilder sb = new StringBuilder("## 项目列表\n");
@@ -57,9 +60,9 @@ public class ProjectTools {
         }
     }
 
-    @Tool(description = "查看项目详情。当用户询问某个项目的状态、负责人、关联客户、泳道、任务列表或任务数量时调用。优先使用项目ID；留空时使用当前项目上下文。")
+    @Tool(description = "查看项目详情。当用户询问某个项目的状态、负责人、关联客户、泳道、任务列表或任务数量时调用。优先使用项目ID。")
     public String getProjectDetail(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr,
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
             @ToolParam(description = "可选任务关键词，用于在项目详情中筛选任务", required = false) String taskKeyword) {
         try {
             Long projectId = resolveProjectId(projectIdStr, "项目ID");
@@ -71,7 +74,7 @@ public class ProjectTools {
         }
     }
 
-    @Tool(description = "创建项目。当用户要求新建、创建一个项目时调用。项目名称必填；可选描述、关联客户、负责人、开始日期、截止日期和状态。")
+    @Tool(description = "创建项目。当用户在“项目”技能下要求新建、创建一个项目时调用。项目名称必填；可选描述、关联客户、负责人、开始日期、截止日期和状态。")
     public String createProject(
             @ToolParam(description = "项目名称，必填") String name,
             @ToolParam(description = "项目描述", required = false) String description,
@@ -82,8 +85,9 @@ public class ProjectTools {
             @ToolParam(description = "截止日期，格式 yyyy-MM-dd", required = false) String dueDate,
             @ToolParam(description = "项目状态：not_started/in_progress/completed/paused/archived 或中文状态，默认未开始", required = false) String status) {
         try {
+            String projectName = normalizeRequiredText(name, "项目名称");
             ProjectBO.Create bo = new ProjectBO.Create();
-            bo.setName(normalizeRequiredText(name, "项目名称"));
+            bo.setName(projectName);
             bo.setDescription(normalizeOptionalText(description));
             bo.setCustomerId(parseOptionalLong(customerIdStr, "客户ID"));
             bo.setCustomerName(normalizeOptionalText(customerName));
@@ -91,16 +95,17 @@ public class ProjectTools {
             bo.setStartDate(parseDate(startDate, "开始日期"));
             bo.setDueDate(parseDate(dueDate, "截止日期"));
             bo.setStatus(normalizeProjectStatus(status));
-            return "项目创建成功。\n" + formatProjectLine(projectService.createProject(bo));
+            ProjectVO project = projectService.createProject(bo);
+            return "项目创建成功。\n" + formatProjectLine(project);
         } catch (Exception e) {
             log.error("Project tool createProject failed", e);
             return "创建项目失败: " + e.getMessage();
         }
     }
 
-    @Tool(description = "更新项目。当用户要求修改项目名称、描述、状态、负责人、关联客户、开始日期或截止日期时调用。项目ID可留空使用当前项目；未提供的字段保持不变。")
+    @Tool(description = "更新项目。当用户要求修改项目名称、描述、状态、负责人、关联客户、开始日期或截止日期时调用。项目ID必填；未提供的字段保持不变。")
     public String updateProject(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr,
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
             @ToolParam(description = "新的项目名称", required = false) String name,
             @ToolParam(description = "新的项目描述", required = false) String description,
             @ToolParam(description = "新的关联客户ID，数字类型", required = false) String customerIdStr,
@@ -122,16 +127,17 @@ public class ProjectTools {
             bo.setStartDate(hasText(startDate) ? parseDate(startDate, "开始日期") : existing.getStartDate());
             bo.setDueDate(hasText(dueDate) ? parseDate(dueDate, "截止日期") : existing.getDueDate());
             bo.setStatus(hasText(status) ? normalizeProjectStatus(status) : existing.getStatus());
-            return "项目更新成功。\n" + formatProjectLine(projectService.updateProject(bo));
+            ProjectVO project = projectService.updateProject(bo);
+            return "项目更新成功。\n" + formatProjectLine(project);
         } catch (Exception e) {
             log.error("Project tool updateProject failed", e);
             return "更新项目失败: " + e.getMessage();
         }
     }
 
-    @Tool(description = "删除项目。当用户明确要求删除某个项目时调用。项目ID可留空使用当前项目；删除不可恢复。")
+    @Tool(description = "删除项目。当用户明确要求删除某个项目时调用。必须提供项目ID。删除是不可恢复操作，调用前应确认用户意图明确。")
     public String deleteProject(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr) {
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr) {
         try {
             Long projectId = resolveProjectId(projectIdStr, "项目ID");
             ProjectVO project = projectService.getProject(projectId);
@@ -143,9 +149,9 @@ public class ProjectTools {
         }
     }
 
-    @Tool(description = "在项目内创建任务。当用户要求给某个项目新增任务、创建项目任务时调用。项目ID可留空使用当前项目；任务标题必填。")
+    @Tool(description = "在项目内创建任务。当用户在“项目”技能下要求给某个项目新增任务、创建项目任务时调用。项目ID和任务标题必填；泳道可用泳道ID或泳道名称指定，未指定则进入默认泳道。")
     public String createProjectTask(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr,
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
             @ToolParam(description = "任务标题，必填") String title,
             @ToolParam(description = "任务描述", required = false) String description,
             @ToolParam(description = "泳道ID，数字类型", required = false) String laneIdStr,
@@ -168,19 +174,24 @@ public class ProjectTools {
             bo.setPriority(normalizeTaskPriority(priority));
             bo.setDueDate(parseDate(dueDate, "截止日期"));
             bo.setGeneratedByAi(true);
-            bo.setAiSourceText("由项目 AI 对话创建");
+            bo.setAiSourceText("由项目技能 AI 对话创建");
             ProjectVO updated = projectService.addTask(projectId, bo);
-            return "项目任务创建成功。\n项目: " + updated.getName() + "\n- 任务: " + bo.getTitle();
+            ProjectVO.ProjectTaskVO created = updated.getTasks().stream()
+                    .filter(task -> bo.getTitle().equals(task.getTitle()))
+                    .findFirst()
+                    .orElse(null);
+            return "项目任务创建成功。\n项目: " + updated.getName()
+                    + "\n" + (created == null ? "- 任务: " + bo.getTitle() : formatTaskLine(created));
         } catch (Exception e) {
             log.error("Project tool createProjectTask failed", e);
             return "创建项目任务失败: " + e.getMessage();
         }
     }
 
-    @Tool(description = "更新项目任务。当用户要求修改项目内某个任务的标题、描述、泳道、负责人、关联客户、优先级或截止日期时调用。项目ID和任务ID可从当前上下文获得。")
+    @Tool(description = "更新项目任务。当用户要求修改项目内某个任务的标题、描述、泳道、负责人、关联客户、优先级或截止日期时调用。项目ID和任务ID必填；未提供的字段保持不变。")
     public String updateProjectTask(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr,
-            @ToolParam(description = "任务ID，数字类型；留空默认当前项目任务", required = false) String taskIdStr,
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
+            @ToolParam(description = "任务ID，数字类型，必填") String taskIdStr,
             @ToolParam(description = "新的任务标题", required = false) String title,
             @ToolParam(description = "新的任务描述", required = false) String description,
             @ToolParam(description = "新的泳道ID，数字类型", required = false) String laneIdStr,
@@ -205,6 +216,10 @@ public class ProjectTools {
             bo.setCustomerName(customerName == null ? existing.getCustomerName() : customerName);
             bo.setPriority(hasText(priority) ? normalizeTaskPriority(priority) : existing.getPriority());
             bo.setDueDate(hasText(dueDate) ? parseDate(dueDate, "截止日期") : existing.getDueDate());
+            bo.setParticipantIds(existing.getParticipantIds());
+            bo.setParticipantNames(existing.getParticipantNames());
+            bo.setHasAttachments(Boolean.TRUE.equals(existing.getHasAttachments()));
+            bo.setHasSchedule(Boolean.TRUE.equals(existing.getHasSchedule()));
             ProjectVO updated = projectService.updateTask(projectId, bo);
             return "项目任务更新成功。\n" + formatTaskLine(findTask(updated, taskId));
         } catch (Exception e) {
@@ -215,8 +230,8 @@ public class ProjectTools {
 
     @Tool(description = "移动项目任务到指定泳道。当用户要求把项目任务移到未开始、进行中、已完成等泳道时调用。")
     public String moveProjectTask(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr,
-            @ToolParam(description = "任务ID，数字类型；留空默认当前项目任务", required = false) String taskIdStr,
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
+            @ToolParam(description = "任务ID，数字类型，必填") String taskIdStr,
             @ToolParam(description = "目标泳道ID，数字类型", required = false) String laneIdStr,
             @ToolParam(description = "目标泳道名称，如未开始、进行中、已完成", required = false) String laneName) {
         try {
@@ -238,10 +253,10 @@ public class ProjectTools {
         }
     }
 
-    @Tool(description = "删除项目任务。当用户明确要求删除某个项目内任务时调用。项目ID和任务ID可从当前上下文获得。")
+    @Tool(description = "删除项目任务。当用户明确要求删除某个项目内任务时调用。项目ID和任务ID必填。")
     public String deleteProjectTask(
-            @ToolParam(description = "项目ID，数字类型；留空默认当前项目", required = false) String projectIdStr,
-            @ToolParam(description = "任务ID，数字类型；留空默认当前项目任务", required = false) String taskIdStr) {
+            @ToolParam(description = "项目ID，数字类型，必填") String projectIdStr,
+            @ToolParam(description = "任务ID，数字类型，必填") String taskIdStr) {
         try {
             Long projectId = resolveProjectId(projectIdStr, "项目ID");
             Long taskId = resolveProjectTaskId(taskIdStr, "任务ID");
@@ -257,11 +272,11 @@ public class ProjectTools {
 
     private String formatProjectLine(ProjectVO project) {
         return "- " + project.getName()
-            + "（项目ID: " + project.getProjectId()
-            + "，状态: " + projectStatusLabel(project.getStatus())
-            + "，负责人: " + StrUtil.blankToDefault(project.getOwnerName(), "未指定")
-            + "，关联客户: " + StrUtil.blankToDefault(project.getCustomerName(), "未关联")
-            + "，任务: " + nullSafe(project.getTaskCount()) + " 个 / 未完成 " + nullSafe(project.getIncompleteTaskCount()) + " 个）";
+                + "（项目ID: " + project.getProjectId()
+                + "，状态: " + projectStatusLabel(project.getStatus())
+                + "，负责人: " + StrUtil.blankToDefault(project.getOwnerName(), "未指定")
+                + "，关联客户: " + StrUtil.blankToDefault(project.getCustomerName(), "未关联")
+                + "，任务: " + nullSafe(project.getTaskCount()) + " 个 / 未完成 " + nullSafe(project.getIncompleteTaskCount()) + " 个）";
     }
 
     private String formatProjectDetail(ProjectVO project) {
@@ -277,8 +292,8 @@ public class ProjectTools {
             sb.append("暂无");
         } else {
             sb.append(project.getLanes().stream()
-                .map(lane -> lane.getName() + "(laneId=" + lane.getLaneId() + ")")
-                .toList());
+                    .map(lane -> lane.getName() + "(laneId=" + lane.getLaneId() + ")")
+                    .toList());
         }
         sb.append("\n\n### 任务\n");
         if (project.getTasks().isEmpty()) {
@@ -291,18 +306,18 @@ public class ProjectTools {
 
     private String formatTaskLine(ProjectVO.ProjectTaskVO task) {
         return "- " + task.getTitle()
-            + "（任务ID: " + task.getTaskId()
-            + "，状态: " + StrUtil.blankToDefault(task.getStatus(), "未设置")
-            + "，优先级: " + taskPriorityLabel(task.getPriority())
-            + "，负责人: " + StrUtil.blankToDefault(task.getOwnerName(), "未指定")
-            + "，截止: " + formatDate(task.getDueDate()) + "）";
+                + "（任务ID: " + task.getTaskId()
+                + "，状态: " + StrUtil.blankToDefault(task.getStatus(), "未设置")
+                + "，优先级: " + taskPriorityLabel(task.getPriority())
+                + "，负责人: " + StrUtil.blankToDefault(task.getOwnerName(), "未指定")
+                + "，截止: " + formatDate(task.getDueDate()) + "）";
     }
 
     private ProjectVO.ProjectTaskVO findTask(ProjectVO project, Long taskId) {
         return project.getTasks().stream()
-            .filter(task -> Objects.equals(task.getTaskId(), taskId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("未找到任务ID: " + taskId));
+                .filter(task -> Objects.equals(task.getTaskId(), taskId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到任务ID: " + taskId));
     }
 
     private Long resolveLaneId(ProjectVO project, String laneIdStr, String laneName) {
@@ -320,14 +335,14 @@ public class ProjectTools {
         }
         String needle = normalizedLaneName.toLowerCase(Locale.ROOT);
         return project.getLanes().stream()
-            .filter(lane -> StrUtil.isNotBlank(lane.getName()))
-            .filter(lane -> {
-                String name = lane.getName().toLowerCase(Locale.ROOT);
-                return name.equals(needle) || name.contains(needle) || needle.contains(name);
-            })
-            .map(ProjectVO.ProjectLaneVO::getLaneId)
-            .findFirst()
-            .orElse(fallbackLaneId);
+                .filter(lane -> StrUtil.isNotBlank(lane.getName()))
+                .filter(lane -> {
+                    String name = lane.getName().toLowerCase(Locale.ROOT);
+                    return name.equals(needle) || name.contains(needle) || needle.contains(name);
+                })
+                .map(ProjectVO.ProjectLaneVO::getLaneId)
+                .findFirst()
+                .orElse(fallbackLaneId);
     }
 
     private String normalizeProjectStatus(String status) {
@@ -389,6 +404,14 @@ public class ProjectTools {
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException(fieldName + "格式无效，请使用 yyyy-MM-dd");
         }
+    }
+
+    private Long parseRequiredLong(String value, String fieldName) {
+        Long parsed = parseOptionalLong(value, fieldName);
+        if (parsed == null) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+        return parsed;
     }
 
     private Long resolveProjectId(String value, String fieldName) {

@@ -1,10 +1,12 @@
 package com.kakarote.ai_crm.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -25,15 +27,17 @@ import com.kakarote.ai_crm.entity.VO.ProductSettingsVO;
 import com.kakarote.ai_crm.entity.VO.ProductVO;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.ProductMapper;
-import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
+import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IProductCategoryService;
 import com.kakarote.ai_crm.service.IProductService;
 import com.kakarote.ai_crm.service.ISystemConfigService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,18 +46,21 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> implements IProductService {
 
     private static final String ENTITY_PRODUCT = "product";
     private static final String CONFIG_PRODUCT_CODE_REQUIRED = "product.code.required";
+    private static final String CONFIG_TYPE_PRODUCT = "product";
     private static final String STATUS_ACTIVE = "active";
     private static final String STATUS_INACTIVE = "inactive";
     private static final String DEFAULT_PRODUCT_TYPE = "goods";
@@ -61,17 +68,29 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             "产品名称", "产品编码", "类目路径", "产品类型", "单位", "标准价", "成本价", "负责人", "状态", "描述"
     );
 
-    private final ProductMapper productMapper;
-    private final IProductCategoryService productCategoryService;
-    private final ManageUserMapper manageUserMapper;
-    private final ISystemConfigService systemConfigService;
-    private final ICustomFieldService customFieldService;
-    private final FileStorageService fileStorageService;
+    @Autowired
+    private IProductCategoryService productCategoryService;
+
+    @Autowired
+    private ISystemConfigService systemConfigService;
+
+    @Autowired
+    private ICustomFieldService customFieldService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Autowired
+    private ManageUserMapper manageUserMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long addProduct(ProductAddBO bo) {
         Product product = new Product();
+        product.setProductId(IdWorker.getId());
         product.setProductName(requireProductName(bo.getProductName()));
         product.setProductCode(normalizeCode(bo.getProductCode()));
         product.setMainImage(normalizeOptional(bo.getMainImage()));
@@ -85,13 +104,11 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         product.setStatus(STATUS_ACTIVE);
         product.setDescription(normalizeOptional(bo.getDescription()));
         product.setDelFlag(0);
-        Long currentUserId = UserUtil.getUserIdOrNull();
-        product.setCreateUserId(currentUserId);
-        product.setUpdateUserId(currentUserId);
         customFieldService.validateUniqueCustomFieldValues(ENTITY_PRODUCT, null,
                 buildUniqueFieldValues(product, bo.getCustomFields()));
-        productMapper.insert(product);
+        save(product);
         updateCustomFields(product.getProductId(), bo.getCustomFields());
+        refreshProductSearchIndex(product.getProductId());
         return product.getProductId();
     }
 
@@ -133,8 +150,9 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         product.setUpdateUserId(UserUtil.getUserIdOrNull());
         customFieldService.validateUniqueCustomFieldValues(ENTITY_PRODUCT, product.getProductId(),
                 buildUniqueFieldValues(product, bo.getCustomFields()));
-        productMapper.updateById(product);
+        updateById(product);
         updateCustomFields(product.getProductId(), bo.getCustomFields());
+        refreshProductSearchIndex(product.getProductId());
     }
 
     @Override
@@ -143,46 +161,52 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         Product product = getVisibleProduct(productId);
         product.setDelFlag(1);
         product.setUpdateUserId(UserUtil.getUserIdOrNull());
-        productMapper.updateById(product);
+        updateById(product);
+        globalSearchIndexService.deleteByEntity(ENTITY_PRODUCT, productId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(ProductStatusUpdateBO bo) {
         Product product = getVisibleProduct(bo.getProductId());
-        product.setStatus(normalizeStatus(bo.getStatus()));
+        String status = normalizeStatus(bo.getStatus());
+        product.setStatus(status);
         product.setUpdateUserId(UserUtil.getUserIdOrNull());
-        productMapper.updateById(product);
+        updateById(product);
+        refreshProductSearchIndex(product.getProductId());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void transferProducts(ProductTransferBO bo) {
         if (bo.getProductIds() == null || bo.getProductIds().isEmpty()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "No products selected");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "请选择要转移的产品");
         }
         Long ownerId = resolveOwnerId(bo.getOwnerId());
         for (Long productId : bo.getProductIds()) {
             Product product = getVisibleProduct(productId);
             product.setOwnerId(ownerId);
             product.setUpdateUserId(UserUtil.getUserIdOrNull());
-            productMapper.updateById(product);
+            updateById(product);
+            refreshProductSearchIndex(productId);
         }
     }
 
     @Override
     public BasePage<ProductVO> queryPageList(ProductQueryBO queryBO) {
-        ProductQueryBO safeQuery = queryBO == null ? new ProductQueryBO() : queryBO;
-        BasePage<ProductVO> page = productMapper.queryPageList(safeQuery.parse(), safeQuery);
+        if (queryBO == null) {
+            queryBO = new ProductQueryBO();
+        }
+        BasePage<ProductVO> page = baseMapper.queryPageList(queryBO.parse(), queryBO);
         enrichProductVOs(page.getRecords());
         return page;
     }
 
     @Override
     public ProductVO getProductDetail(Long productId) {
-        ProductVO vo = productMapper.getProductById(productId);
+        ProductVO vo = baseMapper.getProductById(productId);
         if (vo == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品不存在");
         }
         vo.setCustomFields(customFieldService.getCustomFieldValues(ENTITY_PRODUCT, productId));
         resolveProductImageUrl(vo);
@@ -191,9 +215,9 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Override
     public Product getVisibleProduct(Long productId) {
-        Product product = productMapper.selectById(productId);
+        Product product = getById(productId);
         if (product == null || Integer.valueOf(1).equals(product.getDelFlag())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品不存在");
         }
         return product;
     }
@@ -204,10 +228,10 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if (code == null) {
             return null;
         }
-        return productMapper.selectOne(new LambdaQueryWrapper<Product>()
+        return getOne(new LambdaQueryWrapper<Product>()
                 .eq(Product::getProductCode, code)
                 .eq(Product::getDelFlag, 0)
-                .last("LIMIT 1"));
+                .last("LIMIT 1"), false);
     }
 
     @Override
@@ -220,17 +244,22 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     @Override
     public void updateSettings(ProductSettingsUpdateBO bo) {
         boolean required = bo == null || bo.getCodeRequired() == null || Boolean.TRUE.equals(bo.getCodeRequired());
-        systemConfigService.updateConfig(CONFIG_PRODUCT_CODE_REQUIRED, String.valueOf(required));
+        systemConfigService.updateConfigsWithType(
+                Map.of(CONFIG_PRODUCT_CODE_REQUIRED, String.valueOf(required)),
+                CONFIG_TYPE_PRODUCT
+        );
     }
 
     @Override
     public void exportProducts(ProductQueryBO queryBO, HttpServletResponse response) {
-        ProductQueryBO exportQuery = queryBO == null ? new ProductQueryBO() : queryBO;
-        exportQuery.setPage(1);
-        exportQuery.setLimit(10000);
-        List<ProductVO> products = queryPageList(exportQuery).getRecords();
+        if (queryBO == null) {
+            queryBO = new ProductQueryBO();
+        }
+        queryBO.setPage(1);
+        queryBO.setLimit(10000);
+        List<ProductVO> products = queryPageList(queryBO).getRecords();
         if (products.isEmpty()) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "No product data to export");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "没有符合条件的产品数据");
         }
 
         ExcelWriter writer = ExcelUtil.getWriter(true);
@@ -265,10 +294,11 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     public ProductImportPreviewVO importPreview(MultipartFile file) {
         ProductImportPreviewVO preview = new ProductImportPreviewVO();
         if (file == null || file.isEmpty()) {
-            preview.getErrors().add("Import file cannot be empty");
+            preview.getErrors().add("导入文件不能为空");
             return preview;
         }
 
+        List<ProductImportBO> rows = new ArrayList<>();
         try (ExcelReader reader = ExcelUtil.getReader(file.getInputStream())) {
             List<List<Object>> rawRows = reader.read();
             for (int i = 1; i < rawRows.size(); i++) {
@@ -278,20 +308,19 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 }
                 ProductImportBO row = parseImportRow(i + 1, raw);
                 validateImportRow(row);
-                preview.getRows().add(row);
+                rows.add(row);
             }
         } catch (Exception exception) {
-            preview.getErrors().add("Failed to read import file: " + exception.getMessage());
+            preview.getErrors().add("读取导入文件失败: " + exception.getMessage());
         }
 
-        int errorRows = (int) preview.getRows().stream()
-                .filter(row -> row.getErrors() != null && !row.getErrors().isEmpty())
-                .count();
-        int duplicateRows = (int) preview.getRows().stream().filter(ProductImportBO::isDuplicate).count();
-        preview.setTotalRows(preview.getRows().size());
+        int errorRows = (int) rows.stream().filter(row -> row.getErrors() != null && !row.getErrors().isEmpty()).count();
+        int duplicateRows = (int) rows.stream().filter(ProductImportBO::isDuplicate).count();
+        preview.setRows(rows);
+        preview.setTotalRows(rows.size());
         preview.setErrorRows(errorRows);
         preview.setDuplicateRows(duplicateRows);
-        preview.setValidRows(preview.getRows().size() - errorRows);
+        preview.setValidRows(rows.size() - errorRows);
         return preview;
     }
 
@@ -349,10 +378,19 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 }
                 result.setImported(result.getImported() + 1);
             } catch (Exception exception) {
-                result.getErrors().add("Row " + row.getRowNum() + " import failed: " + exception.getMessage());
+                result.getErrors().add("第" + row.getRowNum() + "行导入失败: " + exception.getMessage());
             }
         }
         return result;
+    }
+
+    @Override
+    public void refreshProductSearchIndex(Long productId) {
+        try {
+            globalSearchIndexService.refreshProductIndex(productId);
+        } catch (Exception exception) {
+            log.warn("刷新产品搜索索引失败: productId={}, error={}", productId, exception.getMessage());
+        }
     }
 
     private void enrichProductVOs(List<ProductVO> products) {
@@ -363,8 +401,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 .map(ProductVO::getProductId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        Map<Long, Map<String, Object>> customFieldValues =
-                customFieldService.getBatchCustomFieldValues(ENTITY_PRODUCT, productIds);
+        Map<Long, Map<String, Object>> customFieldValues = customFieldService.getBatchCustomFieldValues(ENTITY_PRODUCT, productIds);
         for (ProductVO product : products) {
             product.setCustomFields(customFieldValues.get(product.getProductId()));
             resolveProductImageUrl(product);
@@ -386,7 +423,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     private String requireProductName(String productName) {
         if (StrUtil.isBlank(productName)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product name is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品名称不能为空");
         }
         return productName.trim();
     }
@@ -404,14 +441,14 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     private void validateCodeForSave(String productCode, Long excludeProductId) {
         if (isCodeRequired() && StrUtil.isBlank(productCode)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product code is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品编码不能为空");
         }
         if (StrUtil.isBlank(productCode)) {
             return;
         }
-        Long count = productMapper.countByCode(productCode, excludeProductId);
+        Long count = baseMapper.countByCodeIgnoreDataPermission(productCode, excludeProductId);
         if (count != null && count > 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product code already exists");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品编码已存在");
         }
     }
 
@@ -423,10 +460,10 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         Long resolved = categoryId == null ? productCategoryService.ensureDefaultCategoryId() : categoryId;
         ProductCategory category = productCategoryService.getById(resolved);
         if (category == null || Integer.valueOf(1).equals(category.getDelFlag())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product category does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品类目不存在");
         }
         if (category.getLevel() != null && category.getLevel() > 3) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Product category supports at most 3 levels");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品类目最多支持三级");
         }
         return resolved;
     }
@@ -434,11 +471,11 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     private Long resolveOwnerId(Long ownerId) {
         Long resolved = ownerId == null ? UserUtil.getUserIdOrNull() : ownerId;
         if (resolved == null) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Owner is required");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "负责人不能为空");
         }
         ManagerUser owner = manageUserMapper.getUserId(resolved);
         if (owner == null || Integer.valueOf(0).equals(owner.getStatus())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Owner does not exist");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "负责人不存在或已禁用");
         }
         return resolved;
     }
@@ -451,7 +488,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if (STATUS_INACTIVE.equalsIgnoreCase(normalized)) {
             return STATUS_INACTIVE;
         }
-        throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Invalid product status");
+        throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品状态无效");
     }
 
     private Map<String, Object> buildUniqueFieldValues(Product product, Map<String, Object> customFields) {
@@ -477,8 +514,8 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         row.setCategoryPath(cell(raw, 2));
         row.setProductType(cell(raw, 3));
         row.setUnit(cell(raw, 4));
-        row.setStandardPrice(parseDecimal(cell(raw, 5), row, "standard price"));
-        row.setCostPrice(parseDecimal(cell(raw, 6), row, "cost price"));
+        row.setStandardPrice(parseDecimal(cell(raw, 5), row, "标准价"));
+        row.setCostPrice(parseDecimal(cell(raw, 6), row, "成本价"));
         row.setOwnerName(cell(raw, 7));
         row.setStatus(StrUtil.blankToDefault(cell(raw, 8), STATUS_ACTIVE));
         row.setDescription(cell(raw, 9));
@@ -487,18 +524,18 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     private void validateImportRow(ProductImportBO row) {
         if (StrUtil.isBlank(row.getProductName())) {
-            row.getErrors().add("Product name is required");
+            row.getErrors().add("产品名称不能为空");
         }
         row.setProductCode(normalizeCode(row.getProductCode()));
         if (isCodeRequired() && StrUtil.isBlank(row.getProductCode())) {
-            row.getErrors().add("Product code is required");
+            row.getErrors().add("产品编码不能为空");
         }
         if (StrUtil.isBlank(row.getOwnerName())) {
-            row.getErrors().add("Owner is required");
+            row.getErrors().add("负责人不能为空");
         } else {
             ManagerUser owner = findUserByName(row.getOwnerName());
             if (owner == null) {
-                row.getErrors().add("Owner does not exist: " + row.getOwnerName());
+                row.getErrors().add("负责人不存在: " + row.getOwnerName());
             } else {
                 row.setOwnerId(owner.getUserId());
             }
@@ -508,7 +545,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         } else {
             Long categoryId = productCategoryService.findCategoryIdByPath(row.getCategoryPath());
             if (categoryId == null) {
-                row.getErrors().add("Category path does not exist: " + row.getCategoryPath());
+                row.getErrors().add("类目路径不存在: " + row.getCategoryPath());
             } else {
                 row.setCategoryId(categoryId);
             }
@@ -516,7 +553,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         row.setProductType(StrUtil.blankToDefault(normalizeOptional(row.getProductType()), DEFAULT_PRODUCT_TYPE));
         row.setStatus(normalizeImportStatus(row.getStatus(), row));
         if (StrUtil.isNotBlank(row.getProductCode())) {
-            Product existing = findVisibleProductByCode(row.getProductCode());
+            Product existing = baseMapper.selectByCodeIgnoreDataPermission(row.getProductCode());
             if (existing != null) {
                 row.setDuplicate(true);
                 row.setExistingProductId(existing.getProductId());
@@ -547,7 +584,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if ("停用".equals(normalized) || STATUS_INACTIVE.equalsIgnoreCase(normalized)) {
             return STATUS_INACTIVE;
         }
-        row.getErrors().add("Invalid product status: " + status);
+        row.getErrors().add("产品状态无效: " + status);
         return STATUS_ACTIVE;
     }
 
@@ -558,7 +595,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         try {
             return new BigDecimal(value.trim());
         } catch (Exception exception) {
-            row.getErrors().add("Invalid " + label + ": " + value);
+            row.getErrors().add(label + "格式无效: " + value);
             return null;
         }
     }
@@ -594,7 +631,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 writer.flush(out, true);
             }
         } catch (IOException exception) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Export Excel failed");
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "导出 Excel 失败");
         } finally {
             writer.close();
         }

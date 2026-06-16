@@ -8,25 +8,28 @@ import lombok.Data;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * 跟进记录新增参数
+ */
 @Data
-@Schema(name = "FollowUpAddBO", description = "Follow-up create payload")
+@Schema(name = "FollowUpAddBO", description = "跟进记录新增参数")
 public class FollowUpAddBO {
 
-    @Schema(description = "Customer ID")
+    @Schema(description = "客户ID")
     private Long customerId;
 
-    @Schema(description = "Relation ID")
+    @Schema(description = "关系人ID")
     private Long relationId;
 
-    @Schema(description = "Contact ID")
+    @Schema(description = "联系人ID")
     private Long contactId;
 
-    @NotBlank(message = "Type cannot be empty")
-    @Schema(description = "Type: call, meeting, email, visit, other", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "类型不能为空")
+    @Schema(description = "类型: call, meeting, email, visit", requiredMode = Schema.RequiredMode.REQUIRED)
     private String type;
 
-    @NotBlank(message = "Content cannot be empty")
-    @Schema(description = "Follow-up content", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "跟进内容不能为空")
+    @Schema(description = "跟进内容", requiredMode = Schema.RequiredMode.REQUIRED)
     private String content;
 
     @Schema(description = "AI summary")
@@ -38,13 +41,16 @@ public class FollowUpAddBO {
     @Schema(description = "AI generated flag")
     private Integer aiGenerated;
 
-    @NotNull(message = "Follow-up time cannot be empty")
-    @Schema(description = "Follow-up time", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "跟进时间不能为空")
+    @Schema(description = "跟进时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private Date followTime;
 
-    @Schema(description = "Next follow-up time")
+    @Schema(description = "下次跟进时间")
     private Date nextFollowTime;
 
     @Schema(description = "Attachments")
     private List<ChatSendBO.AttachmentDTO> attachments;
+
+    @Schema(description = "Suggested tasks")
+    private List<FollowUpSuggestedTaskBO> suggestedTasks;
 }

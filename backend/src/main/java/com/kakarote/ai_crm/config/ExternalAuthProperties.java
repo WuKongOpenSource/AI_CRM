@@ -22,6 +22,8 @@ public class ExternalAuthProperties {
 
     private Integer ticketTtlSeconds = 300;
 
+    private ProxyConfig proxy = new ProxyConfig();
+
     public ProviderConfig getProvider(String provider) {
         return switch (StrUtil.emptyToDefault(provider, "").toLowerCase()) {
             case "google" -> google;
@@ -39,10 +41,29 @@ public class ExternalAuthProperties {
         private String redirectUri;
         private String tenant = "common";
 
+        public boolean isUsable(String provider) {
+            if (!Boolean.TRUE.equals(enabled)) {
+                return false;
+            }
+            return StrUtil.isNotBlank(clientId) && StrUtil.isNotBlank(clientSecret);
+        }
+
         public boolean isUsable() {
-            return Boolean.TRUE.equals(enabled)
-                    && StrUtil.isNotBlank(clientId)
-                    && StrUtil.isNotBlank(clientSecret);
+            return isUsable(null);
+        }
+
+        public String resolveClientId(String provider) {
+            return clientId;
+        }
+    }
+
+    @Data
+    public static class ProxyConfig {
+        private Boolean enabled = Boolean.FALSE;
+        private String url;
+
+        public boolean isUsable() {
+            return Boolean.TRUE.equals(enabled) && StrUtil.isNotBlank(url);
         }
     }
 }

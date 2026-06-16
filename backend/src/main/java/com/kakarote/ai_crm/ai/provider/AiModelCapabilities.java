@@ -13,10 +13,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AiModelCapabilities {
-
     /**
      * 是否支持流式输出。
      */
+
     private boolean supportsStream;
 
     /**

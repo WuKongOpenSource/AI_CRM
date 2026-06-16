@@ -1,13 +1,14 @@
 package com.kakarote.ai_crm.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
-import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
@@ -27,9 +28,17 @@ public interface ContactMapper extends BaseMapper<Contact> {
      */
     Contact getPrimaryContact(@Param("customerId") Long customerId);
 
-    Long countGlobalSearch(@Param("keyword") String keyword, @Param("pattern") String pattern);
+    /**
+     * 查询按ID忽略数据权限。
+     */
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_contact WHERE contact_id = #{contactId}")
+    Contact selectByIdIgnoreDataPermission(@Param("contactId") Long contactId);
 
-    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
-                                            @Param("pattern") String pattern,
-                                            @Param("limit") int limit);
+    /**
+     * 查询按客户ID忽略数据权限。
+     */
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_contact WHERE customer_id = #{customerId}")
+    List<Contact> selectByCustomerIdIgnoreDataPermission(@Param("customerId") Long customerId);
 }

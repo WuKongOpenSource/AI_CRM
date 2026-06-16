@@ -10,7 +10,17 @@
             a.label AS agent_name,
             s.customer_id,
             c.company_name AS customer_name,
+            s.employee_id,
+            e.realname AS employee_name,
+            s.relation_id,
+            r.name AS relation_name,
+            s.product_id,
+            p.product_name,
+            p.product_code,
             s.title,
+            s.app_code,
+            s.pinned,
+            s.pinned_time,
             s.status,
             s.create_time,
             s.update_time,
@@ -19,8 +29,11 @@
         FROM crm_chat_session s
         LEFT JOIN crm_ai_agent a ON s.agent_id = a.agent_id
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN manager_user e ON s.employee_id = e.user_id
+        LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
+        LEFT JOIN crm_product p ON s.product_id = p.product_id
         WHERE s.user_id = #{userId}
-        ORDER BY s.update_time DESC
+        ORDER BY s.pinned DESC, s.pinned_time DESC, s.update_time DESC
     </select>
 
     <select id="getSessionById" resultType="com.kakarote.ai_crm.entity.VO.ChatSessionVO">
@@ -31,13 +44,26 @@
             a.label AS agent_name,
             s.customer_id,
             c.company_name AS customer_name,
+            s.employee_id,
+            e.realname AS employee_name,
+            s.relation_id,
+            r.name AS relation_name,
+            s.product_id,
+            p.product_name,
+            p.product_code,
             s.title,
+            s.app_code,
+            s.pinned,
+            s.pinned_time,
             s.status,
             s.create_time,
             s.update_time
         FROM crm_chat_session s
         LEFT JOIN crm_ai_agent a ON s.agent_id = a.agent_id
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN manager_user e ON s.employee_id = e.user_id
+        LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
+        LEFT JOIN crm_product p ON s.product_id = p.product_id
         WHERE s.session_id = #{sessionId}
     </select>
 

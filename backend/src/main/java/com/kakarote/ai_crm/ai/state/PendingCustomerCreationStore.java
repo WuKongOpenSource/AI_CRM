@@ -21,6 +21,9 @@ public class PendingCustomerCreationStore {
 
     private final Map<Long, PendingCustomerCreation> pendingRequests = new ConcurrentHashMap<>();
 
+    /**
+     * 保存Pending客户CreationStore。
+     */
     public void save(Long sessionId, CustomerAddBO customerAddBO) {
         if (sessionId == null || customerAddBO == null) {
             return;
@@ -31,6 +34,9 @@ public class PendingCustomerCreationStore {
         );
     }
 
+    /**
+     * 获取Pending客户CreationStore。
+     */
     public PendingCustomerCreation get(Long sessionId) {
         if (sessionId == null) {
             return null;
@@ -46,6 +52,9 @@ public class PendingCustomerCreationStore {
         return pending;
     }
 
+    /**
+     * 移除Pending客户CreationStore。
+     */
     public PendingCustomerCreation remove(Long sessionId) {
         PendingCustomerCreation pending = get(sessionId);
         if (pending != null) {
@@ -54,12 +63,18 @@ public class PendingCustomerCreationStore {
         return pending;
     }
 
+    /**
+     * 清理Pending客户CreationStore。
+     */
     public void clear(Long sessionId) {
         if (sessionId != null) {
             pendingRequests.remove(sessionId);
         }
     }
 
+    /**
+     * 复制客户ADDBO。
+     */
     private CustomerAddBO copyCustomerAddBO(CustomerAddBO source) {
         CustomerAddBO copy = BeanUtil.copyProperties(source, CustomerAddBO.class);
         if (source.getTags() != null) {
@@ -73,6 +88,9 @@ public class PendingCustomerCreationStore {
 
     public record PendingCustomerCreation(CustomerAddBO customerAddBO, Instant expiresAt) {
 
+        /**
+         * 判断是否Expired。
+         */
         public boolean isExpired() {
             return Instant.now().isAfter(expiresAt);
         }

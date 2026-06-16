@@ -13,6 +13,9 @@ public class PermissionServiceImpl implements PermissionService {
     @Autowired
     private IManagerRoleService managerRoleService;
 
+    /**
+     * 判断是否存在权限。
+     */
     @Override
     public boolean hasPermission(String permission) {
         JSONObject auth = managerRoleService.auth(UserUtil.getUserId());

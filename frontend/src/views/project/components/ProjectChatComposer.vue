@@ -389,7 +389,6 @@ import { transcribeFollowUpAudio } from '@/api/followup'
 import { getAiConfig } from '@/api/systemConfig'
 import { useResponsive } from '@/composables/useResponsive'
 import { useChatStore } from '@/stores/chat'
-import { useUserStore } from '@/stores/user'
 import type { ChatAttachmentDTO, ChatAttachmentVO, ChatModelOption, Knowledge } from '@/types/common'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { formatFileSize, resolveKnowledgeFileSizeBytes } from '@/utils/formatFileSize'
@@ -448,9 +447,9 @@ type ComposerAttachmentPreviewItem =
   | { kind: 'file'; key: string; file: File; fileIndex: number }
 
 const chatStore = useChatStore()
-const userStore = useUserStore()
-const { isMobile } = useResponsive()
 const router = useRouter()
+const canManageAiConfig = true
+const { isMobile } = useResponsive()
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadMenuVisible = ref(false)
@@ -490,8 +489,6 @@ const modelOptionGroups = computed(() => {
     { source: 'system', label: '系统模型', options: systemOptions }
   ].filter(group => group.options.length > 0)
 })
-
-const canManageAiConfig = computed(() => userStore.hasPermission('config:ai'))
 
 const composerModelLabel = computed(() => {
   if (chatStore.modelOptionsLoading) return '加载模型...'
@@ -697,7 +694,7 @@ function handleModelChange(modelKey: string) {
 
 function handleOpenMoreModels() {
   modelPopoverVisible.value = false
-  void router.push('/settings/system/api')
+  void router.push('/settings/system?pane=ai')
 }
 
 function handleSelectedAppChipClick() {
@@ -728,20 +725,18 @@ function handleUploadMenuChooseKnowledge() {
   chatKnowledgePickerVisible.value = true
 }
 
-function appendSelectedFiles(files: File[]): boolean {
+function appendSelectedFiles(files: File[]) {
   const slotsLeft = MAX_CHAT_ATTACHMENT_COUNT - selectedKnowledgeItems.value.length - selectedFiles.value.length
   if (slotsLeft <= 0) {
     ElMessage.warning(`最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`)
-    return false
+    return
   }
-
-  const result = mergeChatFiles(selectedFiles.value, files.slice(0, slotsLeft), selectedKnowledgeItems.value.length)
+  const result = mergeChatFiles(selectedFiles.value, files.slice(0, slotsLeft))
   if (result.error) {
     ElMessage.warning(result.error)
-    return false
+    return
   }
   selectedFiles.value = result.files
-  return true
 }
 
 function handleFileSelect(event: Event) {

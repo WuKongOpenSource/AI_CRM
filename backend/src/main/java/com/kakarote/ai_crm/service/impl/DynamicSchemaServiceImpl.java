@@ -25,7 +25,9 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
      */
     private static final Map<String, String> TABLE_MAPPING = Map.of(
             "customer", "crm_customer",
-            "contact", "crm_contact"
+            "contact", "crm_contact",
+            "relation", "crm_relation",
+            "product", "crm_product"
     );
 
     /**
@@ -33,13 +35,15 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
      */
     private static final Map<String, String> ID_COLUMN_MAPPING = Map.of(
             "customer", "customer_id",
-            "contact", "contact_id"
+            "contact", "contact_id",
+            "relation", "relation_id",
+            "product", "product_id"
     );
 
     /**
      * 支持的实体类型集合
      */
-    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact");
+    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact", "relation", "product");
 
     /**
      * 允许的列名正则（防止 SQL 注入）
@@ -49,6 +53,9 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
      */
     private static final Pattern COLUMN_NAME_PATTERN = Pattern.compile("^(cf_[a-z][a-z0-9_]*|field_[a-z0-9]{6})$");
 
+    /**
+     * 新增列。
+     */
     @Override
     public void addColumn(String tableName, String columnName, String columnType, String comment) {
         // 安全验证
@@ -56,7 +63,7 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         validateColumnName(columnName);
 
         if (columnExists(tableName, columnName)) {
-            // 幂等：字段池复用同一物理列，列已存在时跳过
+            // 幂等：字段池共用同一物理列，列已存在时跳过
             return;
         }
 
@@ -78,6 +85,9 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         }
     }
 
+    /**
+     * 处理dropColumn方法逻辑。
+     */
     @Override
     public void dropColumn(String tableName, String columnName) {
         validateTableName(tableName);
@@ -91,6 +101,9 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         jdbcTemplate.execute(sql);
     }
 
+    /**
+     * 处理columnExists方法逻辑。
+     */
     @Override
     public boolean columnExists(String tableName, String columnName) {
         // PostgreSQL: 使用 current_database() 替代 DATABASE()
@@ -103,6 +116,9 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         return count != null && count > 0;
     }
 
+    /**
+     * 获取Table名称。
+     */
     @Override
     public String getTableName(String entityType) {
         String tableName = TABLE_MAPPING.get(entityType);
@@ -112,6 +128,9 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
         return tableName;
     }
 
+    /**
+     * 获取ID列名称。
+     */
     @Override
     public String getIdColumnName(String entityType) {
         String idColumn = ID_COLUMN_MAPPING.get(entityType);

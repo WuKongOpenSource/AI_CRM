@@ -69,11 +69,17 @@ public class ManagerRoleMenuServiceImpl extends ServiceImpl<ManagerRoleMenuMappe
         return baseMapper.queryMenuIdListByRoleId(id);
     }
 
+    /**
+     * 查询角色菜单包含范围按角色ID。
+     */
     @Override
     public List<ManagerRoleMenu> queryRoleMenuWithScopeByRoleId(Long roleId) {
         return baseMapper.queryRoleMenuWithScopeByRoleId(roleId);
     }
 
+    /**
+     * 保存角色菜单包含范围。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void saveRoleMenuWithScope(Long roleId, List<RolePermissionSaveBO.PermItem> items) {

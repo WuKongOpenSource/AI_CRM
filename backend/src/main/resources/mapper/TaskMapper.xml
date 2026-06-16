@@ -13,7 +13,14 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
+            t.project_id,
+            p.name AS project_name,
+            t.lane_id,
+            l.name AS lane_name,
+            t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.completed_time,
             t.create_user_id,
@@ -28,10 +35,20 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_project p ON t.project_id = p.project_id
+        LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE 1=1
+        <if test="query.taskId != null">
+            AND t.task_id = #{query.taskId}
+        </if>
         <if test="query.keyword != null and query.keyword != ''">
-            AND t.title LIKE CONCAT('%', #{query.keyword}, '%')
+            AND (
+                t.title LIKE CONCAT('%', #{query.keyword}, '%')
+                OR t.description LIKE CONCAT('%', #{query.keyword}, '%')
+                OR t.participant_names LIKE CONCAT('%', #{query.keyword}, '%')
+            )
         </if>
         <if test="query.status != null and query.status != ''">
             AND LOWER(t.status) = LOWER(#{query.status})
@@ -44,6 +61,15 @@
         </if>
         <if test="query.customerId != null">
             AND t.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND t.relation_id = #{query.relationId}
+        </if>
+        <if test="query.projectId != null">
+            AND t.project_id = #{query.projectId}
+        </if>
+        <if test="query.laneId != null">
+            AND t.lane_id = #{query.laneId}
         </if>
         <if test="query.generatedByAi != null">
             AND t.generated_by_ai = #{query.generatedByAi}
@@ -82,7 +108,14 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
+            t.project_id,
+            p.name AS project_name,
+            t.lane_id,
+            l.name AS lane_name,
+            t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.completed_time,
             t.create_user_id,
@@ -97,8 +130,14 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_project p ON t.project_id = p.project_id
+        LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE 1=1
+        <if test="query.taskId != null">
+            AND t.task_id = #{query.taskId}
+        </if>
         <if test="query.keyword != null and query.keyword != ''">
             AND (
                 t.title LIKE CONCAT('%', #{query.keyword}, '%')
@@ -117,6 +156,15 @@
         </if>
         <if test="query.customerId != null">
             AND t.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND t.relation_id = #{query.relationId}
+        </if>
+        <if test="query.projectId != null">
+            AND t.project_id = #{query.projectId}
+        </if>
+        <if test="query.laneId != null">
+            AND t.lane_id = #{query.laneId}
         </if>
         <if test="query.generatedByAi != null">
             AND t.generated_by_ai = #{query.generatedByAi}
@@ -151,7 +199,14 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
+            t.project_id,
+            p.name AS project_name,
+            t.lane_id,
+            l.name AS lane_name,
+            t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
@@ -165,6 +220,9 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_project p ON t.project_id = p.project_id
+        LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE t.assigned_to = #{userId} AND LOWER(t.status) != 'completed'
         ORDER BY
@@ -184,7 +242,14 @@
             t.assigned_to,
             u.realname AS assigned_to_name,
             t.customer_id,
+            t.relation_id,
+            t.project_id,
+            p.name AS project_name,
+            t.lane_id,
+            l.name AS lane_name,
+            t.source_follow_up_id,
             c.company_name AS customer_name,
+            r.name AS relation_name,
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
@@ -198,6 +263,9 @@
         FROM crm_task t
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_project p ON t.project_id = p.project_id
+        LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
         WHERE t.assigned_to = #{userId}
         <if test="filter == 'today'">
@@ -217,41 +285,6 @@
     <select id="countPending" resultType="java.lang.Long">
         SELECT COUNT(*) FROM crm_task
         WHERE assigned_to = #{userId} AND LOWER(status) != 'completed'
-    </select>
-
-    <sql id="taskGlobalSearchConditions">
-        (
-            LOWER(COALESCE(t.title, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(t.description, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(t.participant_names, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(c.company_name, '')) LIKE LOWER(#{pattern})
-        )
-    </sql>
-
-    <select id="countGlobalSearch" resultType="java.lang.Long">
-        SELECT COUNT(*)
-        FROM crm_task t
-        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
-        WHERE <include refid="taskGlobalSearchConditions"/>
-    </select>
-
-    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
-        SELECT
-            'task' AS type,
-            t.task_id AS record_id,
-            t.title,
-            CONCAT_WS(' · ', NULLIF(c.company_name, ''), NULLIF(t.status, ''), NULLIF(t.priority, '')) AS subtitle,
-            t.description AS content,
-            t.customer_id,
-            CAST(NULL AS BIGINT) AS contact_id,
-            COALESCE(t.due_date, t.create_time) AS event_time,
-            t.create_time,
-            t.update_time
-        FROM crm_task t
-        LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
-        WHERE <include refid="taskGlobalSearchConditions"/>
-        ORDER BY COALESCE(t.due_date, t.create_time) DESC NULLS LAST, t.task_id DESC
-        LIMIT #{limit}
     </select>
 
 </mapper>

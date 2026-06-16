@@ -25,7 +25,7 @@ public class ChatSendBO {
     @Schema(description = "附件列表")
     private List<AttachmentDTO> attachments;
 
-    @Schema(description = "是否启用 RAG 检索路由，默认 false")
+    @Schema(description = "鏄惁鍚敤 RAG 妫€绱㈣矾鐢憋紝榛樿 false")
     private Boolean ragEnabled;
 
     @Schema(description = "聊天应用编码: general/crm/knowledge/product")
@@ -46,9 +46,8 @@ public class ChatSendBO {
     @Schema(description = "本次对话选择的模型名称")
     private String modelName;
 
-    @Schema(description = "模型来源：custom/system，单机版仅使用 custom")
+    @Schema(description = "Model source: custom/system")
     private String modelSource;
-
     @Schema(description = "知识库文件 ID 列表（限定 RAG 范围等），无需上传文件本体")
     private List<Long> knowledgeIds;
 

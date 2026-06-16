@@ -12,16 +12,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 用户 UI 偏好解析与规范化。
+ */
 public final class UserPreferenceSupport {
+
+    public static final String SIDEBAR_RECENT = "recent";
+    public static final String SIDEBAR_CUSTOMER = "customer";
+    public static final String SIDEBAR_PROJECT = "project";
+    public static final String SIDEBAR_RELATION = "relation";
+    public static final String SIDEBAR_ADDRESS_BOOK = "addressBook";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final List<String> DEFAULT_SIDEBAR_MODULE_ORDER = List.of(
-            "recent",
-            "customer",
-            "product",
-            "project",
-            "relation",
-            "addressBook"
+            SIDEBAR_RECENT,
+            SIDEBAR_CUSTOMER,
+            SIDEBAR_PROJECT,
+            SIDEBAR_RELATION,
+            SIDEBAR_ADDRESS_BOOK
     );
     private static final Set<String> ALLOWED_SIDEBAR_MODULE_KEYS = Set.copyOf(DEFAULT_SIDEBAR_MODULE_ORDER);
 
@@ -72,6 +80,10 @@ public final class UserPreferenceSupport {
         } catch (Exception ignored) {
             return preferences;
         }
+    }
+
+    public static String serializePreferences(Collection<String> sidebarModuleOrder) {
+        return serializePreferences(toPreferenceVO(sidebarModuleOrder));
     }
 
     public static String serializePreferences(UserPreferenceVO preferences) {

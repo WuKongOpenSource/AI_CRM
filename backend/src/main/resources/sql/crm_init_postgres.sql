@@ -20,7 +20,6 @@ $$ LANGUAGE plpgsql;
 DROP TABLE IF EXISTS crm_customer CASCADE;
 CREATE TABLE crm_customer (
     customer_id BIGINT,
-    relation_id BIGINT,
     company_name VARCHAR(255) NOT NULL,
     industry VARCHAR(100),
     stage VARCHAR(50) NOT NULL DEFAULT 'lead',
@@ -34,9 +33,15 @@ CREATE TABLE crm_customer (
     last_contact_time TIMESTAMP,
     next_follow_time TIMESTAMP,
     remark TEXT,
+    ai_status_detection TEXT,
+    ai_insight TEXT,
+    ai_parse_snapshot TEXT,
+    ai_analysis_status VARCHAR(32),
+    ai_analysis_requested_at TIMESTAMP(3),
     status SMALLINT DEFAULT 1,
     create_user_id BIGINT,
     update_user_id BIGINT,
+    search_text TEXT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (customer_id)
@@ -847,6 +852,8 @@ CREATE TABLE crm_knowledge (
     file_size BIGINT DEFAULT 0,
     mime_type VARCHAR(100),
     customer_id BIGINT,
+    employee_id BIGINT,
+    relation_id BIGINT,
     summary TEXT,
     content_text TEXT,
     status SMALLINT DEFAULT 1,
@@ -861,6 +868,8 @@ CREATE TABLE crm_knowledge (
 );
 
 CREATE INDEX idx_knowledge_customer_id ON crm_knowledge (customer_id);
+CREATE INDEX idx_knowledge_employee_id ON crm_knowledge (employee_id);
+CREATE INDEX idx_knowledge_relation_id ON crm_knowledge (relation_id);
 CREATE INDEX idx_knowledge_type ON crm_knowledge (type);
 CREATE INDEX idx_knowledge_upload_user_id ON crm_knowledge (upload_user_id);
 
@@ -952,6 +961,10 @@ CREATE TABLE crm_task (
     status VARCHAR(20) DEFAULT 'pending',
     assigned_to BIGINT,
     customer_id BIGINT,
+    relation_id BIGINT,
+    project_id BIGINT,
+    lane_id BIGINT,
+    source_follow_up_id BIGINT,
     generated_by_ai SMALLINT DEFAULT 0,
     ai_context TEXT,
     value_priority_score INTEGER,
@@ -968,6 +981,9 @@ CREATE TABLE crm_task (
 
 CREATE INDEX idx_task_assigned_to ON crm_task (assigned_to);
 CREATE INDEX idx_task_customer_id ON crm_task (customer_id);
+CREATE INDEX idx_task_relation_id ON crm_task (relation_id);
+CREATE INDEX idx_task_project_id ON crm_task (project_id);
+CREATE INDEX idx_task_lane_id ON crm_task (lane_id);
 CREATE INDEX idx_task_status ON crm_task (status);
 CREATE INDEX idx_task_due_date ON crm_task (due_date);
 
@@ -1400,3 +1416,35 @@ INSERT INTO crm_chat_message (message_id, session_id, role, content, tokens_used
 3. 保持与技术决策人的沟通频率
 
 需要我帮您做什么进一步的操作吗？', 280, 'gpt-3.5-turbo', NOW());
+-- Global search index
+CREATE TABLE IF NOT EXISTS crm_global_search_index (
+    search_id BIGSERIAL PRIMARY KEY,
+    entity_type VARCHAR(30) NOT NULL,
+    entity_id BIGINT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    subtitle VARCHAR(255),
+    summary TEXT,
+    search_text TEXT NOT NULL DEFAULT '',
+    customer_id BIGINT,
+    customer_name VARCHAR(255),
+    owner_user_id BIGINT,
+    customer_owner_id BIGINT,
+    assigned_user_id BIGINT,
+    upload_user_id BIGINT,
+    create_user_id BIGINT,
+    participant_user_ids TEXT,
+    route_path VARCHAR(500),
+    sort_time TIMESTAMP,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_global_search_entity UNIQUE (entity_type, entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_global_search_entity_type ON crm_global_search_index (entity_type);
+CREATE INDEX IF NOT EXISTS idx_global_search_customer_id ON crm_global_search_index (customer_id);
+CREATE INDEX IF NOT EXISTS idx_global_search_owner_user_id ON crm_global_search_index (owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_global_search_customer_owner_id ON crm_global_search_index (customer_owner_id);
+CREATE INDEX IF NOT EXISTS idx_global_search_assigned_user_id ON crm_global_search_index (assigned_user_id);
+CREATE INDEX IF NOT EXISTS idx_global_search_upload_user_id ON crm_global_search_index (upload_user_id);
+CREATE INDEX IF NOT EXISTS idx_global_search_create_user_id ON crm_global_search_index (create_user_id);
+CREATE INDEX IF NOT EXISTS idx_global_search_sort_time ON crm_global_search_index (sort_time DESC);

@@ -1,14 +1,10 @@
 package com.kakarote.ai_crm.controller;
 
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.IdUtil;
-import cn.hutool.core.util.StrUtil;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
-import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAddBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
@@ -24,9 +20,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
@@ -37,14 +34,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 跟进记录控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/followup")
 @Tag(name = "跟进记录")
@@ -59,6 +54,9 @@ public class FollowUpController {
     @Autowired
     private FileStorageService fileStorageService;
 
+    /**
+     * 添加跟进记录。
+     */
     @PostMapping("/add")
     @Operation(summary = "添加跟进记录")
     @RequirePermission("followup:create")
@@ -67,14 +65,20 @@ public class FollowUpController {
         return Result.ok(followUpId);
     }
 
+    /**
+     * 更新跟进记录。
+     */
     @PostMapping("/update")
-    @Operation(summary = "Update follow-up record")
+    @Operation(summary = "更新跟进记录")
     @RequirePermission("followup:edit")
     public Result<String> update(@Valid @RequestBody FollowUpUpdateBO followUpUpdateBO) {
         followUpService.updateFollowUp(followUpUpdateBO);
         return Result.ok();
     }
 
+    /**
+     * 分页查询跟进记录。
+     */
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询跟进记录")
     @RequirePermission("followup:view")
@@ -82,6 +86,9 @@ public class FollowUpController {
         return Result.ok(followUpService.queryPageList(queryBO));
     }
 
+    /**
+     * 按客户查询跟进记录。
+     */
     @PostMapping("/queryByCustomer")
     @Operation(summary = "按客户查询跟进记录")
     @RequirePermission("followup:view")
@@ -90,6 +97,9 @@ public class FollowUpController {
         return Result.ok(followUpService.queryByCustomer(customerId));
     }
 
+    /**
+     * 删除跟进记录。
+     */
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除跟进记录")
     @RequirePermission("followup:delete")
@@ -98,6 +108,9 @@ public class FollowUpController {
         return Result.ok();
     }
 
+    /**
+     * AI 解析跟进内容。
+     */
     @PostMapping("/ai-parse")
     @Operation(summary = "AI 解析跟进内容")
     @RequirePermission("followup:create")
@@ -105,6 +118,9 @@ public class FollowUpController {
         return Result.ok(followUpService.aiParseFollowUp(parseBO));
     }
 
+    /**
+     * 使用 AI 分析附件。
+     */
     @PostMapping("/attachment/{attachmentId}/ai-analyze")
     @Operation(summary = "AI analyze follow-up attachment")
     @RequirePermission("followup:view")
@@ -112,6 +128,9 @@ public class FollowUpController {
         return Result.ok(followUpService.analyzeAttachment(attachmentId));
     }
 
+    /**
+     * 处理aiTranscribe方法逻辑。
+     */
     @PostMapping("/ai-transcribe")
     @Operation(summary = "AI audio transcription")
     @RequirePermission("followup:create")
@@ -119,48 +138,32 @@ public class FollowUpController {
         return Result.ok(aiAudioTranscriptionService.transcribe(file));
     }
 
-    @PostMapping("/attachment/upload")
-    @Operation(summary = "Upload follow-up attachment")
-    @RequirePermission("followup:create")
-    public Result<ChatSendBO.AttachmentDTO> uploadAttachment(@RequestPart("file") MultipartFile file) {
-        String originalName = StrUtil.blankToDefault(file.getOriginalFilename(), "attachment");
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        String ext = FileUtil.extName(originalName);
-        String storedName = IdUtil.fastSimpleUUID() + (StrUtil.isNotBlank(ext) ? "." + ext : "");
-        String objectKey = "followup/" + datePath + "/" + storedName;
-        fileStorageService.upload(file, objectKey);
-
-        ChatSendBO.AttachmentDTO dto = new ChatSendBO.AttachmentDTO();
-        dto.setFileName(originalName);
-        dto.setFilePath(objectKey);
-        dto.setFileSize(file.getSize());
-        dto.setMimeType(file.getContentType());
-        return Result.ok(dto);
-    }
-
+    /**
+     * 预览附件HTML。
+     */
     @GetMapping("/attachment/{attachmentId}/preview-html")
-    @Operation(summary = "Preview follow-up attachment as HTML")
+    @Operation(summary = "Preview follow-up .doc attachment as HTML")
     @RequirePermission("followup:view")
     public Result<String> previewAttachmentHtml(@PathVariable Long attachmentId) {
         FollowUpAttachmentVO attachment = followUpService.getAttachment(attachmentId);
-        String fileName = StrUtil.blankToDefault(attachment.getFileName(), "");
-        String lowerName = fileName.toLowerCase(Locale.ROOT);
-        if (!lowerName.endsWith(".doc") || lowerName.endsWith(".docx")) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Only .doc files support HTML preview");
+        String fileName = attachment.getFileName();
+        String fileNameLower = fileName != null ? fileName.toLowerCase() : "";
+        if (!fileNameLower.endsWith(".doc") || fileNameLower.endsWith(".docx")) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "该文件不是 .doc 格式");
         }
-        if (StrUtil.isBlank(attachment.getFilePath())) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Attachment file path is empty");
-        }
-
         try (InputStream inputStream = fileStorageService.getFileStream(attachment.getFilePath())) {
             return Result.ok(DocToHtmlConverter.convertToHtml(inputStream));
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "Document conversion failed");
+            log.error("Failed to convert .doc follow-up attachment to HTML, attachmentId={}", attachmentId, e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_ERROR, "文档转换失败，请下载后查看");
         }
     }
 
+    /**
+     * 下载附件。
+     */
     @GetMapping("/attachment/{attachmentId}/download")
     @Operation(summary = "Download follow-up attachment")
     @RequirePermission("followup:view")
@@ -171,7 +174,7 @@ public class FollowUpController {
 
         MediaType mediaType = MediaTypeFactory.getMediaType(attachment.getFileName())
             .orElse(MediaType.APPLICATION_OCTET_STREAM);
-        if (StrUtil.isNotBlank(attachment.getMimeType())) {
+        if (attachment.getMimeType() != null && !attachment.getMimeType().isBlank()) {
             try {
                 mediaType = MediaType.parseMediaType(attachment.getMimeType());
             } catch (Exception ignored) {
@@ -188,13 +191,5 @@ public class FollowUpController {
             builder.contentLength(attachment.getFileSize());
         }
         return builder.body(resource);
-    }
-
-    @PostMapping("/attachment/{attachmentId}/delete")
-    @Operation(summary = "Delete follow-up attachment")
-    @RequirePermission("followup:delete")
-    public Result<String> deleteAttachment(@PathVariable Long attachmentId) {
-        followUpService.deleteAttachment(attachmentId);
-        return Result.ok();
     }
 }

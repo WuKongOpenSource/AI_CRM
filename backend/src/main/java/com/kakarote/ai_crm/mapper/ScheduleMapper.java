@@ -1,13 +1,14 @@
 package com.kakarote.ai_crm.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
 import com.kakarote.ai_crm.entity.PO.Schedule;
-import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.Date;
 import java.util.List;
@@ -29,14 +30,21 @@ public interface ScheduleMapper extends BaseMapper<Schedule> {
     List<ScheduleVO> getMySchedules(@Param("userId") Long userId,
                                      @Param("filter") String filter,
                                      @Param("today") Date today,
-                                     @Param("weekEnd") Date weekEnd);
+                                     @Param("weekEnd") Date weekEnd,
+                                     @Param("allData") Boolean allData,
+                                     @Param("userIds") List<Long> userIds);
 
-    Long countGlobalSearch(@Param("keyword") String keyword,
-                           @Param("pattern") String pattern,
-                           @Param("userId") Long userId);
+    /**
+     * 查询按ID忽略数据权限。
+     */
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_schedule WHERE schedule_id = #{scheduleId}")
+    Schedule selectByIdIgnoreDataPermission(@Param("scheduleId") Long scheduleId);
 
-    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
-                                            @Param("pattern") String pattern,
-                                            @Param("userId") Long userId,
-                                            @Param("limit") int limit);
+    /**
+     * 查询按客户ID忽略数据权限。
+     */
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_schedule WHERE customer_id = #{customerId}")
+    List<Schedule> selectByCustomerIdIgnoreDataPermission(@Param("customerId") Long customerId);
 }

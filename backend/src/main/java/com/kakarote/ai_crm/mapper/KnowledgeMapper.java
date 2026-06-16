@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
-import com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -30,10 +29,23 @@ public interface KnowledgeMapper extends BaseMapper<Knowledge> {
      */
     KnowledgeVO getKnowledgeById(@Param("knowledgeId") Long knowledgeId);
 
+    /**
+     * 查询按ID忽略数据权限。
+     */
     @InterceptorIgnore(dataPermission = "true")
     @Select("SELECT * FROM crm_knowledge WHERE knowledge_id = #{knowledgeId}")
     Knowledge selectByIdIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId);
 
+    /**
+     * 查询按客户ID忽略数据权限。
+     */
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("SELECT * FROM crm_knowledge WHERE customer_id = #{customerId}")
+    List<Knowledge> selectByCustomerIdIgnoreDataPermission(@Param("customerId") Long customerId);
+
+    /**
+     * 更新WEKnora信息忽略数据权限。
+     */
     @InterceptorIgnore(dataPermission = "true")
     @Update("""
             UPDATE crm_knowledge
@@ -45,6 +57,9 @@ public interface KnowledgeMapper extends BaseMapper<Knowledge> {
                                               @Param("weKnoraKnowledgeId") String weKnoraKnowledgeId,
                                               @Param("parseStatus") String parseStatus);
 
+    /**
+     * 更新解析状态忽略数据权限。
+     */
     @InterceptorIgnore(dataPermission = "true")
     @Update("""
             UPDATE crm_knowledge
@@ -53,10 +68,4 @@ public interface KnowledgeMapper extends BaseMapper<Knowledge> {
             """)
     int updateParseStatusIgnoreDataPermission(@Param("knowledgeId") Long knowledgeId,
                                               @Param("parseStatus") String parseStatus);
-
-    Long countGlobalSearch(@Param("keyword") String keyword, @Param("pattern") String pattern);
-
-    List<GlobalSearchResultVO> globalSearch(@Param("keyword") String keyword,
-                                            @Param("pattern") String pattern,
-                                            @Param("limit") int limit);
 }

@@ -34,6 +34,9 @@ public class AiCustomerMatcher {
     @Autowired
     private ICustomerService customerService;
 
+    /**
+     * 处理match方法逻辑。
+     */
     public CustomerMatchResult match(String rawName) {
         String input = normalizeRawInput(rawName);
         if (input == null) {
@@ -90,6 +93,9 @@ public class AiCustomerMatcher {
         return CustomerMatchResult.matched(input, best.getCustomer(), topCandidates);
     }
 
+    /**
+     * 查找BestIgnoring数据权限。
+     */
     private ScoredCustomer findBestIgnoringDataPermission(String input,
                                                           List<String> searchKeywords,
                                                           Iterable<Long> accessibleCustomerIds) {
@@ -113,14 +119,23 @@ public class AiCustomerMatcher {
             .orElse(null);
     }
 
+    /**
+     * 判断是否Usable编号AccessMatch。
+     */
     private boolean isUsableNoAccessMatch(ScoredCustomer scoredCustomer) {
         return scoredCustomer != null && scoredCustomer.getScore() >= MIN_MATCH_SCORE;
     }
 
+    /**
+     * 判断是否HighConfidence编号AccessMatch。
+     */
     private boolean isHighConfidenceNoAccessMatch(ScoredCustomer scoredCustomer) {
         return scoredCustomer != null && scoredCustomer.getScore() >= 930;
     }
 
+    /**
+     * 处理collect精确Matches方法逻辑。
+     */
     private void collectExactMatches(String keyword, Map<Long, Customer> candidateMap) {
         if (StrUtil.isBlank(keyword)) {
             return;
@@ -135,6 +150,9 @@ public class AiCustomerMatcher {
         exactMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
     }
 
+    /**
+     * 处理collect模糊Matches方法逻辑。
+     */
     private void collectLikeMatches(String keyword, Map<Long, Customer> candidateMap) {
         if (StrUtil.isBlank(keyword) || keyword.length() < 2) {
             return;
@@ -150,6 +168,9 @@ public class AiCustomerMatcher {
         likeMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
     }
 
+    /**
+     * 处理collect精确MatchesIgnoringDataPermission方法逻辑。
+     */
     private void collectExactMatchesIgnoringDataPermission(String keyword, Map<Long, Customer> candidateMap) {
         if (StrUtil.isBlank(keyword)) {
             return;
@@ -159,6 +180,9 @@ public class AiCustomerMatcher {
         exactMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
     }
 
+    /**
+     * 处理collect模糊MatchesIgnoringDataPermission方法逻辑。
+     */
     private void collectLikeMatchesIgnoringDataPermission(String keyword, Map<Long, Customer> candidateMap) {
         if (StrUtil.isBlank(keyword) || keyword.length() < 2) {
             return;
@@ -168,6 +192,9 @@ public class AiCustomerMatcher {
         likeMatches.forEach(customer -> candidateMap.putIfAbsent(customer.getCustomerId(), customer));
     }
 
+    /**
+     * 构建搜索Keywords。
+     */
     private List<String> buildSearchKeywords(String input) {
         LinkedHashSet<String> keywords = new LinkedHashSet<>();
         addKeyword(keywords, input);
@@ -187,6 +214,9 @@ public class AiCustomerMatcher {
         return new ArrayList<>(keywords);
     }
 
+    /**
+     * 新增Keyword。
+     */
     private void addKeyword(LinkedHashSet<String> keywords, String keyword) {
         if (StrUtil.isBlank(keyword)) {
             return;
@@ -198,6 +228,9 @@ public class AiCustomerMatcher {
         keywords.add(trimmed);
     }
 
+    /**
+     * 处理calculateBestScore方法逻辑。
+     */
     private int calculateBestScore(Customer customer, String rawInput, List<String> searchKeywords) {
         String companyName = StrUtil.blankToDefault(StrUtil.trim(customer.getCompanyName()), "");
         String normalizedCompany = normalizeForComparison(companyName);
@@ -237,6 +270,9 @@ public class AiCustomerMatcher {
         return best;
     }
 
+    /**
+     * 处理countSharedCharacters方法逻辑。
+     */
     private int countSharedCharacters(String left, String right) {
         int count = 0;
         for (char ch : right.toCharArray()) {
@@ -247,6 +283,9 @@ public class AiCustomerMatcher {
         return count;
     }
 
+    /**
+     * 标准化RAW输入。
+     */
     private String normalizeRawInput(String value) {
         String normalized = StrUtil.trim(value);
         if (StrUtil.isBlank(normalized) || "null".equalsIgnoreCase(normalized)) {
@@ -255,6 +294,9 @@ public class AiCustomerMatcher {
         return normalized;
     }
 
+    /**
+     * 标准化用于Comparison。
+     */
     private String normalizeForComparison(String value) {
         String normalized = stripConversationNoise(value);
         normalized = removeSeparators(normalized);
@@ -263,6 +305,9 @@ public class AiCustomerMatcher {
         return normalized;
     }
 
+    /**
+     * 处理stripConversationNoise方法逻辑。
+     */
     private String stripConversationNoise(String value) {
         if (StrUtil.isBlank(value)) {
             return "";
@@ -298,6 +343,9 @@ public class AiCustomerMatcher {
         return result;
     }
 
+    /**
+     * 移除Separators。
+     */
     private String removeSeparators(String value) {
         if (StrUtil.isBlank(value)) {
             return "";
@@ -305,6 +353,9 @@ public class AiCustomerMatcher {
         return SEPARATOR_PATTERN.matcher(value).replaceAll("");
     }
 
+    /**
+     * 处理stripLegalSuffixes方法逻辑。
+     */
     private String stripLegalSuffixes(String value) {
         if (StrUtil.isBlank(value)) {
             return "";
@@ -333,6 +384,9 @@ public class AiCustomerMatcher {
         private final List<Customer> candidateCustomers;
         private final MatchStatus status;
 
+        /**
+         * 处理CustomerMatchResult方法逻辑。
+         */
         private CustomerMatchResult(String rawName, Customer customer, List<Customer> candidateCustomers, MatchStatus status) {
             this.rawName = rawName;
             this.customer = customer;
@@ -340,30 +394,51 @@ public class AiCustomerMatcher {
             this.status = status;
         }
 
+        /**
+         * 处理matched方法逻辑。
+         */
         public static CustomerMatchResult matched(String rawName, Customer customer, List<Customer> candidateCustomers) {
             return new CustomerMatchResult(rawName, customer, candidateCustomers, MatchStatus.MATCHED);
         }
 
+        /**
+         * 处理notFound方法逻辑。
+         */
         public static CustomerMatchResult notFound(String rawName, List<Customer> candidateCustomers) {
             return new CustomerMatchResult(rawName, null, candidateCustomers, MatchStatus.NOT_FOUND);
         }
 
+        /**
+         * 处理ambiguous方法逻辑。
+         */
         public static CustomerMatchResult ambiguous(String rawName, List<Customer> candidateCustomers) {
             return new CustomerMatchResult(rawName, null, candidateCustomers, MatchStatus.AMBIGUOUS);
         }
 
+        /**
+         * 处理existsNoAccess方法逻辑。
+         */
         public static CustomerMatchResult existsNoAccess(String rawName, Customer customer) {
             return new CustomerMatchResult(rawName, customer, List.of(), MatchStatus.EXISTS_NO_ACCESS);
         }
 
+        /**
+         * 判断是否Matched。
+         */
         public boolean isMatched() {
             return status == MatchStatus.MATCHED && customer != null;
         }
 
+        /**
+         * 判断是否Ambiguous。
+         */
         public boolean isAmbiguous() {
             return status == MatchStatus.AMBIGUOUS;
         }
 
+        /**
+         * 判断是否Exists编号Access。
+         */
         public boolean isExistsNoAccess() {
             return status == MatchStatus.EXISTS_NO_ACCESS;
         }
@@ -378,6 +453,9 @@ public class AiCustomerMatcher {
                 + "。当前用户没有这个客户的权限，无法" + actionLabel + "。";
         }
 
+        /**
+         * 格式化Candidate名称。
+         */
         public String formatCandidateNames() {
             return candidateCustomers.stream()
                 .map(Customer::getCompanyName)
@@ -398,6 +476,9 @@ public class AiCustomerMatcher {
         private final Customer customer;
         private final int score;
 
+        /**
+         * 处理ScoredCustomer方法逻辑。
+         */
         private ScoredCustomer(Customer customer, int score) {
             this.customer = customer;
             this.score = score;

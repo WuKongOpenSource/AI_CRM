@@ -19,6 +19,9 @@ public enum RealmTypeEnum {
     private int value;
     private String name;
 
+    /**
+     * 解析名称。
+     */
     public static String  parseName(int type){
         for(RealmTypeEnum value : RealmTypeEnum.values()){
             if(value.value == type){
@@ -29,6 +32,9 @@ public enum RealmTypeEnum {
     }
 
 
+    /**
+     * 处理valueOfType方法逻辑。
+     */
     public static int  valueOfType(String name){
         for(RealmTypeEnum value : RealmTypeEnum.values()){
             if(value.name.equals(name)){
@@ -37,10 +43,16 @@ public enum RealmTypeEnum {
         }
         return -1;
     }
+    /**
+     * 获取名称。
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * 获取值。
+     */
     public int getValue() {
         return value;
     }

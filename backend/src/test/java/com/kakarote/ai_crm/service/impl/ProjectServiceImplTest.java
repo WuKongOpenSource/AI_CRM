@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.BO.ProjectBO;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
@@ -20,6 +21,7 @@ import com.kakarote.ai_crm.mapper.ProjectScheduleMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskAttachmentMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import com.kakarote.ai_crm.service.IKnowledgeService;
+import com.kakarote.ai_crm.service.ISystemConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -69,6 +72,12 @@ class ProjectServiceImplTest {
     @Mock
     private IKnowledgeService knowledgeService;
 
+    @Mock
+    private ISystemConfigService systemConfigService;
+
+    @Mock
+    private JdbcTemplate jdbcTemplate;
+
     private ProjectServiceImpl projectService;
 
     @BeforeEach
@@ -82,7 +91,10 @@ class ProjectServiceImplTest {
             projectScheduleMapper,
             manageUserMapper,
             customerMapper,
-            knowledgeService
+            knowledgeService,
+            systemConfigService,
+            jdbcTemplate,
+            new ObjectMapper()
         );
         setCurrentUser(1001L);
     }

@@ -9,15 +9,15 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-@Schema(name = "KnowledgeTargetedScriptBO", description = "Targeted sales script request")
+@Schema(name = "KnowledgeTargetedScriptBO", description = "定向销售话术生成请求")
 public class KnowledgeTargetedScriptBO {
 
-    @NotEmpty(message = "Please select at least one reference document")
-    @Size(max = 4, message = "At most 4 reference documents can be selected")
-    @Schema(description = "Reference knowledge IDs", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotEmpty(message = "请至少选择一份参考文档")
+    @Size(max = 4, message = "最多只能选择 4 份参考文档")
+    @Schema(description = "参考文档 ID 列表", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<Long> knowledgeIds;
 
-    @NotNull(message = "Please select target customer")
-    @Schema(description = "Target customer ID", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "请选择目标客户")
+    @Schema(description = "目标客户 ID", requiredMode = Schema.RequiredMode.REQUIRED)
     private Long customerId;
 }

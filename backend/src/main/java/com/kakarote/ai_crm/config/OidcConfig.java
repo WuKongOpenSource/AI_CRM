@@ -26,9 +26,6 @@ import java.util.UUID;
 @ConfigurationProperties(prefix = "oidc")
 public class OidcConfig {
 
-    /**
-     * OIDC 客户端 ID
-     */
     private String clientId = "minio-console";
 
     /**
@@ -68,6 +65,9 @@ public class OidcConfig {
 
     /**
      * 应用启动时生成 RSA 密钥对
+     */
+    /**
+     * OIDC 客户端 ID
      */
     @PostConstruct
     public void init() {

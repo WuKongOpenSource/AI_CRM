@@ -20,6 +20,9 @@ public class UserDetailsUserServiceImpl implements UserDetailsService {
     @Resource
     private ManageUserService manageUserService;
 
+    /**
+     * 加载用户按Username。
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         LoginUser loginUser = new LoginUser();

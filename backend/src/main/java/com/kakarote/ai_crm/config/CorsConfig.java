@@ -15,6 +15,9 @@ import java.util.Collections;
 @Configuration
 public class CorsConfig {
 
+    /**
+     * 处理corsFilter方法逻辑。
+     */
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();

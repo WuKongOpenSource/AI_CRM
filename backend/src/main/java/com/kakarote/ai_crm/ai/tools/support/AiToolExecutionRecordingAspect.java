@@ -11,6 +11,10 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 
+/**
+ * Captures every Spring AI tool result, including permission-denial strings
+ * returned by inner aspects, so ChatService can surface failures deterministically.
+ */
 @Aspect
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)

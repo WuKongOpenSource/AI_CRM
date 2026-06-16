@@ -4,14 +4,19 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
+/**
+ * Lets the model explicitly choose "no CRM business tool needed" when CRM tool
+ * calling is required for a turn.
+ */
 @Component
 public class CrmNoopTools {
 
-    @Tool(description = "Use this when the user asks a CRM-related question that does not require creating, updating, deleting, or querying business data with another tool.")
-    public String directAnswer(
-            @ToolParam(description = "Brief reason why no data operation is required", required = false) String reason) {
-        return reason == null || reason.isBlank()
-                ? "No CRM data operation is required. Answer the user directly."
-                : "No CRM data operation is required: " + reason.trim();
+    @Tool(description = "当用户只是咨询、解释、闲聊、讨论操作方法，或问题不需要读取/创建/更新/删除 CRM 业务数据时调用。用户要求创建、新增、添加、记录、安排、更新、修改、删除客户、联系人、任务、日程或跟进记录时，禁止调用此工具，必须选择对应 CRM 业务工具。")
+    public String answerDirectly(
+            @ToolParam(description = "为什么本轮不需要读取或写入 CRM 业务数据", required = false) String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "本轮不需要调用 CRM 业务数据工具，请直接回答用户。";
+        }
+        return "本轮不需要调用 CRM 业务数据工具，请直接回答用户。原因：" + reason;
     }
 }

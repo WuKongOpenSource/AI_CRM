@@ -3378,7 +3378,7 @@ function appendSelectedFiles(files: File[]) {
     return
   }
 
-  const result = mergeChatFiles(selectedFiles.value, files.slice(0, slotsLeft), selectedKnowledgeItems.value.length)
+  const result = mergeChatFiles(selectedFiles.value, files.slice(0, slotsLeft))
   if (result.error) {
     ElMessage.warning(result.error)
     return
@@ -3709,7 +3709,7 @@ function openMobileMainMenu() {
 
 function handleMobileHeaderTitle() {
   if (chatObjectKind.value === 'customer') {
-    openSelectedCustomerBasicInfo()
+    openMobileObjectDetail()
     return
   }
   if (chatObjectKind.value) openMobileObjectDetail()
@@ -3854,13 +3854,6 @@ function formatSessionTime(dateStr: string): string {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function formatTime(date: Date): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date)
 }
 
 function resolveChatAppIcon(code: string): string {

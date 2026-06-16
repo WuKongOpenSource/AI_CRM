@@ -30,6 +30,15 @@
         <if test="query.scheduleId != null">
             AND s.schedule_id = #{query.scheduleId}
         </if>
+        <if test="query.customerId != null">
+            AND s.customer_id = #{query.customerId}
+        </if>
+        <if test="query.relationId != null">
+            AND s.relation_id = #{query.relationId}
+        </if>
+        <if test="query.participantUserId != null">
+            AND (',' || COALESCE(s.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.participantUserId} AS TEXT) || ',%')
+        </if>
         <if test="query.keyword != null and query.keyword != ''">
             AND (
                 s.title LIKE CONCAT('%', #{query.keyword}, '%')
@@ -40,12 +49,6 @@
                 OR COALESCE(ct.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
             )
         </if>
-        <if test="query.customerId != null">
-            AND s.customer_id = #{query.customerId}
-        </if>
-        <if test="query.relationId != null">
-            AND s.relation_id = #{query.relationId}
-        </if>
         <if test="query.type != null and query.type != ''">
             AND s.type = #{query.type}
         </if>
@@ -55,10 +58,29 @@
         <if test="query.endDate != null">
             AND s.start_time &lt;= #{query.endDate}
         </if>
-        <if test="query.participantUserId != null">
+        <if test="query.currentUserId != null">
             AND (
-                s.create_user_id = #{query.participantUserId}
-                OR CONCAT(',', COALESCE(s.participant_user_ids, ''), ',') LIKE CONCAT('%,', #{query.participantUserId}, ',%')
+                (
+                    s.relation_id IS NULL
+                    AND (
+                        <choose>
+                            <when test="query.scheduleAllData != null and query.scheduleAllData">
+                                1 = 1
+                            </when>
+                            <when test="query.scheduleUserIds != null and query.scheduleUserIds.size() > 0">
+                                s.create_user_id IN
+                                <foreach collection="query.scheduleUserIds" item="userId" open="(" separator="," close=")">
+                                    #{userId}
+                                </foreach>
+                            </when>
+                            <otherwise>
+                                1 = 0
+                            </otherwise>
+                        </choose>
+                        OR (',' || COALESCE(s.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.currentUserId} AS TEXT) || ',%')
+                    )
+                )
+                OR (s.relation_id IS NOT NULL AND s.create_user_id = #{query.currentUserId})
             )
         </if>
         ORDER BY s.start_time DESC
@@ -85,9 +107,32 @@
             s.create_time
         FROM crm_schedule s
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
         LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON s.create_user_id = u.user_id
-        WHERE s.create_user_id = #{userId}
+        WHERE (
+            (
+                s.relation_id IS NULL
+                AND (
+                    <choose>
+                        <when test="allData != null and allData">
+                            1 = 1
+                        </when>
+                        <when test="userIds != null and userIds.size() > 0">
+                            s.create_user_id IN
+                            <foreach collection="userIds" item="scopeUserId" open="(" separator="," close=")">
+                                #{scopeUserId}
+                            </foreach>
+                            OR (',' || COALESCE(s.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{userId} AS TEXT) || ',%')
+                        </when>
+                        <otherwise>
+                            1 = 0
+                        </otherwise>
+                    </choose>
+                )
+            )
+            OR (s.relation_id IS NOT NULL AND s.create_user_id = #{userId})
+        )
         <if test="filter == 'today'">
             AND DATE(s.start_time) = CURRENT_DATE
         </if>
@@ -96,46 +141,6 @@
             AND s.start_time &lt;= #{weekEnd}
         </if>
         ORDER BY s.start_time ASC
-    </select>
-
-    <sql id="scheduleGlobalSearchConditions">
-        s.create_user_id = #{userId}
-        AND (
-            LOWER(COALESCE(s.title, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(s.description, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(s.location, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(c.company_name, '')) LIKE LOWER(#{pattern})
-            OR LOWER(COALESCE(ct.name, '')) LIKE LOWER(#{pattern})
-        )
-    </sql>
-
-    <select id="countGlobalSearch" resultType="java.lang.Long">
-        SELECT COUNT(*)
-        FROM crm_schedule s
-        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
-        LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
-        LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
-        WHERE <include refid="scheduleGlobalSearchConditions"/>
-    </select>
-
-    <select id="globalSearch" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
-        SELECT
-            'schedule' AS type,
-            s.schedule_id AS record_id,
-            s.title,
-            CONCAT_WS(' · ', NULLIF(c.company_name, ''), NULLIF(s.type, ''), NULLIF(s.location, '')) AS subtitle,
-            s.description AS content,
-            s.customer_id,
-            s.contact_id,
-            s.start_time AS event_time,
-            s.create_time,
-            s.create_time AS update_time
-        FROM crm_schedule s
-        LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
-        LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
-        WHERE <include refid="scheduleGlobalSearchConditions"/>
-        ORDER BY s.start_time DESC NULLS LAST, s.schedule_id DESC
-        LIMIT #{limit}
     </select>
 
 </mapper>

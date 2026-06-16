@@ -826,7 +826,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
     }
 
     @Data
-    private static class ExternalProfile {
+    static class ExternalProfile {
         private String subject;
         private String email;
         private Boolean emailVerified;

@@ -27,38 +27,32 @@ public class ChatSessionVO {
     @Schema(description = "关联客户ID")
     private Long customerId;
 
+    @Schema(description = "关联客户名称")
+    private String customerName;
+
+    @Schema(description = "关联客户Logo访问地址")
+    private String customerLogoUrl;
+
     @Schema(description = "关联员工ID")
     private Long employeeId;
+
+    @Schema(description = "关联员工姓名")
+    private String employeeName;
+
+    @Schema(description = "关联员工头像访问地址")
+    private String employeeAvatarUrl;
 
     @Schema(description = "关联关系人ID")
     private Long relationId;
 
-    @Schema(description = "关联产品ID")
-    private Long productId;
-
-    @Schema(description = "关联项目ID")
-    private Long projectId;
-
-    @Schema(description = "关联项目任务ID")
-    private Long projectTaskId;
-
-    @Schema(description = "关联客户名称")
-    private String customerName;
-
-    @Schema(description = "关联客户Logo访问URL")
-    private String customerLogoUrl;
-
-    @Schema(description = "关联员工名称")
-    private String employeeName;
-
-    @Schema(description = "关联员工头像访问URL")
-    private String employeeAvatarUrl;
-
-    @Schema(description = "关联关系人名称")
+    @Schema(description = "关联关系人姓名")
     private String relationName;
 
-    @Schema(description = "关联关系人头像访问URL")
+    @Schema(description = "关联关系人头像访问地址")
     private String relationAvatarUrl;
+
+    @Schema(description = "关联产品ID")
+    private Long productId;
 
     @Schema(description = "关联产品名称")
     private String productName;
@@ -66,25 +60,31 @@ public class ChatSessionVO {
     @Schema(description = "关联产品编码")
     private String productCode;
 
-    @Schema(description = "关联产品图片访问URL")
+    @Schema(description = "Product image URL")
     private String productImageUrl;
+
+    @Schema(description = "关联项目ID")
+    private Long projectId;
 
     @Schema(description = "关联项目名称")
     private String projectName;
 
-    @Schema(description = "关联项目任务标题")
-    private String projectTaskTitle;
+    @Schema(description = "关联项目任务ID")
+    private Long projectTaskId;
 
-    @Schema(description = "Application code")
-    private String appCode;
+    @Schema(description = "关联项目任务名称")
+    private String projectTaskTitle;
 
     @Schema(description = "会话标题")
     private String title;
 
-    @Schema(description = "Pinned")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/product")
+    private String appCode;
+
+    @Schema(description = "Whether the session is pinned")
     private Boolean pinned;
 
-    @Schema(description = "Pinned time")
+    @Schema(description = "Last time the session was pinned")
     private Date pinnedTime;
 
     @Schema(description = "状态")

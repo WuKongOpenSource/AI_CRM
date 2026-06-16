@@ -19,6 +19,9 @@ public enum ChatRoleEnum {
         this.name = name;
     }
 
+    /**
+     * 处理fromCode方法逻辑。
+     */
     public static ChatRoleEnum fromCode(String code) {
         for (ChatRoleEnum role : values()) {
             if (role.getCode().equals(code)) {
@@ -28,6 +31,9 @@ public enum ChatRoleEnum {
         return null;
     }
 
+    /**
+     * 获取名称按验证码。
+     */
     public static String getNameByCode(String code) {
         ChatRoleEnum role = fromCode(code);
         return role != null ? role.getName() : code;

@@ -73,22 +73,88 @@ public class DataPermissionServiceImpl implements DataPermissionService {
         }
 
         List<Integer> dataScopes = managerRoleMenuMapper.queryDataScopesByUserIdAndModule(currentUserId, module);
-        if (dataScopes == null || dataScopes.isEmpty()) {
+        DataPermissionContext context = buildContextByScopes(currentUserId, dataScopes);
+        DataPermissionHolder.put(module, context);
+        return context;
+    }
+
+    @Override
+    public boolean hasUserDataAccess(String module, Long targetUserId) {
+        if (targetUserId == null) {
+            return false;
+        }
+        DataPermissionContext context = createContext(module);
+        return context.isAllData() || (context.getUserIds() != null && context.getUserIds().contains(targetUserId));
+    }
+
+    @Override
+    public DataPermissionContext createContextByPermission(String permission) {
+        String key = "permission:" + (permission == null ? "" : permission);
+        DataPermissionContext cached = DataPermissionHolder.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        Long currentUserId = UserUtil.getUserId();
+        if (currentUserId == null) {
             DataPermissionContext context = DataPermissionContext.none();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(key, context);
             return context;
         }
-        if (dataScopes.contains(SCOPE_ALL)) {
+        if (isSuperAdmin(currentUserId)) {
             DataPermissionContext context = DataPermissionContext.all();
-            DataPermissionHolder.put(module, context);
+            DataPermissionHolder.put(key, context);
             return context;
+        }
+
+        List<Integer> dataScopes = managerRoleMenuMapper.queryDataScopesByUserIdAndPermission(currentUserId, permission);
+        DataPermissionContext context = buildContextByScopes(currentUserId, dataScopes);
+        DataPermissionHolder.put(key, context);
+        return context;
+    }
+
+    @Override
+    public boolean hasUserDataAccessByPermission(String permission, Long targetUserId) {
+        if (targetUserId == null) {
+            return false;
+        }
+        DataPermissionContext context = createContextByPermission(permission);
+        return context.isAllData() || (context.getUserIds() != null && context.getUserIds().contains(targetUserId));
+    }
+
+    @Override
+    public void assertUserDataAccess(String module, Long targetUserId) {
+        if (!hasUserDataAccess(module, targetUserId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH);
+        }
+    }
+
+    @Override
+    public void assertUserDataAccessByPermission(String permission, Long targetUserId) {
+        if (!hasUserDataAccessByPermission(permission, targetUserId)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH);
+        }
+    }
+
+    private String resolveModule(String permission) {
+        if (permission == null || permission.isBlank()) {
+            return "";
+        }
+        int separator = permission.indexOf(':');
+        return separator > 0 ? permission.substring(0, separator) : permission;
+    }
+
+    private DataPermissionContext buildContextByScopes(Long currentUserId, List<Integer> dataScopes) {
+        if (dataScopes == null || dataScopes.isEmpty()) {
+            return DataPermissionContext.none();
+        }
+        if (dataScopes.contains(SCOPE_ALL)) {
+            return DataPermissionContext.all();
         }
 
         ManagerUser currentUser = manageUserMapper.getUserId(currentUserId);
         if (currentUser == null) {
-            DataPermissionContext context = DataPermissionContext.none();
-            DataPermissionHolder.put(module, context);
-            return context;
+            return DataPermissionContext.none();
         }
 
         List<ManagerUser> allUsers = manageUserMapper.selectList(
@@ -111,27 +177,9 @@ public class DataPermissionServiceImpl implements DataPermissionService {
             allowedUserIds.addAll(collectUsersByDeptIds(collectDeptIds(currentUser.getDeptId()), allUsers));
         }
 
-        DataPermissionContext context = allowedUserIds.isEmpty()
+        return allowedUserIds.isEmpty()
                 ? DataPermissionContext.none()
                 : DataPermissionContext.users(allowedUserIds);
-        DataPermissionHolder.put(module, context);
-        return context;
-    }
-
-    @Override
-    public boolean hasUserDataAccess(String module, Long targetUserId) {
-        if (targetUserId == null) {
-            return false;
-        }
-        DataPermissionContext context = createContext(module);
-        return context.isAllData() || (context.getUserIds() != null && context.getUserIds().contains(targetUserId));
-    }
-
-    @Override
-    public void assertUserDataAccess(String module, Long targetUserId) {
-        if (!hasUserDataAccess(module, targetUserId)) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_AUTH);
-        }
     }
 
     private boolean isSuperAdmin(Long userId) {

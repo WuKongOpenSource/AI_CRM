@@ -1,8 +1,9 @@
 package com.kakarote.ai_crm.entity.VO;
 
-import com.kakarote.ai_crm.entity.BO.CustomerFieldFilterBO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
+import com.kakarote.ai_crm.entity.BO.CustomerFieldFilterBO;
 
 import java.math.BigDecimal;
 import java.util.Date;

@@ -1,9 +1,6 @@
 .idea
 target
 *.iml
-src/test/*
-!src/test/java/
-!src/test/java/**
 logs
 src/main/webapp/public/**
 src/main/resources/public/**

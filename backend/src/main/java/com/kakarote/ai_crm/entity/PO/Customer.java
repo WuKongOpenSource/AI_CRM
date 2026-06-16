@@ -106,6 +106,26 @@ public class Customer implements Serializable {
     @Schema(description = "备注")
     private String remark;
 
+    @TableField("ai_status_detection")
+    @Schema(description = "AI status detection")
+    private String aiStatusDetection;
+
+    @TableField("ai_insight")
+    @Schema(description = "AI insight")
+    private String aiInsight;
+
+    @TableField("ai_parse_snapshot")
+    @Schema(description = "AI parse snapshot")
+    private String aiParseSnapshot;
+
+    @TableField("ai_analysis_status")
+    @Schema(description = "AI analysis status")
+    private String aiAnalysisStatus;
+
+    @TableField("ai_analysis_requested_at")
+    @Schema(description = "AI analysis requested time")
+    private Date aiAnalysisRequestedAt;
+
     /**
      * 主联系人姓名(冗余)
      */
@@ -135,6 +155,10 @@ public class Customer implements Serializable {
      */
     @Schema(description = "标签名称逗号分隔(冗余)")
     private String tagNames;
+
+    @TableField("search_text")
+    @Schema(description = "Search text")
+    private String searchText;
 
     /**
      * 状态: 0-禁用, 1-正常

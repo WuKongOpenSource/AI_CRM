@@ -451,10 +451,10 @@ export function useTeamManagement() {
           deptId: memberForm.deptId || undefined,
           parentId: memberForm.parentId || 0,
           employeeStatus: memberForm.employeeStatus,
-          password: memberForm.password || undefined
+          password: memberForm.password || undefined,
+          status: memberForm.status,
+          roleIds: memberForm.roleIds
         }
-        payload.status = memberForm.status
-        payload.roleIds = memberForm.roleIds
         await updateUserInfo(payload)
         ElMessage.success('员工更新成功')
         showAddMemberDialog.value = false
@@ -541,11 +541,18 @@ export function useTeamManagement() {
       ElMessage.warning('新用户名不能与当前用户名相同')
       return
     }
+    const resettingCurrentUser = String(member.userId) === String(userStore.userId)
+    if (resettingCurrentUser && !resetUsernameForm.currentPassword.trim()) {
+      ElMessage.warning('请输入当前登录密码')
+      return
+    }
+
     resettingUsername.value = true
     try {
       await resetUsername({
         userId: member.userId,
-        username
+        username,
+        currentPassword: resettingCurrentUser ? resetUsernameForm.currentPassword : undefined
       })
       ElMessage.success('用户名已重置')
       showResetUsernameDialog.value = false

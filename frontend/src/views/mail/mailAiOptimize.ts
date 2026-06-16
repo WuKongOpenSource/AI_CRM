@@ -65,6 +65,7 @@ export function resolveMailOptimizeFailureMessage(response: string): string | nu
     'AI 请求参数有误',
     'AI 服务商暂时不可用',
     'AI 服务返回错误',
+    'AI 服务暂时不可用',
     '抱歉，处理您的请求时发生错误',
   ]
   return knownFailurePrefixes.some(prefix => plainText.startsWith(prefix)) ? plainText : null

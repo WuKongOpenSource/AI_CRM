@@ -17,6 +17,9 @@ public class Knife4jConfiguration {
     @Value("${spring.application.name:common-web}")
     private String desc;
 
+    /**
+     * 创建RestAPI。
+     */
     @Bean
     public OpenAPI createRestApi() {
         OpenAPI openAPI = new OpenAPI();
@@ -24,6 +27,9 @@ public class Knife4jConfiguration {
         return openAPI;
     }
 
+    /**
+     * 处理api信息方法逻辑。
+     */
     private Info apiInfo() {
         return new Info()
                 .title(desc)

@@ -92,14 +92,13 @@ export interface Knowledge {
   contentText?: string
   aiAnalyzeResult?: KnowledgeAiAnalyzeVO
   aiAnalysisTime?: string
-  typeName?: string
   weKnoraParseStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'unsupported'
   createUserId: string
   createUserName?: string
   createTime: string
 }
 
-export type KnowledgeType = 'meeting' | 'email' | 'recording' | 'document' | 'proposal' | 'contract'
+export type KnowledgeType = 'MEETING' | 'EMAIL' | 'RECORDING' | 'DOCUMENT' | 'PROPOSAL' | 'CONTRACT'
 export type KnowledgeFileType = 'image' | 'document' | 'spreadsheet' | 'presentation' | 'pdf' | 'audio' | 'video'
 
 export interface KnowledgeAddBO {
@@ -120,22 +119,13 @@ export interface KnowledgeQueryBO {
   limit?: number
 }
 
-export interface KnowledgeAiSearchBO {
-  keyword: string
-  type?: KnowledgeType
-  limit?: number
-}
-
-export interface KnowledgeAiSearchReferenceItem {
-  knowledgeId: string
-  name: string
-  type?: KnowledgeType | string
-  customerName?: string
-  summary?: string
-  excerpt?: string
-  matchPercent?: number
-  fileSize?: number
-  createTime?: string
+export interface KnowledgeAiAnalyzeVO {
+  coreHighlights: string
+  talkingPoints: string[]
+  relatedEntities: Array<{
+    name: string
+    type: string
+  }>
 }
 
 export interface KnowledgeAiSearchVO {
@@ -144,7 +134,23 @@ export interface KnowledgeAiSearchVO {
   tookMs: number
   matchPercent: number
   totalHits: number
-  references: KnowledgeAiSearchReferenceItem[]
+  references: Array<{
+    knowledgeId: string
+    name: string
+    type: string
+    customerName?: string
+    summary?: string
+    excerpt?: string
+    matchPercent: number
+    fileSize?: number
+    createTime?: string
+  }>
+}
+
+export interface KnowledgeAiSearchBO {
+  keyword: string
+  type?: KnowledgeType
+  limit?: number
 }
 
 export interface KnowledgePreviewTokenVO {
@@ -156,15 +162,6 @@ export interface KnowledgePreviewTokenVO {
 export interface KnowledgeTargetedScriptBO {
   knowledgeIds: string[]
   customerId: string
-}
-
-export interface KnowledgeAiAnalyzeVO {
-  coreHighlights: string
-  talkingPoints: string[]
-  relatedEntities: Array<{
-    name: string
-    type: string
-  }>
 }
 
 // AI Agent types
@@ -206,6 +203,7 @@ export interface AiAgentUpdateBO {
 export interface ChatSession {
   sessionId: string
   title?: string
+  appCode?: string
   agentId?: string
   customerId?: string
   customerName?: string
@@ -224,35 +222,10 @@ export interface ChatSession {
   projectName?: string
   projectTaskId?: string
   projectTaskTitle?: string
-  appCode?: string
   pinned?: boolean
   pinnedTime?: string
   createTime: string
   updateTime: string
-}
-
-export interface ChatAppOption {
-  code: string
-  label: string
-  iconName?: string
-  description?: string
-  defaultRagEnabled?: boolean
-  recommendedQuestions?: string[]
-}
-
-export interface ChatModelOption {
-  provider: string
-  providerLabel?: string
-  modelName: string
-  displayName?: string
-  modelSource?: 'custom' | 'system' | string
-  icon?: string
-  capabilities?: {
-    supportsStream?: boolean
-    supportsToolCall?: boolean
-    supportsVision?: boolean
-    supportsAudioTranscription?: boolean
-  }
 }
 
 export interface ChatMessage {
@@ -263,10 +236,34 @@ export interface ChatMessage {
   functionCall?: string
   functionResult?: string
   tokensUsed?: number
-  tokens?: number
   modelName?: string
   attachments?: ChatAttachmentVO[]
   createTime: string
+}
+
+export interface ChatModelOption {
+  provider: string
+  providerLabel: string
+  modelName: string
+  displayName: string
+  modelSource: 'custom' | 'system'
+  capabilities?: {
+    supportsStream: boolean
+    supportsToolCall: boolean
+    supportsVision: boolean
+    supportsAudioTranscription: boolean
+  }
+  /** 模型图标 URL（可选）；缺省或加载失败时用首字占位 */
+  icon?: string
+}
+
+export interface ChatAppOption {
+  code: string
+  label: string
+  iconName?: string
+  description?: string
+  defaultRagEnabled: boolean
+  recommendedQuestions?: string[]
 }
 
 export interface ChatAttachmentVO {
@@ -289,18 +286,13 @@ export interface ChatSendBO {
   sessionId: string
   content: string
   attachments?: ChatAttachmentDTO[]
-  ragEnabled?: boolean
   appCode?: string
-  customerId?: string
-  employeeId?: string
-  relationId?: string
+  ragEnabled?: boolean
   productId?: string
-  projectId?: string
-  projectTaskId?: string
-  knowledgeIds?: string[]
   modelProvider?: string
   modelName?: string
-  modelSource?: string
+  /** 知识库文档 ID，服务端按 ID 限定 RAG，不经过文件下载上传 */
+  knowledgeIds?: string[]
 }
 
 // Enum types

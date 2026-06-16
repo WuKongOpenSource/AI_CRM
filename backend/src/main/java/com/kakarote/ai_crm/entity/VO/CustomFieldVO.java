@@ -30,8 +30,14 @@ public class CustomFieldVO {
     @Schema(description = "字段类型")
     private String fieldType;
 
+    @Schema(description = "字段来源: system/custom")
+    private String fieldSource;
+
     @Schema(description = "实际数据库列名")
     private String columnName;
+
+    @Schema(description = "实际数据库列类型")
+    private String columnType;
 
     @Schema(description = "默认值")
     private String defaultValue;
@@ -48,7 +54,7 @@ public class CustomFieldVO {
     @Schema(description = "是否在列表显示")
     private Boolean isShowInList;
 
-    @Schema(description = "Whether values must be unique")
+    @Schema(description = "是否唯一")
     private Boolean isUnique;
 
     @Schema(description = "选项列表")

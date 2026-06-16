@@ -4,17 +4,22 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
-@Schema(description = "AI解析跟进内容请求")
+@Schema(description = "AI follow-up parse request")
 public class FollowUpAiParseBO {
 
-    @NotBlank(message = "跟进内容不能为空")
-    @Schema(description = "用户输入的跟进文本内容")
+    @NotBlank(message = "Follow-up content cannot be blank")
+    @Schema(description = "User input content")
     private String content;
 
-    @Schema(description = "客户名称（提供上下文）")
+    @Schema(description = "Customer name")
     private String customerName;
 
-    @Schema(description = "客户ID")
+    @Schema(description = "Customer ID")
     private Long customerId;
+
+    @Schema(description = "Uploaded attachments")
+    private List<ChatSendBO.AttachmentDTO> attachments;
 }

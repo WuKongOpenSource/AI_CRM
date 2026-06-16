@@ -8,7 +8,7 @@ public class ProductCategoryAddBO {
 
     private Long parentId;
 
-    @NotBlank(message = "Category name is required")
+    @NotBlank(message = "类目名称不能为空")
     private String categoryName;
 
     private Integer sortOrder;

@@ -20,6 +20,9 @@ public class PermissionAspect {
     @Autowired
     private PermissionService permissionService;
 
+    /**
+     * 检查权限。
+     */
     @Around("@annotation(com.kakarote.ai_crm.common.auth.RequirePermission) || @within(com.kakarote.ai_crm.common.auth.RequirePermission)")
     public Object checkPermission(ProceedingJoinPoint joinPoint) throws Throwable {
         RequirePermission requirePermission = resolveAnnotation(joinPoint);
@@ -32,6 +35,9 @@ public class PermissionAspect {
         return joinPoint.proceed();
     }
 
+    /**
+     * 解析Annotation。
+     */
     private RequirePermission resolveAnnotation(ProceedingJoinPoint joinPoint) {
         Method method = ((MethodSignature) joinPoint.getSignature()).getMethod();
         RequirePermission methodAnnotation = AnnotationUtils.findAnnotation(method, RequirePermission.class);

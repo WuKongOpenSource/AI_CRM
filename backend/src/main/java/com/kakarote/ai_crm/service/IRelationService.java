@@ -9,6 +9,9 @@ import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.VO.RelationDetailVO;
 import com.kakarote.ai_crm.entity.VO.RelationVO;
 
+/**
+ * 关系人服务接口。
+ */
 public interface IRelationService extends IService<Relation> {
 
     Long addRelation(RelationAddBO relationAddBO);

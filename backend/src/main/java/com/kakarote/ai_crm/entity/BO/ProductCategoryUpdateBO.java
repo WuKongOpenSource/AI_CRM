@@ -7,10 +7,10 @@ import lombok.Data;
 @Data
 public class ProductCategoryUpdateBO {
 
-    @NotNull(message = "Category ID is required")
+    @NotNull(message = "类目ID不能为空")
     private Long categoryId;
 
-    @NotBlank(message = "Category name is required")
+    @NotBlank(message = "类目名称不能为空")
     private String categoryName;
 
     private Integer sortOrder;

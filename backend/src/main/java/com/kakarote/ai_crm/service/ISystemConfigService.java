@@ -21,6 +21,8 @@ public interface ISystemConfigService extends IService<SystemConfig> {
 
     Map<String, String> getConfigsByType(String configType);
 
+    void updateConfigsWithType(Map<String, String> configs, String configType);
+
     void updateConfig(String configKey, String configValue);
 
     void updateConfigs(Map<String, String> configs);

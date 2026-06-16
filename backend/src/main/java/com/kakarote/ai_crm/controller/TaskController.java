@@ -30,6 +30,9 @@ public class TaskController {
     @Autowired
     private ITaskService taskService;
 
+    /**
+     * 创建任务。
+     */
     @PostMapping("/add")
     @Operation(summary = "创建任务")
     @RequirePermission("task:create")
@@ -38,6 +41,9 @@ public class TaskController {
         return Result.ok(taskId);
     }
 
+    /**
+     * 更新任务。
+     */
     @PostMapping("/update")
     @Operation(summary = "更新任务")
     @RequirePermission("task:edit")
@@ -46,6 +52,9 @@ public class TaskController {
         return Result.ok();
     }
 
+    /**
+     * 删除任务。
+     */
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除任务")
     @RequirePermission("task:delete")
@@ -54,6 +63,9 @@ public class TaskController {
         return Result.ok();
     }
 
+    /**
+     * 分页查询任务。
+     */
     @PostMapping("/queryPageList")
     @Operation(summary = "分页查询任务")
     @RequirePermission("task:view")
@@ -61,6 +73,9 @@ public class TaskController {
         return Result.ok(taskService.queryPageList(queryBO));
     }
 
+    /**
+     * 更新任务状态。
+     */
     @PostMapping("/updateStatus")
     @Operation(summary = "更新任务状态")
     @RequirePermission("task:update_status")
@@ -71,6 +86,9 @@ public class TaskController {
         return Result.ok();
     }
 
+    /**
+     * 查询我的任务。
+     */
     @GetMapping("/myTasks")
     @Operation(summary = "查询我的任务")
     @RequirePermission("task:view")
@@ -79,6 +97,9 @@ public class TaskController {
         return Result.ok(taskService.getMyTasks(filter));
     }
 
+    /**
+     * AI智能解析任务。
+     */
     @PostMapping("/ai-parse")
     @Operation(summary = "AI智能解析任务")
     @RequirePermission("task:create")

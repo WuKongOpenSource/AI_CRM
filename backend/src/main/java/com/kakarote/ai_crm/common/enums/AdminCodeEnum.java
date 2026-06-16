@@ -39,11 +39,17 @@ public enum AdminCodeEnum implements ResultCode {
     private int code;
     private String msg;
 
+    /**
+     * 获取验证码。
+     */
     @Override
     public int getCode() {
         return code;
     }
 
+    /**
+     * 获取MSG。
+     */
     @Override
     public String getMsg() {
         return msg;

@@ -13,7 +13,9 @@ import com.kakarote.ai_crm.entity.BO.CustomerUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.CustomerListVO;
+import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
+import org.springframework.context.annotation.Lazy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -43,12 +45,19 @@ public class CustomerTools {
     @Autowired
     private AiToolPermissionSupport permissionSupport;
 
+    @Lazy
+    @Autowired
+    private ICustomFieldService customFieldService;
+
+    /**
+     * 创建客户。
+     */
     @Tool(description = "创建新客户档案。系统会先检查是否已存在同名客户；如果存在，不会直接创建，而是进入待确认状态。只有用户明确确认后，才能再调用 confirmPendingCustomerCreation 完成创建。")
     @AiToolPermission(value = "customer:create", action = "创建客户")
     public String createCustomer(
             @ToolParam(description = "公司名称，必填") String companyName,
             @ToolParam(description = "行业，如互联网、金融、制造业等", required = false) String industry,
-            @ToolParam(description = "客户级别：A（重要客户）、B（普通客户）、C（一般客户），默认B", required = false) String level,
+            @ToolParam(description = "客户级别：A（重要客户）、B（普通客户）、C（一般客户），可不填", required = false) String level,
             @ToolParam(description = "联系人姓名", required = false) String contactName,
             @ToolParam(description = "联系人电话", required = false) String contactPhone,
             @ToolParam(description = "联系人邮箱", required = false) String contactEmail,
@@ -97,12 +106,12 @@ public class CustomerTools {
             List<Customer> existingCustomersIgnoringDataPermission =
                 customerService.findCustomersByExactCompanyNameIgnoreDataPermission(normalizedCompanyName);
             if (!existingCustomersIgnoringDataPermission.isEmpty()) {
-                return buildExistingNoAccessMessage(normalizedCompanyName);
+                return buildExistingNoAccessMessage(normalizedCompanyName, existingCustomersIgnoringDataPermission.get(0), "创建客户");
             }
 
             AiCustomerMatcher.CustomerMatchResult existingNoAccess = aiCustomerMatcher.match(normalizedCompanyName);
             if (existingNoAccess.isExistsNoAccess()) {
-                return buildExistingNoAccessMessage(normalizedCompanyName);
+                return existingNoAccess.formatNoAccessMessage("创建客户");
             }
 
             Long customerId = customerService.addCustomer(bo);
@@ -113,6 +122,9 @@ public class CustomerTools {
         }
     }
 
+    /**
+     * 确认Pending客户Creation。
+     */
     @Tool(description = "确认创建重复客户。只有在 createCustomer 检测到同名客户后，且用户明确表示“确认创建”“继续创建”“仍然创建”时才调用。会基于当前会话中暂存的草稿真正创建客户。")
     @AiToolPermission(value = "customer:create", action = "确认创建客户")
     public String confirmPendingCustomerCreation() {
@@ -137,6 +149,9 @@ public class CustomerTools {
         }
     }
 
+    /**
+     * 处理cancelPendingCustomerCreation方法逻辑。
+     */
     @Tool(description = "取消待确认的重复客户创建。只有在 createCustomer 检测到同名客户后，且用户明确表示“不创建”“取消”“算了”时才调用。")
     @AiToolPermission(value = "customer:create", action = "取消创建客户")
     public String cancelPendingCustomerCreation() {
@@ -153,6 +168,9 @@ public class CustomerTools {
         return "已取消重复客户创建请求：" + pendingCreation.customerAddBO().getCompanyName();
     }
 
+    /**
+     * 查询客户。
+     */
     @Tool(description = "查询客户列表。当用户查看、搜索、筛选客户时调用此工具。")
     @AiToolPermission(value = "customer:view", action = "查看客户")
     public String queryCustomers(
@@ -172,6 +190,13 @@ public class CustomerTools {
 
             BasePage<CustomerListVO> page = customerService.queryPageList(queryBO);
             if (page.getList().isEmpty()) {
+                String normalizedKeyword = normalizeOptionalText(keyword);
+                if (normalizedKeyword != null) {
+                    AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(normalizedKeyword);
+                    if (matchResult.isExistsNoAccess()) {
+                        return matchResult.formatNoAccessMessage("查看客户信息");
+                    }
+                }
                 return "没有找到符合条件的客户。";
             }
 
@@ -201,11 +226,14 @@ public class CustomerTools {
         }
     }
 
-    @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、预计成交金额等。")
+    /**
+     * 更新客户。
+     */
+    @Tool(description = "修改客户信息。当用户要修改、编辑、更新已有客户的信息时调用。包括公司名称、行业、阶段、等级、地址、网站、金额等。客户标识既可以传客户ID，也可以传当前公司名称；优先使用客户ID。")
     @AiToolPermission(value = "customer:edit", action = "编辑客户")
     public String updateCustomer(
-            @ToolParam(description = "客户ID，数字类型，必填") String customerIdStr,
-            @ToolParam(description = "公司名称", required = false) String companyName,
+            @ToolParam(description = "客户标识，可以是客户ID（数字）或当前公司名称；优先使用客户ID") String customerIdStr,
+            @ToolParam(description = "公司名称。若用于按公司名定位客户且未提供客户ID，则仅作为查找标识，不会自动改名。", required = false) String companyName,
             @ToolParam(description = "行业，如互联网、金融、制造业等", required = false) String industry,
             @ToolParam(description = "商机阶段：lead(线索)/qualified(已验证)/proposal(方案)/negotiation(谈判)/closed(成交)/lost(流失)", required = false) String stage,
             @ToolParam(description = "客户级别：A（重要客户）、B（普通客户）、C（一般客户）", required = false) String level,
@@ -215,26 +243,50 @@ public class CustomerTools {
             @ToolParam(description = "下次跟进时间，格式：yyyy-MM-dd", required = false) String nextFollowTime,
             @ToolParam(description = "备注", required = false) String remark) {
 
-        log.info("【Tool调用】updateCustomer: customerId={}, companyName={}, stage={}, level={}",
+        log.info("【Tool调用】updateCustomer: customerIdentifier={}, companyName={}, stage={}, level={}",
             customerIdStr, companyName, stage, level);
 
         try {
-            if (StrUtil.isBlank(customerIdStr) || "null".equalsIgnoreCase(customerIdStr)) {
-                return "更新客户失败: 缺少客户ID参数";
+            String normalizedCustomerIdentifier = normalizeOptionalText(customerIdStr);
+            String normalizedCompanyName = normalizeOptionalText(companyName);
+            boolean companyNameUsedForLookup = normalizedCustomerIdentifier == null && normalizedCompanyName != null;
+            String customerIdentifier = companyNameUsedForLookup ? normalizedCompanyName : normalizedCustomerIdentifier;
+            if (customerIdentifier == null) {
+                Long boundCustomerId = AiContextHolder.getCurrentCustomerId();
+                customerIdentifier = boundCustomerId == null ? null : String.valueOf(boundCustomerId);
+            }
+
+            if (customerIdentifier == null) {
+                return "更新客户失败: 缺少客户标识参数";
             }
 
             Long customerId;
+            String matchedCompanyName = null;
             try {
-                customerId = Long.parseLong(customerIdStr);
+                customerId = Long.parseLong(customerIdentifier);
+                String noAccessMessage = buildNoAccessMessageIfHidden(customerId, customerIdentifier, "更新客户信息");
+                if (noAccessMessage != null) {
+                    return noAccessMessage;
+                }
             } catch (NumberFormatException e) {
-                return "更新客户失败: 客户ID格式无效";
+                AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(customerIdentifier);
+                if (matchResult.isExistsNoAccess()) {
+                    return matchResult.formatNoAccessMessage("更新客户信息");
+                }
+                if (matchResult.isAmbiguous()) {
+                    return "更新客户失败: 客户名称「" + customerIdentifier + "」无法唯一匹配，可能是：" + matchResult.formatCandidateNames() + "。请提供更完整的客户名称或直接提供客户ID。";
+                }
+                if (!matchResult.isMatched()) {
+                    return "更新客户失败: 未找到名为「" + customerIdentifier + "」的客户";
+                }
+                customerId = matchResult.getCustomer().getCustomerId();
+                matchedCompanyName = matchResult.getCustomer().getCompanyName();
             }
 
             CustomerUpdateBO bo = new CustomerUpdateBO();
             bo.setCustomerId(customerId);
 
-            String normalizedCompanyName = normalizeOptionalText(companyName);
-            if (normalizedCompanyName != null) {
+            if (!companyNameUsedForLookup && normalizedCompanyName != null) {
                 bo.setCompanyName(normalizedCompanyName);
             }
             String normalizedIndustry = normalizeOptionalText(industry);
@@ -266,18 +318,21 @@ public class CustomerTools {
                 bo.setRemark(normalizedRemark);
             }
 
-            if (normalizeOptionalText(quotation) != null) {
+            String normalizedQuotation = normalizeOptionalText(quotation);
+            if (normalizedQuotation != null) {
                 try {
-                    bo.setQuotation(new BigDecimal(quotation.trim()));
+                    bo.setQuotation(new BigDecimal(normalizedQuotation));
                 } catch (NumberFormatException e) {
                     log.warn("预计成交金额格式无效: {}", quotation);
                 }
             }
 
-            if (normalizeOptionalText(nextFollowTime) != null) {
+            String normalizedNextFollowTime = normalizeOptionalText(nextFollowTime);
+            if (normalizedNextFollowTime != null) {
                 try {
                     SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
-                    bo.setNextFollowTime(dateFormat.parse(nextFollowTime.trim()));
+                    dateFormat.parse(normalizedNextFollowTime);
+                    bo.setNextFollowTime(normalizedNextFollowTime);
                 } catch (Exception e) {
                     log.warn("下次跟进时间格式无效: {}", nextFollowTime);
                 }
@@ -286,7 +341,10 @@ public class CustomerTools {
             customerService.updateCustomer(bo);
 
             StringBuilder result = new StringBuilder("客户信息已更新成功！");
-            if (normalizedCompanyName != null) {
+            result.append("\n- 客户ID: ").append(customerId);
+            if (companyNameUsedForLookup && matchedCompanyName != null) {
+                result.append("\n- 系统客户名称: ").append(matchedCompanyName);
+            } else if (normalizedCompanyName != null) {
                 result.append("\n- 公司名称: ").append(normalizedCompanyName);
             }
             if (normalizedStage != null) {
@@ -295,8 +353,8 @@ public class CustomerTools {
             if (normalizedLevel != null) {
                 result.append("\n- 等级: ").append(normalizedLevel);
             }
-            if (normalizeOptionalText(quotation) != null) {
-                result.append("\n- 预计成交金额: ").append(quotation.trim());
+            if (normalizedQuotation != null) {
+                result.append("\n- 预计成交金额: ").append(normalizedQuotation);
             }
             return result.toString();
         } catch (Exception e) {
@@ -305,6 +363,9 @@ public class CustomerTools {
         }
     }
 
+    /**
+     * 获取客户详情。
+     */
     @Tool(description = "获取客户详细信息。当用户询问某个客户的具体信息、联系人、跟进记录时调用。可以使用客户ID或公司名称查询。")
     @AiToolPermission(value = "customer:view", action = "查看客户详情")
     public String getCustomerDetail(
@@ -313,6 +374,10 @@ public class CustomerTools {
         try {
             String normalizedIdentifier = normalizeRequiredText(customerIdentifier);
             if (normalizedIdentifier == null) {
+                Long boundCustomerId = AiContextHolder.getCurrentCustomerId();
+                normalizedIdentifier = boundCustomerId == null ? null : String.valueOf(boundCustomerId);
+            }
+            if (normalizedIdentifier == null) {
                 return "获取客户详情失败: 缺少客户标识参数";
             }
 
@@ -320,10 +385,14 @@ public class CustomerTools {
             String matchedCompanyName = normalizedIdentifier;
             try {
                 customerId = Long.parseLong(normalizedIdentifier);
+                String noAccessMessage = buildNoAccessMessageIfHidden(customerId, normalizedIdentifier, "查看客户信息");
+                if (noAccessMessage != null) {
+                    return noAccessMessage;
+                }
             } catch (NumberFormatException e) {
                 AiCustomerMatcher.CustomerMatchResult matchResult = aiCustomerMatcher.match(normalizedIdentifier);
                 if (matchResult.isExistsNoAccess()) {
-                    return buildExistingNoAccessMessage(normalizedIdentifier);
+                    return matchResult.formatNoAccessMessage("查看客户信息");
                 }
                 if (matchResult.isAmbiguous()) {
                     return "获取客户详情失败: 客户名称「" + normalizedIdentifier + "」无法唯一匹配，可能是：" + matchResult.formatCandidateNames() + "。请提供更完整的客户名称。";
@@ -384,6 +453,9 @@ public class CustomerTools {
         }
     }
 
+    /**
+     * 构建客户ADDBO。
+     */
     private CustomerAddBO buildCustomerAddBO(String companyName,
                                              String industry,
                                              String level,
@@ -398,7 +470,7 @@ public class CustomerTools {
         CustomerAddBO bo = new CustomerAddBO();
         bo.setCompanyName(companyName);
         bo.setIndustry(normalizeOptionalText(industry));
-        bo.setLevel(StrUtil.blankToDefault(normalizeOptionalText(level), "B"));
+        bo.setLevel(normalizeOptionalText(level));
         bo.setContactName(normalizeOptionalText(contactName));
         bo.setContactPhone(normalizeOptionalText(contactPhone));
         bo.setContactEmail(normalizeOptionalText(contactEmail));
@@ -418,6 +490,9 @@ public class CustomerTools {
         return bo;
     }
 
+    /**
+     * 构建DuplicateConfirmation消息。
+     */
     private String buildDuplicateConfirmationMessage(CustomerAddBO bo,
                                                      List<Customer> existingCustomers,
                                                      boolean pendingSaved) {
@@ -449,13 +524,50 @@ public class CustomerTools {
         return result.toString().trim();
     }
 
-    private String buildExistingNoAccessMessage(String companyName) {
-        return "客户已存在：「" + companyName + "」。";
+    /**
+     * 构建Existing编号Access消息。
+     */
+    private String buildExistingNoAccessMessage(String requestedName, Customer customer, String actionLabel) {
+        return AiCustomerMatcher.CustomerMatchResult
+            .existsNoAccess(requestedName, customer)
+            .formatNoAccessMessage(actionLabel);
     }
 
+    private String buildNoAccessMessageIfHidden(Long customerId, String requestedName, String actionLabel) {
+        Customer visibleCustomer = customerService.getById(customerId);
+        if (visibleCustomer != null && !Integer.valueOf(0).equals(visibleCustomer.getStatus())) {
+            return null;
+        }
+
+        Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customerId);
+        if (existingCustomer == null || Integer.valueOf(0).equals(existingCustomer.getStatus())) {
+            return null;
+        }
+
+        return buildExistingNoAccessMessage(requestedName, existingCustomer, actionLabel);
+    }
+
+    private String resolveOwnerName(Customer customer) {
+        if (customer == null) {
+            return "未知";
+        }
+        if (StrUtil.isNotBlank(customer.getOwnerName())) {
+            return customer.getOwnerName();
+        }
+        Customer existingCustomer = customerService.findCustomerByIdIgnoreDataPermission(customer.getCustomerId());
+        if (existingCustomer != null && StrUtil.isNotBlank(existingCustomer.getOwnerName())) {
+            return existingCustomer.getOwnerName();
+        }
+        return "未知";
+    }
+
+    /**
+     * 格式化Existing客户。
+     */
     private String formatExistingCustomer(Customer customer) {
         StringBuilder sb = new StringBuilder();
         sb.append("客户ID=").append(customer.getCustomerId());
+        sb.append("，负责人=").append(resolveOwnerName(customer));
         if (StrUtil.isNotBlank(customer.getLevel())) {
             sb.append("，等级=").append(customer.getLevel());
         }
@@ -471,6 +583,9 @@ public class CustomerTools {
         return sb.toString();
     }
 
+    /**
+     * 格式化Draft客户。
+     */
     private String formatDraftCustomer(CustomerAddBO bo) {
         StringBuilder sb = new StringBuilder();
         sb.append("公司名称=").append(bo.getCompanyName());
@@ -489,6 +604,9 @@ public class CustomerTools {
         return sb.toString();
     }
 
+    /**
+     * 构建CreateSuccess消息。
+     */
     private String buildCreateSuccessMessage(CustomerAddBO bo, Long customerId) {
         StringBuilder result = new StringBuilder();
         result.append("客户“")
@@ -529,6 +647,9 @@ public class CustomerTools {
         return page.getList().get(0).getCustomerId();
     }
 
+    /**
+     * 标准化Required文本。
+     */
     private String normalizeRequiredText(String value) {
         String normalized = StrUtil.trim(value);
         if (StrUtil.isBlank(normalized) || "null".equalsIgnoreCase(normalized)) {
@@ -537,22 +658,21 @@ public class CustomerTools {
         return normalized;
     }
 
+    /**
+     * 标准化Optional文本。
+     */
     private String normalizeOptionalText(String value) {
         return normalizeRequiredText(value);
     }
 
+    /**
+     * 获取阶段Label。
+     */
     private String getStageLabel(String stage) {
         if (stage == null) {
             return "未知";
         }
-        return switch (stage.toLowerCase()) {
-            case "lead" -> "线索";
-            case "qualified" -> "已验证";
-            case "proposal" -> "方案阶段";
-            case "negotiation" -> "商务谈判";
-            case "closed" -> "已成交";
-            case "lost" -> "已流失";
-            default -> stage;
-        };
+        // 真相源：crm_custom_field.options
+        return customFieldService.resolveOptionLabel("customer", "stage", stage);
     }
 }

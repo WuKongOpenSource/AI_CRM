@@ -31,6 +31,9 @@ public class CustomFieldSortServiceImpl extends ServiceImpl<CustomFieldSortMappe
     @Autowired
     private ICustomFieldService customFieldService;
 
+    /**
+     * 获取用户字段配置。
+     */
     @Override
     public List<CustomFieldVO> getUserFieldConfig(String entityType) {
         List<CustomFieldVO> allFields = buildMergedConfig(entityType);
@@ -40,11 +43,17 @@ public class CustomFieldSortServiceImpl extends ServiceImpl<CustomFieldSortMappe
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 获取用户全部字段配置。
+     */
     @Override
     public List<CustomFieldVO> getUserAllFieldConfig(String entityType) {
         return buildMergedConfig(entityType);
     }
 
+    /**
+     * 保存用户字段配置。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void saveUserFieldConfig(FieldSortUpdateBO bo) {
@@ -72,6 +81,9 @@ public class CustomFieldSortServiceImpl extends ServiceImpl<CustomFieldSortMappe
         }
     }
 
+    /**
+     * 移除按字段ID。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeByFieldId(Long fieldId) {
@@ -86,7 +98,7 @@ public class CustomFieldSortServiceImpl extends ServiceImpl<CustomFieldSortMappe
         Long userId = UserUtil.getUserId();
 
         // 1. 获取当前实体所有启用字段
-        List<CustomFieldVO> enabledFields = customFieldService.getEnabledFieldsByEntity(entityType);
+        List<CustomFieldVO> enabledFields = customFieldService.getListFieldsByEntity(entityType);
         if (enabledFields.isEmpty()) {
             return Collections.emptyList();
         }

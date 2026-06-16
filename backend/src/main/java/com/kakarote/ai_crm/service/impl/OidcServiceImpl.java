@@ -43,6 +43,9 @@ public class OidcServiceImpl implements OidcService {
     @Autowired
     private ManageUserService manageUserService;
 
+    /**
+     * 创建会话。
+     */
     @Override
     public String createSession(LoginUser loginUser) {
         String sessionId = IdUtil.fastSimpleUUID();
@@ -53,6 +56,9 @@ public class OidcServiceImpl implements OidcService {
         return sessionId;
     }
 
+    /**
+     * 获取Login用户按会话。
+     */
     @Override
     public LoginUser getLoginUserBySession(String sessionId) {
         if (StrUtil.isEmpty(sessionId)) {
@@ -66,6 +72,9 @@ public class OidcServiceImpl implements OidcService {
         return JSON.parseObject(json, LoginUser.class);
     }
 
+    /**
+     * 移除会话。
+     */
     @Override
     public void removeSession(String sessionId) {
         if (StrUtil.isNotEmpty(sessionId)) {
@@ -75,6 +84,9 @@ public class OidcServiceImpl implements OidcService {
         }
     }
 
+    /**
+     * 生成授权验证码。
+     */
     @Override
     public String generateAuthorizationCode(Long userId, String redirectUri) {
         String code = IdUtil.fastSimpleUUID();
@@ -86,6 +98,9 @@ public class OidcServiceImpl implements OidcService {
         return code;
     }
 
+    /**
+     * 处理exchangeCode方法逻辑。
+     */
     @Override
     public Long exchangeCode(String code, String redirectUri) {
         if (StrUtil.isEmpty(code)) {
@@ -115,11 +130,17 @@ public class OidcServiceImpl implements OidcService {
         return Long.parseLong(parts[0]);
     }
 
+    /**
+     * 生成IDToken。
+     */
     @Override
     public String generateIdToken(LoginUser loginUser) {
         return generateIdToken(loginUser, RequestContextUtil.getBaseUrl());
     }
 
+    /**
+     * 生成IDToken。
+     */
     @Override
     public String generateIdToken(LoginUser loginUser, String issuer) {
         try {
@@ -160,6 +181,9 @@ public class OidcServiceImpl implements OidcService {
         }
     }
 
+    /**
+     * 生成AccessToken。
+     */
     @Override
     public String generateAccessToken(LoginUser loginUser) {
         String accessToken = IdUtil.fastSimpleUUID();
@@ -169,6 +193,9 @@ public class OidcServiceImpl implements OidcService {
         return accessToken;
     }
 
+    /**
+     * 获取用户信息按AccessToken。
+     */
     @Override
     public Map<String, Object> getUserInfoByAccessToken(String accessToken) {
         if (StrUtil.isEmpty(accessToken)) {
@@ -198,6 +225,9 @@ public class OidcServiceImpl implements OidcService {
         return userInfo;
     }
 
+    /**
+     * 获取JWKS。
+     */
     @Override
     public String getJwks() {
         try {
@@ -209,11 +239,17 @@ public class OidcServiceImpl implements OidcService {
         }
     }
 
+    /**
+     * 获取Discovery文档。
+     */
     @Override
     public Map<String, Object> getDiscoveryDocument() {
         return getDiscoveryDocument(RequestContextUtil.getBaseUrl());
     }
 
+    /**
+     * 获取Discovery文档。
+     */
     @Override
     public Map<String, Object> getDiscoveryDocument(String issuer) {
         // 使用动态获取的 issuer
@@ -236,6 +272,9 @@ public class OidcServiceImpl implements OidcService {
         return doc;
     }
 
+    /**
+     * 处理determineMinioPolicy方法逻辑。
+     */
     @Override
     public String determineMinioPolicy(LoginUser loginUser) {
         // 默认给所有用户 consoleAdmin 权限

@@ -4,8 +4,8 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.auth.RequirePermission;
 import com.kakarote.ai_crm.common.result.Result;
 import com.kakarote.ai_crm.entity.BO.ResetUsernameBO;
-import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserAddBO;
+import com.kakarote.ai_crm.entity.BO.UserPreferenceUpdateBO;
 import com.kakarote.ai_crm.entity.BO.UserQueryBO;
 import com.kakarote.ai_crm.entity.BO.UserStatusBO;
 import com.kakarote.ai_crm.entity.BO.UserUpdateBO;
@@ -20,71 +20,98 @@ import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/managerUser")
 @RestController
-@Tag(name = "用户管理")
+@Tag(name = "User APIs")
 public class ManagerUserController {
 
     @Autowired
     private ManageUserService manageUserService;
 
+    /**
+     * 新增用户。
+     */
     @PostMapping("/addUser")
-    @Operation(summary = "新增用户")
+    @Operation(summary = "Add user")
     @RequirePermission("user:create")
     public Result<String> addUser(@RequestBody UserAddBO userAddBO) {
         manageUserService.addUser(userAddBO);
         return Result.ok();
     }
 
+    /**
+     * 查询Login用户。
+     */
     @PostMapping("/queryLoginUser")
-    @Operation(summary = "查询当前登录用户")
+    @Operation(summary = "Query current login user")
     public Result<ManageUserVO> queryLoginUser() {
         return Result.ok(manageUserService.queryLoginUser());
     }
 
+    /**
+     * 更新当前登录用户 UI 偏好。
+     */
     @PostMapping("/preferences")
-    @Operation(summary = "更新当前用户偏好")
+    @Operation(summary = "Update current user preferences")
     public Result<UserPreferenceVO> updateCurrentUserPreferences(@RequestBody UserPreferenceUpdateBO preferenceUpdateBO) {
         return Result.ok(manageUserService.updateCurrentUserPreferences(preferenceUpdateBO));
     }
 
+    /**
+     * 分页查询管理用户列表。
+     */
     @PostMapping("/queryPageList")
-    @Operation(summary = "分页查询用户")
+    @Operation(summary = "Query user page")
     public Result<BasePage<ManageUserVO>> queryPageList(@RequestBody UserQueryBO userQueryBO) {
         return Result.ok(manageUserService.queryPageList(userQueryBO));
     }
 
+    /**
+     * 更新用户。
+     */
     @PostMapping("/updateUser")
-    @Operation(summary = "更新用户基本信息")
+    @Operation(summary = "Update user basic info")
     public Result<String> updateUser(@RequestBody UserUpdateBO updateBO) {
         manageUserService.updateUser(updateBO);
         return Result.ok();
     }
 
+    /**
+     * 重置用户名。
+     */
     @PostMapping("/resetUsername")
-    @Operation(summary = "重置用户名")
+    @Operation(summary = "Reset username")
     @RequirePermission("user:edit")
     public Result<String> resetUsername(@RequestBody ResetUsernameBO resetUsernameBO) {
         manageUserService.resetUsername(resetUsernameBO);
         return Result.ok();
     }
 
+    /**
+     * 更新密码。
+     */
     @PostMapping("/updatePassword")
-    @Operation(summary = "更新密码")
-    public Result<String> updatePassword(@Parameter(name = "oldPassword", description = "旧密码") @RequestParam("oldPassword") String oldPassword,
-                                         @Parameter(name = "newPassword", description = "新密码") @RequestParam("newPassword") String newPassword) {
+    @Operation(summary = "Update password")
+    public Result<String> updatePassword(@Parameter(name = "oldPassword", description = "Old password") @RequestParam("oldPassword") String oldPassword,
+                                         @Parameter(name = "newPassword", description = "New password") @RequestParam("newPassword") String newPassword) {
         manageUserService.updatePassword(oldPassword, newPassword);
         return Result.ok();
     }
 
+    /**
+     * 设置用户状态。
+     */
     @PostMapping("/setUserStatus")
-    @Operation(summary = "设置用户状态")
+    @Operation(summary = "Set user status")
     @RequirePermission("user:status")
     public Result setUserStatus(@RequestBody UserStatusBO userStatusBO) {
         manageUserService.setUserStatus(userStatusBO);
         return Result.ok();
     }
 
+    /**
+     * 删除按ID。
+     */
     @PostMapping("/deleteByIds")
-    @Operation(summary = "删除用户")
+    @Operation(summary = "Delete users")
     @RequirePermission("user:delete")
     public Result deleteByIds(@RequestBody Long[] userIds) {
         manageUserService.deleteByIds(userIds);

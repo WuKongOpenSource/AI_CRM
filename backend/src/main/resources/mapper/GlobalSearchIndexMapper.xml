@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.GlobalSearchIndexMapper">
+
+    <sql id="permissionConditions">
+        AND (
+            <trim suffixOverrides="OR">
+                <if test="query.customerEnabled != null and query.customerEnabled">
+                    (
+                        g.entity_type = 'customer'
+                        <choose>
+                            <when test="query.customerAllData != null and query.customerAllData">
+                            </when>
+                            <when test="query.customerUserIds != null and query.customerUserIds.size() > 0">
+                                AND g.owner_user_id IN
+                                <foreach collection="query.customerUserIds" item="userId" open="(" separator="," close=")">
+                                    #{userId}
+                                </foreach>
+                            </when>
+                            <otherwise>
+                                AND 1 = 0
+                            </otherwise>
+                        </choose>
+                    ) OR
+                </if>
+                <if test="query.contactEnabled != null and query.contactEnabled">
+                    (
+                        g.entity_type = 'contact'
+                        <choose>
+                            <when test="query.contactAllData != null and query.contactAllData">
+                            </when>
+                            <when test="query.contactUserIds != null and query.contactUserIds.size() > 0">
+                                AND g.customer_owner_id IN
+                                <foreach collection="query.contactUserIds" item="userId" open="(" separator="," close=")">
+                                    #{userId}
+                                </foreach>
+                            </when>
+                            <otherwise>
+                                AND 1 = 0
+                            </otherwise>
+                        </choose>
+                    ) OR
+                </if>
+                <if test="query.relationEnabled != null and query.relationEnabled and query.currentUserId != null">
+                    (
+                        g.entity_type = 'relation'
+                        AND g.owner_user_id = #{query.currentUserId}
+                    ) OR
+                </if>
+                <if test="query.productEnabled != null and query.productEnabled">
+                    (
+                        g.entity_type = 'product'
+                        <choose>
+                            <when test="query.productAllData != null and query.productAllData">
+                            </when>
+                            <when test="query.productUserIds != null and query.productUserIds.size() > 0">
+                                AND g.owner_user_id IN
+                                <foreach collection="query.productUserIds" item="userId" open="(" separator="," close=")">
+                                    #{userId}
+                                </foreach>
+                            </when>
+                            <otherwise>
+                                AND 1 = 0
+                            </otherwise>
+                        </choose>
+                    ) OR
+                </if>
+                <if test="query.taskEnabled != null and query.taskEnabled">
+                    (
+                        g.entity_type = 'task'
+                        AND (g.owner_user_id IS NULL OR g.owner_user_id = #{query.currentUserId})
+                        <choose>
+                            <when test="query.taskAllData != null and query.taskAllData">
+                            </when>
+                            <when test="query.taskUserIds != null and query.taskUserIds.size() > 0">
+                                AND g.assigned_user_id IN
+                                <foreach collection="query.taskUserIds" item="userId" open="(" separator="," close=")">
+                                    #{userId}
+                                </foreach>
+                            </when>
+                            <otherwise>
+                                AND 1 = 0
+                            </otherwise>
+                        </choose>
+                    ) OR
+                </if>
+                <if test="query.scheduleEnabled != null and query.scheduleEnabled and query.currentUserId != null">
+                    (
+                        g.entity_type = 'schedule'
+                        AND (
+                            (
+                                g.owner_user_id IS NULL
+                                AND (
+                                    <choose>
+                                        <when test="query.scheduleAllData != null and query.scheduleAllData">
+                                            1 = 1
+                                        </when>
+                                        <when test="query.scheduleUserIds != null and query.scheduleUserIds.size() > 0">
+                                            g.create_user_id IN
+                                            <foreach collection="query.scheduleUserIds" item="userId" open="(" separator="," close=")">
+                                                #{userId}
+                                            </foreach>
+                                        </when>
+                                        <otherwise>
+                                            1 = 0
+                                        </otherwise>
+                                    </choose>
+                                    OR (',' || COALESCE(g.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.currentUserId} AS TEXT) || ',%')
+                                )
+                            )
+                            OR (g.owner_user_id = #{query.currentUserId})
+                        )
+                    ) OR
+                </if>
+                <if test="query.knowledgeEnabled != null and query.knowledgeEnabled">
+                    (
+                        g.entity_type = 'knowledge'
+                        AND (g.owner_user_id IS NULL OR g.owner_user_id = #{query.currentUserId})
+                        AND (
+                            (
+                                g.customer_id IS NOT NULL
+                                <choose>
+                                    <when test="query.knowledgeAllData != null and query.knowledgeAllData">
+                                        AND g.customer_owner_id IS NOT NULL
+                                    </when>
+                                    <when test="query.knowledgeUserIds != null and query.knowledgeUserIds.size() > 0">
+                                        AND g.customer_owner_id IN
+                                        <foreach collection="query.knowledgeUserIds" item="userId" open="(" separator="," close=")">
+                                            #{userId}
+                                        </foreach>
+                                    </when>
+                                    <otherwise>
+                                        AND 1 = 0
+                                    </otherwise>
+                                </choose>
+                            )
+                            OR
+                            (
+                                g.customer_id IS NULL
+                                <choose>
+                                    <when test="query.knowledgeAllData != null and query.knowledgeAllData">
+                                        AND g.upload_user_id IS NOT NULL
+                                    </when>
+                                    <when test="query.knowledgeUserIds != null and query.knowledgeUserIds.size() > 0">
+                                        AND g.upload_user_id IN
+                                        <foreach collection="query.knowledgeUserIds" item="userId" open="(" separator="," close=")">
+                                            #{userId}
+                                        </foreach>
+                                    </when>
+                                    <otherwise>
+                                        AND 1 = 0
+                                    </otherwise>
+                                </choose>
+                            )
+                        )
+                    ) OR
+                </if>
+            </trim>
+        )
+    </sql>
+
+    <sql id="commonConditions">
+        WHERE 1 = 1
+        <if test="query.entityType != null and query.entityType != ''">
+            AND g.entity_type = #{query.entityType}
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                LOWER(COALESCE(g.search_text, '')) LIKE CONCAT('%', LOWER(CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT)), '%')
+                OR LOWER(COALESCE(g.title, '')) LIKE CONCAT('%', LOWER(CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT)), '%')
+                OR LOWER(COALESCE(g.subtitle, '')) LIKE CONCAT('%', LOWER(CAST(#{query.keyword,jdbcType=VARCHAR} AS TEXT)), '%')
+            )
+        </if>
+        <include refid="permissionConditions"/>
+    </sql>
+
+    <insert id="upsert">
+        INSERT INTO crm_global_search_index (
+            entity_type,
+            entity_id,
+            title,
+            subtitle,
+            summary,
+            search_text,
+            customer_id,
+            customer_name,
+            owner_user_id,
+            customer_owner_id,
+            assigned_user_id,
+            upload_user_id,
+            create_user_id,
+            participant_user_ids,
+            route_path,
+            sort_time
+        ) VALUES (
+            #{index.entityType},
+            #{index.entityId},
+            #{index.title},
+            #{index.subtitle},
+            #{index.summary},
+            #{index.searchText},
+            #{index.customerId},
+            #{index.customerName},
+            #{index.ownerUserId},
+            #{index.customerOwnerId},
+            #{index.assignedUserId},
+            #{index.uploadUserId},
+            #{index.createUserId},
+            #{index.participantUserIds},
+            #{index.routePath},
+            #{index.sortTime}
+        )
+        ON CONFLICT (entity_type, entity_id) DO UPDATE SET
+            title = EXCLUDED.title,
+            subtitle = EXCLUDED.subtitle,
+            summary = EXCLUDED.summary,
+            search_text = EXCLUDED.search_text,
+            customer_id = EXCLUDED.customer_id,
+            customer_name = EXCLUDED.customer_name,
+            owner_user_id = EXCLUDED.owner_user_id,
+            customer_owner_id = EXCLUDED.customer_owner_id,
+            assigned_user_id = EXCLUDED.assigned_user_id,
+            upload_user_id = EXCLUDED.upload_user_id,
+            create_user_id = EXCLUDED.create_user_id,
+            participant_user_ids = EXCLUDED.participant_user_ids,
+            route_path = EXCLUDED.route_path,
+            sort_time = EXCLUDED.sort_time,
+            update_time = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="deleteByEntity">
+        DELETE FROM crm_global_search_index
+        WHERE entity_type = #{entityType}
+          AND entity_id = #{entityId}
+    </delete>
+
+    <delete id="deleteByCustomerIdAndEntityType">
+        DELETE FROM crm_global_search_index
+        WHERE customer_id = #{customerId}
+          AND entity_type = #{entityType}
+    </delete>
+
+    <select id="queryPageCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM crm_global_search_index g
+        <include refid="commonConditions"/>
+    </select>
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.GlobalSearchResultVO">
+        SELECT
+            g.entity_type,
+            g.entity_id,
+            g.title,
+            g.subtitle,
+            g.summary,
+            g.customer_id,
+            g.customer_name,
+            g.route_path,
+            g.sort_time,
+            NULL AS score
+        FROM crm_global_search_index g
+        <include refid="commonConditions"/>
+        ORDER BY g.sort_time DESC NULLS LAST, g.update_time DESC
+    </select>
+
+</mapper>

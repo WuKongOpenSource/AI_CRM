@@ -22,6 +22,7 @@ CREATE TABLE `crm_custom_field` (
     `is_required` TINYINT DEFAULT 0 COMMENT '是否必填: 0否 1是',
     `is_searchable` TINYINT DEFAULT 0 COMMENT '是否可搜索: 0否 1是',
     `is_show_in_list` TINYINT DEFAULT 1 COMMENT '是否在列表显示: 0否 1是',
+    `is_unique` TINYINT DEFAULT 0 COMMENT '是否唯一: 0否 1是',
     `options` TEXT DEFAULT NULL COMMENT '选项列表(JSON数组): [{"value":"v1","label":"选项1"}]',
     `validation_rules` TEXT DEFAULT NULL COMMENT '验证规则(JSON): {"min":0,"max":100,"pattern":""}',
     `sort_order` INT DEFAULT 0 COMMENT '排序序号',

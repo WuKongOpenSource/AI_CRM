@@ -14,7 +14,6 @@ import SystemSubTabs from '../../components/SystemSubTabs.vue'
 import type { SystemSettingsTab } from '../../types'
 import EnterpriseSettingsPane from './panes/EnterpriseSettingsPane.vue'
 import AiConfigSettingsPane from './panes/AiConfigSettingsPane.vue'
-import ExternalAuthSettingsPane from './panes/ExternalAuthSettingsPane.vue'
 import AgentSettingsPane from './panes/AgentSettingsPane.vue'
 import StorageSettingsPane from './panes/StorageSettingsPane.vue'
 import CustomFieldSettingsPane from './panes/CustomFieldSettingsPane.vue'
@@ -30,7 +29,6 @@ defineEmits<{
 const paneMap = {
   enterprise: EnterpriseSettingsPane,
   api: AiConfigSettingsPane,
-  auth: ExternalAuthSettingsPane,
   agent: AgentSettingsPane,
   storage: StorageSettingsPane,
   customField: CustomFieldSettingsPane

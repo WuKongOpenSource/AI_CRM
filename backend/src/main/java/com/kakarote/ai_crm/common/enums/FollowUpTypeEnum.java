@@ -21,6 +21,9 @@ public enum FollowUpTypeEnum {
         this.name = name;
     }
 
+    /**
+     * 处理fromCode方法逻辑。
+     */
     public static FollowUpTypeEnum fromCode(String code) {
         for (FollowUpTypeEnum type : values()) {
             if (type.getCode().equals(code)) {
@@ -30,6 +33,9 @@ public enum FollowUpTypeEnum {
         return null;
     }
 
+    /**
+     * 获取名称按验证码。
+     */
     public static String getNameByCode(String code) {
         FollowUpTypeEnum type = fromCode(code);
         return type != null ? type.getName() : code;

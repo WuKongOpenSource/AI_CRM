@@ -19,6 +19,9 @@ public enum TaskStatusEnum {
         this.name = name;
     }
 
+    /**
+     * 处理fromCode方法逻辑。
+     */
     public static TaskStatusEnum fromCode(String code) {
         for (TaskStatusEnum status : values()) {
             if (status.getCode().equals(code)) {
@@ -28,6 +31,9 @@ public enum TaskStatusEnum {
         return null;
     }
 
+    /**
+     * 获取名称按验证码。
+     */
     public static String getNameByCode(String code) {
         TaskStatusEnum status = fromCode(code);
         return status != null ? status.getName() : code;

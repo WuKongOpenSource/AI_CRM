@@ -53,6 +53,9 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
     private static final String CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
     private static final int MAX_GENERATE_ATTEMPTS = 10;
 
+    /**
+     * 处理acquireSlot方法逻辑。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CustomFieldPool acquireSlot(String entityType, String fieldType) {
@@ -91,6 +94,9 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
         return createNewSlot(entityType, fieldType, columnType);
     }
 
+    /**
+     * 确保列Created。
+     */
     private void ensureColumnCreated(CustomFieldPool pool, String entityType) {
         if (Boolean.TRUE.equals(pool.getColumnCreated())) {
             return;
@@ -101,6 +107,9 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
         updateById(pool);
     }
 
+    /**
+     * 创建NEWSlot。
+     */
     private CustomFieldPool createNewSlot(String entityType, String fieldType, String columnType) {
         String columnName = generateUniqueColumnName(entityType);
         String tableName = dynamicSchemaService.getTableName(entityType);
@@ -119,6 +128,9 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
         return pool;
     }
 
+    /**
+     * 生成Unique列名称。
+     */
     private String generateUniqueColumnName(String entityType) {
         for (int i = 0; i < MAX_GENERATE_ATTEMPTS; i++) {
             String name = COLUMN_PREFIX + randomSuffix();
@@ -132,6 +144,9 @@ public class CustomFieldPoolServiceImpl extends ServiceImpl<CustomFieldPoolMappe
         throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "生成字段列名失败，请重试");
     }
 
+    /**
+     * 处理randomSuffix方法逻辑。
+     */
     private String randomSuffix() {
         StringBuilder sb = new StringBuilder(COLUMN_SUFFIX_LENGTH);
         ThreadLocalRandom random = ThreadLocalRandom.current();

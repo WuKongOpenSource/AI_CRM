@@ -21,6 +21,9 @@ import java.util.List;
 @Service
 public class AiAgentServiceImpl extends ServiceImpl<AiAgentMapper, AiAgent> implements IAiAgentService {
 
+    /**
+     * 新增Agent。
+     */
     @Override
     public Long addAgent(AgentAddBO agentAddBO) {
         AiAgent agent = BeanUtil.copyProperties(agentAddBO, AiAgent.class, "enabled");
@@ -44,6 +47,9 @@ public class AiAgentServiceImpl extends ServiceImpl<AiAgentMapper, AiAgent> impl
         return agent.getAgentId();
     }
 
+    /**
+     * 更新Agent。
+     */
     @Override
     public void updateAgent(AgentUpdateBO agentUpdateBO) {
         AiAgent agent = getById(agentUpdateBO.getAgentId());
@@ -58,6 +64,9 @@ public class AiAgentServiceImpl extends ServiceImpl<AiAgentMapper, AiAgent> impl
         updateById(agent);
     }
 
+    /**
+     * 删除Agent。
+     */
     @Override
     public void deleteAgent(Long agentId) {
         AiAgent agent = getById(agentId);
@@ -67,6 +76,9 @@ public class AiAgentServiceImpl extends ServiceImpl<AiAgentMapper, AiAgent> impl
         removeById(agentId);
     }
 
+    /**
+     * 查询启用项。
+     */
     @Override
     public List<AgentVO> queryEnabled() {
         List<AiAgent> agents = lambdaQuery()
@@ -76,6 +88,9 @@ public class AiAgentServiceImpl extends ServiceImpl<AiAgentMapper, AiAgent> impl
         return BeanUtil.copyToList(agents, AgentVO.class);
     }
 
+    /**
+     * 查询全部。
+     */
     @Override
     public List<AgentVO> queryAll() {
         List<AiAgent> agents = lambdaQuery()

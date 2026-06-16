@@ -7,7 +7,6 @@ import com.kakarote.ai_crm.entity.VO.ProjectVO;
 import java.util.List;
 
 public interface IProjectService {
-
     List<ProjectVO> listProjects();
 
     BasePage<ProjectVO> queryPageList(ProjectBO.Query queryBO);
@@ -34,6 +33,10 @@ public interface IProjectService {
 
     void deleteProject(Long projectId);
 
+    ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig();
+
+    ProjectVO.ProjectRolePermissionConfigVO updateProjectRolePermissionConfig(ProjectBO.RolePermissionConfig configBO);
+
     ProjectVO addLane(Long projectId, ProjectBO.LaneSave laneBO);
 
     ProjectVO updateLane(Long projectId, ProjectBO.LaneSave laneBO);
@@ -53,10 +56,6 @@ public interface IProjectService {
     ProjectVO deleteTask(Long projectId, Long taskId);
 
     ProjectVO moveTask(Long projectId, ProjectBO.TaskMove moveBO);
-
-    ProjectVO.ProjectRolePermissionConfigVO getProjectRolePermissionConfig();
-
-    ProjectVO.ProjectRolePermissionConfigVO updateProjectRolePermissionConfig(ProjectBO.RolePermissionConfig configBO);
 
     ProjectVO addMember(Long projectId, ProjectBO.MemberSave memberBO);
 

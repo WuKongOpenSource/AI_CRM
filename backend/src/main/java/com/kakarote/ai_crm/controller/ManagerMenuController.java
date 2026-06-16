@@ -28,6 +28,9 @@ public class ManagerMenuController {
     @Autowired
     private IManagerMenuService managerMenuService;
 
+    /**
+     * 查询菜单列表。
+     */
     @PostMapping("/queryAllMenuList")
     @Operation(summary = "查询菜单列表")
     public Result<List<MenuVO>> queryAllMenuList(){

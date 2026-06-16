@@ -55,7 +55,13 @@ public final class AiProviderRegistry {
                 .apiUrlKeywords(List.of("dashscope.aliyuncs.com"))
                 .toolCallEnabledKeywords(List.of())
                 .toolCallDisabledKeywords(List.of())
-                .visionEnabledKeywords(List.of("qwen3.6-plus", "vl", "vision", "qvq", "omni"))
+                .visionEnabledKeywords(List.of(
+                        "qwen3.6-plus",
+                        "vl",
+                        "vision",
+                        "qvq",
+                        "omni"
+                ))
                 .build());
 
         register(AiProviderDescriptor.builder()
@@ -210,9 +216,15 @@ public final class AiProviderRegistry {
                 .build());
     }
 
+    /**
+     * 初始化AI 服务商实例。
+     */
     private AiProviderRegistry() {
     }
 
+    /**
+     * 获取AI 服务商。
+     */
     public static AiProviderDescriptor get(String providerCode) {
         if (StrUtil.isBlank(providerCode)) {
             return PROVIDERS.get(DEFAULT_PROVIDER);
@@ -220,6 +232,9 @@ public final class AiProviderRegistry {
         return PROVIDERS.getOrDefault(normalizeProviderCode(providerCode), PROVIDERS.get(DEFAULT_PROVIDER));
     }
 
+    /**
+     * 解析AI 服务商。
+     */
     public static AiProviderDescriptor resolve(String providerCode, String apiUrl) {
         String normalizedProviderCode = normalizeProviderCode(providerCode);
         if (StrUtil.isNotBlank(normalizedProviderCode) && PROVIDERS.containsKey(normalizedProviderCode)) {
@@ -238,6 +253,9 @@ public final class AiProviderRegistry {
         return get(DEFAULT_PROVIDER);
     }
 
+    /**
+     * 查询AI 服务商。
+     */
     public static List<AiProviderDescriptor> list() {
         return List.copyOf(PROVIDERS.values());
     }
@@ -262,6 +280,13 @@ public final class AiProviderRegistry {
         };
     }
 
+    /**
+     * 完成用户注册。
+     */
+    private static void register(AiProviderDescriptor descriptor) {
+        PROVIDERS.put(descriptor.getCode(), descriptor);
+    }
+
     private static String normalizeProviderCode(String providerCode) {
         if (StrUtil.isBlank(providerCode)) {
             return "";
@@ -270,14 +295,16 @@ public final class AiProviderRegistry {
         return PROVIDER_ALIASES.getOrDefault(normalized, normalized);
     }
 
-    private static void register(AiProviderDescriptor descriptor) {
-        PROVIDERS.put(descriptor.getCode(), descriptor);
-    }
-
+    /**
+     * 生成默认能力。
+     */
     private static AiModelCapabilities defaultCapabilities() {
         return defaultCapabilities(false);
     }
 
+    /**
+     * 生成默认能力。
+     */
     private static AiModelCapabilities defaultCapabilities(boolean supportsAudioTranscription) {
         return AiModelCapabilities.builder()
                 .supportsStream(true)

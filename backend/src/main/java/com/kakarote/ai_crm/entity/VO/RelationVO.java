@@ -6,79 +6,82 @@ import lombok.Data;
 import java.util.Date;
 import java.util.Map;
 
+/**
+ * 关系人视图对象。
+ */
 @Data
-@Schema(name = "RelationVO", description = "Relation view")
+@Schema(name = "RelationVO", description = "关系人视图对象")
 public class RelationVO {
 
-    @Schema(description = "Relation ID")
+    @Schema(description = "关系人ID")
     private Long relationId;
 
-    @Schema(description = "Name")
+    @Schema(description = "姓名")
     private String name;
 
-    @Schema(description = "Avatar object key")
+    @Schema(description = "头像")
     private String avatar;
 
-    @Schema(description = "Avatar URL")
+    @Schema(description = "头像访问URL")
     private String avatarUrl;
 
-    @Schema(description = "Phone")
+    @Schema(description = "手机号")
     private String phone;
 
-    @Schema(description = "Wechat")
+    @Schema(description = "微信号")
     private String wechat;
 
-    @Schema(description = "Email")
+    @Schema(description = "邮箱")
     private String email;
 
-    @Schema(description = "Relation type")
+    @Schema(description = "关系类型")
     private String relationType;
 
-    @Schema(description = "Relation type name")
+    @Schema(description = "关系类型名称")
     private String relationTypeName;
 
-    @Schema(description = "Company")
+    @Schema(description = "所属公司")
     private String company;
 
-    @Schema(description = "Linked customer ID")
+    @Schema(description = "关联客户ID")
     private Long customerId;
 
-    @Schema(description = "Linked customer name")
+    @Schema(description = "关联客户名称")
     private String customerName;
 
-    @Schema(description = "Linked customer logo")
+    @Schema(description = "关联客户Logo")
     private String customerLogo;
 
-    @Schema(description = "Linked customer logo URL")
+    @Schema(description = "关联客户Logo访问URL")
     private String customerLogoUrl;
 
-    @Schema(description = "Remark")
+    @Schema(description = "备注")
     private String remark;
 
-    @Schema(description = "Source")
+    @Schema(description = "来源")
     private String source;
 
-    @Schema(description = "Source name")
+    @Schema(description = "来源名称")
     private String sourceName;
 
-    @Schema(description = "Source customer ID")
+    @Schema(description = "来源客户ID")
     private Long sourceCustomerId;
 
-    @Schema(description = "Source customer name")
+    @Schema(description = "来源客户名称")
     private String sourceCustomerName;
 
-    @Schema(description = "Source contact ID")
+    @Schema(description = "来源客户联系人ID")
     private Long sourceContactId;
 
-    @Schema(description = "Custom field values")
+    @Schema(description = "自定义字段值")
     private Map<String, Object> customFields;
 
-    @Schema(description = "Create user ID")
+    @Schema(description = "创建人ID")
     private Long createUserId;
 
-    @Schema(description = "Create time")
+    @Schema(description = "创建时间")
     private Date createTime;
 
-    @Schema(description = "Update time")
+    @Schema(description = "修改时间")
     private Date updateTime;
 }

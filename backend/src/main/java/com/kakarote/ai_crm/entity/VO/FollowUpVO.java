@@ -22,10 +22,10 @@ public class FollowUpVO {
     @Schema(description = "客户名称")
     private String customerName;
 
-    @Schema(description = "Relation ID")
+    @Schema(description = "关系人ID")
     private Long relationId;
 
-    @Schema(description = "Relation name")
+    @Schema(description = "关系人姓名")
     private String relationName;
 
     @Schema(description = "联系人ID")
@@ -69,4 +69,7 @@ public class FollowUpVO {
 
     @Schema(description = "Attachments")
     private List<FollowUpAttachmentVO> attachments;
+
+    @Schema(description = "Linked tasks")
+    private List<FollowUpLinkedTaskVO> tasks;
 }

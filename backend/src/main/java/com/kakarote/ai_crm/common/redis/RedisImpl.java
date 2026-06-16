@@ -175,6 +175,9 @@ public class RedisImpl implements Redis {
         return redisTemplate.opsForValue().increment(key, value);
     }
 
+    /**
+     * 处理incr方法逻辑。
+     */
     @Override
     public Long incr(String key, Long time, TimeUnit timeUnit) {
         Long increment = redisTemplate.opsForValue().increment(key);

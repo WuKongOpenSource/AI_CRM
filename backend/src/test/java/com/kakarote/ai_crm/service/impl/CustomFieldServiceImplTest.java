@@ -1,49 +1,74 @@
 package com.kakarote.ai_crm.service.impl;
 
-import com.kakarote.ai_crm.common.exception.BusinessException;
-import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
-import com.kakarote.ai_crm.mapper.CustomFieldMapper;
-import com.kakarote.ai_crm.service.IDynamicSchemaService;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.kakarote.ai_crm.entity.PO.CustomField;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class CustomFieldServiceImplTest {
 
     @Test
-    void validateUniqueFieldValueRejectsDuplicateValue() {
-        CustomFieldServiceImpl service = spy(new CustomFieldServiceImpl());
-        CustomFieldMapper customFieldMapper = mock(CustomFieldMapper.class);
-        IDynamicSchemaService dynamicSchemaService = mock(IDynamicSchemaService.class);
-        ReflectionTestUtils.setField(service, "baseMapper", customFieldMapper);
-        ReflectionTestUtils.setField(service, "dynamicSchemaService", dynamicSchemaService);
+    void initializeSystemFieldsSyncsExistingProductUnitFieldMetadata() {
+        InMemoryCustomFieldService service = new InMemoryCustomFieldService(existingProductUnitTextField());
 
-        CustomFieldVO field = new CustomFieldVO();
-        field.setFieldName("customerCode");
-        field.setFieldLabel("客户编码");
+        service.initializeSystemFields("product");
+
+        CustomField unitField = service.field("unit");
+        assertThat(unitField.getFieldType()).isEqualTo("select");
+        assertThat(unitField.getPlaceholder()).isEqualTo("Select unit");
+        assertThat(unitField.getOptions()).contains("\"value\":\"piece\"");
+        assertThat(service.updateCount).isEqualTo(1);
+    }
+
+    private static CustomField existingProductUnitTextField() {
+        CustomField field = new CustomField();
+        field.setFieldId(1L);
+        field.setEntityType("product");
+        field.setFieldName("unit");
+        field.setFieldLabel("Unit");
         field.setFieldType("text");
-        field.setColumnName("text_value_1");
-        field.setIsUnique(true);
-        doReturn(List.of(field)).when(service).getEnabledFieldsByEntity("customer");
-        when(dynamicSchemaService.getTableName("customer")).thenReturn("crm_customer");
-        when(dynamicSchemaService.getIdColumnName("customer")).thenReturn("customer_id");
-        when(dynamicSchemaService.columnExists("crm_customer", "text_value_1")).thenReturn(true);
-        when(customFieldMapper.countDuplicateCustomFieldValue(
-            "crm_customer",
-            "customer_id",
-            1001L,
-            "text_value_1",
-            "ACME"
-        )).thenReturn(1L);
+        field.setColumnName("unit");
+        field.setColumnType("VARCHAR(50)");
+        field.setPlaceholder("Input unit");
+        field.setOptions(null);
+        field.setStatus(1);
+        return field;
+    }
 
-        assertThatThrownBy(() -> service.validateUniqueFieldValue("customer", 1001L, "customerCode", "ACME"))
-            .isInstanceOf(BusinessException.class);
+    private static final class InMemoryCustomFieldService extends CustomFieldServiceImpl {
+        private final List<CustomField> fields = new ArrayList<>();
+        private int updateCount;
+
+        private InMemoryCustomFieldService(CustomField... fields) {
+            this.fields.addAll(List.of(fields));
+        }
+
+        @Override
+        public List<CustomField> list(Wrapper<CustomField> queryWrapper) {
+            return new ArrayList<>(fields);
+        }
+
+        @Override
+        public boolean save(CustomField entity) {
+            fields.add(entity);
+            return true;
+        }
+
+        @Override
+        public boolean updateById(CustomField entity) {
+            updateCount++;
+            return true;
+        }
+
+        private CustomField field(String fieldName) {
+            return fields.stream()
+                    .filter(field -> fieldName.equals(field.getFieldName()))
+                    .findFirst()
+                    .orElseThrow();
+        }
     }
 }

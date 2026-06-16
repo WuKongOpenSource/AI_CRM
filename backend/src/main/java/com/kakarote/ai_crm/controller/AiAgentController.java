@@ -25,6 +25,9 @@ public class AiAgentController {
     @Autowired
     private IAiAgentService aiAgentService;
 
+    /**
+     * 创建智能体。
+     */
     @PostMapping("/add")
     @Operation(summary = "创建智能体")
     @RequirePermission("agent:create")
@@ -33,6 +36,9 @@ public class AiAgentController {
         return Result.ok(agentId);
     }
 
+    /**
+     * 更新智能体。
+     */
     @PostMapping("/update")
     @Operation(summary = "更新智能体")
     @RequirePermission("agent:edit")
@@ -41,6 +47,9 @@ public class AiAgentController {
         return Result.ok();
     }
 
+    /**
+     * 删除智能体。
+     */
     @PostMapping("/delete/{id}")
     @Operation(summary = "删除智能体")
     @RequirePermission("agent:delete")
@@ -49,12 +58,18 @@ public class AiAgentController {
         return Result.ok();
     }
 
+    /**
+     * 查询已启用的智能体。
+     */
     @GetMapping("/queryEnabled")
     @Operation(summary = "查询已启用的智能体")
     public Result<List<AgentVO>> queryEnabled() {
         return Result.ok(aiAgentService.queryEnabled());
     }
 
+    /**
+     * 查询全部智能体。
+     */
     @GetMapping("/queryAll")
     @Operation(summary = "查询全部智能体")
     @RequirePermission("agent")

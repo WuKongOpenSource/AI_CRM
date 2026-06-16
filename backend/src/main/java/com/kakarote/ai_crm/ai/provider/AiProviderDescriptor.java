@@ -28,6 +28,9 @@ public class AiProviderDescriptor {
     private final List<String> toolCallDisabledKeywords;
     private final List<String> visionEnabledKeywords;
 
+    /**
+     * 处理matchesApiUrl方法逻辑。
+     */
     public boolean matchesApiUrl(String apiUrl) {
         if (StrUtil.isBlank(apiUrl)) {
             return false;
@@ -36,6 +39,9 @@ public class AiProviderDescriptor {
         return safeList(apiUrlKeywords).stream().anyMatch(normalized::contains);
     }
 
+    /**
+     * 解析能力。
+     */
     public AiModelCapabilities resolveCapabilities(String model) {
         AiModelCapabilities defaults = defaultCapabilities != null
                 ? defaultCapabilities
@@ -70,10 +76,16 @@ public class AiProviderDescriptor {
                 .build();
     }
 
+    /**
+     * 标准化AI 服务商描述。
+     */
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
     }
 
+    /**
+     * 处理safeList方法逻辑。
+     */
     private static List<String> safeList(List<String> values) {
         return values != null ? values : List.of();
     }

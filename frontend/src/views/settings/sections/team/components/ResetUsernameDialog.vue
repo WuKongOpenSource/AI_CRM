@@ -28,6 +28,19 @@
             @keydown.enter.prevent="$emit('save')"
           />
         </el-form-item>
+
+        <el-form-item label="当前登录密码">
+          <el-input
+            v-model="form.currentPassword"
+            type="password"
+            show-password
+            autocomplete="current-password"
+            placeholder="请输入当前登录密码"
+            class="w-full wk-crm-el-field-input"
+            size="large"
+            @keydown.enter.prevent="$emit('save')"
+          />
+        </el-form-item>
       </el-form>
     </div>
 

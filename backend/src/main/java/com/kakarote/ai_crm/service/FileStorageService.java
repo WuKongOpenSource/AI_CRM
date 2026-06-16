@@ -20,7 +20,13 @@ public interface FileStorageService {
     String upload(MultipartFile file, String path);
 
     /**
-     * 上传输入流内容。
+     * 上传输入流内容
+     *
+     * @param inputStream 文件输入流
+     * @param size 文件大小（字节）
+     * @param path 存储路径/key
+     * @param contentType 文件MIME类型
+     * @return 文件存储路径
      */
     String upload(InputStream inputStream, long size, String path, String contentType);
 
@@ -50,12 +56,12 @@ public interface FileStorageService {
     /**
      * Read a byte range from a stored file.
      *
-     * @param path file storage path/key
-     * @param start zero-based byte offset
-     * @param length byte count to read
+     * @param path file path/key
+     * @param offset zero-based byte offset
+     * @param length number of bytes to read
      * @return bounded file input stream
      */
-    InputStream getFileRangeStream(String path, long start, long length);
+    InputStream getFileRangeStream(String path, long offset, long length);
 
     /**
      * 获取文件的本地路径（用于 WeKnora 上传等需要本地文件的场景）

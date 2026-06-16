@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kakarote.ai_crm.ai.DynamicChatClientProvider;
 import com.kakarote.ai_crm.common.BasePage;
+import com.kakarote.ai_crm.common.auth.DataPermissionContext;
 import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.common.result.SystemCodeEnum;
 import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
@@ -20,6 +21,7 @@ import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleParticipantUserVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
+import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.IScheduleService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.utils.UserUtil;
@@ -54,6 +56,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
     @Autowired
     private ManageUserService manageUserService;
+
+    @Autowired
+    private DataPermissionService dataPermissionService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -138,14 +143,26 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         Long userId = UserUtil.getUserId();
         Date today = DateUtil.beginOfDay(new Date());
         Date weekEnd = DateUtil.endOfWeek(new Date());
+        DataPermissionContext context = dataPermissionService.createContextByPermission("schedule:view");
 
-        List<ScheduleVO> schedules = baseMapper.getMySchedules(userId, filter, today, weekEnd);
+        List<ScheduleVO> schedules = baseMapper.getMySchedules(
+                userId,
+                filter,
+                today,
+                weekEnd,
+                context.isAllData(),
+                context.getUserIds()
+        );
         enrichSchedules(schedules);
         return schedules;
     }
 
     @Override
     public BasePage<ScheduleVO> queryPageList(ScheduleQueryBO queryBO) {
+        queryBO.setCurrentUserId(UserUtil.getUserId());
+        DataPermissionContext context = dataPermissionService.createContextByPermission("schedule:view");
+        queryBO.setScheduleAllData(context.isAllData());
+        queryBO.setScheduleUserIds(context.getUserIds());
         BasePage<ScheduleVO> page = queryBO.parse();
         baseMapper.queryPageList(page, queryBO);
         enrichSchedules(page.getList());

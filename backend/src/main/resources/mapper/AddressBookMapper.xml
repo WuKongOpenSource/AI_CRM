@@ -12,11 +12,7 @@
             u.post,
             u.mobile,
             u.email,
-            COALESCE(NULLIF(u.employee_status, ''), CASE
-                WHEN u.status = 1 THEN 'active'
-                WHEN u.status = 2 THEN 'resigned'
-                ELSE 'disabled'
-            END) AS employee_status,
+            u.employee_status,
             (
                 SELECT MAX(COALESCE(t.completed_time, t.due_date, t.update_time, t.create_time))
                 FROM crm_task t
@@ -25,10 +21,23 @@
         FROM manager_user u
         LEFT JOIN manager_dept d ON u.dept_id = d.dept_id
         WHERE 1 = 1
+        <choose>
+            <when test="query.allData != null and query.allData">
+                AND 1 = 1
+            </when>
+            <when test="query.userIds != null and query.userIds.size() > 0">
+                AND u.user_id IN
+                <foreach collection="query.userIds" item="userId" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </when>
+            <otherwise>
+                AND 1 = 0
+            </otherwise>
+        </choose>
         <if test="query.keyword != null and query.keyword != ''">
             AND (
                 u.realname LIKE CONCAT('%', #{query.keyword}, '%')
-                OR u.username LIKE CONCAT('%', #{query.keyword}, '%')
                 OR u.mobile LIKE CONCAT('%', #{query.keyword}, '%')
                 OR u.email LIKE CONCAT('%', #{query.keyword}, '%')
                 OR u.post LIKE CONCAT('%', #{query.keyword}, '%')
@@ -42,18 +51,10 @@
             </foreach>
         </if>
         <if test="query.employeeStatus != null and query.employeeStatus != ''">
-            AND COALESCE(NULLIF(u.employee_status, ''), CASE
-                WHEN u.status = 1 THEN 'active'
-                WHEN u.status = 2 THEN 'resigned'
-                ELSE 'disabled'
-            END) = #{query.employeeStatus}
+            AND u.employee_status = #{query.employeeStatus}
         </if>
         ORDER BY
-            CASE COALESCE(NULLIF(u.employee_status, ''), CASE
-                WHEN u.status = 1 THEN 'active'
-                WHEN u.status = 2 THEN 'resigned'
-                ELSE 'disabled'
-            END)
+            CASE COALESCE(u.employee_status, 'active')
                 WHEN 'active' THEN 0
                 WHEN 'disabled' THEN 1
                 WHEN 'resigned' THEN 2
@@ -72,11 +73,7 @@
             u.post,
             u.mobile,
             u.email,
-            COALESCE(NULLIF(u.employee_status, ''), CASE
-                WHEN u.status = 1 THEN 'active'
-                WHEN u.status = 2 THEN 'resigned'
-                ELSE 'disabled'
-            END) AS employee_status,
+            u.employee_status,
             u.parent_id,
             p.realname AS parent_name,
             (

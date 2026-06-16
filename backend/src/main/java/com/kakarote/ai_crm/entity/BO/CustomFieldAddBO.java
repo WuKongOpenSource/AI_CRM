@@ -43,7 +43,7 @@ public class CustomFieldAddBO {
     @Schema(description = "是否在列表显示")
     private Boolean isShowInList;
 
-    @Schema(description = "Whether values must be unique")
+    @Schema(description = "是否唯一")
     private Boolean isUnique;
 
     @Schema(description = "选项列表(下拉类型时使用)")

@@ -10,6 +10,6 @@ public class ProductTransferBO {
 
     private List<Long> productIds;
 
-    @NotNull(message = "Owner is required")
+    @NotNull(message = "负责人不能为空")
     private Long ownerId;
 }

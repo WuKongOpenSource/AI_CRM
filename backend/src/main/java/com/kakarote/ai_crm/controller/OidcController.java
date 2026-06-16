@@ -213,7 +213,7 @@ public class OidcController {
     }
 
     /**
-     * UserInfo 端点
+     * User信息 端点
      * 返回当前用户的信息
      */
     @GetMapping(value = "/oauth2/userinfo", produces = MediaType.APPLICATION_JSON_VALUE)

@@ -19,18 +19,29 @@ export interface PageQuery {
 }
 
 // Auth types
+export type LoginType = 'PC' | 'MOBILE'
+
 export interface LoginParams {
   username: string
   password: string
+  loginType?: LoginType
   captchaVerification?: string
 }
 
 export interface LoginResult {
-  token: string
-  userInfo: UserInfo
+  token?: string
+  userInfo?: UserInfo
 }
 
-export type ExternalAuthProviderCode = 'google' | 'wechat' | 'outlook'
+export interface UserPreferences {
+  sidebarModuleOrder?: string[]
+}
+
+export interface UserPreferenceUpdateParams {
+  sidebarModuleOrder?: string[]
+}
+
+export type ExternalAuthProviderCode = 'google' | 'outlook' | 'wechat'
 
 export interface ExternalAuthProvider {
   provider: ExternalAuthProviderCode
@@ -45,20 +56,24 @@ export interface ExternalAuthAuthorizeResult {
 
 export interface ExternalAuthTicketLoginParams {
   ticket: string
+  loginType?: LoginType
+}
+
+export interface ExternalAuthRegisterParams {
+  ticket: string
+  companyName?: string
+  password?: string
+  loginType?: LoginType
 }
 
 export interface ExternalAuthBinding {
   provider: ExternalAuthProviderCode
-  name: string
   providerName: string
   bound: boolean
-  enabled: boolean
   subject?: string
-  email?: string
   displayName?: string
-  avatarUrl?: string
+  email?: string
   bindTime?: string
-  lastLoginTime?: string
 }
 
 export interface UserInfo {
@@ -76,12 +91,4 @@ export interface UserInfo {
   deptName?: string
   sex?: number
   preferences?: UserPreferences
-}
-
-export interface UserPreferences {
-  sidebarModuleOrder?: string[]
-}
-
-export interface UserPreferenceUpdateParams {
-  sidebarModuleOrder?: string[]
 }

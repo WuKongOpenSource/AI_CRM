@@ -44,7 +44,7 @@ public class UserUpdateBO {
     @Schema(description = "状态,0禁用,1正常,2未激活")
     private Integer status;
 
-    @Schema(description = "员工状态: active, resigned, disabled")
+    @Schema(description = "员工状态: active在职, resigned离职, disabled停用")
     private String employeeStatus;
 
     @Schema(description = "直属上级ID")

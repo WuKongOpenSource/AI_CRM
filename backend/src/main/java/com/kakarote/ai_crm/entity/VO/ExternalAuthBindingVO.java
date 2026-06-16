@@ -9,19 +9,19 @@ public class ExternalAuthBindingVO {
 
     private String provider;
 
-    private String name;
-
     private String providerName;
 
-    private Boolean bound;
+    private String name;
 
     private Boolean enabled;
 
+    private Boolean bound;
+
     private String subject;
 
-    private String email;
-
     private String displayName;
+
+    private String email;
 
     private String avatarUrl;
 

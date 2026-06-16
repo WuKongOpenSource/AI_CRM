@@ -45,8 +45,29 @@ public class TaskVO {
     @Schema(description = "客户ID")
     private Long customerId;
 
+    @Schema(description = "关系人ID")
+    private Long relationId;
+
+    @Schema(description = "Source follow-up ID")
+    private Long sourceFollowUpId;
+
     @Schema(description = "客户名称")
     private String customerName;
+
+    @Schema(description = "关系人姓名")
+    private String relationName;
+
+    @Schema(description = "所属项目ID")
+    private Long projectId;
+
+    @Schema(description = "所属项目名称")
+    private String projectName;
+
+    @Schema(description = "所属项目泳道ID")
+    private Long laneId;
+
+    @Schema(description = "所属项目泳道名称")
+    private String laneName;
 
     @Schema(description = "是否AI生成")
     private Integer generatedByAi;
@@ -72,15 +93,15 @@ public class TaskVO {
     @Schema(description = "参与人名称（逗号分隔）")
     private String participantNames;
 
-    @Schema(description = "高价值任务评分")
+    @Schema(description = "High-value priority score")
     private Integer valuePriorityScore;
 
-    @Schema(description = "高价值任务分层: HIGH/MEDIUM/LOW")
+    @Schema(description = "High-value priority tier: HIGH/MEDIUM/LOW")
     private String valuePriorityTier;
 
-    @Schema(description = "高价值任务评分原因")
+    @Schema(description = "Human-readable reason for the high-value priority score")
     private String valuePriorityReason;
 
-    @Schema(description = "是否高价值任务")
+    @Schema(description = "Whether this task belongs to the high-value priority bucket")
     private Boolean highValue;
 }

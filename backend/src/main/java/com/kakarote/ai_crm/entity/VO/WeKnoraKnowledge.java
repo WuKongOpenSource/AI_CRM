@@ -14,10 +14,10 @@ import java.util.Map;
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class WeKnoraKnowledge {
-
     /**
      * 知识 ID（WeKnora 中的唯一标识）
      */
+
     private String id;
 
     /**

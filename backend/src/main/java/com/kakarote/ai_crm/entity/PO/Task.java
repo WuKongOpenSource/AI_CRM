@@ -68,6 +68,18 @@ public class Task implements Serializable {
     @Schema(description = "关联客户ID")
     private Long customerId;
 
+    @Schema(description = "Relation ID")
+    private Long relationId;
+
+    @Schema(description = "Project ID")
+    private Long projectId;
+
+    @Schema(description = "Lane ID")
+    private Long laneId;
+
+    @Schema(description = "Source follow-up ID")
+    private Long sourceFollowUpId;
+
     /**
      * 是否AI生成: 0-否, 1-是
      */

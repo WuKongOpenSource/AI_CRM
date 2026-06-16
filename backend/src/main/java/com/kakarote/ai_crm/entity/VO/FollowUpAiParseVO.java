@@ -12,6 +12,9 @@ public class FollowUpAiParseVO {
     @Schema(description = "核心摘要")
     private String summary;
 
+    @Schema(description = "Business scene type")
+    private String sceneType;
+
     @Schema(description = "跟进类型: call/meeting/email/visit/other")
     private String type;
 

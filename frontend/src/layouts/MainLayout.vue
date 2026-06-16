@@ -1032,7 +1032,7 @@
             v-model="globalSearchKeyword"
             type="text"
             class="w-full rounded-lg border-none bg-slate-100 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/50"
-            placeholder="搜索客户、关系、任务、日程、知识库..."
+            placeholder="搜索客户1、关系、任务、日程、知识库..."
             @focus="handleGlobalSearchFocus"
             @keydown.enter.prevent="handleGlobalSearchEnter"
             @keydown.down.prevent="handleGlobalSearchArrow(1)"
@@ -3060,7 +3060,8 @@ const allMainNavItems: MainNavItem[] = [
 ]
 
 const allConfigNavItems: ConfigNavItem[] = [
-  // 单机版不展示外部数据同步入口。
+  // 暂时隐藏数据同步入口，功能页面与路由先保留便于后续恢复。
+  // { icon: 'import', label: '数据同步', route: '/sync', permission: ['config'] },
   // { icon: 'set', label: '系统设置', route: '/settings', permission: ['user', 'role', 'config', 'dept', 'customField'] },
   { icon: 'set', label: '系统设置', route: '/settings/team', permission: ['user', 'role', 'config', 'dept', 'customField'], query: { scope: 'profile' } },
 ]
@@ -3213,9 +3214,11 @@ const activeMenu = computed(() => {
   const path = route.path
   if (path.startsWith('/customer')) return '/customer'
   if (path.startsWith('/product')) return '/product'
+  if (path.startsWith('/scrm')) return '/scrm'
   if (path.startsWith('/address-book')) return '/address-book'
   if (path.startsWith('/project')) return '/project'
   if (path.startsWith('/relation')) return '/relation'
+  if (path.startsWith('/sync')) return '/sync'
   if (path.startsWith('/settings')) return '/settings'
   return path
 })
@@ -4550,7 +4553,7 @@ async function handleDeleteSession(sessionId: string) {
 }
 
 async function handlePinChatSession(session: ChatSession) {
-  const nextPinned = !session.pinned
+  const nextPinned = !Boolean(session.pinned)
   try {
     await chatStore.setSessionPinned(session.sessionId, nextPinned)
     ElMessage.success(nextPinned ? '已置顶' : '已取消置顶')

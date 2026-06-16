@@ -16,9 +16,6 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "minio")
 public class MinioConfig {
 
-    /**
-     * 是否启用 MinIO
-     */
     private boolean enabled = false;
 
     /**
@@ -58,6 +55,12 @@ public class MinioConfig {
      */
     private String publicEndpoint;
 
+    /**
+     * 处理minioClient方法逻辑。
+     */
+    /**
+     * 是否启用 MinIO
+     */
     @Bean
     @ConditionalOnProperty(name = "minio.enabled", havingValue = "true")
     public MinioClient minioClient() {

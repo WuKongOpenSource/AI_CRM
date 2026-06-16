@@ -151,7 +151,7 @@
                       <div class="min-w-0">
                         <p class="external-binding-item__name">{{ binding.providerName }}</p>
                         <p class="external-binding-item__meta">
-                          {{ binding.bound ? (binding.email || binding.displayName || '已绑定') : (binding.enabled ? '未绑定' : '未配置') }}
+                          {{ binding.bound ? (binding.email || binding.displayName || 'Bound') : 'Not bound' }}
                         </p>
                       </div>
                       <span
@@ -172,7 +172,7 @@
                       v-else
                       type="button"
                       class="external-binding-item__action"
-                      :disabled="!binding.enabled || externalBindingProvider === binding.provider"
+                      :disabled="externalBindingProvider === binding.provider"
                       @click="handleBindExternal(binding.provider)"
                     >
                       绑定

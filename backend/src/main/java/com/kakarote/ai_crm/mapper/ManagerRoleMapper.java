@@ -18,5 +18,8 @@ import java.util.List;
 
 public interface ManagerRoleMapper extends BaseMapper<ManagerRole> {
 
+    /**
+     * 查询角色列表包含用户Count。
+     */
     List<RoleVO> queryRoleListWithUserCount(@Param("search") String search);
 }

@@ -89,11 +89,9 @@ const basicInfoRows = computed(() => [
   { label: '创建时间', value: formatDateTime(product.value.createTime) },
   { label: '更新时间', value: formatDateTime(product.value.updateTime || product.value.createTime) }
 ])
-const customFieldEntries = computed(() =>
-  Object.entries(product.value.customFields || {})
-    .filter(([, value]) => value !== null && value !== undefined && value !== '')
-    .map(([key, value]) => ({ key, value }))
-)
+const customFieldEntries = computed(() => Object.entries(product.value.customFields || {})
+  .filter(([, value]) => value !== null && value !== undefined && value !== '')
+  .map(([key, value]) => ({ key, value })))
 
 function formatMoney(value?: number | string): string {
   if (value === null || value === undefined || value === '') return '-'

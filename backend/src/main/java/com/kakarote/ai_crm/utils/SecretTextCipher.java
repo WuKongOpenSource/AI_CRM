@@ -18,6 +18,8 @@ public class SecretTextCipher {
 
     private static final int NONCE_LENGTH = 12;
     private static final int TAG_LENGTH_BITS = 128;
+    private static final String KEY_REQUIREMENT_MESSAGE =
+            "mail.integration.encryption-key or MAIL_CREDENTIAL_ENCRYPTION_KEY must be set and at least 16 characters";
 
     private final SecureRandom secureRandom = new SecureRandom();
     private final String rawKey;
@@ -66,7 +68,7 @@ public class SecretTextCipher {
 
     private SecretKeySpec keySpec() {
         if (StrUtil.isBlank(rawKey) || rawKey.trim().length() < 16) {
-            throw new IllegalStateException("MAIL_CREDENTIAL_ENCRYPTION_KEY must be set and at least 16 characters");
+            throw new IllegalStateException(KEY_REQUIREMENT_MESSAGE);
         }
         return new SecretKeySpec(sha256(rawKey.trim()), "AES");
     }

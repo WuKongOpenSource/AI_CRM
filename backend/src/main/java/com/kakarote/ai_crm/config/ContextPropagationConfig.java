@@ -26,6 +26,9 @@ import reactor.core.publisher.Hooks;
 @Configuration
 public class ContextPropagationConfig {
 
+    /**
+     * 初始化上下文Propagation。
+     */
     @PostConstruct
     public void init() {
         log.info("初始化 Context Propagation 配置...");
@@ -48,11 +51,17 @@ public class ContextPropagationConfig {
     private static class AiSessionIdAccessor implements ThreadLocalAccessor<Long> {
         private static final String KEY = "ai.context.sessionId";
 
+        /**
+         * 处理key方法逻辑。
+         */
         @Override
         public Object key() {
             return KEY;
         }
 
+        /**
+         * 获取值。
+         */
         @Override
         public Long getValue() {
             Long sessionId = AiContextHolder.getCurrentSessionId();
@@ -63,6 +72,9 @@ public class ContextPropagationConfig {
             return sessionId;
         }
 
+        /**
+         * 设置值。
+         */
         @Override
         public void setValue(Long sessionId) {
             if (sessionId != null) {
@@ -73,6 +85,9 @@ public class ContextPropagationConfig {
             }
         }
 
+        /**
+         * 设置值。
+         */
         @Override
         public void setValue() {
             // 当上下文需要被清除时调用，必须清理 ThreadLocal 防止线程复用时泄露

@@ -22,6 +22,8 @@ import com.kakarote.ai_crm.mapper.*;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import com.kakarote.ai_crm.service.ITaskService;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -82,6 +84,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Autowired
+    private ITaskService taskService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -294,6 +302,49 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (customerUpdateBO.getCustomFields() != null && !customerUpdateBO.getCustomFields().isEmpty()) {
             customFieldService.updateCustomFieldValues("customer", customerUpdateBO.getCustomerId(), customerUpdateBO.getCustomFields());
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CustomerDetailVO updateCustomerField(CustomerFieldUpdateBO fieldUpdateBO) {
+        Customer customer = getById(fieldUpdateBO.getCustomerId());
+        if (ObjectUtil.isNull(customer)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+        }
+
+        String fieldName = StrUtil.trim(fieldUpdateBO.getFieldName());
+        String fieldSource = normalizeFieldSource(fieldUpdateBO.getFieldSource());
+        Object value = fieldUpdateBO.getValue();
+        if (FIELD_SOURCE_CUSTOM.equals(fieldSource) || !CUSTOMER_SYSTEM_FILTER_FIELDS.containsKey(fieldName)) {
+            customFieldService.updateCustomFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, value);
+            return getCustomerDetail(fieldUpdateBO.getCustomerId());
+        }
+
+        customFieldService.validateUniqueFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, value);
+        switch (fieldName) {
+            case "companyName" -> customer.setCompanyName(toStr(value));
+            case "industry" -> customer.setIndustry(toStr(value));
+            case "stage" -> customer.setStage(toStr(value));
+            case "level" -> customer.setLevel(toStr(value));
+            case "source" -> customer.setSource(toStr(value));
+            case "address" -> customer.setAddress(toStr(value));
+            case "website" -> customer.setWebsite(toStr(value));
+            case "logo" -> customer.setLogo(toStr(value));
+            case "quotation" -> customer.setQuotation(toBigDecimal(value));
+            case "lastContactTime" -> customer.setLastContactTime(toDateValue(value));
+            case "nextFollowTime" -> customer.setNextFollowTime(toDateValue(value));
+            case "remark" -> customer.setRemark(toStr(value));
+            case "ownerId" -> customer.setOwnerId(toLong(value));
+            default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Unsupported customer field: " + fieldName);
+        }
+        customer.setUpdateTime(new Date());
+        Long updateUserId = getCurrentUserIdOrNull();
+        if (updateUserId != null) {
+            customer.setUpdateUserId(updateUserId);
+        }
+        updateById(customer);
+        refreshCustomerActivity(fieldUpdateBO.getCustomerId());
+        return getCustomerDetail(fieldUpdateBO.getCustomerId());
     }
 
     @Override
@@ -620,6 +671,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (val instanceof Date d) return d;
         if (val instanceof java.sql.Timestamp ts) return new Date(ts.getTime());
         return null;
+    }
+
+    private Date toDateValue(Object val) {
+        Date date = toDate(val);
+        if (date != null || val == null) {
+            return date;
+        }
+        String text = StrUtil.trimToNull(val.toString());
+        return text == null ? null : DateUtil.parse(text);
     }
 
     private Integer toInt(Object val) {
@@ -1617,6 +1677,20 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     @Override
+    public void refreshCustomerActivity(Long customerId) {
+        if (customerId == null) {
+            return;
+        }
+        Customer customer = baseMapper.selectByIdIgnoreDataPermission(customerId);
+        if (customer == null || !Objects.equals(customer.getStatus(), 1)) {
+            return;
+        }
+        globalSearchIndexService.refreshCustomerIndex(customerId);
+        globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
+    }
+
+    @Override
     public CustomerLogoUploadVO uploadCustomerLogo(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Logo image is required");
@@ -1766,6 +1840,81 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public CustomerAiReportVO generateAiReport(Long customerId) {
+        Customer customer = getById(customerId);
+        if (customer == null || Objects.equals(customer.getStatus(), 0)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Customer does not exist");
+        }
+
+        CustomerAiReportVO report = new CustomerAiReportVO();
+        report.setCustomerId(customerId);
+        report.setAiStatusDetection(StrUtil.blankToDefault(customer.getAiStatusDetection(), "pending"));
+        report.setAiInsight(StrUtil.blankToDefault(customer.getAiInsight(), "No AI analysis has been generated yet."));
+
+        String prompt = """
+                Analyze this CRM customer and return compact JSON only:
+                {
+                  "aiStatusDetection": "short status diagnosis",
+                  "aiInsight": "business insight",
+                  "aiDeepInsight": "deeper opportunity/risk analysis",
+                  "aiNextStep": "recommended next action"
+                }
+                Customer:
+                name=%s
+                industry=%s
+                stage=%s
+                level=%s
+                source=%s
+                quotation=%s
+                lastContactTime=%s
+                nextFollowTime=%s
+                remark=%s
+                """.formatted(
+                StrUtil.blankToDefault(customer.getCompanyName(), ""),
+                StrUtil.blankToDefault(customer.getIndustry(), ""),
+                StrUtil.blankToDefault(customer.getStage(), ""),
+                StrUtil.blankToDefault(customer.getLevel(), ""),
+                StrUtil.blankToDefault(customer.getSource(), ""),
+                customer.getQuotation(),
+                customer.getLastContactTime(),
+                customer.getNextFollowTime(),
+                StrUtil.blankToDefault(customer.getRemark(), "")
+        );
+
+        try {
+            String response = chatClientProvider.getChatClient()
+                    .prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
+            String json = StrUtil.trimToEmpty(response);
+            if (json.startsWith("```")) {
+                json = json.replaceFirst("```(?:json)?\\s*", "");
+                json = json.replaceFirst("\\s*```$", "");
+            }
+            JsonNode root = objectMapper.readTree(json);
+            report.setAiStatusDetection(StrUtil.blankToDefault(getJsonText(root, "aiStatusDetection"), report.getAiStatusDetection()));
+            report.setAiInsight(StrUtil.blankToDefault(getJsonText(root, "aiInsight"), report.getAiInsight()));
+            report.setAiDeepInsight(getJsonText(root, "aiDeepInsight"));
+            report.setAiNextStep(getJsonText(root, "aiNextStep"));
+
+            customer.setAiStatusDetection(report.getAiStatusDetection());
+            customer.setAiInsight(report.getAiInsight());
+            customer.setAiParseSnapshot(json);
+            customer.setAiAnalysisStatus("completed");
+            customer.setAiAnalysisRequestedAt(new Date());
+            updateById(customer);
+        } catch (Exception e) {
+            log.warn("Customer AI report generation failed, customerId={}, error={}", customerId, e.getMessage());
+            customer.setAiAnalysisStatus("failed");
+            customer.setAiAnalysisRequestedAt(new Date());
+            updateById(customer);
+        }
+        return report;
     }
 
     @Override

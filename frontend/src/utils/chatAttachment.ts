@@ -1,6 +1,5 @@
 export const CHAT_ATTACHMENT_ACCEPT =
   'image/*,audio/*,video/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg,.avif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.weba,.mp4,.webm,.mov,.m4v,.avi,.mkv,.ogv,.3gp'
-
 export const MAX_CHAT_ATTACHMENT_SIZE = 50 * 1024 * 1024
 export const MAX_CHAT_ATTACHMENT_COUNT = 5
 
@@ -50,18 +49,23 @@ function resolveFileExtension(file: File): string {
   if (file.name.includes('.')) {
     return file.name.split('.').pop()?.toLowerCase() || 'bin'
   }
+
   if (file.type in MIME_EXTENSION_MAP) {
     return MIME_EXTENSION_MAP[file.type]
   }
+
   if (file.type.startsWith('image/')) {
     return file.type.slice('image/'.length) || 'png'
   }
+
   if (file.type.startsWith('audio/')) {
     return file.type.slice('audio/'.length) || 'mp3'
   }
+
   if (file.type.startsWith('video/')) {
     return file.type.slice('video/'.length) || 'mp4'
   }
+
   return 'bin'
 }
 
@@ -102,33 +106,31 @@ export function extractClipboardFiles(event: ClipboardEvent): File[] {
     if (item.kind !== 'file') {
       continue
     }
+
     const file = item.getAsFile()
     if (file) {
       files.push(normalizeChatFile(file))
     }
   }
+
   return files
 }
 
-export function mergeChatFiles(
-  existingFiles: File[],
-  incomingFiles: File[],
-  occupiedSlots = 0
-): { files: File[], error?: string } {
+export function mergeChatFiles(existingFiles: File[], incomingFiles: File[]): { files: File[]; error?: string } {
   if (incomingFiles.length === 0) {
     return { files: existingFiles }
   }
 
   const normalizedFiles = incomingFiles.map(normalizeChatFile)
 
-  if (occupiedSlots + existingFiles.length + normalizedFiles.length > MAX_CHAT_ATTACHMENT_COUNT) {
+  if (existingFiles.length + normalizedFiles.length > MAX_CHAT_ATTACHMENT_COUNT) {
     return {
       files: existingFiles,
       error: `最多只能上传${MAX_CHAT_ATTACHMENT_COUNT}个文件`
     }
   }
 
-  const oversizedFile = normalizedFiles.find(file => file.size > MAX_CHAT_ATTACHMENT_SIZE)
+  const oversizedFile = normalizedFiles.find((file) => file.size > MAX_CHAT_ATTACHMENT_SIZE)
   if (oversizedFile) {
     return {
       files: existingFiles,

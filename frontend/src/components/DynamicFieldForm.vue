@@ -1,7 +1,7 @@
 <template>
-  <div v-if="dynamicFields.length > 0" class="dynamic-field-form">
+  <div v-if="fields.length > 0" class="dynamic-field-form">
     <div
-      v-for="field in dynamicFields"
+      v-for="field in fields"
       :key="field.fieldId"
       :class="getFieldWrapperClass(field)"
       class="space-y-1.5"
@@ -139,7 +139,7 @@ const emit = defineEmits<{
   'fieldsLoaded': [fields: CustomField[]]
 }>()
 
-const dynamicFields = ref<CustomField[]>([])
+const fields = ref<CustomField[]>([])
 const localValues = ref<Record<string, any>>({})
 const uniqueFieldErrors = ref<Record<string, string>>({})
 
@@ -230,13 +230,13 @@ function normalizeFieldValue(field: CustomField, value: unknown): any {
 function applyModelValue(modelValue?: Record<string, any>) {
   const sourceValues = modelValue || {}
 
-  if (dynamicFields.value.length === 0) {
+  if (fields.value.length === 0) {
     localValues.value = { ...sourceValues }
     return
   }
 
   const nextValues: Record<string, any> = {}
-  const fieldMap = new Map(dynamicFields.value.map(field => [field.fieldName, field]))
+  const fieldMap = new Map(fields.value.map(field => [field.fieldName, field]))
 
   for (const [fieldName, rawValue] of Object.entries(sourceValues)) {
     const field = fieldMap.get(fieldName)
@@ -273,7 +273,7 @@ function parseDefaultValue(field: CustomField): any {
 }
 
 function applyFieldDefaults() {
-  dynamicFields.value.forEach(field => {
+  fields.value.forEach(field => {
     const hasExplicitValue = Object.prototype.hasOwnProperty.call(localValues.value, field.fieldName)
     if (!hasExplicitValue || localValues.value[field.fieldName] === undefined) {
       if (field.fieldType === 'multiselect') {
@@ -299,11 +299,11 @@ async function loadFields() {
         ? await getFormFieldsByEntity(props.entityType)
         : await getEnabledFieldsByEntity(props.entityType)
 
-    dynamicFields.value = filterFieldsByMode(loadedFields)
+    fields.value = filterFieldsByMode(loadedFields)
     // 先按字段类型归一化编辑态已有值，再补默认值
     applyModelValue(props.modelValue)
     applyFieldDefaults()
-    emit('fieldsLoaded', dynamicFields.value)
+    emit('fieldsLoaded', fields.value)
   } catch {
     // Error handled by interceptor
   }
@@ -391,10 +391,10 @@ watch(() => props.modelValue, (newVal) => {
 
 watch(() => props.fields, (newFields) => {
   if (newFields && newFields.length > 0) {
-    dynamicFields.value = filterFieldsByMode(newFields)
+    fields.value = filterFieldsByMode(newFields)
     applyModelValue(props.modelValue)
     applyFieldDefaults()
-    emit('fieldsLoaded', dynamicFields.value)
+    emit('fieldsLoaded', fields.value)
   }
 }, { deep: true })
 
@@ -404,7 +404,7 @@ onMounted(() => {
 
 // Expose validation method
 function validate(): boolean {
-  for (const field of dynamicFields.value) {
+  for (const field of fields.value) {
     if (field.isRequired) {
       const value = localValues.value[field.fieldName]
       if (value === null || value === undefined || value === '' ||
@@ -418,7 +418,7 @@ function validate(): boolean {
 
 function getRequiredFieldLabels(): string[] {
   const missing: string[] = []
-  for (const field of dynamicFields.value) {
+  for (const field of fields.value) {
     if (field.isRequired) {
       const value = localValues.value[field.fieldName]
       if (value === null || value === undefined || value === '' ||
@@ -431,7 +431,7 @@ function getRequiredFieldLabels(): string[] {
 }
 
 async function validateUniqueFields(): Promise<boolean> {
-  for (const field of dynamicFields.value) {
+  for (const field of fields.value) {
     const valid = await validateUniqueField(field)
     if (!valid) {
       return false
@@ -445,7 +445,7 @@ defineExpose({
   getRequiredFieldLabels,
   validateUniqueFields,
   clearUniqueFieldErrors,
-  fields: dynamicFields,
+  fields,
   localValues,
   uniqueFieldErrors
 })

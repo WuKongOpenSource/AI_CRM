@@ -25,13 +25,16 @@ import java.util.OptionalDouble;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+/**
+ * Extracts lightweight AI-analysis inputs from stored video files.
+ */
 @Slf4j
 @Service
 public class VideoMediaExtractionService {
 
     private static final int MAX_VIDEO_FRAME_COUNT = 10;
     private static final String VIDEO_PROCESSOR_MISSING_MESSAGE =
-            "视频处理组件未配置，请配置 ffmpeg/ffprobe 后重试";
+        "视频处理组件未配置，请配置 ffmpeg/ffprobe 后重试";
 
     @Autowired
     private FileStorageService fileStorageService;
@@ -48,6 +51,9 @@ public class VideoMediaExtractionService {
     @Value("${media-analysis.video.timeout-seconds:60}")
     private long timeoutSeconds;
 
+    /**
+     * Extract audio bytes and representative video frames.
+     */
     public VideoExtractionResult extract(String filePath, String fileName) {
         Path tempDir = null;
         try {
@@ -81,11 +87,11 @@ public class VideoMediaExtractionService {
 
     private OptionalDouble probeDuration(Path sourcePath, Duration timeout) {
         List<String> command = List.of(
-                resolveToolPath(ffprobePath, "ffprobe"),
-                "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                sourcePath.toString()
+            resolveToolPath(ffprobePath, "ffprobe"),
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            sourcePath.toString()
         );
         CommandResult result = runCommand(command, timeout);
         if (result.exitCode() != 0) {
@@ -104,16 +110,16 @@ public class VideoMediaExtractionService {
     private byte[] extractAudio(Path sourcePath, Path tempDir, Duration timeout) {
         Path audioPath = tempDir.resolve("audio.mp3");
         List<String> command = List.of(
-                resolveToolPath(ffmpegPath, "ffmpeg"),
-                "-hide_banner", "-loglevel", "error",
-                "-y",
-                "-i", sourcePath.toString(),
-                "-map", "0:a:0",
-                "-vn",
-                "-ac", "1",
-                "-ar", "16000",
-                "-f", "mp3",
-                audioPath.toString()
+            resolveToolPath(ffmpegPath, "ffmpeg"),
+            "-hide_banner", "-loglevel", "error",
+            "-y",
+            "-i", sourcePath.toString(),
+            "-map", "0:a:0",
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-f", "mp3",
+            audioPath.toString()
         );
         CommandResult result = runCommand(command, timeout);
         if (result.exitCode() != 0 || !Files.isRegularFile(audioPath)) {
@@ -136,14 +142,14 @@ public class VideoMediaExtractionService {
         for (Double timestamp : timestamps) {
             Path framePath = tempDir.resolve("frame-" + index + ".jpg");
             List<String> command = List.of(
-                    resolveToolPath(ffmpegPath, "ffmpeg"),
-                    "-hide_banner", "-loglevel", "error",
-                    "-y",
-                    "-ss", String.format(Locale.ROOT, "%.3f", timestamp),
-                    "-i", sourcePath.toString(),
-                    "-frames:v", "1",
-                    "-q:v", "3",
-                    framePath.toString()
+                resolveToolPath(ffmpegPath, "ffmpeg"),
+                "-hide_banner", "-loglevel", "error",
+                "-y",
+                "-ss", String.format(Locale.ROOT, "%.3f", timestamp),
+                "-i", sourcePath.toString(),
+                "-frames:v", "1",
+                "-q:v", "3",
+                framePath.toString()
             );
             CommandResult result = runCommand(command, timeout);
             if (result.exitCode() == 0 && Files.isRegularFile(framePath)) {
@@ -185,8 +191,8 @@ public class VideoMediaExtractionService {
     private CommandResult runCommand(List<String> command, Duration timeout) {
         try {
             Process process = new ProcessBuilder(command)
-                    .redirectErrorStream(true)
-                    .start();
+                .redirectErrorStream(true)
+                .start();
             boolean finished = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
             if (!finished) {
                 process.destroyForcibly();
@@ -232,10 +238,10 @@ public class VideoMediaExtractionService {
     }
 
     public record VideoExtractionResult(
-            byte[] audioBytes,
-            String audioFileName,
-            String audioContentType,
-            List<VideoFrame> frames
+        byte[] audioBytes,
+        String audioFileName,
+        String audioContentType,
+        List<VideoFrame> frames
     ) {
         public boolean hasAudio() {
             return audioBytes != null && audioBytes.length > 0;

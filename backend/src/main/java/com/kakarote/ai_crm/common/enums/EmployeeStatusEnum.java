@@ -7,7 +7,7 @@ import java.util.Arrays;
 public enum EmployeeStatusEnum {
 
     ACTIVE("active", "在职"),
-    RESIGNED("resigned", "未激活"),
+    RESIGNED("resigned", "离职"),
     DISABLED("disabled", "停用");
 
     private final String value;
@@ -42,15 +42,5 @@ public enum EmployeeStatusEnum {
                 .findFirst()
                 .map(EmployeeStatusEnum::getName)
                 .orElse(ACTIVE.name);
-    }
-
-    public static String fromManagerUserStatus(Integer status) {
-        if (status == null || status == 1) {
-            return ACTIVE.value;
-        }
-        if (status == 2) {
-            return RESIGNED.value;
-        }
-        return DISABLED.value;
     }
 }

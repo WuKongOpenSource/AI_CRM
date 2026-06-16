@@ -7,9 +7,9 @@ import lombok.Data;
 @Data
 public class ProductStatusUpdateBO {
 
-    @NotNull(message = "Product ID is required")
+    @NotNull(message = "产品ID不能为空")
     private Long productId;
 
-    @NotBlank(message = "Status is required")
+    @NotBlank(message = "状态不能为空")
     private String status;
 }

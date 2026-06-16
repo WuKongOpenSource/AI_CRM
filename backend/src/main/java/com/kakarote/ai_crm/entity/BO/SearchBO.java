@@ -14,15 +14,18 @@ import lombok.Setter;
 @Setter
 public class SearchBO extends PageEntity {
 
-    /**
-     * 搜索内容
-     */
     @Schema(description = "")
     private String search;
 
     @Schema(description = "类型")
     private String type;
 
+    /**
+     * 返回对象的字符串表示。
+     */
+    /**
+     * 搜索内容
+     */
     @Override
     public String toString() {
         return "CompanySearchBO{" +

@@ -43,14 +43,35 @@ public class KnowledgeVO {
     @Schema(description = "关联客户名称")
     private String customerName;
 
+    @Schema(description = "关联员工ID")
+    private Long employeeId;
+
+    @Schema(description = "关联员工名称")
+    private String employeeName;
+
+    @Schema(description = "关联关系人ID")
+    private Long relationId;
+
+    @Schema(description = "关联关系人姓名")
+    private String relationName;
+
     @Schema(description = "AI摘要")
     private String summary;
+
+    @Schema(description = "鏂囨湰鍐呭")
+    private String contentText;
 
     @Schema(description = "状态")
     private Integer status;
 
     @Schema(description = "WeKnora 解析状态: pending, processing, completed, failed, unsupported")
     private String weKnoraParseStatus;
+
+    @Schema(description = "AI analysis result")
+    private KnowledgeAiAnalyzeVO aiAnalyzeResult;
+
+    @Schema(description = "AI analysis time")
+    private Date aiAnalysisTime;
 
     @Schema(description = "上传人ID")
     private Long uploadUserId;

@@ -80,6 +80,9 @@ public class WebConfig {
      */
     public static class NumberSerializer extends JsonSerializer<Long> {
 
+        /**
+         * 处理serialize方法逻辑。
+         */
         @Override
         public void serialize(Long value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
             gen.writeNumber(value);
@@ -91,6 +94,9 @@ public class WebConfig {
      */
     public static class DateDeSerializer extends JsonDeserializer<Date> {
 
+        /**
+         * 处理deserialize方法逻辑。
+         */
         @Override
         public Date deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
             String text = p.getText();

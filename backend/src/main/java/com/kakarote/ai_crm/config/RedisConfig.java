@@ -9,11 +9,17 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 @Configuration
 public class RedisConfig {
 
+    /**
+     * 处理redisKeySerializer方法逻辑。
+     */
     @Bean
     public RedisSerializer<String> redisKeySerializer() {
         return RedisSerializer.string();
     }
 
+    /**
+     * 处理redisValueSerializer方法逻辑。
+     */
     @Bean
     public RedisSerializer<Object> redisValueSerializer() {
         return RedisSerializer.json();

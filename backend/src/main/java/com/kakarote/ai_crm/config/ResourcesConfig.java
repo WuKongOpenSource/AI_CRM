@@ -10,6 +10,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class ResourcesConfig implements WebMvcConfigurer {
 
+    /**
+     * 新增资源Handlers。
+     */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         /* swagger配置 */

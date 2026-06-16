@@ -7,8 +7,8 @@ import com.kakarote.ai_crm.entity.BO.FollowUpAiParseBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpQueryBO;
 import com.kakarote.ai_crm.entity.BO.FollowUpUpdateBO;
 import com.kakarote.ai_crm.entity.PO.FollowUp;
-import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpAttachmentVO;
+import com.kakarote.ai_crm.entity.VO.FollowUpAiParseVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 
 import java.util.List;
@@ -24,7 +24,7 @@ public interface IFollowUpService extends IService<FollowUp> {
     Long addFollowUp(FollowUpAddBO followUpAddBO);
 
     /**
-     * Update follow-up record.
+     * 更新跟进。
      */
     void updateFollowUp(FollowUpUpdateBO followUpUpdateBO);
 
@@ -49,17 +49,17 @@ public interface IFollowUpService extends IService<FollowUp> {
     FollowUpAiParseVO aiParseFollowUp(FollowUpAiParseBO parseBO);
 
     /**
+     * 处理analyzeAttachment方法逻辑。
+     */
+    FollowUpAttachmentVO analyzeAttachment(Long attachmentId);
+
+    /**
      * 获取附件。
      */
     FollowUpAttachmentVO getAttachment(Long attachmentId);
 
     /**
-     * Analyze an attachment with the configured AI model.
-     */
-    FollowUpAttachmentVO analyzeAttachment(Long attachmentId);
-
-    /**
-     * 删除附件。
+     * Delete an attachment from a follow-up record.
      */
     void deleteAttachment(Long attachmentId);
 }

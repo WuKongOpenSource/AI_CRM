@@ -5,8 +5,10 @@ import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactQueryBO;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
+import com.kakarote.ai_crm.entity.BO.CustomerAiParseBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.VO.ContactVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiParseVO;
 
 import java.util.List;
 
@@ -44,4 +46,9 @@ public interface IContactService extends IService<Contact> {
      * 分页查询联系人
      */
     BasePage<ContactVO> queryPageList(ContactQueryBO queryBO);
+
+    /**
+     * 使用 AI 解析联系人。
+     */
+    CustomerAiParseVO aiParseContact(CustomerAiParseBO parseBO);
 }

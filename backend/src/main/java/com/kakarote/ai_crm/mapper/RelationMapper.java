@@ -8,13 +8,22 @@ import com.kakarote.ai_crm.entity.VO.RelationVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+/**
+ * 关系人Mapper。
+ */
 @Mapper
 public interface RelationMapper extends BaseMapper<Relation> {
 
+    /**
+     * 分页查询关系人。
+     */
     IPage<RelationVO> queryPageList(IPage<RelationVO> page,
                                     @Param("query") RelationQueryBO query,
                                     @Param("ownerUserId") Long ownerUserId);
 
+    /**
+     * 查询关系人详情基础信息。
+     */
     RelationVO getRelationById(@Param("relationId") Long relationId,
                                @Param("ownerUserId") Long ownerUserId);
 }

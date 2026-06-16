@@ -15,6 +15,9 @@ import java.io.InputStream;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AiMediaUtil {
 
+    /**
+     * 构建媒体。
+     */
     public static Media buildMedia(FileStorageService fileStorageService, String filePath, MimeType mimeType)
             throws IOException {
         try (InputStream inputStream = fileStorageService.getFileStream(filePath)) {
@@ -23,8 +26,14 @@ public final class AiMediaUtil {
         }
     }
 
+    /**
+     * 构建内存媒体。
+     */
     public static Media buildMedia(byte[] data, String filename, MimeType mimeType) {
         Resource resource = new ByteArrayResource(data) {
+            /**
+             * 获取Filename。
+             */
             @Override
             public String getFilename() {
                 return filename;

@@ -31,9 +31,9 @@ public class SessionCreateBO {
     @Schema(description = "关联项目任务ID")
     private Long projectTaskId;
 
-    @Schema(description = "Application code")
-    private String appCode;
-
     @Schema(description = "会话标题")
     private String title;
+
+    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/relation/product")
+    private String appCode;
 }

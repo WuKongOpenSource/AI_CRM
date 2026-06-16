@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.ContactTagMapper">
+
+    <select id="getTagsByContactId" resultType="java.lang.String">
+        SELECT tag_name
+        FROM crm_contact_tag
+        WHERE contact_id = #{contactId}
+        ORDER BY create_time ASC, id ASC
+    </select>
+
+    <delete id="deleteByContactId">
+        DELETE FROM crm_contact_tag
+        WHERE contact_id = #{contactId}
+    </delete>
+
+</mapper>

@@ -5,22 +5,25 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * 关系人详情视图对象。
+ */
 @Data
-@Schema(name = "RelationDetailVO", description = "Relation detail")
+@Schema(name = "RelationDetailVO", description = "关系人详情视图对象")
 public class RelationDetailVO {
 
-    @Schema(description = "Base relation information")
+    @Schema(description = "基本信息")
     private RelationVO relation;
 
-    @Schema(description = "Related tasks")
+    @Schema(description = "相关任务")
     private List<TaskVO> tasks;
 
-    @Schema(description = "Related schedules")
+    @Schema(description = "相关日程")
     private List<ScheduleVO> schedules;
 
-    @Schema(description = "Related attachments")
+    @Schema(description = "相关附件")
     private List<KnowledgeVO> attachments;
 
-    @Schema(description = "History records")
+    @Schema(description = "历史记录")
     private List<FollowUpVO> histories;
 }

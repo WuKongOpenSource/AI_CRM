@@ -11,7 +11,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 自定义字段池（按实体复用物理列）
+ * 自定义字段池（全局共享，复用物理列）
  */
 @Data
 @TableName("crm_custom_field_pool")

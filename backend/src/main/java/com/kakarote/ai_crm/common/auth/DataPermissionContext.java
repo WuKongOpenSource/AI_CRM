@@ -17,18 +17,30 @@ public class DataPermissionContext {
 
     private List<Long> userIds = new ArrayList<>();
 
+    /**
+     * 处理all方法逻辑。
+     */
     public static DataPermissionContext all() {
         return new DataPermissionContext(true, new ArrayList<>());
     }
 
+    /**
+     * 处理none方法逻辑。
+     */
     public static DataPermissionContext none() {
         return new DataPermissionContext(false, new ArrayList<>());
     }
 
+    /**
+     * 处理users方法逻辑。
+     */
     public static DataPermissionContext users(Collection<Long> userIds) {
         return new DataPermissionContext(false, new ArrayList<>(userIds));
     }
 
+    /**
+     * 判断是否空值。
+     */
     public boolean isEmpty() {
         return !allData && (userIds == null || userIds.isEmpty());
     }
