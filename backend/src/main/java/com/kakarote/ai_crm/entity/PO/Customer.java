@@ -51,6 +51,10 @@ public class Customer implements Serializable {
     @Schema(description = "负责人ID")
     private Long ownerId;
 
+    @TableField(exist = false)
+    @Schema(description = "负责人名称")
+    private String ownerName;
+
     /**
      * 客户等级: A, B, C
      */

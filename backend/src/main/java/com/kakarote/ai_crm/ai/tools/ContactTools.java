@@ -1,7 +1,9 @@
 package com.kakarote.ai_crm.ai.tools;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.ai.tools.support.AiToolCustomerResolver;
 import com.kakarote.ai_crm.ai.tools.support.AiToolPermission;
+import com.kakarote.ai_crm.entity.BO.ContactAddBO;
 import com.kakarote.ai_crm.entity.BO.ContactUpdateBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
@@ -29,6 +31,85 @@ public class ContactTools {
 
     @Autowired
     private ICustomerService customerService;
+
+    @Autowired
+    private AiToolCustomerResolver customerResolver;
+
+    /**
+     * 创建联系人。
+     */
+    @Tool(description = "创建新联系人。当用户要给某个客户添加联系人、新增联系人、记录联系人姓名/电话/邮箱/职位时调用。客户解析优先级：显式customerIdStr > 显式客户名称 > 当前客户对话绑定客户。当前客户对话中，如果用户只说“这个客户/当前客户/他们”等，不要把代词作为customerName，留空即可让工具默认关联当前客户。联系人姓名必填；如果只提供电话但没有姓名，请先向用户询问联系人姓名。")
+    @AiToolPermission(value = "contact:create", action = "创建联系人")
+    public String createContact(
+            @ToolParam(description = "Optional CRM customer ID returned by createCustomer or getCustomerDetail. Explicit ID has highest priority.", required = false) String customerIdStr,
+            @ToolParam(description = "客户名称（公司名）；客户对话模式下未显式指定其他客户时可留空", required = false) String customerName,
+            @ToolParam(description = "联系人姓名，必填") String name,
+            @ToolParam(description = "职位", required = false) String position,
+            @ToolParam(description = "电话/手机号", required = false) String phone,
+            @ToolParam(description = "邮箱", required = false) String email,
+            @ToolParam(description = "微信", required = false) String wechat,
+            @ToolParam(description = "是否主联系人：true/false 或 1/0，默认 false", required = false) String isPrimary,
+            @ToolParam(description = "备注", required = false) String notes) {
+
+        log.info("【Tool调用】createContact: customerId={}, customerName={}, name={}, phone={}",
+                customerIdStr, customerName, name, phone);
+
+        try {
+            String normalizedName = normalizeRequiredText(name);
+            if (normalizedName == null) {
+                return "创建联系人失败: 缺少联系人姓名。请先提供联系人姓名。";
+            }
+
+            AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
+                    customerIdStr,
+                    customerName,
+                    "创建联系人",
+                    "创建联系人失败",
+                    "添加联系人"
+            );
+            if (customerResolve.errorMessage() != null) {
+                return customerResolve.errorMessage();
+            }
+            Customer customer = customerResolve.customer();
+            if (customer == null) {
+                return "创建联系人失败: 缺少关联客户。请提供客户名称或客户ID。";
+            }
+
+            ContactAddBO bo = new ContactAddBO();
+            bo.setCustomerId(customer.getCustomerId());
+            bo.setName(normalizedName);
+            bo.setPosition(normalizeOptionalText(position));
+            bo.setPhone(normalizeOptionalText(phone));
+            bo.setEmail(normalizeOptionalText(email));
+            bo.setWechat(normalizeOptionalText(wechat));
+            bo.setIsPrimary(parseBooleanFlag(isPrimary) ? 1 : 0);
+            bo.setNotes(normalizeOptionalText(notes));
+
+            Long contactId = contactService.addContact(bo);
+
+            StringBuilder result = new StringBuilder();
+            result.append("联系人“").append(normalizedName).append("”已创建成功！");
+            result.append("\n- 联系人ID: ").append(contactId);
+            result.append("\n- 所属客户: ").append(customer.getCompanyName())
+                    .append("（客户ID: ").append(customer.getCustomerId()).append("）");
+            if (bo.getPosition() != null) {
+                result.append("\n- 职位: ").append(bo.getPosition());
+            }
+            if (bo.getPhone() != null) {
+                result.append("\n- 电话: ").append(bo.getPhone());
+            }
+            if (bo.getEmail() != null) {
+                result.append("\n- 邮箱: ").append(bo.getEmail());
+            }
+            if (bo.getIsPrimary() != null && bo.getIsPrimary() == 1) {
+                result.append("\n- 已设为主联系人");
+            }
+            return result.toString();
+        } catch (Exception e) {
+            log.error("【Tool调用】createContact 失败: {}", e.getMessage(), e);
+            return "创建联系人失败: " + e.getMessage();
+        }
+    }
 
     @Tool(description = "查询联系人。当用户要搜索、查找联系人时调用。支持按姓名和/或手机号搜索。")
     @AiToolPermission(value = "contact:view", action = "查看联系人")
@@ -298,5 +379,33 @@ public class ContactTools {
             log.error("【Tool调用】deleteContact 失败: {}", e.getMessage(), e);
             return "删除联系人失败: " + e.getMessage();
         }
+    }
+
+    private String normalizeRequiredText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty() || "null".equalsIgnoreCase(normalized)) {
+            return null;
+        }
+        return normalized;
+    }
+
+    private String normalizeOptionalText(String value) {
+        return normalizeRequiredText(value);
+    }
+
+    private boolean parseBooleanFlag(String value) {
+        String normalized = normalizeOptionalText(value);
+        if (normalized == null) {
+            return false;
+        }
+        return "1".equals(normalized)
+                || "true".equalsIgnoreCase(normalized)
+                || "yes".equalsIgnoreCase(normalized)
+                || "y".equalsIgnoreCase(normalized)
+                || "是".equals(normalized)
+                || "主联系人".equals(normalized);
     }
 }

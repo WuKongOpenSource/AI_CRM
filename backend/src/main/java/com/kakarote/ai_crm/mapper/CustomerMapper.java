@@ -51,6 +51,15 @@ public interface CustomerMapper extends BaseMapper<Customer> {
 
     @InterceptorIgnore(dataPermission = "true")
     @Select("""
+            SELECT c.*, u.realname AS owner_name
+            FROM crm_customer c
+            LEFT JOIN manager_user u ON c.owner_id = u.user_id
+            WHERE c.customer_id = #{customerId}
+            """)
+    Customer selectByIdIgnoreDataPermission(@Param("customerId") Long customerId);
+
+    @InterceptorIgnore(dataPermission = "true")
+    @Select("""
             SELECT *
             FROM crm_customer
             WHERE company_name = #{companyName}

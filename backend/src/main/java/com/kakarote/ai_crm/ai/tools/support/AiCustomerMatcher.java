@@ -50,7 +50,7 @@ public class AiCustomerMatcher {
         if (candidateMap.isEmpty()) {
             ScoredCustomer noAccessMatch = findBestIgnoringDataPermission(input, searchKeywords, List.of());
             if (isUsableNoAccessMatch(noAccessMatch)) {
-                return CustomerMatchResult.existsNoAccess(input);
+                return CustomerMatchResult.existsNoAccess(input, noAccessMatch.getCustomer());
             }
             return CustomerMatchResult.notFound(input, List.of());
         }
@@ -71,13 +71,13 @@ public class AiCustomerMatcher {
         ScoredCustomer noAccessMatch = findBestIgnoringDataPermission(input, searchKeywords, candidateMap.keySet());
         if (best.getScore() < MIN_MATCH_SCORE) {
             if (isUsableNoAccessMatch(noAccessMatch)) {
-                return CustomerMatchResult.existsNoAccess(input);
+                return CustomerMatchResult.existsNoAccess(input, noAccessMatch.getCustomer());
             }
             return CustomerMatchResult.notFound(input, topCandidates);
         }
 
         if (isHighConfidenceNoAccessMatch(noAccessMatch) && noAccessMatch.getScore() > best.getScore()) {
-            return CustomerMatchResult.existsNoAccess(input);
+            return CustomerMatchResult.existsNoAccess(input, noAccessMatch.getCustomer());
         }
 
         if (scoredCustomers.size() > 1) {
@@ -352,8 +352,8 @@ public class AiCustomerMatcher {
             return new CustomerMatchResult(rawName, null, candidateCustomers, MatchStatus.AMBIGUOUS);
         }
 
-        public static CustomerMatchResult existsNoAccess(String rawName) {
-            return new CustomerMatchResult(rawName, null, List.of(), MatchStatus.EXISTS_NO_ACCESS);
+        public static CustomerMatchResult existsNoAccess(String rawName, Customer customer) {
+            return new CustomerMatchResult(rawName, customer, List.of(), MatchStatus.EXISTS_NO_ACCESS);
         }
 
         public boolean isMatched() {
@@ -366,6 +366,16 @@ public class AiCustomerMatcher {
 
         public boolean isExistsNoAccess() {
             return status == MatchStatus.EXISTS_NO_ACCESS;
+        }
+
+        public String formatNoAccessMessage(String actionLabel) {
+            String displayName = customer != null && StrUtil.isNotBlank(customer.getCompanyName())
+                ? customer.getCompanyName()
+                : rawName;
+            String ownerName = customer == null ? null : customer.getOwnerName();
+            String ownerText = "（负责人：" + StrUtil.blankToDefault(ownerName, "未知") + "）";
+            return "操作未执行：客户已存在：「" + displayName + "」" + ownerText
+                + "。当前用户没有这个客户的权限，无法" + actionLabel + "。";
         }
 
         public String formatCandidateNames() {

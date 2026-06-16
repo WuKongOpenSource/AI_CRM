@@ -689,6 +689,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     @Override
+    public Customer findCustomerByIdIgnoreDataPermission(Long customerId) {
+        if (customerId == null) {
+            return null;
+        }
+        return baseMapper.selectByIdIgnoreDataPermission(customerId);
+    }
+
+    @Override
     public CustomerDetailVO getCustomerDetail(Long customerId) {
         CustomerDetailVO detail = baseMapper.getCustomerById(customerId);
         if (ObjectUtil.isNull(detail)) {
