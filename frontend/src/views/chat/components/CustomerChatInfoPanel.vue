@@ -19,26 +19,134 @@
         @mousedown.prevent="startResize"
       />
 
-      <header class="flex shrink-0 items-center justify-between gap-3 border-b border-[#ececec] px-4 py-3">
-        <div class="min-w-0">
-          <p class="truncate text-[15px] font-semibold text-[#0d0d0d]">{{ customer?.companyName || '客户信息' }}</p>
-          <p class="mt-0.5 truncate text-xs text-[#8f8f8f]">{{ fullDetailMode ? '完整详情' : '关键信息' }}</p>
+      <header class="shrink-0 border-b border-[#ececec] px-4 py-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="truncate text-[15px] font-semibold text-[#0d0d0d]">{{ customer?.companyName || '客户信息' }}</p>
+            <p class="mt-0.5 truncate text-xs text-[#8f8f8f]">{{ fullDetailMode ? '完整详情' : '关键信息' }}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+              @click="basicDrawerOpen = true"
+            >
+              基本信息
+            </button>
+            <button
+              type="button"
+              class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#f3f3f3]"
+              title="收起"
+              @click="collapsed = true"
+            >
+              <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+            </button>
+          </div>
         </div>
-        <div class="flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
-            @click="basicDrawerOpen = true"
+
+        <div v-if="customer" class="mt-3 flex flex-wrap items-center gap-2">
+          <el-dropdown v-if="canChangeCustomerStage" trigger="click" @command="handleCustomerStageCommand">
+            <button
+              type="button"
+              class="customer-chat-panel-stage-button"
+              :class="getCustomerStageButtonClass(customer.stage)"
+            >
+              <span class="material-symbols-outlined text-[15px] leading-none">
+                {{ getCustomerStageIcon(customer.stage) }}
+              </span>
+              <span class="min-w-0 truncate">{{ customerStageText }}</span>
+              <span class="material-symbols-outlined text-[15px] leading-none">expand_more</span>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-for="stage in customerStageOptions"
+                  :key="stage.value"
+                  :command="stage.value"
+                >
+                  <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">
+                      {{ getCustomerStageIcon(stage.value) }}
+                    </span>
+                    {{ stage.label }}
+                  </span>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <span
+            v-else
+            class="customer-chat-panel-stage-button"
+            :class="getCustomerStageButtonClass(customer.stage)"
           >
-            基本信息
-          </button>
-          <button
-            type="button"
-            class="flex size-8 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors hover:bg-[#f3f3f3]"
-            title="收起"
-            @click="collapsed = true"
+            <span class="material-symbols-outlined text-[15px] leading-none">
+              {{ getCustomerStageIcon(customer.stage) }}
+            </span>
+            <span class="min-w-0 truncate">{{ customerStageText }}</span>
+          </span>
+
+          <span
+            v-for="tag in visibleCustomerTags"
+            :key="tag.tagId"
+            class="customer-chat-panel-tag group/tag"
+            :title="tag.tagName"
           >
-            <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+            <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+            <button
+              v-if="canEditCustomerTags"
+              type="button"
+              class="customer-chat-panel-tag__remove"
+              title="删除标签"
+              aria-label="删除标签"
+              @click.stop="handleRemoveCustomerTag(tag)"
+            >
+              <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+            </button>
+          </span>
+
+          <el-popover
+            v-if="hiddenCustomerTags.length > 0"
+            trigger="hover"
+            placement="bottom-start"
+            :width="220"
+            popper-class="wk-customer-tags-popover"
+          >
+            <template #reference>
+              <span class="customer-chat-panel-tag customer-chat-panel-tag--muted">
+                +{{ hiddenCustomerTags.length }}
+              </span>
+            </template>
+            <div class="flex max-h-48 flex-wrap gap-1.5 overflow-y-auto">
+              <span
+                v-for="tag in hiddenCustomerTags"
+                :key="tag.tagId"
+                class="customer-chat-panel-tag group/tag max-w-full"
+                :title="tag.tagName"
+              >
+                <span class="min-w-0 truncate">{{ tag.tagName }}</span>
+                <button
+                  v-if="canEditCustomerTags"
+                  type="button"
+                  class="customer-chat-panel-tag__remove"
+                  title="删除标签"
+                  aria-label="删除标签"
+                  @click.stop="handleRemoveCustomerTag(tag)"
+                >
+                  <span class="material-symbols-outlined text-[12px] leading-none">close</span>
+                </button>
+              </span>
+            </div>
+          </el-popover>
+
+          <button
+            v-if="canEditCustomerTags"
+            type="button"
+            class="customer-chat-panel-tag-add"
+            title="添加标签"
+            aria-label="添加标签"
+            @click="showAddTagDialog = true"
+          >
+            <span class="material-symbols-outlined text-[15px] leading-none">add</span>
           </button>
         </div>
       </header>
@@ -175,20 +283,46 @@
         :contacts="customer?.contacts || []"
         @contacts-updated="handleContactsUpdated"
       />
+
+      <el-dialog
+        v-model="showAddTagDialog"
+        title="添加标签"
+        width="400px"
+        class="wk-dialog--flush"
+      >
+        <el-input
+          v-model="newTagName"
+          placeholder="请输入标签名称"
+          maxlength="20"
+          show-word-limit
+          @keyup.enter="handleAddCustomerTag"
+        />
+        <template #footer>
+          <el-button @click="showAddTagDialog = false">取消</el-button>
+          <el-button type="primary" :loading="tagSubmitting" @click="handleAddCustomerTag">添加</el-button>
+        </template>
+      </el-dialog>
     </template>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { getCustomerDetail } from '@/api/customer'
+import { ElMessage } from 'element-plus'
+import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerStage } from '@/api/customer'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
-import type { Contact, CustomerDetailVO } from '@/types/customer'
+import { useEnumStore } from '@/stores/enums'
+import { useUserStore } from '@/stores/user'
+import type { Contact, CustomerDetailVO, CustomerTag } from '@/types/customer'
 import { appEvents, APP_EVENT } from '@/utils/events'
+import { isRequestErrorHandled } from '@/utils/requestError'
 
 const props = defineProps<{
   customerId: string
 }>()
+
+const enumStore = useEnumStore()
+const userStore = useUserStore()
 
 type CustomerDetailRefreshModule = 'contacts' | 'followUps' | 'tasks' | 'schedules'
 
@@ -210,12 +344,39 @@ const panelWidth = ref(DEFAULT_WIDTH)
 const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 const basicDrawerOpen = ref(false)
 const openSections = ref(['ai', 'activities', 'modules'])
+const showAddTagDialog = ref(false)
+const newTagName = ref('')
+const tagSubmitting = ref(false)
 let offCustomerDetailRefresh: (() => void) | null = null
 let aiAnalysisPollTimer: ReturnType<typeof setTimeout> | null = null
 let aiAnalysisPollAttempts = 0
 
+const CUSTOMER_STAGE_FLOW_FALLBACK = [
+  { value: 'lead', label: '线索' },
+  { value: 'qualified', label: '资格审查' },
+  { value: 'proposal', label: '方案报价' },
+  { value: 'negotiation', label: '谈判中' },
+  { value: 'closed', label: '已成交' },
+  { value: 'lost', label: '已流失' },
+]
+
 const maxWidth = computed(() => Math.min(960, Math.floor(viewportWidth.value * 0.6)))
 const fullDetailMode = computed(() => panelWidth.value >= FULL_DETAIL_WIDTH)
+const canChangeCustomerStage = computed(() => userStore.hasPermission('customer:change_stage'))
+const canEditCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
+const customerStageOptions = computed(() =>
+  enumStore.customerStage.length ? enumStore.customerStage : CUSTOMER_STAGE_FLOW_FALLBACK
+)
+const customerStageText = computed(() => {
+  const stage = customer.value?.stage
+  if (!stage) return '-'
+  const enumLabel = enumStore.stageLabel(stage)
+  if (enumLabel && enumLabel !== stage) return enumLabel
+  if (customer.value?.stageName && customer.value.stageName !== stage) return customer.value.stageName
+  return customerStageOptions.value.find(item => item.value === stage)?.label || stage
+})
+const visibleCustomerTags = computed(() => customer.value?.tags?.slice(0, 3) || [])
+const hiddenCustomerTags = computed(() => customer.value?.tags?.slice(3) || [])
 
 const recentActivities = computed(() => {
   const followUps = customer.value?.recentFollowUps || []
@@ -307,6 +468,79 @@ function handleContactsUpdated(contacts: Contact[]) {
   }
 }
 
+async function handleCustomerStageCommand(stage: string) {
+  if (!customer.value || customer.value.stage === stage) return
+  try {
+    await updateCustomerStage(customer.value.customerId, stage)
+    await loadCustomer()
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    ElMessage.success('客户阶段已更新')
+  } catch (error) {
+    console.error('Update customer stage failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('客户阶段更新失败')
+  }
+}
+
+async function handleAddCustomerTag() {
+  if (!canEditCustomerTags.value || !customer.value) return
+  const tagName = newTagName.value.trim()
+  if (!tagName) return
+  tagSubmitting.value = true
+  try {
+    await addCustomerTag(customer.value.customerId, tagName)
+    await loadCustomer()
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    showAddTagDialog.value = false
+    newTagName.value = ''
+    ElMessage.success('标签添加成功')
+  } catch (error) {
+    console.error('Add customer tag failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('标签添加失败')
+  } finally {
+    tagSubmitting.value = false
+  }
+}
+
+async function handleRemoveCustomerTag(tag: CustomerTag) {
+  if (!canEditCustomerTags.value || !customer.value) return
+  try {
+    await removeCustomerTag(customer.value.customerId, tag.tagId)
+    await loadCustomer()
+    appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH)
+    ElMessage.success('标签已删除')
+  } catch (error) {
+    console.error('Remove customer tag failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('标签删除失败')
+  }
+}
+
+function getCustomerStageButtonClass(stage?: string) {
+  switch (stage) {
+    case 'closed':
+      return 'customer-chat-panel-stage-button--success'
+    case 'lost':
+      return 'customer-chat-panel-stage-button--danger'
+    case 'negotiation':
+      return 'customer-chat-panel-stage-button--warning'
+    case 'proposal':
+      return 'customer-chat-panel-stage-button--info'
+    default:
+      return 'customer-chat-panel-stage-button--primary'
+  }
+}
+
+function getCustomerStageIcon(stage?: string) {
+  const map: Record<string, string> = {
+    lead: 'radio_button_unchecked',
+    qualified: 'task_alt',
+    proposal: 'description',
+    negotiation: 'forum',
+    closed: 'handshake',
+    lost: 'block',
+  }
+  return map[stage || ''] || 'lens'
+}
+
 function updateViewportWidth() {
   viewportWidth.value = window.innerWidth
   panelWidth.value = clampWidth(panelWidth.value)
@@ -374,6 +608,7 @@ watch(() => props.customerId, () => {
 }, { immediate: true })
 
 onMounted(() => {
+  void enumStore.ensureCustomerStage()
   window.addEventListener('resize', updateViewportWidth)
   offCustomerDetailRefresh = appEvents.on<CustomerDetailRefreshPayload>(
     APP_EVENT.CUSTOMER_DETAIL_REFRESH,
@@ -397,5 +632,96 @@ onBeforeUnmount(() => {
 
 .customer-chat-panel-collapse :deep(.el-collapse-item__content) {
   padding-bottom: 16px;
+}
+
+.customer-chat-panel-stage-button {
+  display: inline-flex;
+  max-width: 180px;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.customer-chat-panel-stage-button--primary {
+  background: rgba(19, 127, 236, 0.1);
+  color: #137fec;
+}
+
+.customer-chat-panel-stage-button--info {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.customer-chat-panel-stage-button--warning {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.customer-chat-panel-stage-button--success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.customer-chat-panel-stage-button--danger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.customer-chat-panel-tag {
+  display: inline-flex;
+  max-width: 88px;
+  height: 24px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  background: var(--wk-bg-surface-muted, #f4f4f5);
+  padding: 0 8px;
+  color: var(--wk-text-secondary, #52525b);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.customer-chat-panel-tag--muted {
+  color: var(--wk-text-muted, #71717a);
+}
+
+.customer-chat-panel-tag__remove {
+  display: none;
+  flex-shrink: 0;
+  color: #a1a1aa;
+  transition: color 0.15s ease;
+}
+
+.customer-chat-panel-tag:hover .customer-chat-panel-tag__remove,
+.customer-chat-panel-tag:focus-within .customer-chat-panel-tag__remove {
+  display: inline-flex;
+}
+
+.customer-chat-panel-tag__remove:hover {
+  color: #dc2626;
+}
+
+.customer-chat-panel-tag-add {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--wk-border-muted, #d4d4d8);
+  border-radius: 8px;
+  color: var(--wk-text-primary, #18181b);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.customer-chat-panel-tag-add:hover {
+  border-color: rgba(19, 127, 236, 0.4);
+  background: rgba(19, 127, 236, 0.08);
 }
 </style>
