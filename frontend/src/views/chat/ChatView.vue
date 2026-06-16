@@ -3203,9 +3203,55 @@ function sendQuickMessage(text: string) {
 
 function renderAssistantMessage(content: string, isStreaming = false, isThinking = false): string {
   const normalized = normalizeAssistantMessageContent(content, isStreaming)
-  return renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
+  const html = renderMarkdown(normalized || (isThinking ? getAssistantMessagePlaceholder(true) : ''), {
     streaming: isStreaming
   })
+  return wrapMarkdownHeadingLeadingEmoji(html)
+}
+
+const HEADING_LEADING_EMOJI_PATTERN = /^([\u2600-\u27BF]\uFE0F?|\p{Extended_Pictographic}\uFE0F?)/u
+
+function wrapMarkdownHeadingLeadingEmoji(html: string): string {
+  if (!html.includes('<h')) return html
+
+  const template = document.createElement('template')
+  template.innerHTML = html
+
+  template.content.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(heading => {
+    const textNode = findFirstNonEmptyTextNode(heading)
+    if (!textNode) return
+
+    const text = textNode.data
+    const leadingWhitespaceLength = text.search(/\S/)
+    const contentStart = leadingWhitespaceLength < 0 ? 0 : leadingWhitespaceLength
+    const content = text.slice(contentStart)
+    const match = content.match(HEADING_LEADING_EMOJI_PATTERN)
+    if (!match) return
+
+    const icon = match[0]
+    const iconSpan = document.createElement('span')
+    iconSpan.className = 'wk-markdown-heading-icon'
+    iconSpan.textContent = icon
+
+    const fragment = document.createDocumentFragment()
+    if (contentStart > 0) {
+      fragment.appendChild(document.createTextNode(text.slice(0, contentStart)))
+    }
+    fragment.appendChild(iconSpan)
+    fragment.appendChild(document.createTextNode(content.slice(icon.length)))
+    textNode.replaceWith(fragment)
+  })
+
+  return template.innerHTML
+}
+
+function findFirstNonEmptyTextNode(root: Element): Text | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text
+    if (node.data.trim()) return node
+  }
+  return null
 }
 
 function htmlToPlainText(html: string): string {
@@ -3908,35 +3954,43 @@ function resolveChatAppIcon(code: string): string {
   color: var(--wk-text-primary) !important;
 }
 
-.wk-chat-message :deep(.wk-markdown) {
-  color: var(--wk-text-primary, #0d0d0d);
+.wk-chat-message--assistant :deep(.wk-markdown) {
+  color: var(--wk-text-primary);
   font-size: 15px;
   line-height: 1.75;
 }
 
-.wk-chat-message :deep(.wk-markdown > *:first-child) {
+.wk-chat-message--assistant :deep(.wk-markdown > *:first-child) {
   margin-top: 0;
 }
 
-.wk-chat-message :deep(.wk-markdown > *:last-child) {
+.wk-chat-message--assistant :deep(.wk-markdown > *:last-child) {
   margin-bottom: 0;
 }
 
-.wk-chat-message :deep(.wk-markdown p) {
+.wk-chat-message--assistant :deep(.wk-markdown p) {
   margin: 0 0 0.85em;
 }
 
-.wk-chat-message :deep(.wk-markdown ul),
-.wk-chat-message :deep(.wk-markdown ol) {
+.wk-chat-message--assistant :deep(.wk-markdown-heading-icon) {
+  display: inline-block;
+  margin-right: 0.18em;
+  font-size: 0.72em;
+  line-height: 1;
+  vertical-align: 0.04em;
+}
+
+.wk-chat-message--assistant :deep(.wk-markdown ul),
+.wk-chat-message--assistant :deep(.wk-markdown ol) {
   margin: 0.85em 0;
   padding-left: 1.5em;
 }
 
-.wk-chat-message :deep(.wk-markdown li) {
+.wk-chat-message--assistant :deep(.wk-markdown li) {
   margin: 0.25em 0;
 }
 
-.wk-chat-message :deep(.wk-markdown pre) {
+.wk-chat-message--assistant :deep(.wk-markdown pre) {
   margin: 1em 0;
   overflow-x: auto;
   border-radius: 12px;
@@ -3945,48 +3999,48 @@ function resolveChatAppIcon(code: string): string {
   color: #f7f7f7;
 }
 
-:global(html.dark) .wk-chat-message :deep(.wk-markdown pre) {
+:global(html.dark) .wk-chat-message--assistant :deep(.wk-markdown pre) {
   background: #030712;
   color: #e5edf8;
 }
 
-.wk-chat-message :deep(.wk-markdown code) {
+.wk-chat-message--assistant :deep(.wk-markdown code) {
   border-radius: 6px;
-  background: var(--wk-bg-surface-muted, #f4f4f4);
+  background: var(--wk-bg-surface-muted);
   padding: 0.15em 0.35em;
-  color: var(--wk-text-primary, #0d0d0d);
+  color: var(--wk-text-primary);
   font-size: 0.92em;
 }
 
-.wk-chat-message :deep(.wk-markdown pre code) {
+.wk-chat-message--assistant :deep(.wk-markdown pre code) {
   background: transparent;
   padding: 0;
   color: inherit;
 }
 
-.wk-chat-message :deep(.wk-markdown blockquote) {
+.wk-chat-message--assistant :deep(.wk-markdown blockquote) {
   margin: 1em 0;
-  border-left: 3px solid var(--wk-border-strong, #d4d4d4);
+  border-left: 3px solid var(--wk-border-strong);
   padding-left: 1em;
-  color: var(--wk-text-secondary, #5f5f5f);
+  color: var(--wk-text-secondary);
 }
 
-.wk-chat-message :deep(.wk-markdown table) {
+.wk-chat-message--assistant :deep(.wk-markdown table) {
   width: 100%;
   margin: 1em 0;
   border-collapse: collapse;
   font-size: 14px;
 }
 
-.wk-chat-message :deep(.wk-markdown th),
-.wk-chat-message :deep(.wk-markdown td) {
-  border: 1px solid var(--wk-border-subtle, #e5e5e5);
+.wk-chat-message--assistant :deep(.wk-markdown th),
+.wk-chat-message--assistant :deep(.wk-markdown td) {
+  border: 1px solid var(--wk-border-subtle);
   padding: 8px 10px;
   text-align: left;
 }
 
-.wk-chat-message :deep(.wk-markdown th) {
-  background: var(--wk-bg-surface-subtle, #fafafa);
+.wk-chat-message--assistant :deep(.wk-markdown th) {
+  background: var(--wk-bg-surface-subtle);
   font-weight: 600;
 }
 
