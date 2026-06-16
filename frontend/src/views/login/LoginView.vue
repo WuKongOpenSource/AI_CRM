@@ -443,7 +443,8 @@ function prefersReducedMotion(): boolean {
 function isWebKitWithoutChromium(): boolean {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent || ''
-  return /AppleWebKit/i.test(ua) && !/Chrome|Chromium|Edg\//i.test(ua)
+  if (/Chrome|Chromium|CriOS|EdgA|EdgiOS|Edg\/|OPR\//i.test(ua)) return false
+  return /AppleWebKit/i.test(ua)
 }
 
 function measureActiveLayerHeight(): number {
