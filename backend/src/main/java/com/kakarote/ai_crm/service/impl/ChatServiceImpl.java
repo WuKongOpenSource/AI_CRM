@@ -499,7 +499,7 @@ public class ChatServiceImpl implements IChatService {
             return Flux.just(routedKnowledgeResponse);
         }
 
-        List<Message> history = buildMessageHistory(sessionId);
+        List<Message> history = buildMessageHistory(sessionId, messageId);
 
         String knowledgeToolPrompt = buildKnowledgeToolPrompt(application, ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
@@ -676,7 +676,7 @@ public class ChatServiceImpl implements IChatService {
             return routedKnowledgeResponse;
         }
 
-        List<Message> history = buildMessageHistory(sessionId);
+        List<Message> history = buildMessageHistory(sessionId, messageId);
 
         String knowledgeToolPrompt = buildKnowledgeToolPrompt(application, ragEnabled);
         String attachmentContext = buildAttachmentContext(attachments);
@@ -904,16 +904,26 @@ public class ChatServiceImpl implements IChatService {
         }
     }
 
-    private List<Message> buildMessageHistory(Long sessionId) {
+    private List<Message> buildMessageHistory(Long sessionId, Long beforeMessageId) {
         List<ChatMessage> dbMessages = chatMessageMapper.selectList(
             new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getSessionId, sessionId)
-                .orderByAsc(ChatMessage::getCreateTime)
+                .lt(beforeMessageId != null, ChatMessage::getMessageId, beforeMessageId)
+                .orderByDesc(ChatMessage::getCreateTime)
+                .orderByDesc(ChatMessage::getMessageId)
                 .last("LIMIT 20")
         );
 
+        if (CollUtil.isEmpty(dbMessages)) {
+            return Collections.emptyList();
+        }
+
+        Collections.reverse(dbMessages);
         List<Message> messages = new ArrayList<>();
         for (ChatMessage dbMsg : dbMessages) {
+            if (dbMsg == null || StrUtil.isBlank(dbMsg.getContent())) {
+                continue;
+            }
             switch (dbMsg.getRole()) {
                 case "user":
                     messages.add(new UserMessage(dbMsg.getContent()));
