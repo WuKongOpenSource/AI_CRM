@@ -29,12 +29,6 @@
             >
               inventory_2
             </span>
-            <span
-              v-else-if="kind === 'chat'"
-              class="material-symbols-outlined text-[17px] leading-none text-primary"
-            >
-              auto_awesome
-            </span>
             <span v-else class="text-xs font-bold text-slate-400">
               {{ title.charAt(0) || '?' }}
             </span>
@@ -51,13 +45,11 @@
         <button
           type="button"
           class="wk-mobile-customer-header-detail flex size-9 shrink-0 items-center justify-center rounded-full text-[#0d0d0d] transition-colors active:bg-[#f1f1f1]"
-          :aria-label="detailable ? detailLabel : '新建会话'"
-          :title="detailable ? detailLabel : '新建会话'"
-          @click="detailable ? emit('detail') : emit('newSession')"
+          :aria-label="detailLabel"
+          :title="detailLabel"
+          @click="emit('detail')"
         >
-          <span class="material-symbols-outlined text-[24px] leading-none">
-            {{ detailable ? 'more_horiz' : 'edit_square' }}
-          </span>
+          <span class="material-symbols-outlined text-[24px] leading-none">more_horiz</span>
         </button>
       </div>
     </div>
@@ -69,33 +61,30 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   visible: boolean
-  kind: 'chat' | 'customer' | 'employee' | 'relation' | 'product'
+  kind: 'customer' | 'employee' | 'relation' | 'product'
   title: string
   avatarUrl?: string
   fixedStyle?: Record<string, string> | undefined
-  detailable?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'menu'): void
   (e: 'title'): void
   (e: 'detail'): void
-  (e: 'newSession'): void
 }>()
 
 const detailLabel = computed(() => {
   if (props.kind === 'employee') return '通讯录详情'
   if (props.kind === 'relation') return '关系详情'
   if (props.kind === 'product') return '产品详情'
-  if (props.kind === 'customer') return '客户详情'
-  return '对话详情'
+  return '客户详情'
 })
 
 const avatarAlt = computed(() => {
   if (props.kind === 'employee') return 'employee avatar'
   if (props.kind === 'relation') return 'relation avatar'
   if (props.kind === 'product') return 'product icon'
-  return 'chat avatar'
+  return 'company logo'
 })
 
 const avatarClass = computed(() =>

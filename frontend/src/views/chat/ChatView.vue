@@ -47,11 +47,9 @@
       :title="mobileChatHeaderTitle"
       :avatar-url="mobileChatHeaderAvatarUrl"
       :fixed-style="mobileTopFixedLayerStyle"
-      :detailable="Boolean(chatObjectKind)"
       @menu="openMobileMainMenu"
       @title="handleMobileHeaderTitle"
       @detail="openMobileObjectDetail"
-      @new-session="handleNewSession"
     />
 
     <!-- Internal Sidebar: Chat History -->
@@ -1518,9 +1516,12 @@ const mobileTopFixedLayerStyle = computed(() =>
       }
     : undefined
 )
-const mobileChatHeaderKind = computed<'chat' | 'customer' | 'employee' | 'relation' | 'product'>(() =>
-  chatObjectKind.value || 'chat'
-)
+const mobileChatHeaderKind = computed<'customer' | 'employee' | 'relation' | 'product'>(() => {
+  if (chatObjectKind.value === 'employee') return 'employee'
+  if (chatObjectKind.value === 'relation') return 'relation'
+  if (chatObjectKind.value === 'product') return 'product'
+  return 'customer'
+})
 const mobileChatHeaderTitle = computed(() => {
   const session = currentChatSession.value
   if (chatObjectKind.value === 'customer') {
