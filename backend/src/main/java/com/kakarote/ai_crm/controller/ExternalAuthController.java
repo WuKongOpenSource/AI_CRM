@@ -27,20 +27,20 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/auth/external")
-@Tag(name = "External auth")
+@Tag(name = "外部登录")
 public class ExternalAuthController {
 
     @Autowired
     private ExternalAuthService externalAuthService;
 
     @GetMapping("/providers")
-    @Operation(summary = "List external auth providers")
+    @Operation(summary = "获取外部登录服务商")
     public Result<List<ExternalAuthProviderVO>> providers() {
         return Result.ok(externalAuthService.listProviders());
     }
 
     @GetMapping("/{provider}/authorize")
-    @Operation(summary = "Create external auth authorize URL")
+    @Operation(summary = "创建外部登录授权地址")
     public Result<ExternalAuthAuthorizeVO> authorize(@PathVariable String provider,
                                                      @RequestParam(required = false) String redirect,
                                                      HttpServletRequest request) {
@@ -48,7 +48,7 @@ public class ExternalAuthController {
     }
 
     @GetMapping("/{provider}/callback")
-    @Operation(summary = "External auth callback")
+    @Operation(summary = "外部登录回调")
     public void callback(@PathVariable String provider,
                          @RequestParam(required = false) String code,
                          @RequestParam(required = false) String state,
@@ -59,20 +59,20 @@ public class ExternalAuthController {
     }
 
     @PostMapping("/login-ticket")
-    @Operation(summary = "Exchange external auth login ticket")
+    @Operation(summary = "兑换外部登录票据")
     public Result<Map<String, Object>> loginTicket(@Valid @RequestBody ExternalAuthTicketLoginBO loginBO,
                                                    HttpServletResponse response) {
         return Result.ok(externalAuthService.loginByTicket(loginBO, response));
     }
 
     @GetMapping("/bindings")
-    @Operation(summary = "List current user external auth bindings")
+    @Operation(summary = "获取当前用户外部登录绑定")
     public Result<List<ExternalAuthBindingVO>> bindings() {
         return Result.ok(externalAuthService.listBindings());
     }
 
     @GetMapping("/{provider}/bind/authorize")
-    @Operation(summary = "Create external auth bind authorize URL")
+    @Operation(summary = "创建外部登录绑定授权地址")
     public Result<ExternalAuthAuthorizeVO> bindAuthorize(@PathVariable String provider,
                                                         @RequestParam(required = false) String redirect,
                                                         HttpServletRequest request) {
@@ -80,7 +80,7 @@ public class ExternalAuthController {
     }
 
     @DeleteMapping("/{provider}/binding")
-    @Operation(summary = "Unbind current user external auth identity")
+    @Operation(summary = "解绑当前用户外部登录身份")
     public Result<String> unbind(@PathVariable String provider) {
         externalAuthService.unbind(provider);
         return Result.ok();

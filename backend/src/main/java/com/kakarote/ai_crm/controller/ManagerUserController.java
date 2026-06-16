@@ -20,14 +20,14 @@ import org.springframework.web.bind.annotation.*;
 
 @RequestMapping("/managerUser")
 @RestController
-@Tag(name = "User APIs")
+@Tag(name = "用户管理")
 public class ManagerUserController {
 
     @Autowired
     private ManageUserService manageUserService;
 
     @PostMapping("/addUser")
-    @Operation(summary = "Add user")
+    @Operation(summary = "新增用户")
     @RequirePermission("user:create")
     public Result<String> addUser(@RequestBody UserAddBO userAddBO) {
         manageUserService.addUser(userAddBO);
@@ -35,32 +35,32 @@ public class ManagerUserController {
     }
 
     @PostMapping("/queryLoginUser")
-    @Operation(summary = "Query current login user")
+    @Operation(summary = "查询当前登录用户")
     public Result<ManageUserVO> queryLoginUser() {
         return Result.ok(manageUserService.queryLoginUser());
     }
 
     @PostMapping("/preferences")
-    @Operation(summary = "Update current user preferences")
+    @Operation(summary = "更新当前用户偏好")
     public Result<UserPreferenceVO> updateCurrentUserPreferences(@RequestBody UserPreferenceUpdateBO preferenceUpdateBO) {
         return Result.ok(manageUserService.updateCurrentUserPreferences(preferenceUpdateBO));
     }
 
     @PostMapping("/queryPageList")
-    @Operation(summary = "Query user page")
+    @Operation(summary = "分页查询用户")
     public Result<BasePage<ManageUserVO>> queryPageList(@RequestBody UserQueryBO userQueryBO) {
         return Result.ok(manageUserService.queryPageList(userQueryBO));
     }
 
     @PostMapping("/updateUser")
-    @Operation(summary = "Update user basic info")
+    @Operation(summary = "更新用户基本信息")
     public Result<String> updateUser(@RequestBody UserUpdateBO updateBO) {
         manageUserService.updateUser(updateBO);
         return Result.ok();
     }
 
     @PostMapping("/resetUsername")
-    @Operation(summary = "Reset username")
+    @Operation(summary = "重置用户名")
     @RequirePermission("user:edit")
     public Result<String> resetUsername(@RequestBody ResetUsernameBO resetUsernameBO) {
         manageUserService.resetUsername(resetUsernameBO);
@@ -68,15 +68,15 @@ public class ManagerUserController {
     }
 
     @PostMapping("/updatePassword")
-    @Operation(summary = "Update password")
-    public Result<String> updatePassword(@Parameter(name = "oldPassword", description = "Old password") @RequestParam("oldPassword") String oldPassword,
-                                         @Parameter(name = "newPassword", description = "New password") @RequestParam("newPassword") String newPassword) {
+    @Operation(summary = "更新密码")
+    public Result<String> updatePassword(@Parameter(name = "oldPassword", description = "旧密码") @RequestParam("oldPassword") String oldPassword,
+                                         @Parameter(name = "newPassword", description = "新密码") @RequestParam("newPassword") String newPassword) {
         manageUserService.updatePassword(oldPassword, newPassword);
         return Result.ok();
     }
 
     @PostMapping("/setUserStatus")
-    @Operation(summary = "Set user status")
+    @Operation(summary = "设置用户状态")
     @RequirePermission("user:status")
     public Result setUserStatus(@RequestBody UserStatusBO userStatusBO) {
         manageUserService.setUserStatus(userStatusBO);
@@ -84,7 +84,7 @@ public class ManagerUserController {
     }
 
     @PostMapping("/deleteByIds")
-    @Operation(summary = "Delete users")
+    @Operation(summary = "删除用户")
     @RequirePermission("user:delete")
     public Result deleteByIds(@RequestBody Long[] userIds) {
         manageUserService.deleteByIds(userIds);
