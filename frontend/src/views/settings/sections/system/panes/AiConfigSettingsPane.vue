@@ -536,7 +536,21 @@ function inferCapabilities(provider: AiProvider | undefined, model: string | und
     supportsVision = ['kimi-k2.5', 'kimi-k2.6', 'kimi-k2-5', 'kimi-k2-6', 'vision', 'vl']
       .some((keyword) => normalizedModel.includes(keyword))
   } else {
-    if (['gpt-5', '4o', '4.1', 'vision', 'omni', 'qwen3.6-plus', 'doubao-seed-2-0', 'doubao-seed-2.0', '1-8', '4.6v', '4.5v', '4v', 'vl'].some((keyword) => normalizedModel.includes(keyword))) {
+    if ([
+      'gpt-5',
+      '4o',
+      '4.1',
+      'vision',
+      'omni',
+      'qwen3.6-plus',
+      'doubao-seed-2-0',
+      'doubao-seed-2.0',
+      '1-8',
+      '4.6v',
+      '4.5v',
+      '4v',
+      'vl'
+    ].some((keyword) => normalizedModel.includes(keyword))) {
       supportsVision = true
     }
     if (['openai', 'dashscope', 'deepseek', 'ark', 'minimax', 'zhipu', 'custom'].includes(normalizedProvider)) {
