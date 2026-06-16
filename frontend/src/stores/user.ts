@@ -37,9 +37,10 @@ export const useUserStore = defineStore('user', () => {
     return !!permissions.value[permission]
   }
 
-  async function login(params: LoginParams): Promise<void> {
+  async function login(params: LoginParams): Promise<LoginResult> {
     const result = await apiLogin(params)
     await applyLoginResult(result)
+    return result
   }
 
   async function applyLoginResult(result: LoginResult): Promise<void> {
