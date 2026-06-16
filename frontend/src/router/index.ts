@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory, RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 import { getToken } from '@/utils/request'
 import { getOidcSessionToken } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
@@ -176,8 +176,8 @@ router.beforeEach(async (to, _from, next) => {
           const url = new URL(redirect)
           url.searchParams.set('session_token', sessionToken)
           redirect = url.toString()
-        } catch (e) {
-          console.error('Failed to get OIDC session token:', e)
+        } catch (error) {
+          console.error('Failed to get OIDC session token:', error)
         }
       }
       // 如果是外部 URL，直接跳转
@@ -195,9 +195,9 @@ router.beforeEach(async (to, _from, next) => {
     if (!userStore.userInfo || !userStore.permissionsLoaded) {
       try {
         await userStore.fetchUserInfo()
-      } catch (e) {
+      } catch (error) {
         // token 失效，跳转登录页
-        console.error('Failed to fetch user info:', e)
+        console.error('Failed to fetch user info:', error)
         next({ name: 'Login', query: { redirect: to.fullPath } })
         return
       }
