@@ -593,89 +593,123 @@
               <!-- Selected Attachments Preview -->
               <div
                 v-if="composerAttachmentPreviewItems.length > 0"
-                class="wk-chat-attachment-preview flex min-h-[54px] w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1"
+                class="relative min-w-0"
               >
-                <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
-                  <div
-                    v-if="item.kind === 'knowledge'"
-                    class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
-                  >
+                <div
+                  v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollLeft"
+                  class="pointer-events-none absolute bottom-1 left-0 top-0 z-[1] w-12 rounded-l-xl bg-gradient-to-r from-white to-transparent"
+                  aria-hidden="true"
+                />
+                <div
+                  v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollRight"
+                  class="pointer-events-none absolute bottom-1 right-0 top-0 z-[1] w-12 rounded-r-xl bg-gradient-to-l from-white to-transparent"
+                  aria-hidden="true"
+                />
+                <button
+                  v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollLeft"
+                  type="button"
+                  class="absolute left-3 top-1/2 z-[2] flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-black/[0.06] bg-[#f0f0f0] text-[#0d0d0d] shadow-sm transition-colors hover:bg-[#e6e6e6]"
+                  aria-label="向左查看附件"
+                  @click="scrollComposerAttachmentStep(-1)"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">chevron_left</span>
+                </button>
+                <button
+                  v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollRight"
+                  type="button"
+                  class="absolute right-3 top-1/2 z-[2] flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-black/[0.06] bg-[#f0f0f0] text-[#0d0d0d] shadow-sm transition-colors hover:bg-[#e6e6e6]"
+                  aria-label="向右查看附件"
+                  @click="scrollComposerAttachmentStep(1)"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">chevron_right</span>
+                </button>
+                <div
+                  ref="composerAttachmentScrollRef"
+                  class="wk-chat-attachment-preview flex min-h-[54px] min-w-0 w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden scroll-smooth pb-1"
+                  @scroll.passive="updateComposerAttachmentScrollState"
+                >
+                  <template v-for="item in composerAttachmentPreviewItems" :key="item.key">
                     <div
-                      class="flex size-10 shrink-0 items-center justify-center rounded-xl"
-                      :class="getKnowledgeDocIconMeta(item.knowledge).bg"
+                      v-if="item.kind === 'knowledge'"
+                      class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
                     >
-                      <span
-                        class="material-symbols-outlined text-[22px] leading-none"
-                        :class="getKnowledgeDocIconMeta(item.knowledge).color"
+                      <div
+                        class="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                        :class="getKnowledgeDocIconMeta(item.knowledge).bg"
                       >
-                        {{ getKnowledgeDocIconMeta(item.knowledge).icon }}
-                      </span>
+                        <span
+                          class="material-symbols-outlined text-[22px] leading-none"
+                          :class="getKnowledgeDocIconMeta(item.knowledge).color"
+                        >
+                          {{ getKnowledgeDocIconMeta(item.knowledge).icon }}
+                        </span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-[14px] leading-[18px] text-[#0d0d0d]">{{ item.knowledge.name }}</div>
+                        <div class="text-[12px] leading-[14px] text-[#909090]">{{ getKnowledgeCardSubtitle(item.knowledge) }}</div>
+                      </div>
+                      <button
+                        type="button"
+                        class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
+                        aria-label="移除知识库文件"
+                        title="移除"
+                        @click="removeSelectedKnowledge(item.knowledge.knowledgeId)"
+                      >
+                        <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                      </button>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate text-[14px] leading-[18px] text-[#0d0d0d]">{{ item.knowledge.name }}</div>
-                      <div class="text-[12px] leading-[14px] text-[#909090]">{{ getKnowledgeCardSubtitle(item.knowledge) }}</div>
-                    </div>
-                    <button
-                      type="button"
-                      class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
-                      aria-label="移除知识库文件"
-                      title="移除"
-                      @click="removeSelectedKnowledge(item.knowledge.knowledgeId)"
-                    >
-                      <span class="material-symbols-outlined text-[14px] leading-none">close</span>
-                    </button>
-                  </div>
 
-                  <div
-                    v-else-if="item.kind === 'file' && item.file.type.startsWith('image/')"
-                    class="relative h-[54px] w-[54px] shrink-0 overflow-hidden rounded-xl border border-[#0d0d0d0d] bg-white"
-                  >
-                    <img
-                      :src="getSelectedFilePreviewUrl(item.file)"
-                      :alt="item.file.name"
-                      class="size-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
-                      aria-label="移除图片"
-                      title="移除"
-                      @click="removeSelectedFile(item.fileIndex)"
-                    >
-                      <span class="material-symbols-outlined text-[14px] leading-none">close</span>
-                    </button>
-                  </div>
-
-                  <div
-                    v-else-if="item.kind === 'file'"
-                    class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
-                  >
                     <div
-                      class="flex size-10 shrink-0 items-center justify-center rounded-xl"
-                      :class="getChatDocIconMeta(item.file).bg"
+                      v-else-if="item.kind === 'file' && item.file.type.startsWith('image/')"
+                      class="relative h-[54px] w-[54px] shrink-0 overflow-hidden rounded-xl border border-[#0d0d0d0d] bg-white"
                     >
-                      <span
-                        class="material-symbols-outlined text-[22px] leading-none"
-                        :class="getChatDocIconMeta(item.file).color"
+                      <img
+                        :src="getSelectedFilePreviewUrl(item.file)"
+                        :alt="item.file.name"
+                        class="size-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
+                        aria-label="移除图片"
+                        title="移除"
+                        @click="removeSelectedFile(item.fileIndex)"
                       >
-                        {{ getChatDocIconMeta(item.file).icon }}
-                      </span>
+                        <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                      </button>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate text-[14px] leading-[18px] text-[#0d0d0d]">{{ item.file.name }}</div>
-                      <div class="text-[12px] leading-[14px] text-[#909090]">{{ getChatDocumentSubtitle(item.file) }}</div>
-                    </div>
-                    <button
-                      type="button"
-                      class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
-                      aria-label="移除文件"
-                      title="移除"
-                      @click="removeSelectedFile(item.fileIndex)"
+
+                    <div
+                      v-else-if="item.kind === 'file'"
+                      class="relative flex h-[54px] min-w-[200px] max-w-[320px] shrink-0 items-center gap-3 overflow-hidden rounded-2xl bg-[#f5f5f5] pl-3 pr-[30px]"
                     >
-                      <span class="material-symbols-outlined text-[14px] leading-none">close</span>
-                    </button>
-                  </div>
-                </template>
+                      <div
+                        class="flex size-10 shrink-0 items-center justify-center rounded-xl"
+                        :class="getChatDocIconMeta(item.file).bg"
+                      >
+                        <span
+                          class="material-symbols-outlined text-[22px] leading-none"
+                          :class="getChatDocIconMeta(item.file).color"
+                        >
+                          {{ getChatDocIconMeta(item.file).icon }}
+                        </span>
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-[14px] leading-[18px] text-[#0d0d0d]">{{ item.file.name }}</div>
+                        <div class="text-[12px] leading-[14px] text-[#909090]">{{ getChatDocumentSubtitle(item.file) }}</div>
+                      </div>
+                      <button
+                        type="button"
+                        class="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-[#0d0d0d] text-white"
+                        aria-label="移除文件"
+                        title="移除"
+                        @click="removeSelectedFile(item.fileIndex)"
+                      >
+                        <span class="material-symbols-outlined text-[14px] leading-none">close</span>
+                      </button>
+                    </div>
+                  </template>
+                </div>
               </div>
 
               <!-- Input Box -->
@@ -1251,6 +1285,10 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatInputRef = ref<HTMLTextAreaElement | null>(null)
 const selectedFiles = ref<File[]>([])
 const selectedKnowledgeItems = ref<Knowledge[]>([])
+const composerAttachmentScrollRef = ref<HTMLElement | null>(null)
+const composerAttachmentShowScrollArrows = ref(false)
+const composerAttachmentCanScrollLeft = ref(false)
+const composerAttachmentCanScrollRight = ref(false)
 const chatModelPopoverVisible = ref(false)
 const chatUploadMenuVisible = ref(false)
 const chatModelImageLoadFailed = ref<Record<string, boolean>>({})
@@ -1303,6 +1341,7 @@ let skipNextTranscription = false
 let transcriptionToken = 0
 let speechInputBase = ''
 let applyingChatRouteQuery = false
+let composerAttachmentScrollResizeObserver: ResizeObserver | null = null
 let mobileKeyboardInsetTimer: ReturnType<typeof setTimeout> | null = null
 let removeNativeKeyboardInsetListeners: (() => void) | null = null
 
@@ -1628,6 +1667,7 @@ onBeforeUnmount(() => {
   unregisterMobileKeyboardInsetListeners()
   offSelectedCustomerDetailRefresh?.()
   offSelectedCustomerDetailRefresh = null
+  disconnectComposerAttachmentScrollObserver()
   revokeAllSelectedFilePreviewUrls()
   abortVoiceRecording()
   if (scrollTimer) {
@@ -1645,6 +1685,22 @@ watch(isMobile, (mobile) => {
   nativeKeyboardInset.value = 0
   mobileViewportTopOffset.value = 0
 })
+
+watch(
+  () => composerAttachmentPreviewItems.value.length,
+  async (count) => {
+    await nextTick()
+    if (count > 0) {
+      observeComposerAttachmentScroll()
+      updateComposerAttachmentScrollState()
+      return
+    }
+    disconnectComposerAttachmentScrollObserver()
+    composerAttachmentShowScrollArrows.value = false
+    composerAttachmentCanScrollLeft.value = false
+    composerAttachmentCanScrollRight.value = false
+  }
+)
 
 // Auto scroll to bottom when new messages arrive or during streaming while the user stays near the bottom.
 let scrollTimer: ReturnType<typeof setTimeout> | null = null
@@ -1670,6 +1726,47 @@ function handleMessagesScroll() {
     isPinnedToBottom.value = getMessagesDistanceToBottom(el) <= SCROLL_TO_BOTTOM_THRESHOLD_PX
   }
   updateScrollToBottomVisibility()
+}
+
+function updateComposerAttachmentScrollState() {
+  const el = composerAttachmentScrollRef.value
+  if (!el) {
+    composerAttachmentShowScrollArrows.value = false
+    composerAttachmentCanScrollLeft.value = false
+    composerAttachmentCanScrollRight.value = false
+    return
+  }
+
+  const { clientWidth, scrollLeft, scrollWidth } = el
+  const hasOverflow = scrollWidth - clientWidth > 2
+  composerAttachmentShowScrollArrows.value = hasOverflow
+  composerAttachmentCanScrollLeft.value = hasOverflow && scrollLeft > 2
+  composerAttachmentCanScrollRight.value = hasOverflow && scrollLeft + clientWidth < scrollWidth - 2
+}
+
+function scrollComposerAttachmentStep(direction: -1 | 1) {
+  const el = composerAttachmentScrollRef.value
+  if (!el) return
+
+  const distance = Math.max(180, Math.floor(el.clientWidth * 0.75))
+  el.scrollBy({ left: direction * distance, behavior: 'smooth' })
+  window.setTimeout(updateComposerAttachmentScrollState, 240)
+}
+
+function disconnectComposerAttachmentScrollObserver() {
+  composerAttachmentScrollResizeObserver?.disconnect()
+  composerAttachmentScrollResizeObserver = null
+}
+
+function observeComposerAttachmentScroll() {
+  disconnectComposerAttachmentScrollObserver()
+  const el = composerAttachmentScrollRef.value
+  if (!el || typeof ResizeObserver === 'undefined') return
+
+  composerAttachmentScrollResizeObserver = new ResizeObserver(() => {
+    updateComposerAttachmentScrollState()
+  })
+  composerAttachmentScrollResizeObserver.observe(el)
 }
 
 function scrollToBottom() {
