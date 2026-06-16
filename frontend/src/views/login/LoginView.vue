@@ -205,6 +205,12 @@
                               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 4 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                             />
                           </svg>
+                          <span v-else-if="provider.provider === 'outlook'" class="external-auth-btn__microsoft-icon">
+                            <span class="external-auth-btn__microsoft-pane external-auth-btn__microsoft-pane--red" />
+                            <span class="external-auth-btn__microsoft-pane external-auth-btn__microsoft-pane--green" />
+                            <span class="external-auth-btn__microsoft-pane external-auth-btn__microsoft-pane--blue" />
+                            <span class="external-auth-btn__microsoft-pane external-auth-btn__microsoft-pane--yellow" />
+                          </span>
                           <span v-else class="external-auth-btn__fallback">{{ providerMark(provider.provider) }}</span>
                         </span>
                         <span>{{ providerDisplayName(provider) }}</span>
@@ -483,18 +489,20 @@ function snapStageHeightForResize() {
 }
 
 function isSupportedExternalProvider(provider: ExternalAuthProvider): boolean {
-  return provider.provider === 'google' || provider.provider === 'wechat'
+  return provider.provider === 'google' || provider.provider === 'wechat' || provider.provider === 'outlook'
 }
 
 function providerMark(provider: ExternalAuthProviderCode): string {
   if (provider === 'google') return 'G'
   if (provider === 'wechat') return '微'
+  if (provider === 'outlook') return 'O'
   return '?'
 }
 
 function providerDisplayName(provider: ExternalAuthProvider): string {
   if (provider.provider === 'google') return 'Google'
   if (provider.provider === 'wechat') return '微信'
+  if (provider.provider === 'outlook') return 'Microsoft'
   return provider.name
 }
 
@@ -532,7 +540,13 @@ async function handleExternalAuthQuery(): Promise<boolean> {
   const externalError = typeof route.query.externalAuthError === 'string' ? route.query.externalAuthError : ''
   if (externalError) {
     const provider = typeof route.query.provider === 'string' ? route.query.provider : ''
-    const providerName = provider === 'wechat' ? '微信' : provider === 'google' ? 'Google' : '第三方'
+    const providerName = provider === 'wechat'
+      ? '微信'
+      : provider === 'google'
+        ? 'Google'
+        : provider === 'outlook'
+          ? 'Microsoft'
+          : '第三方'
     const messageMap: Record<string, string> = {
       unbound: `当前${providerName}账号尚未绑定本地用户`,
       invalid_state: '第三方登录状态已过期，请重新登录',
@@ -1090,6 +1104,35 @@ async function completeLoginRedirect(redirectValue: unknown) {
   color: #137fec;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.external-auth-btn__microsoft-icon {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.external-auth-btn__microsoft-pane {
+  display: block;
+  border-radius: 1px;
+}
+
+.external-auth-btn__microsoft-pane--red {
+  background: #f25022;
+}
+
+.external-auth-btn__microsoft-pane--green {
+  background: #7fba00;
+}
+
+.external-auth-btn__microsoft-pane--blue {
+  background: #00a4ef;
+}
+
+.external-auth-btn__microsoft-pane--yellow {
+  background: #ffb900;
 }
 
 .mobile-agreement-consent {

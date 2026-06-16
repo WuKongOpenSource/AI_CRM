@@ -30,7 +30,7 @@ export interface LoginResult {
   userInfo: UserInfo
 }
 
-export type ExternalAuthProviderCode = 'google' | 'wechat'
+export type ExternalAuthProviderCode = 'google' | 'wechat' | 'outlook'
 
 export interface ExternalAuthProvider {
   provider: ExternalAuthProviderCode

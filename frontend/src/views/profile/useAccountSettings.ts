@@ -76,13 +76,18 @@ export function useAccountSettings() {
       ])
       const bindingMap = new Map(bindings.map((binding) => [binding.provider, binding]))
       externalBindings.value = providers
-        .filter((provider) => provider.provider === 'google' || provider.provider === 'wechat')
+        .filter((provider) =>
+          provider.provider === 'google'
+          || provider.provider === 'wechat'
+          || provider.provider === 'outlook'
+        )
         .map((provider) => {
           const binding = bindingMap.get(provider.provider)
+          const providerName = externalProviderName(provider.provider)
           return {
             provider: provider.provider,
-            name: binding?.name || provider.name,
-            providerName: provider.name,
+            name: binding?.name || providerName,
+            providerName,
             subject: binding?.subject || '',
             email: binding?.email,
             displayName: binding?.displayName,
@@ -243,6 +248,7 @@ export function useAccountSettings() {
   function externalProviderName(provider: ExternalAuthProviderCode): string {
     if (provider === 'wechat') return '微信'
     if (provider === 'google') return 'Google'
+    if (provider === 'outlook') return 'Microsoft'
     return '第三方'
   }
 
