@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/captcha")
-@Tag(name = "Captcha APIs")
+@Tag(name = "验证码接口")
 public class CaptchaController {
 
     private static final String DEFAULT_CAPTCHA_TYPE = CaptchaTypeEnum.BLOCKPUZZLE.getCodeValue();
@@ -36,7 +36,7 @@ public class CaptchaController {
     private CaptchaService captchaService;
 
     @PostMapping("/get")
-    @Operation(summary = "Get slider captcha")
+    @Operation(summary = "获取滑块验证码")
     public Result<Object> get(@RequestBody(required = false) CaptchaVO data, HttpServletRequest request) {
         if (data == null) {
             data = new CaptchaVO();
@@ -52,7 +52,7 @@ public class CaptchaController {
     }
 
     @PostMapping("/check")
-    @Operation(summary = "Check slider captcha")
+    @Operation(summary = "校验滑块验证码")
     public Result<CaptchaCheckVO> check(@Valid @RequestBody CaptchaCheckBO data, HttpServletRequest request) {
         String pointJson = buildPointJson(data.getPointX(), data.getPointY());
 
