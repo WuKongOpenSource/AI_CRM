@@ -600,10 +600,10 @@
             <button
               v-if="showScrollToBottomButton"
               type="button"
-              class="wk-scroll-to-bottom-button absolute left-1/2 z-20 flex items-center justify-center rounded-full border bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900"
+              class="wk-scroll-to-bottom-button absolute left-1/2 z-20 flex -translate-x-1/2 items-center justify-center rounded-full border bg-white text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900"
               :class="isMobile ? 'bottom-[118px]' : 'bottom-[196px]'"
-              aria-label="滚动到底部"
-              title="滚动到底部"
+              aria-label="回到底部"
+              title="回到底部"
               @click="scrollToBottomSmooth"
             >
               <span class="material-symbols-outlined text-[22px] leading-none">arrow_downward</span>
