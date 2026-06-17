@@ -1,5 +1,6 @@
 package com.kakarote.ai_crm.service.impl;
 
+import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
@@ -13,19 +14,24 @@ import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +69,11 @@ class KnowledgeServiceImplTest {
         ReflectionTestUtils.setField(knowledgeService, "fileStorageService", fileStorageService);
     }
 
+    @AfterEach
+    void tearDown() {
+        AiContextHolder.clear();
+    }
+
     @Test
     void shouldRemoveNullBytesAndControlCharactersBeforePersistingSearchableContent() {
         String normalized = ReflectionTestUtils.invokeMethod(
@@ -83,6 +94,114 @@ class KnowledgeServiceImplTest {
         );
 
         assertThat(normalized).isNull();
+    }
+
+    @Test
+    void uploadFileRefreshesKnowledgeSearchIndexAfterInsert() {
+        AiContextHolder.setContext(9001L, 7L);
+        when(knowledgeMapper.insert(any(Knowledge.class))).thenAnswer(invocation -> {
+            Knowledge knowledge = invocation.getArgument(0);
+            knowledge.setKnowledgeId(5001L);
+            return 1;
+        });
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "demo.txt",
+                "text/plain",
+                "hello".getBytes(StandardCharsets.UTF_8)
+        );
+
+        Long knowledgeId = knowledgeService.uploadFile(file, "document", null, "summary");
+
+        assertThat(knowledgeId).isEqualTo(5001L);
+        verify(globalSearchIndexService).refreshKnowledgeIndex(5001L);
+    }
+
+    @Test
+    void archiveExistingStandaloneFileRefreshesKnowledgeSearchIndexAfterInsert() {
+        AiContextHolder.setContext(9002L, 7L);
+        when(knowledgeMapper.insert(any(Knowledge.class))).thenAnswer(invocation -> {
+            Knowledge knowledge = invocation.getArgument(0);
+            knowledge.setKnowledgeId(5002L);
+            return 1;
+        });
+        when(fileStorageService.getFileStream("docs/demo.txt"))
+                .thenReturn(new ByteArrayInputStream("hello".getBytes(StandardCharsets.UTF_8)));
+
+        Long knowledgeId = knowledgeService.archiveExistingStandaloneFile(
+                "demo.txt",
+                "docs/demo.txt",
+                5L,
+                "text/plain",
+                null,
+                "summary"
+        );
+
+        assertThat(knowledgeId).isEqualTo(5002L);
+        verify(globalSearchIndexService).refreshKnowledgeIndex(5002L);
+    }
+
+    @Test
+    void archiveTextRefreshesKnowledgeSearchIndexAfterInsert() {
+        AiContextHolder.setContext(9003L, 7L);
+        when(knowledgeMapper.insert(any(Knowledge.class))).thenAnswer(invocation -> {
+            Knowledge knowledge = invocation.getArgument(0);
+            knowledge.setKnowledgeId(5003L);
+            return 1;
+        });
+
+        Long knowledgeId = knowledgeService.archiveText(
+                "note.txt",
+                "hello",
+                "document",
+                null,
+                "summary"
+        );
+
+        assertThat(knowledgeId).isEqualTo(5003L);
+        verify(globalSearchIndexService).refreshKnowledgeIndex(5003L);
+    }
+
+    @Test
+    void archiveTextStoresTextFileAndQueuesWeKnoraUploadWhenEnabled() {
+        AiContextHolder.setContext(9004L, 7L);
+        KnowledgeServiceImpl self = mock(KnowledgeServiceImpl.class);
+        ReflectionTestUtils.setField(knowledgeService, "self", self);
+        when(weKnoraClient.isEnabled()).thenReturn(true);
+        when(knowledgeMapper.insert(any(Knowledge.class))).thenAnswer(invocation -> {
+            Knowledge knowledge = invocation.getArgument(0);
+            knowledge.setKnowledgeId(5004L);
+            return 1;
+        });
+
+        Long knowledgeId = knowledgeService.archiveText(
+                "note",
+                "hello",
+                "email",
+                null,
+                "summary"
+        );
+
+        ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Knowledge> knowledgeCaptor = ArgumentCaptor.forClass(Knowledge.class);
+        verify(fileStorageService).upload(
+                any(ByteArrayInputStream.class),
+                org.mockito.ArgumentMatchers.eq(5L),
+                pathCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq("text/plain;charset=UTF-8")
+        );
+        verify(knowledgeMapper).insert(knowledgeCaptor.capture());
+        Knowledge inserted = knowledgeCaptor.getValue();
+        assertThat(knowledgeId).isEqualTo(5004L);
+        assertThat(inserted.getName()).isEqualTo("note.txt");
+        assertThat(inserted.getType()).isEqualTo("email");
+        assertThat(inserted.getFilePath()).isEqualTo(pathCaptor.getValue());
+        assertThat(inserted.getFileSize()).isEqualTo(5L);
+        assertThat(inserted.getMimeType()).isEqualTo("text/plain");
+        assertThat(inserted.getContentText()).isEqualTo("hello");
+        assertThat(inserted.getWeKnoraParseStatus()).isEqualTo("pending");
+        verify(self).asyncUploadToWeKnora(5004L, pathCaptor.getValue(), "note.txt");
     }
 
     @Test

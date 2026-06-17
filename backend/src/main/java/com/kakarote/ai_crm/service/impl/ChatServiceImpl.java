@@ -1464,33 +1464,16 @@ public class ChatServiceImpl implements IChatService {
 
         try {
             String knowledgeIdsStr = joinKnowledgeIds(knowledgeIds);
-            if (StrUtil.isNotBlank(knowledgeIdsStr)) {
-                String scopedResponse = knowledgeTools.askKnowledgeQuestion(content, knowledgeIdsStr);
-                if (StrUtil.isBlank(scopedResponse)) {
-                    log.debug("Knowledge scoped route returned empty response: sessionId={}", sessionId);
-                    return null;
-                }
-                log.debug("Knowledge scoped route handled: sessionId={}, responseLength={}",
-                        sessionId, scopedResponse.length());
-                return scopedResponse;
+            String directAnswerResponse = knowledgeTools.askKnowledgeQuestion(content,
+                    StrUtil.isNotBlank(knowledgeIdsStr) ? knowledgeIdsStr : null);
+            if (isUsableKnowledgeAnswerResponse(directAnswerResponse)) {
+                log.debug("Knowledge route handled by askKnowledgeQuestion: sessionId={}, responseLength={}",
+                        sessionId, directAnswerResponse.length());
+                return directAnswerResponse;
             }
 
-            String searchResponse = knowledgeTools.searchKnowledgeContent(content);
-            if (isUsableKnowledgeSearchResponse(searchResponse)) {
-                log.debug("知识库问题优先由 searchKnowledgeContent 命中: sessionId={}, responseLength={}",
-                        sessionId, searchResponse.length());
-                return searchResponse;
-            }
-
-            log.debug("searchKnowledgeContent 未命中或结果不可用，回退 askKnowledgeQuestion: sessionId={}", sessionId);
-            String askResponse = knowledgeTools.askKnowledgeQuestion(content, null);
-            if (StrUtil.isBlank(askResponse)) {
-                log.debug("知识库前置路由已触发，但 askKnowledgeQuestion 返回空结果: sessionId={}", sessionId);
-                return null;
-            }
-            log.debug("知识库问题已由 askKnowledgeQuestion 兜底处理: sessionId={}, responseLength={}",
-                    sessionId, askResponse.length());
-            return askResponse;
+            log.debug("知识库前置路由已触发，但 askKnowledgeQuestion 返回不可用结果: sessionId={}", sessionId);
+            return null;
         } catch (Exception e) {
             log.warn("服务端前置处理知识库问题失败，将回退到通用聊天链路: sessionId={}, error={}",
                     sessionId, e.getMessage(), e);
@@ -1519,13 +1502,15 @@ public class ChatServiceImpl implements IChatService {
                 .collect(Collectors.joining(","));
     }
 
-    private boolean isUsableKnowledgeSearchResponse(String response) {
+    private boolean isUsableKnowledgeAnswerResponse(String response) {
         if (StrUtil.isBlank(response)) {
             return false;
         }
-        return !response.contains("未找到与")
-                && !response.contains("语义检索失败")
-                && !response.contains("功能未启用");
+        return !response.contains("当前未能直接从知识库生成回答")
+                && !response.contains("当前未能从知识库生成回答")
+                && !response.contains("知识库问答失败")
+                && !response.contains("知识库问答功能未启用")
+                && !response.contains("问题不能为空");
     }
 
     private DynamicChatClientProvider.AiRuntimeConfigSnapshot resolveChatRuntimeConfig(ChatSendBO sendBO) {
@@ -1768,9 +1753,9 @@ public class ChatServiceImpl implements IChatService {
         return """
                 【知识库问题处理规则】
                 1. 优先使用知识库工具，不要直接凭空回答。
-                2. 优先先调用 searchKnowledgeContent 获取相关文档片段。
-                3. 如果已经拿到相关片段，但用户仍然需要结论性总结、条款归纳、反馈汇总，再调用 askKnowledgeQuestion。
-                4. 若 searchKnowledgeContent 没有找到结果，再尝试 askKnowledgeQuestion；仍未命中时再告知用户换关键词。
+                2. 所有知识库相关问题都调用 askKnowledgeQuestion，由 RAG 问答模式直接生成结论。
+                3. 回答应基于知识库内容，优先给出结论，再补充必要依据。
+                4. searchKnowledgeContent 片段检索模式暂时关闭，不要调用它返回原始片段。
                 """;
     }
 

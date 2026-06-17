@@ -19,12 +19,14 @@ import com.kakarote.ai_crm.mapper.ProductMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
 import com.kakarote.ai_crm.mapper.ProjectMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
+import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -124,6 +126,28 @@ class ChatServiceImplTest {
                 .hasMessageContaining("会话不存在");
 
         verify(chatMessageMapper, never()).insert(any(ChatMessage.class));
+    }
+
+    @Test
+    void knowledgeRoutePrefersQuestionAnswerOverSearchSnippets() {
+        ChatServiceImpl service = new ChatServiceImpl();
+        KnowledgeTools knowledgeTools = mock(KnowledgeTools.class);
+        ReflectionTestUtils.setField(service, "knowledgeTools", knowledgeTools);
+        AiContextHolder.setContext(3003L, 7L);
+        when(knowledgeTools.askKnowledgeQuestion("客户合同怎么约定?", null)).thenReturn("这是知识库问答结论");
+        when(knowledgeTools.searchKnowledgeContent("客户合同怎么约定?")).thenReturn("这是片段检索结果");
+
+        String response = ReflectionTestUtils.invokeMethod(
+                service,
+                "tryHandleKnowledgeQuestion",
+                "客户合同怎么约定?",
+                Collections.emptyList(),
+                true,
+                List.of()
+        );
+
+        assertThat(response).isEqualTo("这是知识库问答结论");
+        verify(knowledgeTools, never()).searchKnowledgeContent("客户合同怎么约定?");
     }
 
     @Test

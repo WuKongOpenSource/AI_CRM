@@ -64,6 +64,7 @@ import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -193,6 +194,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, file.getOriginalFilename());
         }
 
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
         return knowledge.getKnowledgeId();
     }
 
@@ -262,6 +264,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), filePath, normalizedFileName);
         }
 
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
         return knowledge.getKnowledgeId();
     }
 
@@ -294,24 +297,44 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long archiveText(String fileName, String contentText, String type, Long customerId, String summary) {
+        String normalizedText = normalizeSearchableContent(contentText);
+        if (StrUtil.isBlank(normalizedText)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "知识正文不能为空");
+        }
         if (customerId != null) {
             Customer customer = customerMapper.selectById(customerId);
             if (ObjectUtil.isNull(customer)) {
                 throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在或无权限访问");
             }
         }
+
+        String normalizedFileName = StrUtil.blankToDefault(StrUtil.trim(fileName), "knowledge-text.txt");
+        if (!normalizedFileName.toLowerCase(Locale.ROOT).endsWith(".txt")) {
+            normalizedFileName = normalizedFileName + ".txt";
+        }
+        byte[] bytes = normalizedText.getBytes(StandardCharsets.UTF_8);
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String relativePath = datePath + "/" + IdUtil.fastSimpleUUID() + ".txt";
+        fileStorageService.upload(new ByteArrayInputStream(bytes), bytes.length, relativePath, "text/plain;charset=UTF-8");
+
         Knowledge knowledge = new Knowledge();
-        knowledge.setName(StrUtil.blankToDefault(StrUtil.trim(fileName), "knowledge-text.txt"));
+        knowledge.setName(normalizedFileName);
         knowledge.setType(StrUtil.blankToDefault(StrUtil.trim(type), "document"));
         knowledge.setCustomerId(customerId);
-        knowledge.setFileSize(contentText == null ? 0L : (long) contentText.getBytes(StandardCharsets.UTF_8).length);
+        knowledge.setFilePath(relativePath);
+        knowledge.setFileSize((long) bytes.length);
         knowledge.setMimeType("text/plain");
         knowledge.setSummary(normalizeUserFacingSummary(summary));
-        knowledge.setContentText(contentText);
+        knowledge.setContentText(normalizedText);
         knowledge.setStatus(1);
-        knowledge.setWeKnoraParseStatus("unsupported");
+        knowledge.setWeKnoraParseStatus("pending");
         knowledge.setUploadUserId(UserUtil.getUserId());
         save(knowledge);
+
+        if (weKnoraClient.isEnabled()) {
+            self.asyncUploadToWeKnora(knowledge.getKnowledgeId(), relativePath, normalizedFileName);
+        }
+        globalSearchIndexService.refreshKnowledgeIndex(knowledge.getKnowledgeId());
         return knowledge.getKnowledgeId();
     }
 
