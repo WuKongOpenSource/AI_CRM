@@ -221,6 +221,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final Pattern RECENT_NEW_CUSTOMERS_PATTERN = Pattern.compile("(?:最近|近)(\\d{1,3})\\s*天新增");
     private static final Pattern LEVEL_PATTERN = Pattern.compile("([ABC])\\s*(?:类|级)?客户", Pattern.CASE_INSENSITIVE);
     private static final Pattern WEBSITE_URL_PATTERN = Pattern.compile("(?i)\\b(?:https?://|www\\.)[^\\s，。；;、)）\\]】>]+");
+    private static final Pattern QUOTATION_COMPARE_PATTERN = Pattern.compile(
+            "(?:预计成交金额|成交金额|金额|报价)\\s*(大于等于|不低于|至少|超过|大于|高于|小于等于|不超过|至多|低于|小于|少于|等于|>=|<=|>|<|=)?\\s*(\\d+(?:\\.\\d+)?)\\s*(万|w|W|千|k|K|亿)?"
+    );
     private static final List<String> COMMON_INDUSTRIES = List.of(
         "制造业", "互联网", "金融", "教育", "医疗", "零售", "物流", "房地产", "SaaS", "政府", "能源"
     );
@@ -2843,6 +2846,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             }
         }
 
+        applyQuotationComparisonFromQuery(query, normalizedQuery);
+
         if (query.getQuotationMin() == null && normalizedQuery.contains("高价值")) {
             query.setQuotationMin(BigDecimal.valueOf(500_000));
             if (StrUtil.isBlank(query.getSortBy())) {
@@ -2896,6 +2901,63 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                     query.setLevel(level);
                 }
             }
+        }
+    }
+
+    private void applyQuotationComparisonFromQuery(CustomerAiSearchQueryVO query, String normalizedQuery) {
+        if (query == null || StrUtil.isBlank(normalizedQuery)) {
+            return;
+        }
+        Matcher matcher = QUOTATION_COMPARE_PATTERN.matcher(normalizedQuery);
+        if (!matcher.find()) {
+            return;
+        }
+        BigDecimal amount = parseSearchAmount(matcher.group(2), matcher.group(3));
+        if (amount == null) {
+            return;
+        }
+
+        String operator = StrUtil.blankToDefault(matcher.group(1), "大于等于");
+        if (containsAny(operator, "小于", "少于", "低于", "不超过", "至多", "<")) {
+            query.setQuotationMax(amount);
+            if (StrUtil.isBlank(query.getSortBy())) {
+                query.setSortBy("quotation");
+            }
+            if (StrUtil.isBlank(query.getSortOrder())) {
+                query.setSortOrder("asc");
+            }
+            return;
+        }
+
+        if (containsAny(operator, "等于", "=") && !containsAny(operator, "大于", "小于", ">", "<")) {
+            query.setQuotationMin(amount);
+            query.setQuotationMax(amount);
+        } else {
+            query.setQuotationMin(amount);
+        }
+        if (StrUtil.isBlank(query.getSortBy())) {
+            query.setSortBy("quotation");
+        }
+        if (StrUtil.isBlank(query.getSortOrder())) {
+            query.setSortOrder("desc");
+        }
+    }
+
+    private BigDecimal parseSearchAmount(String numberText, String unit) {
+        if (StrUtil.isBlank(numberText)) {
+            return null;
+        }
+        try {
+            BigDecimal amount = new BigDecimal(numberText.replace(",", ""));
+            String normalizedUnit = StrUtil.blankToDefault(unit, "").trim().toLowerCase(Locale.ROOT);
+            return switch (normalizedUnit) {
+                case "万", "w" -> amount.multiply(BigDecimal.valueOf(10_000L));
+                case "千", "k" -> amount.multiply(BigDecimal.valueOf(1_000L));
+                case "亿" -> amount.multiply(BigDecimal.valueOf(100_000_000L));
+                default -> amount;
+            };
+        } catch (NumberFormatException exception) {
+            return null;
         }
     }
 

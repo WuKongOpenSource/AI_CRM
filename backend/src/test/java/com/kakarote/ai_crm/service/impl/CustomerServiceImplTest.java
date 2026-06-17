@@ -8,6 +8,7 @@ import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiSearchParseVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiSearchQueryVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.mapper.ContactMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
@@ -20,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -150,6 +152,23 @@ class CustomerServiceImplTest {
         assertNotNull(result.getParsedQuery().getLastContactEnd());
         assertEquals(Boolean.TRUE, result.getParsedQuery().getIncludeNoLastContact());
         assertTrue(result.getParsedQuery().getFilters() == null || result.getParsedQuery().getFilters().isEmpty());
+    }
+
+    @Test
+    void heuristicSearchParsesChineseAmountComparison() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+
+        CustomerAiSearchQueryVO query = ReflectionTestUtils.invokeMethod(
+                service,
+                "buildHeuristicSearchQuery",
+                "预计成交金额大于50万的客户"
+        );
+
+        assertNotNull(query);
+        assertEquals(new BigDecimal("500000"), query.getQuotationMin());
+        assertNull(query.getQuotationMax());
+        assertEquals("quotation", query.getSortBy());
+        assertEquals("desc", query.getSortOrder());
     }
 
     @Test
