@@ -531,6 +531,7 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     public List<ChatMessageVO> getMessageList(Long sessionId) {
+        getRequiredSession(sessionId);
         List<ChatMessage> messages = chatMessageMapper.selectList(
             new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getSessionId, sessionId)
@@ -580,7 +581,7 @@ public class ChatServiceImpl implements IChatService {
         List<Long> knowledgeIds = sendBO.getKnowledgeIds();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
-        ChatSession session = chatSessionMapper.selectById(sessionId);
+        ChatSession session = getRequiredSession(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
         session = bindBusinessContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
@@ -769,7 +770,7 @@ public class ChatServiceImpl implements IChatService {
         List<Long> knowledgeIds = sendBO.getKnowledgeIds();
 
         Long currentUserId = UserUtil.getUserIdOrNull();
-        ChatSession session = chatSessionMapper.selectById(sessionId);
+        ChatSession session = getRequiredSession(sessionId);
         ChatApplicationDefinition application = resolveChatApplication(sendBO, session);
         session = bindBusinessContextFromSendIfNeeded(sendBO, session, application);
         persistSessionAppCodeIfNeeded(session, application.code());
@@ -1274,6 +1275,14 @@ public class ChatServiceImpl implements IChatService {
             session.setUpdateTime(new Date());
             chatSessionMapper.updateById(session);
         }
+    }
+
+    private ChatSession getRequiredSession(Long sessionId) {
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (ObjectUtil.isNull(session)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "会话不存在");
+        }
+        return session;
     }
 
     private void setAiContext(ChatSession session, Long sessionId, Long userId) {

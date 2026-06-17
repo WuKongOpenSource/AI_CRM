@@ -40,6 +40,7 @@ import com.kakarote.ai_crm.service.AiAudioTranscriptionService;
 import com.kakarote.ai_crm.service.DataPermissionService;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ICustomerService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.IKnowledgeService;
 import com.kakarote.ai_crm.service.WeKnoraClient;
 import com.kakarote.ai_crm.utils.AiMediaUtil;
@@ -118,6 +119,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
     @Autowired
     private DataPermissionService dataPermissionService;
+
+    @Autowired
+    private IGlobalSearchIndexService globalSearchIndexService;
 
     @Autowired
     private VideoMediaExtractionService videoMediaExtractionService;
@@ -400,6 +404,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         knowledgeTagMapper.delete(
             new LambdaQueryWrapper<KnowledgeTag>().eq(KnowledgeTag::getKnowledgeId, knowledgeId)
         );
+        globalSearchIndexService.deleteByEntity("knowledge", knowledgeId);
     }
 
     @Override
@@ -427,6 +432,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         }
         knowledge.setCustomerId(customerId);
         updateById(knowledge);
+        globalSearchIndexService.refreshKnowledgeIndex(knowledgeId);
     }
 
     @Override
@@ -1576,6 +1582,7 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         tag.setKnowledgeId(knowledgeId);
         tag.setTagName(tagName);
         knowledgeTagMapper.insert(tag);
+        globalSearchIndexService.refreshKnowledgeIndex(knowledgeId);
     }
 
     // ==================== AI 文档分析 ====================

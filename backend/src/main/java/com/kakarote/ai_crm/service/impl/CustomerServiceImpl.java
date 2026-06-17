@@ -412,10 +412,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
         removeById(customerId);
+        deleteCustomerLogoAfterCommit(customer.getLogo());
         // Delete related contacts
         contactMapper.delete(new LambdaQueryWrapper<Contact>().eq(Contact::getCustomerId, customerId));
         // Delete related tags
         customerTagMapper.delete(new LambdaQueryWrapper<CustomerTag>().eq(CustomerTag::getCustomerId, customerId));
+        globalSearchIndexService.deleteByEntity("customer", customerId);
+        globalSearchIndexService.deleteContactIndexesByCustomerId(customerId);
+        globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
+        taskService.refreshValuePriorityByCustomerId(customerId);
     }
 
     @Override
@@ -3555,5 +3560,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         } catch (Exception e) {
             log.warn("Auto populate customer logo failed: customerId={}, error={}", customerId, e.getMessage());
         }
+    }
+
+    private void deleteCustomerLogoAfterCommit(String logo) {
+        Runnable task = () -> customerLogoService.deleteStoredLogoQuietly(logo);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+            return;
+        }
+        task.run();
     }
 }

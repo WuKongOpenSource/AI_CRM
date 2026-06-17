@@ -1,13 +1,60 @@
 package com.kakarote.ai_crm.service.impl;
 
+import com.kakarote.ai_crm.entity.PO.Customer;
+import com.kakarote.ai_crm.entity.PO.Knowledge;
+import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.KnowledgeMapper;
+import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
+import com.kakarote.ai_crm.service.FileStorageService;
+import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import com.kakarote.ai_crm.service.WeKnoraClient;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class KnowledgeServiceImplTest {
 
-    private final KnowledgeServiceImpl knowledgeService = new KnowledgeServiceImpl();
+    @Mock
+    private KnowledgeMapper knowledgeMapper;
+
+    @Mock
+    private KnowledgeTagMapper knowledgeTagMapper;
+
+    @Mock
+    private CustomerMapper customerMapper;
+
+    @Mock
+    private IGlobalSearchIndexService globalSearchIndexService;
+
+    @Mock
+    private WeKnoraClient weKnoraClient;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    private KnowledgeServiceImpl knowledgeService;
+
+    @BeforeEach
+    void setUp() {
+        knowledgeService = new KnowledgeServiceImpl();
+        ReflectionTestUtils.setField(knowledgeService, "baseMapper", knowledgeMapper);
+        ReflectionTestUtils.setField(knowledgeService, "knowledgeTagMapper", knowledgeTagMapper);
+        ReflectionTestUtils.setField(knowledgeService, "customerMapper", customerMapper);
+        ReflectionTestUtils.setField(knowledgeService, "globalSearchIndexService", globalSearchIndexService);
+        ReflectionTestUtils.setField(knowledgeService, "weKnoraClient", weKnoraClient);
+        ReflectionTestUtils.setField(knowledgeService, "fileStorageService", fileStorageService);
+    }
 
     @Test
     void shouldRemoveNullBytesAndControlCharactersBeforePersistingSearchableContent() {
@@ -29,5 +76,55 @@ class KnowledgeServiceImplTest {
         );
 
         assertThat(normalized).isNull();
+    }
+
+    @Test
+    void updateCustomerRefreshesKnowledgeSearchIndex() {
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(5001L);
+        knowledge.setCustomerId(1001L);
+        Customer customer = new Customer();
+        customer.setCustomerId(2002L);
+
+        when(knowledgeMapper.selectById(5001L)).thenReturn(knowledge);
+        when(customerMapper.selectById(2002L)).thenReturn(customer);
+
+        knowledgeService.updateCustomer(5001L, 2002L);
+
+        ArgumentCaptor<Knowledge> knowledgeCaptor = ArgumentCaptor.forClass(Knowledge.class);
+        verify(knowledgeMapper).updateById(knowledgeCaptor.capture());
+        assertThat(knowledgeCaptor.getValue().getCustomerId()).isEqualTo(2002L);
+        verify(globalSearchIndexService).refreshKnowledgeIndex(5001L);
+    }
+
+    @Test
+    void addTagRefreshesKnowledgeSearchIndexAfterInsert() {
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(5001L);
+
+        when(knowledgeMapper.selectById(5001L)).thenReturn(knowledge);
+        when(knowledgeTagMapper.selectCount(any())).thenReturn(0L);
+
+        knowledgeService.addTag(5001L, "方案");
+
+        ArgumentCaptor<KnowledgeTag> tagCaptor = ArgumentCaptor.forClass(KnowledgeTag.class);
+        verify(knowledgeTagMapper).insert(tagCaptor.capture());
+        assertThat(tagCaptor.getValue().getKnowledgeId()).isEqualTo(5001L);
+        assertThat(tagCaptor.getValue().getTagName()).isEqualTo("方案");
+        verify(globalSearchIndexService).refreshKnowledgeIndex(5001L);
+    }
+
+    @Test
+    void deleteKnowledgeRemovesKnowledgeSearchIndex() {
+        Knowledge knowledge = new Knowledge();
+        knowledge.setKnowledgeId(5001L);
+
+        when(knowledgeMapper.selectById(5001L)).thenReturn(knowledge);
+
+        knowledgeService.deleteKnowledge(5001L);
+
+        verify(knowledgeMapper).deleteById(5001L);
+        verify(knowledgeTagMapper).delete(any());
+        verify(globalSearchIndexService).deleteByEntity("knowledge", 5001L);
     }
 }

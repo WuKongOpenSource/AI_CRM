@@ -55,8 +55,14 @@ import org.springframework.util.MimeType;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
+import java.time.DateTimeException;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -65,6 +71,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
@@ -85,6 +93,7 @@ public class ProjectServiceImpl implements IProjectService {
     private static final String ROLE_EXTERNAL = "EXTERNAL";
     private static final String MEMBER_STATUS_ACTIVE = "ACTIVE";
     private static final int MAX_AI_CONTEXT_TEXT_LENGTH = 8_000;
+    private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Shanghai");
     private static final String PERMISSION_VIEW_PROJECT = "VIEW_PROJECT";
     private static final String PERMISSION_EDIT_PROJECT = "EDIT_PROJECT";
     private static final String PERMISSION_DELETE_PROJECT = "DELETE_PROJECT";
@@ -676,7 +685,7 @@ public class ProjectServiceImpl implements IProjectService {
         }
         String reply = "当前对话对象是任务「" + task.getTitle() + "」，我已经收到你的指令。";
         if (containsAny(content, "改到", "改成", "调整到", "延期到")
-                && containsAny(content, "今天", "明天", "后天", "上午", "下午", "晚上", "点")) {
+                && hasDateTimeIntent(content)) {
             Date dueDate = parseRelativeDateTime(content);
             if (dueDate != null) {
                 task.setDueDate(dueDate);
@@ -1149,29 +1158,118 @@ public class ProjectServiceImpl implements IProjectService {
     }
 
     private Date parseRelativeDateTime(String content) {
-        if (StrUtil.isBlank(content)) {
+        if (!hasDateTimeIntent(content)) {
             return null;
         }
-        if (!containsAny(content, "今天", "明天", "后天", "上午", "下午", "晚上", "点")) {
-            return null;
-        }
-        Calendar calendar = Calendar.getInstance();
-        if (content.contains("后天")) {
-            calendar.add(Calendar.DAY_OF_MONTH, 2);
+        LocalDate today = LocalDate.now(DEFAULT_ZONE);
+        LocalDate date = today;
+        LocalDate explicitDate = parseExplicitDate(content, today);
+        DayOfWeek weekday = parseChineseWeekday(content);
+        if (explicitDate != null) {
+            date = explicitDate;
+        } else if (weekday != null) {
+            LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            if (content.contains("下周")) {
+                weekStart = weekStart.plusWeeks(1);
+            }
+            date = weekStart.plusDays(weekday.getValue() - 1L);
+            if (!content.contains("下周") && date.isBefore(today)) {
+                date = date.plusWeeks(1);
+            }
+        } else if (content.contains("后天")) {
+            date = date.plusDays(2);
         } else if (content.contains("明天")) {
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
+            date = date.plusDays(1);
+        } else if (content.contains("本周") || content.contains("这周")) {
+            date = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
+        } else if (content.contains("下周")) {
+            date = date.plusWeeks(1);
+        } else if (content.contains("本月") || content.contains("月底") || content.contains("月末")) {
+            date = date.with(TemporalAdjusters.lastDayOfMonth());
         }
-        int hour = content.contains("晚上") ? 19 : content.contains("下午") ? 14 : content.contains("上午") ? 10 : 18;
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d{1,2})\\s*点").matcher(content);
-        if (matcher.find()) {
-            int parsedHour = Integer.parseInt(matcher.group(1));
-            hour = content.contains("下午") && parsedHour < 12 ? parsedHour + 12 : parsedHour;
+
+        int hour = containsAny(content, "下午", "晚上", "本周", "这周", "本月", "月底", "月末", "完成", "截止") ? 18 : 9;
+        int minute = 0;
+        Matcher colon = Pattern.compile("(\\d{1,2})[:：](\\d{1,2})").matcher(content);
+        if (colon.find()) {
+            hour = Integer.parseInt(colon.group(1));
+            minute = Integer.parseInt(colon.group(2));
+        } else {
+            Matcher chineseHour = Pattern.compile("(\\d{1,2})\\s*点(?:\\s*(\\d{1,2})\\s*分?)?").matcher(content);
+            if (chineseHour.find()) {
+                hour = Integer.parseInt(chineseHour.group(1));
+                if (StrUtil.isNotBlank(chineseHour.group(2))) {
+                    minute = Integer.parseInt(chineseHour.group(2));
+                }
+            } else if (content.contains("三点")) {
+                hour = 3;
+            } else if (content.contains("两点") || content.contains("二点")) {
+                hour = 2;
+            }
         }
-        calendar.set(Calendar.HOUR_OF_DAY, Math.min(Math.max(hour, 0), 23));
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-        return calendar.getTime();
+        if ((content.contains("下午") || content.contains("晚上")) && hour < 12) {
+            hour += 12;
+        }
+        return Date.from(LocalDateTime.of(date, LocalTime.of(Math.min(Math.max(hour, 0), 23), Math.min(Math.max(minute, 0), 59)))
+                .atZone(DEFAULT_ZONE)
+                .toInstant());
+    }
+
+    private boolean hasDateTimeIntent(String content) {
+        if (StrUtil.isBlank(content)) {
+            return false;
+        }
+        return containsAny(content, "今天", "明天", "后天", "本周", "这周", "下周", "本月", "月底", "月末", "上午", "下午", "晚上", "点", ":", "：")
+                || Pattern.compile("\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}/\\d{1,2}|\\d{1,2}月\\d{1,2}[日号]?|周[一二三四五六日天]|星期[一二三四五六日天]").matcher(content).find();
+    }
+
+    private LocalDate parseExplicitDate(String content, LocalDate baseDate) {
+        Matcher iso = Pattern.compile("(\\d{4})-(\\d{1,2})-(\\d{1,2})").matcher(content);
+        if (iso.find()) {
+            return localDateOf(Integer.parseInt(iso.group(1)), Integer.parseInt(iso.group(2)), Integer.parseInt(iso.group(3)));
+        }
+        Matcher slash = Pattern.compile("(\\d{1,2})/(\\d{1,2})").matcher(content);
+        if (slash.find()) {
+            return localDateOf(baseDate.getYear(), Integer.parseInt(slash.group(1)), Integer.parseInt(slash.group(2)));
+        }
+        Matcher chinese = Pattern.compile("(\\d{1,2})月(\\d{1,2})[日号]?").matcher(content);
+        if (chinese.find()) {
+            return localDateOf(baseDate.getYear(), Integer.parseInt(chinese.group(1)), Integer.parseInt(chinese.group(2)));
+        }
+        return null;
+    }
+
+    private LocalDate localDateOf(int year, int month, int day) {
+        try {
+            return LocalDate.of(year, month, day);
+        } catch (DateTimeException ignored) {
+            return null;
+        }
+    }
+
+    private DayOfWeek parseChineseWeekday(String content) {
+        if (containsAny(content, "周一", "星期一")) {
+            return DayOfWeek.MONDAY;
+        }
+        if (containsAny(content, "周二", "星期二")) {
+            return DayOfWeek.TUESDAY;
+        }
+        if (containsAny(content, "周三", "星期三")) {
+            return DayOfWeek.WEDNESDAY;
+        }
+        if (containsAny(content, "周四", "星期四")) {
+            return DayOfWeek.THURSDAY;
+        }
+        if (containsAny(content, "周五", "星期五")) {
+            return DayOfWeek.FRIDAY;
+        }
+        if (containsAny(content, "周六", "星期六")) {
+            return DayOfWeek.SATURDAY;
+        }
+        if (containsAny(content, "周日", "周天", "星期日", "星期天")) {
+            return DayOfWeek.SUNDAY;
+        }
+        return null;
     }
 
     private String parsePriority(String content) {

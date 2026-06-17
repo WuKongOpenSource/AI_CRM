@@ -18,6 +18,7 @@ import com.kakarote.ai_crm.mapper.TaskMapper;
 import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.IDynamicSchemaService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
+import com.kakarote.ai_crm.service.ITaskService;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -116,6 +117,41 @@ class CustomerServiceImplTest {
         assertEquals("13800000000", contactCaptor.getValue().getPhone());
         verify(service).syncContactCache(customerId);
         verify(globalSearchIndexService).refreshContactIndex(contactId);
+    }
+
+    @Test
+    void deleteCustomerClearsSearchIndexesAndRefreshesRelatedPriorities() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+        CustomerMapper customerMapper = mock(CustomerMapper.class);
+        ContactMapper contactMapper = mock(ContactMapper.class);
+        CustomerTagMapper customerTagMapper = mock(CustomerTagMapper.class);
+        IGlobalSearchIndexService globalSearchIndexService = mock(IGlobalSearchIndexService.class);
+        ITaskService taskService = mock(ITaskService.class);
+        CustomerLogoService customerLogoService = mock(CustomerLogoService.class);
+
+        ReflectionTestUtils.setField(service, "baseMapper", customerMapper);
+        ReflectionTestUtils.setField(service, "contactMapper", contactMapper);
+        ReflectionTestUtils.setField(service, "customerTagMapper", customerTagMapper);
+        ReflectionTestUtils.setField(service, "globalSearchIndexService", globalSearchIndexService);
+        ReflectionTestUtils.setField(service, "taskService", taskService);
+        ReflectionTestUtils.setField(service, "customerLogoService", customerLogoService);
+
+        Long customerId = 100L;
+        Customer customer = new Customer();
+        customer.setCustomerId(customerId);
+        customer.setLogo("customer/logo/acme.png");
+        when(customerMapper.selectById(customerId)).thenReturn(customer);
+
+        service.deleteCustomer(customerId);
+
+        verify(customerMapper).deleteById(customerId);
+        verify(customerLogoService).deleteStoredLogoQuietly("customer/logo/acme.png");
+        verify(contactMapper).delete(any());
+        verify(customerTagMapper).delete(any());
+        verify(globalSearchIndexService).deleteByEntity("customer", customerId);
+        verify(globalSearchIndexService).deleteContactIndexesByCustomerId(customerId);
+        verify(globalSearchIndexService).refreshCustomerRelatedIndexes(customerId);
+        verify(taskService).refreshValuePriorityByCustomerId(customerId);
     }
 
     @Test

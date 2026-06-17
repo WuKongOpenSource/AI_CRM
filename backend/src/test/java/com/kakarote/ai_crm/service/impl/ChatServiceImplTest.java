@@ -9,6 +9,7 @@ import com.kakarote.ai_crm.common.exception.BusinessException;
 import com.kakarote.ai_crm.entity.BO.ChatSendBO;
 import com.kakarote.ai_crm.entity.BO.SessionCreateBO;
 import com.kakarote.ai_crm.entity.BO.SessionPinBO;
+import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
 import com.kakarote.ai_crm.entity.PO.Product;
 import com.kakarote.ai_crm.entity.PO.Project;
@@ -103,6 +104,26 @@ class ChatServiceImplTest {
         assertThat(updated.getPinned()).isTrue();
         assertThat(updated.getPinnedTime()).isNotNull();
         assertThat(updated.getUpdateTime()).isNull();
+    }
+
+    @Test
+    void chatRejectsMissingSessionBeforePersistingMessage() {
+        ChatServiceImpl service = new ChatServiceImpl();
+        ChatSessionMapper chatSessionMapper = mock(ChatSessionMapper.class);
+        ChatMessageMapper chatMessageMapper = mock(ChatMessageMapper.class);
+        ReflectionTestUtils.setField(service, "chatApplicationRegistry", new ChatApplicationRegistry());
+        ReflectionTestUtils.setField(service, "chatSessionMapper", chatSessionMapper);
+        ReflectionTestUtils.setField(service, "chatMessageMapper", chatMessageMapper);
+
+        ChatSendBO sendBO = new ChatSendBO();
+        sendBO.setSessionId(404L);
+        sendBO.setContent("hello");
+
+        assertThatThrownBy(() -> service.chat(sendBO))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("会话不存在");
+
+        verify(chatMessageMapper, never()).insert(any(ChatMessage.class));
     }
 
     @Test

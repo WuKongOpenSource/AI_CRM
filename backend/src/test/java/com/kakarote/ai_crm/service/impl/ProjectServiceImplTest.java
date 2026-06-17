@@ -39,6 +39,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -356,6 +359,46 @@ class ProjectServiceImplTest {
         verify(projectTaskMapper).updateById(taskCaptor.capture());
         assertThat(taskCaptor.getValue().getLaneId()).isEqualTo(30L);
         assertThat(taskCaptor.getValue().getStatus()).isEqualTo("COMPLETED");
+    }
+
+    @Test
+    void taskAiCommandUpdatesDueDateWithExplicitDateTime() {
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setName("Implementation");
+        project.setOwnerId(1001L);
+
+        ProjectTask task = new ProjectTask();
+        task.setTaskId(3001L);
+        task.setProjectId(2001L);
+        task.setLaneId(10L);
+        task.setTitle("Prepare proposal");
+        task.setPriority("MEDIUM");
+        task.setStatus("TODO");
+
+        ProjectLane todoLane = lane(10L, "todo", "未开始", 10);
+
+        when(projectMapper.selectById(2001L)).thenReturn(project);
+        when(projectTaskMapper.selectById(3001L)).thenReturn(task);
+        when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
+        when(projectLaneMapper.selectList(any())).thenReturn(List.of(todoLane));
+        when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of(taskVO(3001L)));
+        when(projectTaskAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(projectAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(projectScheduleMapper.selectList(any())).thenReturn(List.of());
+
+        ProjectBO.AiCommand command = new ProjectBO.AiCommand();
+        command.setContent("把截止时间改到2026-07-01 15:30");
+
+        ProjectVO result = projectService.handleTaskAiCommand(2001L, 3001L, command);
+
+        assertThat(result.getProjectId()).isEqualTo(2001L);
+        ArgumentCaptor<ProjectTask> taskCaptor = ArgumentCaptor.forClass(ProjectTask.class);
+        verify(projectTaskMapper).updateById(taskCaptor.capture());
+        Date expectedDueDate = Date.from(LocalDateTime.of(2026, 7, 1, 15, 30)
+                .atZone(ZoneId.of("Asia/Shanghai"))
+                .toInstant());
+        assertThat(taskCaptor.getValue().getDueDate()).isEqualTo(expectedDueDate);
     }
 
     private ManagerUser activeUser(Long userId) {
