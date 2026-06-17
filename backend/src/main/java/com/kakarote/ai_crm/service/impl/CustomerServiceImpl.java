@@ -2271,10 +2271,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
 
-        CustomerAiReportVO report = new CustomerAiReportVO();
-        report.setCustomerId(customerId);
-        report.setAiStatusDetection(StrUtil.blankToDefault(customer.getAiStatusDetection(), "pending"));
-        report.setAiInsight(StrUtil.blankToDefault(customer.getAiInsight(), "No AI analysis has been generated yet."));
+        CustomerAiReportVO fallbackReport = buildFallbackCustomerAiReport(customer);
+        CustomerAiReportVO report = fallbackReport;
+        String aiParseSnapshot = null;
 
         String prompt = """
                 Analyze this CRM customer and return compact JSON only:
@@ -2318,24 +2317,75 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 json = json.replaceFirst("\\s*```$", "");
             }
             JsonNode root = objectMapper.readTree(json);
-            report.setAiStatusDetection(StrUtil.blankToDefault(getJsonText(root, "aiStatusDetection"), report.getAiStatusDetection()));
-            report.setAiInsight(StrUtil.blankToDefault(getJsonText(root, "aiInsight"), report.getAiInsight()));
-            report.setAiDeepInsight(getJsonText(root, "aiDeepInsight"));
-            report.setAiNextStep(getJsonText(root, "aiNextStep"));
-
-            customer.setAiStatusDetection(report.getAiStatusDetection());
-            customer.setAiInsight(report.getAiInsight());
-            customer.setAiParseSnapshot(json);
-            if (persistCompletedStatus) {
-                customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_SUCCESS);
-            }
-            customer.setAiAnalysisRequestedAt(expectedRequestedAt == null ? new Date() : expectedRequestedAt);
-            updateCustomerAiReportResult(customer, expectedRequestedAt);
+            report = new CustomerAiReportVO();
+            report.setCustomerId(customerId);
+            report.setAiStatusDetection(StrUtil.blankToDefault(getJsonText(root, "aiStatusDetection"), fallbackReport.getAiStatusDetection()));
+            report.setAiInsight(StrUtil.blankToDefault(getJsonText(root, "aiInsight"), fallbackReport.getAiInsight()));
+            report.setAiDeepInsight(StrUtil.blankToDefault(getJsonText(root, "aiDeepInsight"), fallbackReport.getAiDeepInsight()));
+            report.setAiNextStep(StrUtil.blankToDefault(getJsonText(root, "aiNextStep"), fallbackReport.getAiNextStep()));
+            aiParseSnapshot = json;
         } catch (Exception e) {
             log.warn("Customer AI report generation failed, customerId={}, error={}", customerId, e.getMessage());
-            updateCustomerAiAnalysisState(customerId, expectedRequestedAt, AI_ANALYSIS_STATUS_FAILED, null);
         }
+
+        customer.setAiStatusDetection(report.getAiStatusDetection());
+        customer.setAiInsight(report.getAiInsight());
+        customer.setAiParseSnapshot(StrUtil.blankToDefault(aiParseSnapshot, serializeFallbackCustomerAiReport(report)));
+        if (persistCompletedStatus) {
+            customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_SUCCESS);
+        }
+        customer.setAiAnalysisRequestedAt(expectedRequestedAt == null ? new Date() : expectedRequestedAt);
+        updateCustomerAiReportResult(customer, expectedRequestedAt);
         return report;
+    }
+
+    private CustomerAiReportVO buildFallbackCustomerAiReport(Customer customer) {
+        CustomerAiReportVO report = new CustomerAiReportVO();
+        if (customer == null) {
+            report.setAiStatusDetection("客户资料不足，暂无法判断状态");
+            report.setAiInsight("请先补充客户基础信息、联系人和跟进记录，再生成更完整的分析。");
+            report.setAiDeepInsight("当前缺少可分析的客户资料，无法判断商机质量、推进风险和下一步优先级。");
+            report.setAiNextStep("补齐客户行业、负责人、联系人、预计成交金额和最近跟进记录。");
+            return report;
+        }
+
+        report.setCustomerId(customer.getCustomerId());
+        String stageLabel = fallbackStageLabel(customer.getStage());
+        String levelLabel = StrUtil.blankToDefault(getLevelDisplayLabel(customer.getLevel()), "未分级");
+        String industry = StrUtil.blankToDefault(customer.getIndustry(), "未填写行业");
+        String amount = formatFallbackAmount(customer.getQuotation());
+
+        report.setAiStatusDetection("当前客户处于" + stageLabel + "阶段，等级为" + levelLabel + "，预计成交金额" + amount + "。");
+        report.setAiInsight("客户行业为" + industry + "，当前阶段显示已有明确业务推进线索。建议结合最近跟进记录继续确认预算、决策人和成交阻碍。");
+        report.setAiDeepInsight("""
+                - 客户阶段、等级和预计成交金额是当前判断商机价值的主要依据。
+                - 如果联系人、预算、决策链或下次跟进时间缺失，后续推进容易停留在意向层面。
+                - 若客户长期没有有效跟进记录，应优先判断沉默原因，再决定重新激活或阶段性搁置。
+                """.trim());
+        report.setAiNextStep("安排一次结构化跟进，确认客户需求、预算范围、关键联系人、决策时间表和下一步动作。");
+        return report;
+    }
+
+    private String fallbackStageLabel(String stage) {
+        if (StrUtil.isBlank(stage)) {
+            return "未知";
+        }
+        return STAGE_LABEL_MAP.getOrDefault(stage, stage);
+    }
+
+    private String formatFallbackAmount(BigDecimal amount) {
+        if (amount == null) {
+            return "未填写";
+        }
+        return amount.stripTrailingZeros().toPlainString();
+    }
+
+    private String serializeFallbackCustomerAiReport(CustomerAiReportVO report) {
+        try {
+            return objectMapper.writeValueAsString(report);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private void updateCustomerAiReportResult(Customer customer, Date expectedRequestedAt) {

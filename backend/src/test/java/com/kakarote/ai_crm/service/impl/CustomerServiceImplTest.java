@@ -7,6 +7,7 @@ import com.kakarote.ai_crm.entity.BO.CustomerResolvedFieldFilterBO;
 import com.kakarote.ai_crm.entity.PO.Contact;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.VO.CustomFieldVO;
+import com.kakarote.ai_crm.entity.VO.CustomerAiReportVO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiSearchParseVO;
 import com.kakarote.ai_crm.entity.VO.CustomerAiSearchQueryVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
@@ -34,6 +35,28 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class CustomerServiceImplTest {
+
+    @Test
+    void generateAiReportReturnsFallbackReportWhenAiUnavailable() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+        Customer customer = new Customer();
+        customer.setCustomerId(100L);
+        customer.setCompanyName("悟空科技");
+        customer.setIndustry("制造业");
+        customer.setStage("proposal");
+        customer.setLevel("A");
+        customer.setQuotation(new BigDecimal("800000"));
+        customer.setStatus(1);
+
+        CustomerAiReportVO report = ReflectionTestUtils.invokeMethod(service, "buildFallbackCustomerAiReport", customer);
+
+        assertNotNull(report);
+        assertEquals(100L, report.getCustomerId());
+        assertNotEquals("pending", report.getAiStatusDetection());
+        assertFalse(report.getAiInsight().startsWith("No AI analysis"));
+        assertNotNull(report.getAiDeepInsight());
+        assertNotNull(report.getAiNextStep());
+    }
 
     @Test
     void updateCustomerFieldUpdatesPrimaryContactPhone() {
