@@ -2,9 +2,9 @@
 > 智能对话式客户关系管理系统 / Intelligent Conversational Customer Relationship Management System
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![GitHub Stars](https://img.shields.io/badge/GitHub-Stars-181717.svg?logo=github)](https://github.com/WuKongOpenSource/AI_CRM/stargazers)
-[![GitHub Release](https://img.shields.io/badge/Release-20260610-blue.svg)](https://github.com/WuKongOpenSource/AI_CRM/releases)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/WuKongOpenSource/AI_CRM/pulls)
+
+[GitHub Stars](https://github.com/WuKongOpenSource/AI_CRM/stargazers) · [Release 20260610](https://github.com/WuKongOpenSource/AI_CRM/releases)
 
 **快速导航** | **Quick Nav:** [🇨🇳 中文](#-中文版--chinese) | [🇺🇸 English](#-english-version--英文版)
 
