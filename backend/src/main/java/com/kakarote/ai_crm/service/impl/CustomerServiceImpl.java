@@ -8,6 +8,7 @@ import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -33,8 +34,11 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MimeType;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,6 +50,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.Executor;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -94,6 +99,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Autowired
     private CustomerLogoService customerLogoService;
 
+    @Autowired
+    @Qualifier("customerAiAnalysisExecutor")
+    private Executor customerAiAnalysisExecutor;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String CUSTOMER_TABLE_NAME = "crm_customer";
@@ -108,6 +117,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     private static final String EMPTY_MODE_JSON_ARRAY = "jsonArray";
     private static final Pattern SAFE_SQL_COLUMN_PATTERN = Pattern.compile("^[a-z][a-z0-9_]*$");
     private static final Map<String, CustomerFilterFieldDefinition> CUSTOMER_SYSTEM_FILTER_FIELDS = buildCustomerSystemFilterFields();
+    private static final String AI_ANALYSIS_STATUS_PENDING = "pending";
+    private static final String AI_ANALYSIS_STATUS_RUNNING = "running";
+    private static final String AI_ANALYSIS_STATUS_SUCCESS = "success";
+    private static final String AI_ANALYSIS_STATUS_FAILED = "failed";
 
     private record CustomerFilterFieldDefinition(
             String fieldName,
@@ -256,6 +269,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Customer customer = BeanUtil.copyProperties(customerAddBO, Customer.class);
         customer.setOwnerId(UserUtil.getUserId());
         customer.setStatus(1);
+        customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
+        customer.setAiAnalysisRequestedAt(new Date());
         if (StrUtil.isEmpty(customer.getStage())) {
             customer.setStage("lead");
         }
@@ -285,6 +300,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         populateCustomerLogoQuietly(customer.getCustomerId());
+        refreshCustomerActivity(customer.getCustomerId());
         return customer.getCustomerId();
     }
 
@@ -301,6 +317,8 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (updateUserId != null) {
             customer.setUpdateUserId(updateUserId);
         }
+        customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_PENDING);
+        customer.setAiAnalysisRequestedAt(customer.getUpdateTime());
         updateById(customer);
 
         // 更新自定义字段
@@ -308,6 +326,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             customFieldService.updateCustomFieldValues("customer", customerUpdateBO.getCustomerId(), customerUpdateBO.getCustomFields());
         }
         populateCustomerLogoQuietly(customerUpdateBO.getCustomerId());
+        refreshCustomerActivity(customerUpdateBO.getCustomerId());
     }
 
     @Override
@@ -323,6 +342,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         Object value = fieldUpdateBO.getValue();
         if (FIELD_SOURCE_CUSTOM.equals(fieldSource) || !CUSTOMER_SYSTEM_FILTER_FIELDS.containsKey(fieldName)) {
             customFieldService.updateCustomFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, value);
+            refreshCustomerActivity(fieldUpdateBO.getCustomerId());
             return getCustomerDetail(fieldUpdateBO.getCustomerId());
         }
 
@@ -1700,9 +1720,17 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (customer == null || !Objects.equals(customer.getStatus(), 1)) {
             return;
         }
+        Date analysisRequestedAt = new Date();
+        LambdaUpdateWrapper<Customer> updateWrapper = new LambdaUpdateWrapper<Customer>()
+                .eq(Customer::getCustomerId, customerId)
+                .set(Customer::getAiAnalysisStatus, AI_ANALYSIS_STATUS_PENDING)
+                .set(Customer::getAiAnalysisRequestedAt, analysisRequestedAt)
+                .set(Customer::getUpdateTime, analysisRequestedAt);
+        baseMapper.update(null, updateWrapper);
         globalSearchIndexService.refreshCustomerIndex(customerId);
         globalSearchIndexService.refreshCustomerRelatedIndexes(customerId);
         taskService.refreshValuePriorityByCustomerId(customerId);
+        scheduleCustomerAiAnalysis(customerId, analysisRequestedAt);
     }
 
     @Override
@@ -1865,6 +1893,19 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
         }
 
+        Date analysisRequestedAt = new Date();
+        updateCustomerAiAnalysisState(customerId, null, AI_ANALYSIS_STATUS_RUNNING, analysisRequestedAt);
+        return generateAiReportInternal(customerId, analysisRequestedAt, true);
+    }
+
+    private CustomerAiReportVO generateAiReportInternal(Long customerId,
+                                                        Date expectedRequestedAt,
+                                                        boolean persistCompletedStatus) {
+        Customer customer = getById(customerId);
+        if (customer == null || Objects.equals(customer.getStatus(), 0)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "客户不存在");
+        }
+
         CustomerAiReportVO report = new CustomerAiReportVO();
         report.setCustomerId(customerId);
         report.setAiStatusDetection(StrUtil.blankToDefault(customer.getAiStatusDetection(), "pending"));
@@ -1920,16 +1961,92 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             customer.setAiStatusDetection(report.getAiStatusDetection());
             customer.setAiInsight(report.getAiInsight());
             customer.setAiParseSnapshot(json);
-            customer.setAiAnalysisStatus("completed");
-            customer.setAiAnalysisRequestedAt(new Date());
-            updateById(customer);
+            if (persistCompletedStatus) {
+                customer.setAiAnalysisStatus(AI_ANALYSIS_STATUS_SUCCESS);
+            }
+            customer.setAiAnalysisRequestedAt(expectedRequestedAt == null ? new Date() : expectedRequestedAt);
+            updateCustomerAiReportResult(customer, expectedRequestedAt);
         } catch (Exception e) {
             log.warn("Customer AI report generation failed, customerId={}, error={}", customerId, e.getMessage());
-            customer.setAiAnalysisStatus("failed");
-            customer.setAiAnalysisRequestedAt(new Date());
-            updateById(customer);
+            updateCustomerAiAnalysisState(customerId, expectedRequestedAt, AI_ANALYSIS_STATUS_FAILED, null);
         }
         return report;
+    }
+
+    private void updateCustomerAiReportResult(Customer customer, Date expectedRequestedAt) {
+        LambdaUpdateWrapper<Customer> updateWrapper = new LambdaUpdateWrapper<Customer>()
+                .eq(Customer::getCustomerId, customer.getCustomerId())
+                .set(Customer::getAiStatusDetection, StrUtil.nullToEmpty(customer.getAiStatusDetection()))
+                .set(Customer::getAiInsight, StrUtil.nullToEmpty(customer.getAiInsight()))
+                .set(Customer::getAiParseSnapshot, customer.getAiParseSnapshot())
+                .set(Customer::getAiAnalysisStatus, customer.getAiAnalysisStatus())
+                .set(Customer::getAiAnalysisRequestedAt, customer.getAiAnalysisRequestedAt());
+        if (expectedRequestedAt != null) {
+            updateWrapper.eq(Customer::getAiAnalysisRequestedAt, expectedRequestedAt);
+        }
+        int updated = baseMapper.update(null, updateWrapper);
+        if (updated <= 0) {
+            log.info("Skip stale customer AI analysis result, customerId={}", customer.getCustomerId());
+            return;
+        }
+        globalSearchIndexService.refreshCustomerIndex(customer.getCustomerId());
+        taskService.refreshValuePriorityByCustomerId(customer.getCustomerId());
+    }
+
+    private void scheduleCustomerAiAnalysis(Long customerId, Date analysisRequestedAt) {
+        if (customerId == null || analysisRequestedAt == null) {
+            return;
+        }
+        Runnable triggerTask = () -> {
+            try {
+                customerAiAnalysisExecutor.execute(() -> runCustomerAiAnalysisAsync(customerId, analysisRequestedAt));
+            } catch (Exception exception) {
+                log.error("Dispatch customer AI analysis failed, customerId={}", customerId, exception);
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    triggerTask.run();
+                }
+            });
+            return;
+        }
+
+        triggerTask.run();
+    }
+
+    private void runCustomerAiAnalysisAsync(Long customerId, Date analysisRequestedAt) {
+        try {
+            if (!updateCustomerAiAnalysisState(customerId, analysisRequestedAt, AI_ANALYSIS_STATUS_RUNNING, null)) {
+                log.info("Skip stale customer AI analysis before execution, customerId={}", customerId);
+                return;
+            }
+            generateAiReportInternal(customerId, analysisRequestedAt, true);
+        } catch (Exception exception) {
+            updateCustomerAiAnalysisState(customerId, analysisRequestedAt, AI_ANALYSIS_STATUS_FAILED, null);
+            log.error("Auto generate customer AI report failed, customerId={}", customerId, exception);
+        }
+    }
+
+    private boolean updateCustomerAiAnalysisState(Long customerId,
+                                                  Date expectedRequestedAt,
+                                                  String aiAnalysisStatus,
+                                                  Date nextRequestedAt) {
+        LambdaUpdateWrapper<Customer> updateWrapper = new LambdaUpdateWrapper<Customer>()
+                .eq(Customer::getCustomerId, customerId);
+        if (expectedRequestedAt != null) {
+            updateWrapper.eq(Customer::getAiAnalysisRequestedAt, expectedRequestedAt);
+        }
+        if (StrUtil.isNotBlank(aiAnalysisStatus)) {
+            updateWrapper.set(Customer::getAiAnalysisStatus, aiAnalysisStatus);
+        }
+        if (nextRequestedAt != null) {
+            updateWrapper.set(Customer::getAiAnalysisRequestedAt, nextRequestedAt);
+        }
+        return baseMapper.update(null, updateWrapper) > 0;
     }
 
     @Override
