@@ -468,7 +468,7 @@ A: You can visit the project’s [Community Forum](https://bbs.72crm.com) to ask
 <div align="center">
 
 ## 🌟 项目动态 / Project Updates
-**最新 / Latest**: 开源版 v1.0.0 已正式发布！/ Open-source v1.0.0 has been officially released!
+**最新 / Latest**: 社区开源版 v1.0.0 已正式发布！/ Community open-source v1.0.0 has been officially released!
 
 **如果 AI CRM 对你有帮助，请给我们一个 ⭐️ Star！这是对我们开源工作的最大鼓励。**<br>
 **If AI CRM helps you, please give us a ⭐️ Star! It's the greatest encouragement for our open-source work.**
