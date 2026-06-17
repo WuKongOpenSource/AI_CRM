@@ -93,6 +93,7 @@ export function addUser(data: {
  */
 export function updateUserInfo(data: {
   userId: number | string
+  img?: string
   realname?: string
   mobile?: string
   email?: string
