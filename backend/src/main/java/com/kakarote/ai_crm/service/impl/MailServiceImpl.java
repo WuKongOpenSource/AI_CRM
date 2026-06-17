@@ -1195,8 +1195,8 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 syncImapMessages(account, credentials, syncLog, result);
             } else {
                 List<SyncedMail> messages = switch (account.getProvider()) {
-                    case PROVIDER_GMAIL -> fetchGmailMessages(account, credentials);
-                    case PROVIDER_OUTLOOK -> fetchGraphMessages(account, credentials);
+                    case PROVIDER_GMAIL -> fetchGmailMessages(account, credentials, syncLog);
+                    case PROVIDER_OUTLOOK -> fetchGraphMessages(account, credentials, syncLog);
                     default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的邮箱服务商");
                 };
                 processFetchedMessages(account, syncLog, result, messages);
@@ -1612,10 +1612,13 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
         );
     }
 
-    private List<SyncedMail> fetchGmailMessages(MailAccount account, Map<String, Object> credentials) throws Exception {
+    private List<SyncedMail> fetchGmailMessages(MailAccount account, Map<String, Object> credentials,
+                                                MailSyncLog syncLog) throws Exception {
+        logSyncStage(syncLog, account, "gmail.token", "Refreshing or reusing Gmail access token");
         String accessToken = refreshOAuthIfNeeded(account, credentials);
         List<String> folders = normalizeFolders(splitFolders(account.getFolders()), DEFAULT_GMAIL_FOLDERS);
         List<SyncedMail> messages = new ArrayList<>();
+        logSyncStage(syncLog, account, "gmail.prepare", "Gmail labels=" + folders);
         for (String folder : folders) {
             String label = "SENT".equalsIgnoreCase(folder) ? "SENT" : "INBOX";
             String url = UriComponentsBuilder.fromUriString("https://gmail.googleapis.com/gmail/v1/users/me/messages")
@@ -1624,16 +1627,29 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .queryParam("q", "newer_than:" + resolveSyncDays(account.getSyncDays()) + "d")
                     .build()
                     .toUriString();
+            logSyncStage(syncLog, account, "gmail.label.list", "Listing Gmail label=" + label);
             JsonNode listNode = getJson(url, accessToken);
             JsonNode messageNodes = listNode.path("messages");
             if (!messageNodes.isArray()) {
+                logSyncStage(syncLog, account, "gmail.label.empty", "No Gmail messages for label=" + label);
                 continue;
             }
+            logSyncStage(syncLog, account, "gmail.label.list.done",
+                    "Label=" + label + ", candidates=" + messageNodes.size());
+            int fetchedCount = 0;
             for (JsonNode messageNode : messageNodes) {
                 String messageId = messageNode.path("id").asText();
+                fetchedCount++;
+                if (fetchedCount == 1 || fetchedCount % IMAP_FETCH_BATCH_SIZE == 0 || fetchedCount == messageNodes.size()) {
+                    logSyncStage(syncLog, account, "gmail.message.fetch",
+                            "Fetching Gmail message label=" + label + ", index=" + fetchedCount + "/" + messageNodes.size()
+                                    + ", messageId=" + messageId);
+                }
                 JsonNode detail = getJson("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId + "?format=raw", accessToken);
                 String raw = detail.path("raw").asText();
                 if (StrUtil.isBlank(raw)) {
+                    logSyncStage(syncLog, account, "gmail.message.skip",
+                            "Gmail message has empty raw body, messageId=" + messageId);
                     continue;
                 }
                 byte[] rawBytes = Base64.getUrlDecoder().decode(raw);
@@ -1664,14 +1680,20 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     upsertCursor(account, label, "gmail_history", historyId, null, historyId, null);
                 }
             }
+            logSyncStage(syncLog, account, "gmail.label.done",
+                    "Label=" + label + " done, fetched=" + fetchedCount + ", totalFetched=" + messages.size());
         }
+        logSyncStage(syncLog, account, "gmail.done", "Gmail fetch done, messages=" + messages.size());
         return messages;
     }
 
-    private List<SyncedMail> fetchGraphMessages(MailAccount account, Map<String, Object> credentials) throws Exception {
+    private List<SyncedMail> fetchGraphMessages(MailAccount account, Map<String, Object> credentials,
+                                                MailSyncLog syncLog) throws Exception {
+        logSyncStage(syncLog, account, "graph.token", "Refreshing or reusing Graph access token");
         String accessToken = refreshOAuthIfNeeded(account, credentials);
         List<String> folders = normalizeFolders(splitFolders(account.getFolders()), DEFAULT_GRAPH_FOLDERS);
         List<SyncedMail> messages = new ArrayList<>();
+        logSyncStage(syncLog, account, "graph.prepare", "Graph folders=" + folders);
         for (String folder : folders) {
             String url = UriComponentsBuilder.fromUriString("https://graph.microsoft.com/v1.0/me/mailFolders/" + folder + "/messages")
                     .queryParam("$top", Math.min(resolveSyncLimit(account.getSyncLimit()), 100))
@@ -1679,16 +1701,27 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                     .queryParam("$select", "id,internetMessageId,conversationId,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,body,hasAttachments")
                     .build()
                     .toUriString();
+            logSyncStage(syncLog, account, "graph.folder.list", "Listing Graph folder=" + folder);
             JsonNode root = getJson(url, accessToken);
             JsonNode values = root.path("value");
             if (!values.isArray()) {
+                logSyncStage(syncLog, account, "graph.folder.empty", "No Graph messages for folder=" + folder);
                 continue;
             }
+            logSyncStage(syncLog, account, "graph.folder.list.done",
+                    "Folder=" + folder + ", candidates=" + values.size());
+            int fetchedCount = 0;
             for (JsonNode node : values) {
                 String bodyContent = node.path("body").path("content").asText(null);
                 String bodyType = node.path("body").path("contentType").asText("");
                 String bodyText = "html".equalsIgnoreCase(bodyType) ? htmlToText(bodyContent) : bodyContent;
                 String messageId = node.path("id").asText();
+                fetchedCount++;
+                if (fetchedCount == 1 || fetchedCount % IMAP_FETCH_BATCH_SIZE == 0 || fetchedCount == values.size()) {
+                    logSyncStage(syncLog, account, "graph.message.fetch",
+                            "Fetching Graph message folder=" + folder + ", index=" + fetchedCount + "/" + values.size()
+                                    + ", messageId=" + messageId);
+                }
                 messages.add(new SyncedMail(
                         messageId,
                         node.path("internetMessageId").asText(null),
@@ -1711,7 +1744,10 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
             if (nextLink != null) {
                 upsertCursor(account, folder, "graph_delta", nextLink, null, null, nextLink);
             }
+            logSyncStage(syncLog, account, "graph.folder.done",
+                    "Folder=" + folder + " done, fetched=" + fetchedCount + ", totalFetched=" + messages.size());
         }
+        logSyncStage(syncLog, account, "graph.done", "Graph fetch done, messages=" + messages.size());
         return messages;
     }
 

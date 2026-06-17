@@ -19,6 +19,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,6 +96,22 @@ class MailServiceImplTest {
         assertThatThrownBy(() -> service.bindImapAccount(bindBO))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("邮箱凭据加密密钥未配置");
+    }
+
+    @Test
+    void oauthFetchersShouldReceiveSyncLogForStageTracing() throws Exception {
+        assertThat(MailServiceImpl.class.getDeclaredMethod(
+                "fetchGmailMessages",
+                MailAccount.class,
+                Map.class,
+                MailSyncLog.class
+        )).isNotNull();
+        assertThat(MailServiceImpl.class.getDeclaredMethod(
+                "fetchGraphMessages",
+                MailAccount.class,
+                Map.class,
+                MailSyncLog.class
+        )).isNotNull();
     }
 
     private static void bindLoginUser(Long userId) {

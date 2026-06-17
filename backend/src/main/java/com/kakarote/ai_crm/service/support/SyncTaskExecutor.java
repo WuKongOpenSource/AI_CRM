@@ -31,7 +31,11 @@ public class SyncTaskExecutor {
     }
 
     public Future<?> submit(String taskName, Runnable task) {
-        return executor.submit(wrap(taskName, currentLoginUser(), task));
+        return submit(taskName, currentLoginUser(), task);
+    }
+
+    public Future<?> submit(String taskName, LoginUser loginUser, Runnable task) {
+        return executor.submit(wrap(taskName, loginUser, task));
     }
 
     @PreDestroy
