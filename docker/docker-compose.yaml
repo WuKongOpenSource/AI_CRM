@@ -217,6 +217,9 @@ services:
       - LC_ALL=zh_CN.UTF-8
       - HOST_IP=${HOST_IP}
       - BASE_PATH=${CRM_BASE_PATH:-/}
+      - MAIL_CREDENTIAL_ENCRYPTION_KEY=${MAIL_CREDENTIAL_ENCRYPTION_KEY:-aicrm-single-mail-key-change-me}
+      - MAIL_PROXY_ENABLED=${MAIL_PROXY_ENABLED:-false}
+      - MAIL_PROXY_URL=${MAIL_PROXY_URL:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/"]
       interval: 30s

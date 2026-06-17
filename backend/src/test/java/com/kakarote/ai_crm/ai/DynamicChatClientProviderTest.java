@@ -1,7 +1,21 @@
 package com.kakarote.ai_crm.ai;
 
+import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
+import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
+import com.kakarote.ai_crm.ai.tools.ContactTools;
+import com.kakarote.ai_crm.ai.tools.CrmNoopTools;
+import com.kakarote.ai_crm.ai.tools.CustomerTools;
+import com.kakarote.ai_crm.ai.tools.FollowupTools;
+import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
+import com.kakarote.ai_crm.ai.tools.MailTools;
+import com.kakarote.ai_crm.ai.tools.ProductTools;
+import com.kakarote.ai_crm.ai.tools.ProjectTools;
+import com.kakarote.ai_crm.ai.tools.RelationTools;
+import com.kakarote.ai_crm.ai.tools.ScheduleTools;
+import com.kakarote.ai_crm.ai.tools.TaskTools;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 
@@ -102,6 +116,49 @@ class DynamicChatClientProviderTest {
                 false, defaultTools, "openai", "https://api.openai.com")).isFalse();
         assertThat(provider.shouldEnableParallelToolCalls(
                 true, defaultTools, "deepseek", "https://api.deepseek.com")).isFalse();
+    }
+
+    @Test
+    void resolveDefaultToolsFiltersToolsByChatApplication() {
+        CustomerTools customerTools = new CustomerTools();
+        ContactTools contactTools = new ContactTools();
+        FollowupTools followupTools = new FollowupTools();
+        TaskTools taskTools = new TaskTools();
+        ScheduleTools scheduleTools = new ScheduleTools();
+        MailTools mailTools = new MailTools();
+        ProjectTools projectTools = new ProjectTools();
+        ProductTools productTools = new ProductTools();
+        RelationTools relationTools = new RelationTools();
+        KnowledgeTools knowledgeTools = new KnowledgeTools();
+        CrmNoopTools crmNoopTools = new CrmNoopTools();
+
+        ReflectionTestUtils.setField(provider, "chatApplicationRegistry", new ChatApplicationRegistry());
+        ReflectionTestUtils.setField(provider, "customerTools", customerTools);
+        ReflectionTestUtils.setField(provider, "contactTools", contactTools);
+        ReflectionTestUtils.setField(provider, "followupTools", followupTools);
+        ReflectionTestUtils.setField(provider, "taskTools", taskTools);
+        ReflectionTestUtils.setField(provider, "scheduleTools", scheduleTools);
+        ReflectionTestUtils.setField(provider, "mailTools", mailTools);
+        ReflectionTestUtils.setField(provider, "projectTools", projectTools);
+        ReflectionTestUtils.setField(provider, "productTools", productTools);
+        ReflectionTestUtils.setField(provider, "relationTools", relationTools);
+        ReflectionTestUtils.setField(provider, "knowledgeTools", knowledgeTools);
+        ReflectionTestUtils.setField(provider, "crmNoopTools", crmNoopTools);
+
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.GENERAL)).isEmpty();
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.CRM))
+                .containsExactly(customerTools, contactTools, followupTools, taskTools,
+                        scheduleTools, mailTools, knowledgeTools, crmNoopTools);
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.PRODUCT))
+                .containsExactly(productTools, knowledgeTools);
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.PROJECT))
+                .containsExactly(projectTools, knowledgeTools);
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.RELATION))
+                .containsExactly(relationTools, followupTools, taskTools, scheduleTools, knowledgeTools);
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.ADDRESS_BOOK))
+                .containsExactly(taskTools, scheduleTools, knowledgeTools);
+        assertThat(provider.resolveDefaultTools(ChatApplicationCodes.KNOWLEDGE))
+                .containsExactly(knowledgeTools);
     }
 
     @Test

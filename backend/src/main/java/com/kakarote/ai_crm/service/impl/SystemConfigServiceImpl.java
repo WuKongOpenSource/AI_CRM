@@ -393,7 +393,7 @@ public class SystemConfigServiceImpl extends ServiceImpl<SystemConfigMapper, Sys
         vo.setModelHint(descriptor.getModelHint());
         vo.setExtraHeadersHint(descriptor.getExtraHeadersHint());
         vo.setAvailableProviders(buildProviderOptions(
-                detailView ? savedProviderConfigs : Map.of(),
+                savedProviderConfigs,
                 detailView && includeSensitiveExtraHeaders,
                 selectedSavedProvider != null ? selectedSavedProvider.providerCode() : null
         ));

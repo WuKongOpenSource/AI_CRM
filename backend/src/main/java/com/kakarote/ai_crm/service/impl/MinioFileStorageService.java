@@ -161,7 +161,7 @@ public class MinioFileStorageService implements FileStorageService {
         String baseUrl = StrUtil.isNotBlank(minioConfig.getPublicEndpoint())
                 ? minioConfig.getPublicEndpoint()
                 : minioConfig.getEndpoint();
-        return baseUrl + "/" + minioConfig.getBucket() + "/" + path;
+        return joinEndpointAndPath(baseUrl, minioConfig.getBucket() + "/" + path);
     }
 
     /**
@@ -256,6 +256,31 @@ public class MinioFileStorageService implements FileStorageService {
         if (StrUtil.isBlank(publicEndpoint)) {
             return internalUrl;
         }
-        return internalUrl.replace(minioConfig.getEndpoint(), publicEndpoint);
+        String internalEndpoint = stripTrailingSlash(minioConfig.getEndpoint());
+        if (StrUtil.isBlank(internalEndpoint) || !internalUrl.startsWith(internalEndpoint)) {
+            return internalUrl;
+        }
+        String normalizedPublicEndpoint = stripTrailingSlash(publicEndpoint);
+        return normalizedPublicEndpoint + internalUrl.substring(internalEndpoint.length());
+    }
+
+    private String joinEndpointAndPath(String endpoint, String path) {
+        return stripTrailingSlash(endpoint) + "/" + stripLeadingSlash(path);
+    }
+
+    private String stripTrailingSlash(String value) {
+        String normalized = StrUtil.trimToEmpty(value);
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private String stripLeadingSlash(String value) {
+        String normalized = StrUtil.trimToEmpty(value);
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized;
     }
 }

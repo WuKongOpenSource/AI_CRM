@@ -19,6 +19,7 @@ class CustomFieldServiceImplTest {
 
         CustomField unitField = service.field("unit");
         assertThat(unitField.getFieldType()).isEqualTo("select");
+        assertThat(unitField.getFieldSource()).isEqualTo("system");
         assertThat(unitField.getPlaceholder()).isEqualTo("Select unit");
         assertThat(unitField.getOptions()).contains("\"value\":\"piece\"");
         assertThat(service.updateCount).isEqualTo(1);
@@ -35,6 +36,7 @@ class CustomFieldServiceImplTest {
         field.setColumnType("VARCHAR(50)");
         field.setPlaceholder("Input unit");
         field.setOptions(null);
+        field.setFieldSource("custom");
         field.setStatus(1);
         return field;
     }

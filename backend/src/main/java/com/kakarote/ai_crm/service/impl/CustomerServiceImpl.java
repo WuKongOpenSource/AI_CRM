@@ -91,6 +91,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Autowired
     private ITaskService taskService;
 
+    @Autowired
+    private CustomerLogoService customerLogoService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String CUSTOMER_TABLE_NAME = "crm_customer";
@@ -280,6 +283,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             customFieldService.updateCustomFieldValues("customer", customer.getCustomerId(), customerAddBO.getCustomFields());
         }
 
+        populateCustomerLogoQuietly(customer.getCustomerId());
         return customer.getCustomerId();
     }
 
@@ -302,6 +306,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (customerUpdateBO.getCustomFields() != null && !customerUpdateBO.getCustomFields().isEmpty()) {
             customFieldService.updateCustomFieldValues("customer", customerUpdateBO.getCustomerId(), customerUpdateBO.getCustomFields());
         }
+        populateCustomerLogoQuietly(customerUpdateBO.getCustomerId());
     }
 
     @Override
@@ -343,6 +348,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             customer.setUpdateUserId(updateUserId);
         }
         updateById(customer);
+        if ("website".equals(fieldName)) {
+            populateCustomerLogoQuietly(fieldUpdateBO.getCustomerId());
+        }
         refreshCustomerActivity(fieldUpdateBO.getCustomerId());
         return getCustomerDetail(fieldUpdateBO.getCustomerId());
     }
@@ -2841,5 +2849,13 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         vo.setTags(List.of());
         vo.setKeyPoints(List.of());
         return vo;
+    }
+
+    private void populateCustomerLogoQuietly(Long customerId) {
+        try {
+            customerLogoService.populateCustomerLogo(customerId, null);
+        } catch (Exception e) {
+            log.warn("Auto populate customer logo failed: customerId={}, error={}", customerId, e.getMessage());
+        }
     }
 }

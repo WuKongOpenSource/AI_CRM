@@ -4,6 +4,9 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kakarote.ai_crm.ai.app.ChatApplicationCodes;
+import com.kakarote.ai_crm.ai.app.ChatApplicationDefinition;
+import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.provider.AiProviderDescriptor;
 import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
@@ -35,6 +38,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +70,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private SystemConfigMapper systemConfigMapper;
+
+    @Autowired
+    private ChatApplicationRegistry chatApplicationRegistry;
 
     @Autowired
     private CustomerTools customerTools;
@@ -138,6 +145,16 @@ public class DynamicChatClientProvider {
         }
         AiRuntimeConfig runtimeConfig = resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
         return createChatClient(runtimeConfig);
+    }
+
+    public ChatClient getChatClient(String providerCode, String modelName, String appCode) {
+        if (StrUtil.isBlank(appCode)) {
+            return getChatClient(providerCode, modelName);
+        }
+        AiRuntimeConfig runtimeConfig = StrUtil.isBlank(providerCode) && StrUtil.isBlank(modelName)
+                ? resolveRuntimeConfig(loadAiConfigsFromDB())
+                : resolveRuntimeConfigForSelection(loadAiConfigsFromDB(), providerCode, modelName);
+        return createChatClient(runtimeConfig, appCode);
     }
 
     public void refreshChatClient() {
@@ -220,11 +237,29 @@ public class DynamicChatClientProvider {
                                        Double temperature, Integer maxTokens,
                                        String extraHeadersJson, AiModelCapabilities capabilities,
                                        boolean registerTools) {
+        return createChatClient(
+                providerCode,
+                baseUrl,
+                apiKey,
+                model,
+                temperature,
+                maxTokens,
+                extraHeadersJson,
+                capabilities,
+                registerTools,
+                null
+        );
+    }
+
+    private ChatClient createChatClient(String providerCode, String baseUrl, String apiKey, String model,
+                                       Double temperature, Integer maxTokens,
+                                       String extraHeadersJson, AiModelCapabilities capabilities,
+                                       boolean registerTools, String appCode) {
         OpenAiApi openAiApi = buildOpenAiApi(providerCode, baseUrl, apiKey, extraHeadersJson);
 
         OpenAiChatOptions options = buildChatOptions(providerCode, baseUrl, model, temperature, maxTokens);
         boolean toolCallingEnabled = registerTools && capabilities != null && capabilities.isSupportsToolCall();
-        Object[] defaultTools = toolCallingEnabled ? resolveDefaultTools() : new Object[0];
+        Object[] defaultTools = toolCallingEnabled ? resolveDefaultTools(appCode) : new Object[0];
         if (shouldEnableParallelToolCalls(toolCallingEnabled, defaultTools, providerCode, baseUrl)) {
             options.setParallelToolCalls(Boolean.TRUE);
         }
@@ -272,6 +307,50 @@ public class DynamicChatClientProvider {
                 contactTools, followupTools, scheduleTools, relationTools, mailTools,
                 crmNoopTools
         }).filter(Objects::nonNull).toArray();
+    }
+
+    Object[] resolveDefaultTools(String appCode) {
+        if (StrUtil.isBlank(appCode)) {
+            return resolveDefaultTools();
+        }
+        ChatApplicationDefinition application = chatApplicationRegistry == null
+                ? null
+                : chatApplicationRegistry.resolve(appCode);
+        if (application == null || ChatApplicationCodes.GENERAL.equals(application.code())) {
+            return new Object[0];
+        }
+
+        List<Object> tools = new ArrayList<>();
+        for (String group : application.toolGroups()) {
+            addToolsForGroup(tools, group);
+        }
+        return tools.toArray();
+    }
+
+    private void addToolsForGroup(List<Object> tools, String group) {
+        switch (StrUtil.nullToEmpty(group)) {
+            case ChatApplicationRegistry.TOOL_GROUP_CUSTOMER -> addTool(tools, customerTools);
+            case ChatApplicationRegistry.TOOL_GROUP_CONTACT -> addTool(tools, contactTools);
+            case ChatApplicationRegistry.TOOL_GROUP_FOLLOW_UP -> addTool(tools, followupTools);
+            case ChatApplicationRegistry.TOOL_GROUP_TASK_SCHEDULE -> {
+                addTool(tools, taskTools);
+                addTool(tools, scheduleTools);
+            }
+            case ChatApplicationRegistry.TOOL_GROUP_MAIL -> addTool(tools, mailTools);
+            case ChatApplicationRegistry.TOOL_GROUP_PRODUCT -> addTool(tools, productTools);
+            case ChatApplicationRegistry.TOOL_GROUP_PROJECT -> addTool(tools, projectTools);
+            case ChatApplicationRegistry.TOOL_GROUP_RELATION -> addTool(tools, relationTools);
+            case ChatApplicationRegistry.TOOL_GROUP_KNOWLEDGE -> addTool(tools, knowledgeTools);
+            case ChatApplicationRegistry.TOOL_GROUP_CRM_NOOP -> addTool(tools, crmNoopTools);
+            default -> {
+            }
+        }
+    }
+
+    private void addTool(List<Object> tools, Object tool) {
+        if (tool != null && !tools.contains(tool)) {
+            tools.add(tool);
+        }
     }
 
     boolean shouldEnableParallelToolCalls(boolean toolCallingEnabled, Object[] defaultTools,
@@ -411,6 +490,10 @@ public class DynamicChatClientProvider {
     }
 
     private ChatClient createChatClient(AiRuntimeConfig runtimeConfig) {
+        return createChatClient(runtimeConfig, null);
+    }
+
+    private ChatClient createChatClient(AiRuntimeConfig runtimeConfig, String appCode) {
         return createChatClient(
                 runtimeConfig.providerCode(),
                 runtimeConfig.apiUrl(),
@@ -420,7 +503,8 @@ public class DynamicChatClientProvider {
                 runtimeConfig.maxTokens(),
                 runtimeConfig.extraHeadersJson(),
                 runtimeConfig.capabilities(),
-                true
+                true,
+                appCode
         );
     }
 

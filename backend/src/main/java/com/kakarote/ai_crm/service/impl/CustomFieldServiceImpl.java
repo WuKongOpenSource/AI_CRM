@@ -113,6 +113,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         field.setFieldName(columnName);
         field.setFieldLabel(bo.getFieldLabel());
         field.setFieldType(bo.getFieldType());
+        field.setFieldSource("custom");
         field.setColumnName(columnName);
         field.setColumnType(poolEntry.getColumnType());
         field.setDefaultValue(bo.getDefaultValue());
@@ -264,6 +265,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
         ));
         for (CustomField field : fields) {
             field.setFieldType("select");
+            field.setFieldSource("system");
             field.setColumnType("VARCHAR(50)");
             field.setPlaceholder("Select unit");
             field.setOptions(unitOptions);

@@ -13,6 +13,7 @@ CREATE TABLE crm_custom_field (
     field_name VARCHAR(100) NOT NULL,
     field_label VARCHAR(100) NOT NULL,
     field_type VARCHAR(50) NOT NULL,
+    field_source VARCHAR(20) NOT NULL DEFAULT 'custom',
     column_name VARCHAR(100) NOT NULL,
     column_type VARCHAR(100) NOT NULL,
     default_value VARCHAR(500) DEFAULT NULL,
@@ -46,6 +47,7 @@ COMMENT ON COLUMN crm_custom_field.entity_type IS '实体类型: customer, conta
 COMMENT ON COLUMN crm_custom_field.field_name IS '字段标识(英文，用于代码)';
 COMMENT ON COLUMN crm_custom_field.field_label IS '字段显示标签(中文)';
 COMMENT ON COLUMN crm_custom_field.field_type IS '字段类型: text, textarea, number, date, datetime, select, multiselect, checkbox';
+COMMENT ON COLUMN crm_custom_field.field_source IS '字段来源: system/custom';
 COMMENT ON COLUMN crm_custom_field.column_name IS '实际数据库列名';
 COMMENT ON COLUMN crm_custom_field.column_type IS '数据库列类型';
 COMMENT ON COLUMN crm_custom_field.is_required IS '是否必填: 0否 1是';

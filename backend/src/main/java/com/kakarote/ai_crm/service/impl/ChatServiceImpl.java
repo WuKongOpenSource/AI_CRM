@@ -541,7 +541,7 @@ public class ChatServiceImpl implements IChatService {
 
         log.debug("开始 AI 对话，启用工具调用...");
 
-        ChatClient chatClient = resolveChatClient(sendBO);
+        ChatClient chatClient = resolveChatClient(sendBO, application);
         aiToolExecutionRecorder.begin(sessionId);
 
         final String finalSystemPrompt = enhancedSystemPrompt;
@@ -705,7 +705,7 @@ public class ChatServiceImpl implements IChatService {
         }
 
         try {
-            ChatClient chatClient = resolveChatClient(sendBO);
+            ChatClient chatClient = resolveChatClient(sendBO, application);
             aiToolExecutionRecorder.begin(sessionId);
 
             final String finalSystemPrompt = enhancedSystemPrompt;
@@ -1161,8 +1161,9 @@ public class ChatServiceImpl implements IChatService {
         return chatClientProvider.getRuntimeConfigSnapshot(sendBO.getModelProvider(), sendBO.getModelName());
     }
 
-    private ChatClient resolveChatClient(ChatSendBO sendBO) {
-        return chatClientProvider.getChatClient(sendBO.getModelProvider(), sendBO.getModelName());
+    private ChatClient resolveChatClient(ChatSendBO sendBO, ChatApplicationDefinition application) {
+        String appCode = application == null ? ChatApplicationCodes.GENERAL : application.code();
+        return chatClientProvider.getChatClient(sendBO.getModelProvider(), sendBO.getModelName(), appCode);
     }
 
     private String resolveAiUnavailableTip(DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig) {

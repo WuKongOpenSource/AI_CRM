@@ -52,6 +52,7 @@ import com.kakarote.ai_crm.service.support.SyncTaskExecutor;
 import com.kakarote.ai_crm.utils.MailMimeParser;
 import com.kakarote.ai_crm.utils.SecretTextCipher;
 import com.kakarote.ai_crm.utils.UserUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.FetchProfile;
 import jakarta.mail.Folder;
 import jakarta.mail.Message;
@@ -71,6 +72,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +85,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -125,6 +130,11 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private static final String ATTACHMENT_SYNC_AUTO = "auto";
     private static final String ATTACHMENT_SYNC_FULL = "full";
     private static final String OAUTH_STATE_PREFIX = "mail:oauth:state:";
+    private static final String MAIL_CREDENTIAL_KEY_REQUIRED_MESSAGE =
+            "邮箱凭据加密密钥未配置，请设置 mail.integration.encryption-key 或 MAIL_CREDENTIAL_ENCRYPTION_KEY（至少16位）";
+    private static final String MAIL_CREDENTIAL_ENCRYPT_FAILED_MESSAGE = "邮箱凭据加密失败，请检查邮箱加密密钥配置";
+    private static final String MAIL_CREDENTIAL_DECRYPT_FAILED_MESSAGE =
+            "邮箱凭据解密失败，请确认邮箱加密密钥与绑定邮箱时使用的密钥一致";
     private static final List<String> DEFAULT_IMAP_FOLDERS = List.of("INBOX", "Sent");
     private static final List<String> DEFAULT_GMAIL_FOLDERS = List.of("INBOX", "SENT");
     private static final List<String> DEFAULT_GRAPH_FOLDERS = List.of("inbox", "sentitems");
@@ -181,6 +191,32 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = new RestTemplate();
     private final ConcurrentHashMap<Long, ReentrantLock> accountSyncLocks = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    void configureRestTemplateProxy() {
+        MailIntegrationProperties.ProxyConfig proxyConfig = properties.getProxy();
+        if (proxyConfig == null || !proxyConfig.isUsable()) {
+            return;
+        }
+        URI proxyUri;
+        try {
+            proxyUri = parseProxyUri(proxyConfig.getUrl());
+        } catch (IllegalArgumentException e) {
+            log.warn("Mail HTTP proxy is ignored because url is invalid: {}", proxyConfig.getUrl());
+            return;
+        }
+        String host = proxyUri.getHost();
+        int port = proxyUri.getPort();
+        if (StrUtil.isBlank(host) || port < 0) {
+            log.warn("Mail HTTP proxy is ignored because url is invalid: {}", proxyConfig.getUrl());
+            return;
+        }
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setProxy(new Proxy(resolveProxyType(proxyUri.getScheme()), new InetSocketAddress(host, port)));
+        restTemplate.setRequestFactory(requestFactory);
+        log.info("Mail HTTP proxy enabled: {}://{}:{}", StrUtil.blankToDefault(proxyUri.getScheme(), "http"), host, port);
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -1762,17 +1798,42 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
     private String encryptCredentials(Map<String, ?> values) {
         try {
             return secretTextCipher.encrypt(objectMapper.writeValueAsString(values));
+        } catch (BusinessException e) {
+            throw e;
+        } catch (IllegalStateException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, resolveCredentialCipherMessage(e, true));
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize mail credentials", e);
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "邮箱凭据序列化失败");
         }
     }
 
     private Map<String, Object> decryptCredentials(MailAccount account) throws Exception {
-        String json = secretTextCipher.decrypt(account.getCredentialJson());
-        if (StrUtil.isBlank(json)) {
-            return new HashMap<>();
+        try {
+            String json = secretTextCipher.decrypt(account.getCredentialJson());
+            if (StrUtil.isBlank(json)) {
+                return new HashMap<>();
+            }
+            return objectMapper.readValue(json, new TypeReference<>() {});
+        } catch (IllegalStateException e) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, resolveCredentialCipherMessage(e, false));
         }
-        return objectMapper.readValue(json, new TypeReference<>() {});
+    }
+
+    private String resolveCredentialCipherMessage(Throwable throwable, boolean encrypting) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (containsIgnoreCase(message, "mail.integration.encryption-key")
+                    || containsIgnoreCase(message, "MAIL_CREDENTIAL_ENCRYPTION_KEY")) {
+                return MAIL_CREDENTIAL_KEY_REQUIRED_MESSAGE;
+            }
+            current = current.getCause();
+        }
+        return encrypting ? MAIL_CREDENTIAL_ENCRYPT_FAILED_MESSAGE : MAIL_CREDENTIAL_DECRYPT_FAILED_MESSAGE;
+    }
+
+    private boolean containsIgnoreCase(String value, String keyword) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(keyword.toLowerCase(Locale.ROOT));
     }
 
     private MailAccountVO toAccountVO(MailAccount account) {
@@ -2110,6 +2171,21 @@ public class MailServiceImpl extends ServiceImpl<MailAccountMapper, MailAccount>
                 || StrUtil.isBlank(oauthProvider.getRedirectUri())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, provider + " OAuth 配置未完成");
         }
+    }
+
+    private URI parseProxyUri(String proxyUrl) {
+        String trimmed = StrUtil.trim(proxyUrl);
+        if (!trimmed.contains("://")) {
+            trimmed = "http://" + trimmed;
+        }
+        return URI.create(trimmed);
+    }
+
+    private Proxy.Type resolveProxyType(String scheme) {
+        if (StrUtil.equalsAnyIgnoreCase(scheme, "socks", "socks5")) {
+            return Proxy.Type.SOCKS;
+        }
+        return Proxy.Type.HTTP;
     }
 
     private String normalizeOAuthProvider(String provider) {

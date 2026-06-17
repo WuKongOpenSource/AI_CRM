@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -132,6 +133,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         baseMapper.queryPageList(page, queryBO);
         fillTaskNames(page.getList());
         hydrateValuePriority(page.getList(), true);
+        attachStatusCounts(page, queryBO);
         return page;
     }
 
@@ -178,7 +180,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
                 .sorted(buildValuePriorityComparator())
                 .collect(Collectors.toList());
 
-        return paginateTasks(rankedTasks, queryBO);
+        BasePage<TaskVO> page = paginateTasks(rankedTasks, queryBO);
+        attachStatusCounts(page, queryBO);
+        return page;
     }
 
     private BasePage<TaskVO> paginateTasks(List<TaskVO> tasks, TaskQueryBO queryBO) {
@@ -202,6 +206,47 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
                 .thenComparing(TaskVO::getValuePriorityScore, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(task -> task.getDueDate() == null ? Long.MAX_VALUE : task.getDueDate().getTime())
                 .thenComparing(task -> task.getCreateTime() == null ? Long.MAX_VALUE : task.getCreateTime().getTime());
+    }
+
+    private void attachStatusCounts(BasePage<TaskVO> page, TaskQueryBO queryBO) {
+        page.setExtraData(Map.of("statusCounts", buildStatusCounts(queryBO)));
+    }
+
+    private Map<String, Long> buildStatusCounts(TaskQueryBO queryBO) {
+        TaskQueryBO countQuery = new TaskQueryBO();
+        BeanUtil.copyProperties(queryBO, countQuery);
+        countQuery.setTaskId(null);
+        countQuery.setStatus(null);
+
+        List<TaskVO> tasks = baseMapper.queryList(countQuery);
+        fillTaskNames(tasks);
+        hydrateValuePriority(tasks, false);
+        if (Boolean.TRUE.equals(queryBO.getHighValueOnly())) {
+            tasks = tasks.stream()
+                    .filter(task -> Boolean.TRUE.equals(task.getHighValue()))
+                    .toList();
+        }
+
+        Date now = new Date();
+        Map<String, Long> counts = new LinkedHashMap<>();
+        counts.put("all", (long) tasks.size());
+        counts.put("PENDING", countStatus(tasks, "PENDING"));
+        counts.put("IN_PROGRESS", countStatus(tasks, "IN_PROGRESS"));
+        counts.put("COMPLETED", countStatus(tasks, "COMPLETED"));
+        counts.put("OVERDUE", tasks.stream().filter(task -> isOverdue(task, now)).count());
+        return counts;
+    }
+
+    private long countStatus(List<TaskVO> tasks, String status) {
+        return tasks.stream()
+                .filter(task -> status.equalsIgnoreCase(StrUtil.blankToDefault(task.getStatus(), "")))
+                .count();
+    }
+
+    private boolean isOverdue(TaskVO task, Date now) {
+        return task.getDueDate() != null
+                && task.getDueDate().before(now)
+                && !"COMPLETED".equalsIgnoreCase(StrUtil.blankToDefault(task.getStatus(), ""));
     }
 
     @Override

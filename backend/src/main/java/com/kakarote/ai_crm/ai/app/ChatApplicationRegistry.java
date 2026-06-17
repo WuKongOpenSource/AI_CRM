@@ -13,7 +13,16 @@ import java.util.Map;
 public class ChatApplicationRegistry {
 
     public static final String TOOL_GROUP_CRM = "crm";
+    public static final String TOOL_GROUP_CUSTOMER = "customer";
+    public static final String TOOL_GROUP_CONTACT = "contact";
+    public static final String TOOL_GROUP_FOLLOW_UP = "followup";
+    public static final String TOOL_GROUP_TASK_SCHEDULE = "task_schedule";
+    public static final String TOOL_GROUP_MAIL = "mail";
+    public static final String TOOL_GROUP_PRODUCT = "product";
+    public static final String TOOL_GROUP_PROJECT = "project";
+    public static final String TOOL_GROUP_RELATION = "relation";
     public static final String TOOL_GROUP_KNOWLEDGE = "knowledge";
+    public static final String TOOL_GROUP_CRM_NOOP = "crm_noop";
 
     private final Map<String, ChatApplicationDefinition> applications = new LinkedHashMap<>();
 
@@ -45,7 +54,9 @@ public class ChatApplicationRegistry {
                 只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
                 """,
                 false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of(TOOL_GROUP_CUSTOMER, TOOL_GROUP_CONTACT, TOOL_GROUP_FOLLOW_UP,
+                        TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_MAIL, TOOL_GROUP_KNOWLEDGE,
+                        TOOL_GROUP_CRM_NOOP),
                 List.of("把今天新增但还没跟进的客户列出来", "找出快丢单的客户", "筛选出高意向客户", "总结本周的销售情况")
         ));
         register(new ChatApplicationDefinition(
@@ -59,7 +70,7 @@ public class ChatApplicationRegistry {
                 新增或修改产品必须调用 ProductTools，并且只有工具结果确认成功后才能回复创建、更新或停用成功。
                 """,
                 false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of(TOOL_GROUP_PRODUCT, TOOL_GROUP_KNOWLEDGE),
                 List.of("列出启用中的产品", "帮我新建一个产品", "更新这个产品的标准价", "停用当前产品")
         ));
         register(new ChatApplicationDefinition(
@@ -74,7 +85,7 @@ public class ChatApplicationRegistry {
                 如果用户只说“任务”但上下文明确是在项目技能中，请先判断是否指项目任务；缺少项目ID或任务ID且无法从上下文确认时，请先询问。
                 """,
                 false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of(TOOL_GROUP_PROJECT, TOOL_GROUP_KNOWLEDGE),
                 List.of("列出进行中的项目", "帮我新建一个项目", "查看这个项目的任务", "给某个项目新增一个任务")
         ));
         register(new ChatApplicationDefinition(
@@ -104,7 +115,7 @@ public class ChatApplicationRegistry {
                 只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
                 """,
                 false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of(TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_KNOWLEDGE),
                 List.of("明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会", "总结这个员工最近的任务和附件")
         ));
         register(new ChatApplicationDefinition(
@@ -121,7 +132,8 @@ public class ChatApplicationRegistry {
                 只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
                 """,
                 false,
-                List.of(TOOL_GROUP_CRM, TOOL_GROUP_KNOWLEDGE),
+                List.of(TOOL_GROUP_RELATION, TOOL_GROUP_FOLLOW_UP,
+                        TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_KNOWLEDGE),
                 List.of("下周三提醒我去拜访他", "记录一下，他对我们的新产品比较感兴趣", "总结这个关系人的任务和附件")
         ));
     }

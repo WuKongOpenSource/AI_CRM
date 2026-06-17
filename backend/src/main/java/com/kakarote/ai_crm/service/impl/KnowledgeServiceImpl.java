@@ -1331,7 +1331,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
             throw e;
         } catch (Exception e) {
             log.error("AI 文档分析失败，返回默认值", e);
-            return buildFallbackAnalyzeResult(knowledge);
+            KnowledgeAiAnalyzeVO fallback = buildFallbackAnalyzeResult(knowledge);
+            persistAnalyzeResult(knowledge, fallback);
+            return fallback;
         }
     }
 

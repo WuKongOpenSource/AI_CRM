@@ -58,10 +58,17 @@ knife4j:
 file:
   upload-path: ./uploads
 
+mail:
+  integration:
+    encryption-key: ${MAIL_CREDENTIAL_ENCRYPTION_KEY:aicrm-single-mail-key-change-me}
+    proxy:
+      enabled: ${MAIL_PROXY_ENABLED:false}
+      url: ${MAIL_PROXY_URL:}
+
 minio:
   enabled: true
   endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
-  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://127.0.0.1:9000/}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:/s3}
   access-key: ${MINIO_ACCESS_KEY:minioadmin}
   secret-key: ${MINIO_SECRET_KEY:minioadmin}
   bucket: ai-crm
@@ -77,6 +84,9 @@ oidc:
   session-cookie: CRM_SESSION
 
 external-auth:
+  proxy:
+    enabled: ${EXTERNAL_AUTH_PROXY_ENABLED:false}
+    url: ${EXTERNAL_AUTH_PROXY_URL:}
   frontend-redirect-uri: ${EXTERNAL_AUTH_FRONTEND_REDIRECT_URI:}
   state-ttl-seconds: 600
   ticket-ttl-seconds: 300
@@ -85,6 +95,12 @@ external-auth:
     client-id: ${EXTERNAL_AUTH_GOOGLE_CLIENT_ID:}
     client-secret: ${EXTERNAL_AUTH_GOOGLE_CLIENT_SECRET:}
     redirect-uri: ${EXTERNAL_AUTH_GOOGLE_REDIRECT_URI:}
+  outlook:
+    enabled: ${EXTERNAL_AUTH_OUTLOOK_ENABLED:false}
+    client-id: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_ID:}
+    client-secret: ${EXTERNAL_AUTH_OUTLOOK_CLIENT_SECRET:}
+    tenant: ${EXTERNAL_AUTH_OUTLOOK_TENANT:common}
+    redirect-uri: ${EXTERNAL_AUTH_OUTLOOK_REDIRECT_URI:}
   wechat:
     enabled: ${EXTERNAL_AUTH_WECHAT_ENABLED:false}
     client-id: ${EXTERNAL_AUTH_WECHAT_CLIENT_ID:}
@@ -92,9 +108,10 @@ external-auth:
     redirect-uri: ${EXTERNAL_AUTH_WECHAT_REDIRECT_URI:}
 
 weknora:
-  enabled: true
-  base-url: http://39.97.38.69/api/v1
+  enabled: ${WEKNORA_ENABLED:true}
+  base-url: ${WEKNORA_BASE_URL:http://frontend/api/v1}
   api-key: ${WEKNORA_API_KEY:}
+  knowledge-base-id: ${WEKNORA_KNOWLEDGE_BASE_ID:}
   init-models:
     chat:
       name: qwen-max

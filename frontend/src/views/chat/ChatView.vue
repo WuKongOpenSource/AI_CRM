@@ -642,7 +642,7 @@
               <!-- Selected Attachments Preview -->
               <div
                 v-if="composerAttachmentPreviewItems.length > 0"
-                class="relative min-w-0"
+                class="wk-chat-attachment-preview-shell relative min-w-0"
               >
                 <div
                   v-if="composerAttachmentShowScrollArrows && composerAttachmentCanScrollLeft"
@@ -783,6 +783,7 @@
                 <div
                   v-if="!isMobile"
                   class="wk-chat-composer relative flex items-center rounded-2xl p-2 transition-all"
+                  :class="{ 'wk-chat-composer--with-attachments': composerAttachmentPreviewItems.length > 0 }"
                 >
                   <input
                     ref="fileInputRef"
@@ -1045,7 +1046,10 @@
                     </button>
                   </div>
                 </div>
-                <div v-else class="wk-mobile-composer-row flex w-full items-end gap-2">
+                <div
+                  v-else
+                  class="wk-mobile-composer-row flex w-full items-end gap-2"
+                >
                   <el-popover
                     v-model:visible="chatUploadMenuVisible"
                     placement="top-start"
@@ -1550,6 +1554,24 @@
       :remaining-slots="Math.max(0, MAX_FILE_COUNT - selectedFiles.length - selectedKnowledgeItems.length)"
       @confirm="handleKnowledgePickerConfirm"
     />
+    <TaskEditDialog
+      v-model="showObjectTaskDialog"
+      :editing-task="null"
+      :default-customer="objectDialogDefaultCustomer"
+      :default-relation="objectDialogDefaultRelation"
+      :default-assignee="objectDialogDefaultAssignee"
+      :refresh-store-after-save="false"
+      @saved="handleObjectRelatedCreated"
+    />
+    <ScheduleFormDialog
+      v-model="showObjectScheduleDialog"
+      :editing-schedule="null"
+      :default-customer="objectDialogDefaultCustomer"
+      :default-relation="objectDialogDefaultRelation"
+      :default-participant-users="objectDialogDefaultParticipantUsers"
+      @created="handleObjectRelatedCreated"
+      @updated="handleObjectRelatedCreated"
+    />
   </div>
 </template>
 
@@ -1573,6 +1595,8 @@ import { getProductDetail } from '@/api/product'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import ChatKnowledgePickerModal from '@/components/chat/ChatKnowledgePickerModal.vue'
 import CustomerBasicInfoDrawer from '@/views/customer/components/CustomerBasicInfoDrawer.vue'
+import ScheduleFormDialog from '@/views/calendar/components/ScheduleFormDialog.vue'
+import TaskEditDialog from '@/views/task/components/TaskEditDialog.vue'
 import CustomerChatInfoPanel from './components/CustomerChatInfoPanel.vue'
 import EmployeeChatInfoPanel from './components/EmployeeChatInfoPanel.vue'
 import MobileChatTopHeader from './components/MobileChatTopHeader.vue'
@@ -1697,6 +1721,8 @@ const newSelectedCustomerTagName = ref('')
 const selectedCustomerTagSubmitting = ref(false)
 const objectPanelLoading = ref(false)
 const objectPanelError = ref('')
+const showObjectTaskDialog = ref(false)
+const showObjectScheduleDialog = ref(false)
 const mobileObjectDetailOpen = ref(false)
 const mobileObjectDetailSheetHeight = ref<number>(MOBILE_OBJECT_DETAIL_SHEET_LEVELS[0])
 const mobileObjectDetailSheetDragging = ref(false)
@@ -1898,6 +1924,49 @@ const currentObjectId = computed(() => {
   if (chatObjectKind.value === 'relation') return String(session.relationId || '')
   if (chatObjectKind.value === 'product') return String(session.productId || '')
   return ''
+})
+const objectDialogDefaultRelation = computed(() => {
+  if (chatObjectKind.value !== 'relation') return null
+  const relation = relationDetail.value?.relation
+  if (!relation?.relationId) return null
+  return {
+    relationId: relation.relationId,
+    name: relation.name || null
+  }
+})
+const objectDialogDefaultCustomer = computed(() => {
+  if (chatObjectKind.value === 'customer' && currentObjectId.value) {
+    return {
+      customerId: currentObjectId.value,
+      companyName: selectedCustomer.value?.companyName || currentChatSession.value?.customerName || null
+    }
+  }
+  if (chatObjectKind.value === 'relation') {
+    const relation = relationDetail.value?.relation
+    const customerId = relation?.customerId || relation?.sourceCustomerId
+    if (!customerId) return null
+    return {
+      customerId,
+      companyName: relation?.customerName || relation?.sourceCustomerName || relation?.company || null
+    }
+  }
+  return null
+})
+const objectDialogDefaultAssignee = computed(() => {
+  if (chatObjectKind.value !== 'employee' || !employeeDetail.value?.userId) return null
+  return {
+    userId: employeeDetail.value.userId,
+    realname: employeeDetail.value.realname || null,
+    username: employeeDetail.value.email || null
+  }
+})
+const objectDialogDefaultParticipantUsers = computed(() => {
+  if (chatObjectKind.value !== 'employee' || !employeeDetail.value?.userId) return []
+  return [{
+    userId: employeeDetail.value.userId,
+    realname: employeeDetail.value.realname || null,
+    username: employeeDetail.value.email || null
+  }]
 })
 const isChatEmpty = computed(() => chatStore.messages.length === 0)
 const isObjectContextChat = computed(() => Boolean(chatObjectKind.value && currentObjectId.value))
@@ -3817,15 +3886,21 @@ function handleMobileObjectEditProduct(product: ProductVO) {
 }
 
 function handleObjectAddTask() {
-  void router.push('/task')
+  showObjectTaskDialog.value = true
 }
 
 function handleObjectAddSchedule() {
-  void router.push('/calendar')
+  showObjectScheduleDialog.value = true
 }
 
 function handleObjectAddAttachment() {
   void router.push('/knowledge')
+}
+
+async function handleObjectRelatedCreated() {
+  if (chatObjectKind.value === 'employee' || chatObjectKind.value === 'relation') {
+    await loadObjectPanelDetail()
+  }
 }
 
 function handleObjectViewTask(task: Task) {
@@ -4129,6 +4204,20 @@ function resolveChatAppIcon(code: string): string {
   box-shadow:
     0 20px 70px rgb(var(--wk-shadow-color) / 0.08),
     0 2px 8px rgb(var(--wk-shadow-color) / 0.05);
+}
+
+.wk-chat-attachment-preview-shell {
+  border: 1px solid var(--wk-border-subtle);
+  border-bottom: 0;
+  border-radius: 1rem 1rem 0 0;
+  background: var(--wk-bg-surface);
+  padding: 0.75rem 0.75rem 0.25rem;
+  box-shadow: 0 18px 60px rgb(var(--wk-shadow-color) / 0.06);
+}
+
+.wk-chat-composer--with-attachments {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .wk-chat-composer:focus-within {

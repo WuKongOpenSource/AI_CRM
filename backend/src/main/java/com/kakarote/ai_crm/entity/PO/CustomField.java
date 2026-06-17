@@ -50,6 +50,9 @@ public class CustomField implements Serializable {
     @Schema(description = "字段类型: text, textarea, number, date, datetime, select, multiselect, checkbox")
     private String fieldType;
 
+    @Schema(description = "瀛楁鏉ユ簮: system/custom")
+    private String fieldSource;
+
     /**
      * 实际数据库列名
      */

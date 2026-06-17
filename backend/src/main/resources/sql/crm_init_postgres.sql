@@ -153,7 +153,81 @@ CREATE TABLE crm_contact_tag (
 CREATE INDEX idx_contact_tag_contact_id ON crm_contact_tag (contact_id);
 
 -- ============================================
--- 5.1. External relation table (crm_relation)
+-- 5.1. Custom field metadata tables
+-- ============================================
+DROP TABLE IF EXISTS crm_custom_field_sort CASCADE;
+DROP TABLE IF EXISTS crm_custom_field_pool CASCADE;
+DROP TABLE IF EXISTS crm_custom_field CASCADE;
+CREATE TABLE crm_custom_field (
+    field_id BIGINT NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    field_label VARCHAR(100) NOT NULL,
+    field_type VARCHAR(50) NOT NULL,
+    field_source VARCHAR(20) NOT NULL DEFAULT 'custom',
+    column_name VARCHAR(100) NOT NULL,
+    column_type VARCHAR(100) NOT NULL,
+    default_value VARCHAR(500) DEFAULT NULL,
+    placeholder VARCHAR(200) DEFAULT NULL,
+    is_required SMALLINT DEFAULT 0,
+    is_searchable SMALLINT DEFAULT 0,
+    is_show_in_list SMALLINT DEFAULT 1,
+    is_unique SMALLINT DEFAULT 0,
+    options TEXT DEFAULT NULL,
+    validation_rules TEXT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    status SMALLINT DEFAULT 1,
+    create_user_id BIGINT DEFAULT NULL,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (field_id),
+    UNIQUE (entity_type, field_name),
+    UNIQUE (entity_type, column_name)
+);
+
+CREATE INDEX idx_custom_field_entity_type ON crm_custom_field (entity_type);
+CREATE INDEX idx_custom_field_status ON crm_custom_field (status);
+CREATE INDEX idx_custom_field_source ON crm_custom_field (field_source);
+
+CREATE TRIGGER trg_custom_field_update_time
+    BEFORE UPDATE ON crm_custom_field
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+CREATE TABLE crm_custom_field_pool (
+    pool_id BIGINT NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    column_name VARCHAR(100) NOT NULL,
+    column_type VARCHAR(100) NOT NULL,
+    field_type VARCHAR(50) NOT NULL,
+    column_created BOOLEAN NOT NULL DEFAULT FALSE,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (pool_id),
+    UNIQUE (entity_type, column_name)
+);
+
+CREATE INDEX idx_custom_field_pool_entity_type ON crm_custom_field_pool (entity_type, field_type);
+
+CREATE TABLE crm_custom_field_sort (
+    sort_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    field_id BIGINT NOT NULL,
+    sort_order INT DEFAULT 0,
+    is_hidden SMALLINT DEFAULT 0,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (sort_id),
+    UNIQUE (user_id, entity_type, field_id)
+);
+
+CREATE INDEX idx_custom_field_sort_user_entity ON crm_custom_field_sort (user_id, entity_type);
+
+CREATE TRIGGER trg_custom_field_sort_update_time
+    BEFORE UPDATE ON crm_custom_field_sort
+    FOR EACH ROW EXECUTE FUNCTION update_timestamp();
+
+-- ============================================
+-- 5.2. External relation table (crm_relation)
 -- ============================================
 DROP TABLE IF EXISTS crm_relation CASCADE;
 CREATE TABLE crm_relation (
@@ -191,7 +265,7 @@ COMMENT ON TABLE crm_relation IS 'External relation records';
 COMMENT ON COLUMN crm_relation.customer_id IS 'Linked customer ID';
 
 -- ============================================
--- 5.2. Product catalog tables (crm_product, crm_product_category)
+-- 5.3. Product catalog tables (crm_product, crm_product_category)
 -- ============================================
 DROP TABLE IF EXISTS crm_product CASCADE;
 DROP TABLE IF EXISTS crm_product_category CASCADE;
@@ -297,7 +371,7 @@ COMMENT ON TABLE crm_product_category IS 'Product categories';
 COMMENT ON COLUMN crm_product.status IS 'active=enabled, inactive=disabled';
 
 -- ============================================
--- 5.3. Project board tables (crm_project, crm_project_lane, crm_project_task)
+-- 5.4. Project board tables (crm_project, crm_project_lane, crm_project_task)
 -- ============================================
 DROP TABLE IF EXISTS crm_project_task CASCADE;
 DROP TABLE IF EXISTS crm_project_task_schedule CASCADE;
@@ -1360,7 +1434,7 @@ INSERT INTO crm_system_config (config_id, config_key, config_value, config_type,
 (7, 'file_max_size', '52428800', 'file', '文件最大大小(字节)', NOW()),
 (8, 'file_allowed_types', 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,mp3,mp4,jpg,png', 'file', '允许的文件类型', NOW()),
 -- WeKnora 知识库服务配置
-(101, 'weknora_enabled', 'false', 'weknora', 'WeKnora是否启用', NOW()),
+(101, 'weknora_enabled', '', 'weknora', 'WeKnora是否启用（留空时使用运行时配置）', NOW()),
 (102, 'weknora_base_url', '', 'weknora', 'WeKnora API地址', NOW()),
 (103, 'weknora_api_key', '', 'weknora', 'WeKnora API密钥', NOW()),
 (104, 'weknora_knowledge_base_id', '', 'weknora', '默认知识库ID', NOW()),
