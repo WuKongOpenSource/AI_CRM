@@ -5,6 +5,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
 import com.kakarote.ai_crm.common.enums.EmployeeStatusEnum;
@@ -89,43 +90,47 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void addUser(UserAddBO userAddBO) {
-        ManagerUser manageUser = null;
-        //判断用户名是否存在
-        if (StrUtil.isNotEmpty(userAddBO.getUsername())) {
-            Optional<ManagerUser> userOptional = lambdaQuery().eq(ManagerUser::getUsername, userAddBO.getUsername()).oneOpt();
-            if (userOptional.isPresent()) {
-                manageUser = userOptional.get();
-            }
+        if (userAddBO == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "用户信息不能为空");
         }
-        //用户不存在
-        if (manageUser == null) {
-            if (StrUtil.isNotEmpty(userAddBO.getPassword())){
-                BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
-                String password =bCryptPasswordEncoder.encode(userAddBO.getPassword());
-                userAddBO.setPassword(password);
+        if (StrUtil.isNotEmpty(userAddBO.getUsername())) {
+            String username = StrUtil.trim(userAddBO.getUsername());
+            long duplicateCount = baseMapper.selectCount(new QueryWrapper<ManagerUser>().eq("username", username));
+            if (duplicateCount > 0) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "用户名已存在");
             }
-            manageUser = BeanUtil.copyProperties(userAddBO, ManagerUser.class);
-            if (userAddBO.getStatus() != null) {
-                manageUser.setStatus(userAddBO.getStatus());
-            } else {
-                manageUser.setStatus(1);
-            }
-            manageUser.setEmployeeStatus(EmployeeStatusEnum.normalize(userAddBO.getEmployeeStatus()));
-            manageUser.setCreateTime(new Date());
-            save(manageUser);
-            // 关联角色
-            if (CollUtil.isNotEmpty(userAddBO.getRoleIds())) {
-                Long userId = manageUser.getUserId();
-                List<ManagerUserRole> roles = userAddBO.getRoleIds().stream().map(roleId -> {
-                    ManagerUserRole ur = new ManagerUserRole();
-                    ur.setUserId(userId);
-                    ur.setRoleId(roleId);
-                    ur.setCreateUserId(UserUtil.getUserId());
-                    ur.setCreateTime(LocalDateTime.now());
-                    return ur;
-                }).collect(Collectors.toList());
-                userRoleService.saveBatch(roles, Const.BATCH_SAVE_SIZE);
-            }
+            userAddBO.setUsername(username);
+        }
+        Long parentId = normalizeParentUserId(userAddBO.getParentId());
+        validateParentUser(null, parentId);
+        userAddBO.setParentId(parentId);
+
+        if (StrUtil.isNotEmpty(userAddBO.getPassword())) {
+            BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+            String password = bCryptPasswordEncoder.encode(userAddBO.getPassword());
+            userAddBO.setPassword(password);
+        }
+        ManagerUser manageUser = BeanUtil.copyProperties(userAddBO, ManagerUser.class);
+        if (userAddBO.getStatus() != null) {
+            manageUser.setStatus(userAddBO.getStatus());
+        } else {
+            manageUser.setStatus(1);
+        }
+        manageUser.setEmployeeStatus(EmployeeStatusEnum.normalize(userAddBO.getEmployeeStatus()));
+        manageUser.setCreateTime(new Date());
+        save(manageUser);
+        // 关联角色
+        if (CollUtil.isNotEmpty(userAddBO.getRoleIds())) {
+            Long userId = manageUser.getUserId();
+            List<ManagerUserRole> roles = userAddBO.getRoleIds().stream().map(roleId -> {
+                ManagerUserRole ur = new ManagerUserRole();
+                ur.setUserId(userId);
+                ur.setRoleId(roleId);
+                ur.setCreateUserId(UserUtil.getUserId());
+                ur.setCreateTime(LocalDateTime.now());
+                return ur;
+            }).collect(Collectors.toList());
+            userRoleService.saveBatch(roles, Const.BATCH_SAVE_SIZE);
         }
     }
 
@@ -437,9 +442,7 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
         }
 
         Map<Long, Long> parentByUserId = new HashMap<>();
-        lambdaQuery()
-                .select(ManagerUser::getUserId, ManagerUser::getParentId)
-                .list()
+        baseMapper.selectList(new QueryWrapper<ManagerUser>().select("user_id", "parent_id"))
                 .forEach(user -> {
                     if (user.getUserId() != null) {
                         parentByUserId.put(user.getUserId(), normalizeParentUserId(user.getParentId()));

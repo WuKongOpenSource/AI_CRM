@@ -482,7 +482,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             if (val == null || "".equals(val)) {
                 continue;
             }
-            val = convertValueForJdbc(field.getFieldType(), val, entry.getKey());
+            val = convertValueForJdbc(field, val, entry.getKey());
             if (val != null) {
                 validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, val);
                 columnValues.put(field.getColumnName(), val);
@@ -514,7 +514,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "自定义字段列不存在");
         }
 
-        Object jdbcValue = "".equals(value) ? null : convertValueForJdbc(field.getFieldType(), value, fieldName);
+        Object jdbcValue = "".equals(value) ? null : convertValueForJdbc(field, value, fieldName);
         validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, jdbcValue);
         Map<String, Object> columnValues = new HashMap<>();
         columnValues.put(field.getColumnName(), jdbcValue);
@@ -546,7 +546,7 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
             if (value == null || "".equals(value)) {
                 continue;
             }
-            Object jdbcValue = convertValueForJdbc(field.getFieldType(), value, entry.getKey());
+            Object jdbcValue = convertValueForJdbc(field, value, entry.getKey());
             validateUniqueCustomFieldValue(tableName, idColumn, entityId, field, jdbcValue);
         }
     }
@@ -695,6 +695,20 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
      * checkbox → Boolean
      * multiselect (List) → JSON String
      */
+    private Object convertValueForJdbc(CustomFieldVO field, Object val, String fieldName) {
+        if (field == null) {
+            return val;
+        }
+        Object converted = convertValueForJdbc(field.getFieldType(), val, fieldName);
+        if (converted instanceof Boolean bool
+                && "checkbox".equals(field.getFieldType())
+                && field.getColumnType() != null
+                && field.getColumnType().toUpperCase(Locale.ROOT).contains("SMALLINT")) {
+            return bool ? 1 : 0;
+        }
+        return converted;
+    }
+
     private Object convertValueForJdbc(String fieldType, Object val, String fieldName) {
         if (val == null || fieldType == null) {
             return val;
