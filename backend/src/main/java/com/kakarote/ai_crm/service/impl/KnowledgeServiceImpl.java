@@ -23,6 +23,7 @@ import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
 import com.kakarote.ai_crm.entity.PO.Relation;
+import com.kakarote.ai_crm.entity.VO.ContactVO;
 import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
 import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.entity.VO.KnowledgeAiAnalyzeVO;
@@ -892,13 +893,19 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         StringBuilder builder = new StringBuilder();
         builder.append("公司名称: ").append(StrUtil.blankToDefault(detail.getCompanyName(), "未提供")).append('\n');
         builder.append("行业: ").append(StrUtil.blankToDefault(detail.getIndustry(), "未提供")).append('\n');
-        builder.append("商机阶段: ").append(StrUtil.blankToDefault(detail.getStageName(), detail.getStage())).append('\n');
+        builder.append("商机阶段: ")
+                .append(StrUtil.blankToDefault(detail.getStageName(), StrUtil.blankToDefault(detail.getStage(), "未提供")))
+                .append('\n');
         builder.append("客户级别: ").append(StrUtil.blankToDefault(detail.getLevel(), "未提供")).append('\n');
         builder.append("客户来源: ").append(StrUtil.blankToDefault(detail.getSource(), "未提供")).append('\n');
         builder.append("最后联系时间: ").append(formatDateTime(detail.getLastContactTime())).append('\n');
         builder.append("下次跟进时间: ").append(formatDateTime(detail.getNextFollowTime())).append('\n');
+        builder.append("AI 状态判断: ").append(StrUtil.blankToDefault(detail.getAiStatusDetection(), "未提供")).append('\n');
+        builder.append("AI 洞察: ").append(StrUtil.blankToDefault(detail.getAiInsight(), "未提供")).append('\n');
         builder.append("备注: ").append(StrUtil.blankToDefault(detail.getRemark(), "未提供")).append('\n');
-        builder.append("最近跟进记录:\n").append(formatFollowUpSummary(recentFollowUps));
+        builder.append("主联系人: ").append(resolvePrimaryContactSummary(detail.getContacts())).append('\n');
+        builder.append("最近跟进记录: ").append(formatFollowUpSummary(recentFollowUps)).append('\n');
+        builder.append("近期任务: ").append(formatTaskSummary(detail)).append('\n');
         return builder.toString().trim();
     }
 
@@ -933,7 +940,8 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         String customerName = StrUtil.blankToDefault(detail.getCompanyName(), "该客户");
         String industry = StrUtil.blankToDefault(detail.getIndustry(), "所在行业");
         String stage = StrUtil.blankToDefault(detail.getStageName(), StrUtil.blankToDefault(detail.getStage(), "当前阶段"));
-        String openingHook = StrUtil.firstNonBlank(
+        String openingHook = firstNonBlank(
+                detail.getAiInsight(),
                 detail.getRemark(),
                 recentFollowUps == null || recentFollowUps.isEmpty() ? null : recentFollowUps.get(0).getContent()
         );
@@ -987,21 +995,73 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         return builder.toString().trim();
     }
 
+    private String resolvePrimaryContactSummary(List<ContactVO> contacts) {
+        if (contacts == null || contacts.isEmpty()) {
+            return "未提供";
+        }
+        ContactVO primary = contacts.stream()
+                .filter(contact -> contact != null && Integer.valueOf(1).equals(contact.getIsPrimary()))
+                .findFirst()
+                .orElse(contacts.get(0));
+        if (primary == null) {
+            return "未提供";
+        }
+        StringBuilder builder = new StringBuilder(StrUtil.blankToDefault(primary.getName(), "未命名联系人"));
+        if (StrUtil.isNotBlank(primary.getPosition())) {
+            builder.append(" / ").append(primary.getPosition());
+        }
+        if (StrUtil.isNotBlank(primary.getPhone())) {
+            builder.append(" / ").append(primary.getPhone());
+        }
+        return builder.toString();
+    }
+
     private String formatFollowUpSummary(List<FollowUpVO> recentFollowUps) {
         if (recentFollowUps == null || recentFollowUps.isEmpty()) {
-            return "暂无最近跟进记录";
+            return "近期暂无有效跟进记录";
         }
-        StringBuilder builder = new StringBuilder();
+        List<String> summaries = new ArrayList<>();
         for (FollowUpVO followUp : recentFollowUps) {
-            builder.append("- ")
-                    .append(formatDateTime(followUp.getFollowTime()))
-                    .append(" / ")
-                    .append(StrUtil.blankToDefault(followUp.getTypeName(), followUp.getType()))
-                    .append(" / ")
-                    .append(abbreviate(followUp.getContent(), 220))
-                    .append('\n');
+            if (followUp == null) {
+                continue;
+            }
+            StringBuilder builder = new StringBuilder();
+            builder.append(formatDateTime(followUp.getFollowTime())).append(" ");
+            builder.append(StrUtil.blankToDefault(followUp.getTypeName(), StrUtil.blankToDefault(followUp.getType(), "跟进")));
+            builder.append("：");
+            builder.append(StrUtil.blankToDefault(firstNonBlank(followUp.getSummary(), followUp.getContent()), "暂无内容"));
+            summaries.add(builder.toString());
         }
-        return builder.toString().trim();
+        return summaries.isEmpty() ? "近期暂无有效跟进记录" : String.join("；", summaries);
+    }
+
+    private String formatTaskSummary(CustomerDetailVO detail) {
+        if (detail.getTasks() == null || detail.getTasks().isEmpty()) {
+            return "暂无待跟进任务";
+        }
+        return detail.getTasks().stream()
+                .limit(3)
+                .map(task -> {
+                    StringBuilder builder = new StringBuilder(StrUtil.blankToDefault(task.getTitle(), "未命名任务"));
+                    if (StrUtil.isNotBlank(task.getStatus())) {
+                        builder.append("（").append(task.getStatus()).append("）");
+                    }
+                    return builder.toString();
+                })
+                .reduce((left, right) -> left + "；" + right)
+                .orElse("暂无待跟进任务");
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StrUtil.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private String formatDateTime(Date date) {

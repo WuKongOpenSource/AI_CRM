@@ -3,6 +3,10 @@ package com.kakarote.ai_crm.service.impl;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
+import com.kakarote.ai_crm.entity.PO.Task;
+import com.kakarote.ai_crm.entity.VO.ContactVO;
+import com.kakarote.ai_crm.entity.VO.CustomerDetailVO;
+import com.kakarote.ai_crm.entity.VO.FollowUpVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
@@ -16,6 +20,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Date;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -126,5 +133,44 @@ class KnowledgeServiceImplTest {
         verify(knowledgeMapper).deleteById(5001L);
         verify(knowledgeTagMapper).delete(any());
         verify(globalSearchIndexService).deleteByEntity("knowledge", 5001L);
+    }
+
+    @Test
+    void targetedCustomerContextIncludesAiContactAndTaskSignals() {
+        CustomerDetailVO detail = new CustomerDetailVO();
+        detail.setCompanyName("悟空软件");
+        detail.setAiStatusDetection("预算明确");
+        detail.setAiInsight("优先推进续约");
+
+        ContactVO contact = new ContactVO();
+        contact.setName("张三");
+        contact.setPosition("CTO");
+        contact.setPhone("13800000000");
+        contact.setIsPrimary(1);
+        detail.setContacts(List.of(contact));
+
+        Task task = new Task();
+        task.setTitle("确认预算");
+        task.setStatus("todo");
+        detail.setTasks(List.of(task));
+
+        FollowUpVO followUp = new FollowUpVO();
+        followUp.setFollowTime(new Date(0L));
+        followUp.setTypeName("电话");
+        followUp.setSummary("已确认需求");
+
+        String context = ReflectionTestUtils.invokeMethod(
+                knowledgeService,
+                "buildTargetedCustomerContext",
+                detail,
+                List.of(followUp)
+        );
+
+        assertThat(context)
+                .contains("AI 状态判断: 预算明确")
+                .contains("AI 洞察: 优先推进续约")
+                .contains("主联系人: 张三 / CTO / 13800000000")
+                .contains("近期任务: 确认预算")
+                .contains("已确认需求");
     }
 }

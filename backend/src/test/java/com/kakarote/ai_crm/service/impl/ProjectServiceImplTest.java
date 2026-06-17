@@ -280,6 +280,35 @@ class ProjectServiceImplTest {
     }
 
     @Test
+    void deleteLaneMovesTasksToDefaultLaneBeforeDeleting() {
+        Project project = new Project();
+        project.setProjectId(2001L);
+        project.setOwnerId(1001L);
+        ProjectLane defaultLane = lane(10L, "not-started", "未开始", 10);
+        defaultLane.setSystemFlag(true);
+        ProjectLane customLane = lane(20L, "custom", "评审中", 20);
+        customLane.setSystemFlag(false);
+
+        when(projectMapper.selectById(2001L)).thenReturn(project);
+        when(projectLaneMapper.selectById(20L)).thenReturn(customLane);
+        when(projectLaneMapper.selectOne(any())).thenReturn(defaultLane);
+        when(projectMapper.getProjectById(2001L)).thenReturn(projectDetail(2001L));
+        when(projectLaneMapper.selectList(any())).thenReturn(List.of(defaultLane));
+        when(projectTaskMapper.selectProjectTasks(2001L, null)).thenReturn(List.of());
+        when(projectAttachmentMapper.selectList(any())).thenReturn(List.of());
+        when(projectScheduleMapper.selectList(any())).thenReturn(List.of());
+
+        ProjectVO result = projectService.deleteLane(2001L, 20L);
+
+        assertThat(result.getProjectId()).isEqualTo(2001L);
+        ArgumentCaptor<ProjectTask> taskCaptor = ArgumentCaptor.forClass(ProjectTask.class);
+        verify(projectTaskMapper).update(taskCaptor.capture(), any());
+        assertThat(taskCaptor.getValue().getLaneId()).isEqualTo(10L);
+        assertThat(taskCaptor.getValue().getStatus()).isEqualTo("TODO");
+        verify(projectLaneMapper).deleteById(20L);
+    }
+
+    @Test
     void taskAiCommandWithAttachmentsUsesProjectAiRuntime() {
         Project project = new Project();
         project.setProjectId(2001L);

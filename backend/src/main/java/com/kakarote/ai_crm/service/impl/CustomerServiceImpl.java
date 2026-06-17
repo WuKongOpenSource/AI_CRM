@@ -369,25 +369,25 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             return getCustomerDetail(fieldUpdateBO.getCustomerId());
         }
         if (FIELD_SOURCE_CUSTOM.equals(fieldSource) || !CUSTOMER_SYSTEM_FILTER_FIELDS.containsKey(fieldName)) {
-            customFieldService.updateCustomFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, value);
+            customFieldService.updateCustomFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, normalizeBlankToNull(value));
             refreshCustomerActivity(fieldUpdateBO.getCustomerId());
             return getCustomerDetail(fieldUpdateBO.getCustomerId());
         }
 
         customFieldService.validateUniqueFieldValue("customer", fieldUpdateBO.getCustomerId(), fieldName, value);
         switch (fieldName) {
-            case "companyName" -> customer.setCompanyName(toStr(value));
-            case "industry" -> customer.setIndustry(toStr(value));
-            case "stage" -> customer.setStage(toStr(value));
-            case "level" -> customer.setLevel(toStr(value));
-            case "source" -> customer.setSource(toStr(value));
-            case "address" -> customer.setAddress(toStr(value));
-            case "website" -> customer.setWebsite(toStr(value));
-            case "logo" -> customer.setLogo(toStr(value));
-            case "quotation" -> customer.setQuotation(toBigDecimal(value));
-            case "lastContactTime" -> customer.setLastContactTime(toDateValue(value));
-            case "nextFollowTime" -> customer.setNextFollowTime(toDateValue(value));
-            case "remark" -> customer.setRemark(toStr(value));
+            case "companyName" -> customer.setCompanyName(normalizeStringValue(value));
+            case "industry" -> customer.setIndustry(normalizeStringValue(value));
+            case "stage" -> customer.setStage(normalizeStringValue(value));
+            case "level" -> customer.setLevel(normalizeStringValue(value));
+            case "source" -> customer.setSource(normalizeStringValue(value));
+            case "address" -> customer.setAddress(normalizeStringValue(value));
+            case "website" -> customer.setWebsite(normalizeStringValue(value));
+            case "logo" -> customer.setLogo(normalizeLogoValue(value));
+            case "quotation" -> customer.setQuotation(parseFieldBigDecimal(value));
+            case "lastContactTime" -> customer.setLastContactTime(parseFieldDate(value));
+            case "nextFollowTime" -> customer.setNextFollowTime(parseFieldDate(value));
+            case "remark" -> customer.setRemark(normalizeStringValue(value));
             case "ownerId" -> customer.setOwnerId(toLong(value));
             default -> throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "不支持的客户字段: " + fieldName);
         }
@@ -723,10 +723,62 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
     private String normalizeStringValue(Object value) {
+        Object normalized = normalizeBlankToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        return normalized.toString().trim();
+    }
+
+    private Object normalizeBlankToNull(Object value) {
         if (value == null) {
             return null;
         }
-        return value.toString().trim();
+        if (value instanceof String text && StrUtil.isBlank(text)) {
+            return null;
+        }
+        return value;
+    }
+
+    private String normalizeLogoValue(Object value) {
+        String normalizedLogo = normalizeStringValue(value);
+        return normalizedLogo == null ? "" : normalizedLogo;
+    }
+
+    private BigDecimal parseFieldBigDecimal(Object value) {
+        Object normalized = normalizeBlankToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized instanceof BigDecimal bigDecimal) {
+            return bigDecimal;
+        }
+        if (normalized instanceof Number number) {
+            return new BigDecimal(number.toString());
+        }
+        try {
+            return new BigDecimal(normalized.toString().replace(",", ""));
+        } catch (NumberFormatException exception) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "数字格式不正确");
+        }
+    }
+
+    private Date parseFieldDate(Object value) {
+        Object normalized = normalizeBlankToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized instanceof Date date) {
+            return date;
+        }
+        if (normalized instanceof java.sql.Timestamp timestamp) {
+            return new Date(timestamp.getTime());
+        }
+        try {
+            return DateUtil.parse(normalized.toString());
+        } catch (Exception exception) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "日期格式不正确");
+        }
     }
 
     private String normalizeEmptyFilterOperator(String operator) {
@@ -1582,9 +1634,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 // 阶段：中文标签 → 英文code
                 String stageStr = getCellStr(rowData, colStage);
                 if (StrUtil.isNotEmpty(stageStr)) {
-                    String stageCode = LABEL_STAGE_MAP.get(stageStr);
-                    if (stageCode == null && STAGE_LABEL_MAP.containsKey(stageStr)) {
-                        stageCode = stageStr; // 允许直接写英文code
+                    String stageCode = resolveImportOptionValue("stage", stageStr);
+                    if (stageCode == null) {
+                        stageCode = LABEL_STAGE_MAP.get(stageStr);
+                        if (stageCode == null && STAGE_LABEL_MAP.containsKey(stageStr)) {
+                            stageCode = stageStr; // 允许直接写英文code
+                        }
                     }
                     if (stageCode != null) {
                         bo.setStage(stageCode);
@@ -1596,9 +1651,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
                 // 级别
                 String levelStr = getCellStr(rowData, colLevel);
                 if (StrUtil.isNotEmpty(levelStr)) {
-                    String upperLevel = levelStr.toUpperCase();
-                    if (VALID_LEVELS.contains(upperLevel)) {
-                        bo.setLevel(upperLevel);
+                    String resolvedLevel = resolveImportOptionValue("level", levelStr);
+                    if (resolvedLevel == null) {
+                        String upperLevel = levelStr.toUpperCase(Locale.ROOT);
+                        if (VALID_LEVELS.contains(upperLevel)) {
+                            resolvedLevel = upperLevel;
+                        }
+                    }
+                    if (resolvedLevel != null) {
+                        bo.setLevel(resolvedLevel);
                     } else {
                         rowErrors.add("客户级别「" + levelStr + "」无效，可选 A/B/C");
                     }
@@ -2218,12 +2279,37 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StrUtil.isBlank(level)) {
             return null;
         }
+        if (customFieldService != null) {
+            String label = customFieldService.resolveOptionLabel("customer", "level", level);
+            if (StrUtil.isNotBlank(label)) {
+                return label;
+            }
+        }
         return switch (level.trim().toUpperCase(Locale.ROOT)) {
             case "A" -> "A级客户";
             case "B" -> "B级客户";
             case "C" -> "C级客户";
             default -> level;
         };
+    }
+
+    private String resolveImportOptionValue(String fieldName, String input) {
+        if (StrUtil.isBlank(input) || customFieldService == null) {
+            return null;
+        }
+        String trimmed = input.trim();
+        List<FieldOption> options = customFieldService.getFieldOptions("customer", fieldName);
+        if (options == null || options.isEmpty()) {
+            return null;
+        }
+        return options.stream()
+                .filter(Objects::nonNull)
+                .filter(option -> StrUtil.equalsIgnoreCase(option.getValue(), trimmed)
+                        || StrUtil.equals(option.getLabel(), trimmed))
+                .map(FieldOption::getValue)
+                .filter(StrUtil::isNotBlank)
+                .findFirst()
+                .orElse(null);
     }
 
     private void appendSearchText(Set<String> fragments, String value) {

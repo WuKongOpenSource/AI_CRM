@@ -40,7 +40,7 @@ public class KnowledgePreviewTokenService {
             log.error("Failed to create knowledge preview token: knowledgeId={}", knowledgeId, e);
             throw new IllegalStateException("Failed to create preview token", e);
         }
-        return new PreviewToken(token, expiresAt);
+        return new PreviewToken(token, expiresAt, DEFAULT_TTL.toSeconds());
     }
 
     public boolean validateToken(String token, Long knowledgeId) {
@@ -61,7 +61,7 @@ public class KnowledgePreviewTokenService {
         }
     }
 
-    public record PreviewToken(String token, Instant expiresAt) {
+    public record PreviewToken(String token, Instant expiresAt, long expiresInSeconds) {
     }
 
     private record PreviewPayload(Long knowledgeId, Long userId, long expiresAtEpochMillis) {

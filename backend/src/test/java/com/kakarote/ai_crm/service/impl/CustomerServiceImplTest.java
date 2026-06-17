@@ -1,6 +1,8 @@
 package com.kakarote.ai_crm.service.impl;
 
 import com.kakarote.ai_crm.entity.BO.CustomerFieldUpdateBO;
+import com.kakarote.ai_crm.common.exception.BusinessException;
+import com.kakarote.ai_crm.entity.BO.FieldOption;
 import com.kakarote.ai_crm.entity.BO.CustomerFieldFilterBO;
 import com.kakarote.ai_crm.entity.BO.CustomerQueryBO;
 import com.kakarote.ai_crm.entity.BO.CustomerResolvedFieldFilterBO;
@@ -29,8 +31,12 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -117,6 +123,58 @@ class CustomerServiceImplTest {
         assertEquals("13800000000", contactCaptor.getValue().getPhone());
         verify(service).syncContactCache(customerId);
         verify(globalSearchIndexService).refreshContactIndex(contactId);
+    }
+
+    @Test
+    void updateCustomerFieldNormalizesBlankCustomValueToNull() {
+        CustomerServiceImpl service = spy(new CustomerServiceImpl());
+        CustomerMapper customerMapper = mock(CustomerMapper.class);
+        ICustomFieldService customFieldService = mock(ICustomFieldService.class);
+        ReflectionTestUtils.setField(service, "baseMapper", customerMapper);
+        ReflectionTestUtils.setField(service, "customFieldService", customFieldService);
+
+        Long customerId = 100L;
+        Customer customer = new Customer();
+        customer.setCustomerId(customerId);
+        when(customerMapper.selectById(customerId)).thenReturn(customer);
+        doNothing().when(service).refreshCustomerActivity(customerId);
+        CustomerDetailVO detail = new CustomerDetailVO();
+        detail.setCustomerId(customerId);
+        doReturn(detail).when(service).getCustomerDetail(customerId);
+
+        CustomerFieldUpdateBO updateBO = new CustomerFieldUpdateBO();
+        updateBO.setCustomerId(customerId);
+        updateBO.setFieldName("field_budget_note");
+        updateBO.setFieldSource("custom");
+        updateBO.setValue("   ");
+
+        CustomerDetailVO result = service.updateCustomerField(updateBO);
+
+        assertSame(detail, result);
+        verify(customFieldService).updateCustomFieldValue(eq("customer"), eq(customerId), eq("field_budget_note"), isNull());
+    }
+
+    @Test
+    void updateCustomerFieldRejectsInvalidQuotationValue() {
+        CustomerServiceImpl service = spy(new CustomerServiceImpl());
+        CustomerMapper customerMapper = mock(CustomerMapper.class);
+        ICustomFieldService customFieldService = mock(ICustomFieldService.class);
+        ReflectionTestUtils.setField(service, "baseMapper", customerMapper);
+        ReflectionTestUtils.setField(service, "customFieldService", customFieldService);
+
+        Long customerId = 100L;
+        Customer customer = new Customer();
+        customer.setCustomerId(customerId);
+        when(customerMapper.selectById(customerId)).thenReturn(customer);
+
+        CustomerFieldUpdateBO updateBO = new CustomerFieldUpdateBO();
+        updateBO.setCustomerId(customerId);
+        updateBO.setFieldName("quotation");
+        updateBO.setFieldSource("system");
+        updateBO.setValue("not-a-number");
+
+        assertThrows(BusinessException.class, () -> service.updateCustomerField(updateBO));
+        verify(customerMapper, never()).updateById(any(Customer.class));
     }
 
     @Test
@@ -321,6 +379,35 @@ class CustomerServiceImplTest {
         assertEquals("blank", filters.get(0).getEmptyMode());
         assertEquals("field_ef3456", filters.get(1).getColumnName());
         assertEquals("jsonArray", filters.get(1).getEmptyMode());
+    }
+
+    @Test
+    void levelDisplayLabelUsesConfiguredFieldOptions() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+        ICustomFieldService customFieldService = mock(ICustomFieldService.class);
+        ReflectionTestUtils.setField(service, "customFieldService", customFieldService);
+        when(customFieldService.resolveOptionLabel("customer", "level", "vip")).thenReturn("VIP客户");
+
+        String label = ReflectionTestUtils.invokeMethod(service, "getLevelDisplayLabel", "vip");
+
+        assertEquals("VIP客户", label);
+    }
+
+    @Test
+    void importOptionValueResolvesConfiguredValueAndLabel() {
+        CustomerServiceImpl service = new CustomerServiceImpl();
+        ICustomFieldService customFieldService = mock(ICustomFieldService.class);
+        ReflectionTestUtils.setField(service, "customFieldService", customFieldService);
+        FieldOption option = new FieldOption();
+        option.setValue("vip");
+        option.setLabel("VIP客户");
+        when(customFieldService.getFieldOptions("customer", "level")).thenReturn(List.of(option));
+
+        String byValue = ReflectionTestUtils.invokeMethod(service, "resolveImportOptionValue", "level", "vip");
+        String byLabel = ReflectionTestUtils.invokeMethod(service, "resolveImportOptionValue", "level", "VIP客户");
+
+        assertEquals("vip", byValue);
+        assertEquals("vip", byLabel);
     }
 
     private static List<CustomerResolvedFieldFilterBO> invokeResolveFilters(CustomerServiceImpl service,

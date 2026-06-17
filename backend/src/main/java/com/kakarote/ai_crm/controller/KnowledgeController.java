@@ -169,8 +169,10 @@ public class KnowledgeController {
         KnowledgePreviewTokenService.PreviewToken token =
                 previewTokenService.createToken(id, UserUtil.getUserId());
         KnowledgePreviewTokenVO vo = new KnowledgePreviewTokenVO();
-        vo.setUrl("/knowledge/preview-range/" + id + "?previewToken=" + token.token());
+        vo.setUrl("/knowledge/preview-range/" + id
+                + "?previewToken=" + URLEncoder.encode(token.token(), StandardCharsets.UTF_8));
         vo.setExpiresAt(token.expiresAt().toString());
+        vo.setExpiresInSeconds(token.expiresInSeconds());
         return Result.ok(vo);
     }
 

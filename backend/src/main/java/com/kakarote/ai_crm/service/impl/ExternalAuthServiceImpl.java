@@ -25,6 +25,7 @@ import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
 import com.kakarote.ai_crm.service.support.UserPreferenceSupport;
 import com.kakarote.ai_crm.utils.UserUtil;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
@@ -37,6 +38,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -44,6 +47,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -68,7 +73,7 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
     private static final String SCENE_BIND = "bind";
     private static final List<String> SUPPORTED_PROVIDERS = List.of("google", "outlook", "wechat");
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = createRestTemplate();
 
     @Autowired
     private ExternalAuthProperties externalAuthProperties;
@@ -90,6 +95,45 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    private static RestTemplate createRestTemplate() {
+        RestTemplate template = new RestTemplate();
+        template.getMessageConverters().replaceAll(converter ->
+                converter instanceof StringHttpMessageConverter
+                        ? new StringHttpMessageConverter(StandardCharsets.UTF_8)
+                        : converter);
+        return template;
+    }
+
+    @PostConstruct
+    void configureRestTemplateProxy() {
+        ExternalAuthProperties.ProxyConfig proxyConfig = externalAuthProperties.getProxy();
+        if (proxyConfig == null || !proxyConfig.isUsable()) {
+            return;
+        }
+        URI proxyUri;
+        try {
+            proxyUri = parseProxyUri(proxyConfig.getUrl());
+        } catch (IllegalArgumentException e) {
+            log.warn("External auth proxy is ignored because url is invalid: {}", proxyConfig.getUrl());
+            return;
+        }
+
+        String host = proxyUri.getHost();
+        int port = proxyUri.getPort();
+        if (StrUtil.isBlank(host) || port < 0) {
+            log.warn("External auth proxy is ignored because url is invalid: {}", proxyConfig.getUrl());
+            return;
+        }
+
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setProxy(new Proxy(resolveProxyType(proxyUri.getScheme()), new InetSocketAddress(host, port)));
+        restTemplate.setRequestFactory(requestFactory);
+        log.info("External auth proxy enabled: {}://{}:{}",
+                StrUtil.blankToDefault(proxyUri.getScheme(), "http"),
+                host,
+                port);
+    }
 
     @Override
     public List<ExternalAuthProviderVO> listProviders() {
@@ -633,6 +677,21 @@ public class ExternalAuthServiceImpl extends ServiceImpl<ExternalAuthIdentityMap
     private String outlookOAuthUrl(ExternalAuthProperties.ProviderConfig config, String action) {
         String tenant = StrUtil.blankToDefault(config.getTenant(), "common");
         return "https://login.microsoftonline.com/" + tenant + "/oauth2/v2.0/" + action;
+    }
+
+    private URI parseProxyUri(String proxyUrl) {
+        String trimmed = StrUtil.trim(proxyUrl);
+        if (!trimmed.contains("://")) {
+            trimmed = "http://" + trimmed;
+        }
+        return URI.create(trimmed);
+    }
+
+    private Proxy.Type resolveProxyType(String scheme) {
+        if (StrUtil.equalsAnyIgnoreCase(scheme, "socks", "socks5")) {
+            return Proxy.Type.SOCKS;
+        }
+        return Proxy.Type.HTTP;
     }
 
     private JSONObject parseJwtPayload(String jwt) {

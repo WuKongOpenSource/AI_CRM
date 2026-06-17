@@ -423,13 +423,16 @@ public class ProjectServiceImpl implements IProjectService {
         if (Boolean.TRUE.equals(lane.getSystemFlag())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "System lane cannot be deleted");
         }
-        Long taskCount = projectTaskMapper.selectCount(Wrappers.<ProjectTask>lambdaQuery()
+        ProjectLane fallbackLane = firstLaneExcluding(projectId, laneId);
+        ProjectTask movedTask = new ProjectTask();
+        movedTask.setLaneId(fallbackLane.getLaneId());
+        movedTask.setStatus(isCompletedLane(fallbackLane) ? TASK_STATUS_COMPLETED : TASK_STATUS_TODO);
+        movedTask.setUpdateUserId(UserUtil.getUserId());
+        projectTaskMapper.update(movedTask, Wrappers.<ProjectTask>lambdaUpdate()
                 .eq(ProjectTask::getProjectId, projectId)
                 .eq(ProjectTask::getLaneId, laneId));
-        if (taskCount != null && taskCount > 0) {
-            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Lane has tasks");
-        }
         projectLaneMapper.deleteById(laneId);
+        touchProject(projectId);
         return getProject(projectId);
     }
 
@@ -1801,6 +1804,19 @@ public class ProjectServiceImpl implements IProjectService {
         return lane;
     }
 
+    private ProjectLane firstLaneExcluding(Long projectId, Long excludedLaneId) {
+        ProjectLane lane = projectLaneMapper.selectOne(Wrappers.<ProjectLane>lambdaQuery()
+                .eq(ProjectLane::getProjectId, projectId)
+                .ne(ProjectLane::getLaneId, excludedLaneId)
+                .orderByDesc(ProjectLane::getSystemFlag)
+                .orderByAsc(ProjectLane::getSortOrder)
+                .last("LIMIT 1"));
+        if (lane == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "Project lane does not exist");
+        }
+        return lane;
+    }
+
     private int nextLaneSortOrder(Long projectId) {
         ProjectLane latest = projectLaneMapper.selectOne(Wrappers.<ProjectLane>lambdaQuery()
                 .eq(ProjectLane::getProjectId, projectId)
@@ -1811,6 +1827,10 @@ public class ProjectServiceImpl implements IProjectService {
 
     private boolean isCompletedLane(Long laneId) {
         ProjectLane lane = projectLaneMapper.selectById(laneId);
+        return isCompletedLane(lane);
+    }
+
+    private boolean isCompletedLane(ProjectLane lane) {
         return lane != null && ("completed".equals(lane.getCode()) || "已完成".equals(lane.getName()));
     }
 
