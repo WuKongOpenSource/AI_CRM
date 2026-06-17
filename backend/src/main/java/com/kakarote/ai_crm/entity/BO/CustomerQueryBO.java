@@ -77,7 +77,7 @@ public class CustomerQueryBO extends PageEntity {
     @Schema(description = "通用字段筛选条件")
     private List<CustomerFieldFilterBO> filters;
 
-    @Schema(description = "排序字段: createTime/quotation/lastContactTime/nextFollowTime/contactCount")
+    @Schema(description = "排序字段: updateTime/createTime/quotation/lastContactTime/nextFollowTime/contactCount")
     private String sortBy;
 
     @Schema(description = "排序方向: asc/desc")

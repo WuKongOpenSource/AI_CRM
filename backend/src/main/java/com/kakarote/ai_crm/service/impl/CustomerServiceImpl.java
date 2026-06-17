@@ -241,7 +241,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             "filters": [
               {"fieldName": "lastContactTime", "fieldSource": "system/custom", "operator": "isEmpty/isNotEmpty"}
             ],
-            "sortBy": "createTime/quotation/lastContactTime/nextFollowTime/contactCount",
+            "sortBy": "updateTime/createTime/quotation/lastContactTime/nextFollowTime/contactCount",
             "sortOrder": "asc/desc"
           },
           "explanation": "一句话说明解析依据",
@@ -1176,6 +1176,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         }
 
         switch (sortBy) {
+            case "updateTime" -> wrapper.orderBy(true, asc, Customer::getUpdateTime);
             case "quotation" -> wrapper.orderBy(true, asc, Customer::getQuotation);
             case "lastContactTime" -> wrapper.orderBy(true, asc, Customer::getLastContactTime);
             case "nextFollowTime" -> wrapper.orderBy(true, asc, Customer::getNextFollowTime);
