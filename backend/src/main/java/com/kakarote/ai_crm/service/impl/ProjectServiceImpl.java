@@ -46,6 +46,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.content.Media;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -168,6 +169,7 @@ public class ProjectServiceImpl implements IProjectService {
                               CustomerMapper customerMapper,
                               IKnowledgeService knowledgeService,
                               ISystemConfigService systemConfigService,
+                              @Lazy
                               DynamicChatClientProvider chatClientProvider,
                               FileStorageService fileStorageService,
                               JdbcTemplate jdbcTemplate,
