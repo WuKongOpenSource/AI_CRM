@@ -1,7 +1,7 @@
 # Wukong AICRM
 
 
-[![License](https://img.shields.io/badge/License-Noncommercial%20Source%20Available-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Noncommercial%20Use-blue.svg)](LICENSE)
 [![Commercial Use](https://img.shields.io/badge/Commercial%20Use-Authorization%20Required-orange.svg)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/WuKongOpenSource/AI_CRM)](https://github.com/WuKongOpenSource/AI_CRM/stargazers)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/WuKongOpenSource/AI_CRM/pulls)
