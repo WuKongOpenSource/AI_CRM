@@ -1,7 +1,13 @@
 package com.kakarote.ai_crm.ai.app;
 
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kakarote.ai_crm.entity.PO.CrmAiApplication;
 import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
+import com.kakarote.ai_crm.mapper.CrmAiApplicationMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -9,8 +15,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class ChatApplicationRegistry {
+
+    /** 已安装 AI 应用来源（可空：缺失时仅用内置）。 */
+    @Autowired(required = false)
+    private CrmAiApplicationMapper aiApplicationMapper;
 
     public static final String TOOL_GROUP_CRM = "crm";
     public static final String TOOL_GROUP_CUSTOMER = "customer";
@@ -139,17 +150,23 @@ public class ChatApplicationRegistry {
     }
 
     public ChatApplicationDefinition resolve(String appCode) {
-        return applications.getOrDefault(normalize(appCode), applications.get(ChatApplicationCodes.GENERAL));
+        Map<String, ChatApplicationDefinition> all = mergedApplications();
+        String code = normalizeWith(all, appCode);
+        return all.getOrDefault(code, all.get(ChatApplicationCodes.GENERAL));
     }
 
     public String normalize(String appCode) {
+        return normalizeWith(mergedApplications(), appCode);
+    }
+
+    private String normalizeWith(Map<String, ChatApplicationDefinition> all, String appCode) {
         String normalized = StrUtil.blankToDefault(appCode, ChatApplicationCodes.GENERAL).trim().toLowerCase();
-        return applications.containsKey(normalized) ? normalized : ChatApplicationCodes.GENERAL;
+        return all.containsKey(normalized) ? normalized : ChatApplicationCodes.GENERAL;
     }
 
     public List<ChatAppOptionVO> listOptions() {
         List<ChatAppOptionVO> options = new ArrayList<>();
-        applications.values().forEach(app -> {
+        mergedApplications().values().forEach(app -> {
             ChatAppOptionVO vo = new ChatAppOptionVO();
             vo.setCode(app.code());
             vo.setLabel(app.label());
@@ -160,6 +177,56 @@ public class ChatApplicationRegistry {
             options.add(vo);
         });
         return options;
+    }
+
+    /**
+     * 合并：内置应用(内存) + 已安装应用(crm_ai_application, enabled)。内置永远优先;
+     * DB 查询失败时回退为仅内置,绝不影响在线对话。
+     */
+    private Map<String, ChatApplicationDefinition> mergedApplications() {
+        Map<String, ChatApplicationDefinition> merged = new LinkedHashMap<>(applications);
+        try {
+            if (aiApplicationMapper != null) {
+                List<CrmAiApplication> rows = aiApplicationMapper.selectList(
+                        new LambdaQueryWrapper<CrmAiApplication>().eq(CrmAiApplication::getStatus, 1));
+                for (CrmAiApplication row : rows) {
+                    String code = StrUtil.blankToDefault(row.getCode(), "").trim().toLowerCase();
+                    if (code.isEmpty() || merged.containsKey(code)) {
+                        continue; // 跳过空 code 与内置冲突(内置优先)
+                    }
+                    merged.put(code, toDefinition(code, row));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("合并已安装 AI 应用失败,仅用内置: {}", e.getMessage());
+        }
+        return merged;
+    }
+
+    private ChatApplicationDefinition toDefinition(String code, CrmAiApplication row) {
+        boolean rag = row.getDefaultRagEnabled() != null && row.getDefaultRagEnabled() == 1;
+        return new ChatApplicationDefinition(
+                code,
+                StrUtil.blankToDefault(row.getLabel(), code),
+                StrUtil.blankToDefault(row.getIconName(), "sparkles"),
+                StrUtil.nullToEmpty(row.getDescription()),
+                StrUtil.nullToEmpty(row.getSystemPrompt()),
+                rag,
+                parseJsonArray(row.getToolGroups()),
+                parseJsonArray(row.getRecommendedQuestions())
+        );
+    }
+
+    private List<String> parseJsonArray(String json) {
+        if (StrUtil.isBlank(json)) {
+            return List.of();
+        }
+        try {
+            List<String> list = JSON.parseArray(json, String.class);
+            return list != null ? list : List.of();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     public boolean hasToolGroup(String appCode, String toolGroup) {

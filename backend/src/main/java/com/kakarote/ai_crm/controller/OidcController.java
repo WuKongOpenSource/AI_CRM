@@ -6,6 +6,7 @@ import com.kakarote.ai_crm.entity.BO.LoginUser;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.service.ManageUserService;
 import com.kakarote.ai_crm.service.OidcService;
+import com.kakarote.ai_crm.service.PluginAuthService;
 import com.kakarote.ai_crm.utils.RequestContextUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +44,9 @@ public class OidcController {
 
     @Autowired
     private ManageUserService manageUserService;
+
+    @Autowired
+    private PluginAuthService pluginAuthService;
 
     /**
      * OIDC 发现文档
@@ -138,16 +142,40 @@ public class OidcController {
     @Operation(summary = "OIDC Token 端点")
     public ResponseEntity<?> token(
             @RequestParam("grant_type") String grantType,
-            @RequestParam("code") String code,
-            @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam(value = "code", required = false) String code,
+            @RequestParam(value = "redirect_uri", required = false) String redirectUri,
             @RequestParam(value = "client_id", required = false) String clientId,
             @RequestParam(value = "client_secret", required = false) String clientSecret,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
 
+        // client_credentials：插件机器对机器授权（校验 crm_oauth_client 注册表）
+        if ("client_credentials".equals(grantType)) {
+            String ccClientId = clientId;
+            String ccClientSecret = clientSecret;
+            if (StrUtil.isNotEmpty(authorization) && authorization.startsWith("Basic ")) {
+                try {
+                    String basicCreds = new String(Base64.getDecoder().decode(authorization.substring(6)), StandardCharsets.UTF_8);
+                    String[] basicParts = basicCreds.split(":", 2);
+                    if (basicParts.length == 2) {
+                        ccClientId = basicParts[0];
+                        ccClientSecret = basicParts[1];
+                    }
+                } catch (Exception e) {
+                    log.warn("OIDC Token: 解析 Basic Auth 失败");
+                }
+            }
+            Map<String, Object> ccToken = pluginAuthService.issueClientCredentialsToken(ccClientId, ccClientSecret);
+            if (ccToken == null) {
+                log.warn("OIDC Token 失败: 插件 client 凭据无效");
+                return errorResponse("invalid_client", "client 凭据无效");
+            }
+            return ResponseEntity.ok(ccToken);
+        }
+
         // 验证 grant_type
         if (!"authorization_code".equals(grantType)) {
             log.warn("OIDC Token 失败: 不支持的 grant_type={}", grantType);
-            return errorResponse("unsupported_grant_type", "仅支持 authorization_code 授权方式");
+            return errorResponse("unsupported_grant_type", "仅支持 authorization_code / client_credentials 授权方式");
         }
 
         // 支持 HTTP Basic Auth 方式传递 client credentials
