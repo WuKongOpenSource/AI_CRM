@@ -43,6 +43,9 @@ public class ImController {
     @Autowired
     private ImPresenceService presenceService;
 
+    @Autowired
+    private com.kakarote.ai_crm.service.ImReactionService reactionService;
+
     @PostMapping("/conversations/direct")
     @Operation(summary = "查找或创建与某用户的私聊会话")
     @RequirePermission("im")
@@ -59,7 +62,7 @@ public class ImController {
                                              @RequestParam(value = "beforeId", required = false) Long beforeId,
                                              @RequestParam(value = "limit", defaultValue = "30") int limit) {
         conversationService.assertMember(conversationId, UserUtil.getUserId());
-        return Result.ok(messageService.history(conversationId, beforeId, limit));
+        return Result.ok(messageService.history(conversationId, UserUtil.getUserId(), beforeId, limit));
     }
 
     @PostMapping("/messages")
@@ -173,6 +176,22 @@ public class ImController {
             out.add(vo);
         }
         return Result.ok(out);
+    }
+
+    @PostMapping("/messages/{id}/reactions")
+    @Operation(summary = "切换消息表情回应")
+    @RequirePermission("im")
+    public Result<java.util.List<com.kakarote.ai_crm.entity.VO.ImReactionVO>> toggleReaction(
+            @PathVariable("id") Long messageId,
+            @RequestBody com.kakarote.ai_crm.entity.BO.ImReactionBO bo) {
+        return Result.ok(reactionService.toggle(UserUtil.getUserId(), messageId, bo.getEmoji()));
+    }
+
+    @GetMapping("/messages/{id}/thread")
+    @Operation(summary = "获取话题（根消息+回复）")
+    @RequirePermission("im")
+    public Result<List<ImMessageVO>> thread(@PathVariable("id") Long rootId) {
+        return Result.ok(messageService.getThread(rootId, UserUtil.getUserId()));
     }
 
     private Long parseLong(Object o) {

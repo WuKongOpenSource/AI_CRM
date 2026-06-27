@@ -6,14 +6,18 @@ import {
   listConversations, listContacts, openDirect, fetchHistory,
   sendMessage, recallMessage, markRead,
   createChannel, browsePublicChannels, joinChannel, leaveChannel, addChannelMembers, listChannelMembers,
-  type ImConversation, type ImMessage, type ImContact, type ImSendPayload, type ImCreateChannelPayload,
+  toggleReaction, fetchThread,
+  type ImConversation, type ImMessage, type ImContact, type ImSendPayload, type ImCreateChannelPayload, type ImReaction,
 } from '@/api/im'
 
 interface PushEnvelope {
-  type: 'message' | 'unread'
+  type: 'message' | 'unread' | 'reaction'
   conversationId: string
   message?: ImMessage | null
   unread?: number | null
+  // reaction envelope fields
+  messageId?: string
+  reactions?: ImReaction[]
 }
 
 export const useImStore = defineStore('im', () => {
@@ -23,6 +27,11 @@ export const useImStore = defineStore('im', () => {
   const presence = ref<Record<string, boolean>>({})
   const activeConversationId = ref<string | null>(null)
   const connected = ref(false)
+  // myId is set from outside (ImView) so mention notifications can reference it
+  const myId = ref<string>('')
+  // Thread state
+  const threadRoot = ref<ImMessage | null>(null)
+  const threadMessages = ref<ImMessage[]>([])
 
   let client: Client | null = null
 
@@ -66,13 +75,55 @@ export const useImStore = defineStore('im', () => {
     connected.value = false
   }
 
+  function maybeNotifyMention(msg: ImMessage) {
+    const mentionsMe = msg.mentionAll === true || (msg.mentionedUserIds || []).includes(myId.value)
+    if (!mentionsMe || msg.senderId === myId.value) return
+    const elsewhere = document.hidden || msg.conversationId !== activeConversationId.value
+    if (!elsewhere) return
+    try {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(`${msg.senderName || ''} 提及了你`, { body: msg.content || '' })
+      }
+    } catch { /* ignore */ }
+  }
+
   function onPush(env: PushEnvelope) {
     const conv = conversations.value.find((c) => c.id === env.conversationId)
+
+    // Handle reaction envelope
+    if (env.type === 'reaction') {
+      if (env.messageId && env.reactions) {
+        const list = messagesByConv.value[env.conversationId]
+        const target = list?.find((m) => m.id === env.messageId)
+        if (target) target.reactions = env.reactions
+        if (threadRoot.value && threadRoot.value.id === env.messageId) threadRoot.value.reactions = env.reactions
+        const tm = threadMessages.value.find((m) => m.id === env.messageId)
+        if (tm) tm.reactions = env.reactions
+      }
+      return
+    }
+
     if (env.type === 'message' && env.message) {
-      upsertMessage(env.conversationId, env.message)
+      const msg = env.message
+
+      // Thread reply: do NOT add to main timeline; bump root replyCount; append to open thread
+      if (msg.parentId) {
+        const list = messagesByConv.value[env.conversationId]
+        const root = list?.find((m) => m.id === msg.parentId)
+        if (root) root.replyCount = (root.replyCount ?? 0) + 1
+        if (threadRoot.value && threadRoot.value.id === msg.parentId) threadMessages.value.push(msg)
+        maybeNotifyMention(msg)
+        // still update unread for mentions but don't add to timeline
+        if (env.conversationId !== activeConversationId.value) {
+          if (conv && typeof env.unread === 'number') conv.unreadCount = env.unread
+        }
+        return
+      }
+
+      upsertMessage(env.conversationId, msg)
       if (conv) {
-        conv.lastMessage = env.message
-        conv.updateTime = env.message.createTime
+        conv.lastMessage = msg
+        conv.updateTime = msg.createTime
       } else {
         void refreshConversations()
       }
@@ -84,6 +135,7 @@ export const useImStore = defineStore('im', () => {
         if (conv && typeof env.unread === 'number') conv.unreadCount = env.unread
         notifyIfHidden(env)
       }
+      maybeNotifyMention(msg)
     } else if (env.type === 'unread' && conv && typeof env.unread === 'number') {
       conv.unreadCount = env.unread
     }
@@ -176,10 +228,42 @@ export const useImStore = defineStore('im', () => {
     return listChannelMembers(channelId)
   }
 
+  async function toggleReactionAction(messageId: string, emoji: string) {
+    const reactions = await toggleReaction(messageId, emoji)
+    // optimistic local update for the actor; WS push also arrives shortly
+    for (const cid in messagesByConv.value) {
+      const m = messagesByConv.value[cid].find((x) => x.id === messageId)
+      if (m) m.reactions = reactions
+    }
+    if (threadRoot.value?.id === messageId) threadRoot.value.reactions = reactions
+    const tm = threadMessages.value.find((x) => x.id === messageId)
+    if (tm) tm.reactions = reactions
+  }
+
+  async function openThread(rootId: string) {
+    const rows = await fetchThread(rootId)
+    threadRoot.value = rows[0] ?? null
+    threadMessages.value = rows.slice(1)
+  }
+
+  function closeThread() {
+    threadRoot.value = null
+    threadMessages.value = []
+  }
+
+  async function sendThreadReply(payload: ImSendPayload) {
+    if (!threadRoot.value) return
+    await sendMessage({ ...payload, parentId: threadRoot.value.id })
+    // The WS push appends the reply to the open thread; no local append needed here
+  }
+
   return {
     conversations, contacts, messagesByConv, presence, activeConversationId, connected, totalUnread,
+    myId,
+    threadRoot, threadMessages,
     connect, disconnect, refreshConversations, refreshContacts, loadHistory,
     openConversationWith, selectConversation, send, recall, markReadAction, ensureNotificationPermission,
     createChannelAction, browseChannels, joinChannelAction, leaveChannelAction, addMembersAction, fetchChannelMembers,
+    toggleReactionAction, openThread, closeThread, sendThreadReply,
   }
 })

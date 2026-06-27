@@ -14,8 +14,11 @@ public interface ImMessageService extends IService<ImMessage> {
 
     ImMessageVO send(Long senderId, ImSendMessageBO bo);
 
-    /** History newest-first; beforeId null = latest page. */
-    List<ImMessageVO> history(Long conversationId, Long beforeId, int limit);
+    /** History newest-first; beforeId null = latest page. Excludes thread replies. */
+    List<ImMessageVO> history(Long conversationId, Long viewerId, Long beforeId, int limit);
+
+    /** Return root message + replies for a thread, ascending. */
+    List<ImMessageVO> getThread(Long rootId, Long viewerId);
 
     /** Recall own message within the window; throws otherwise. */
     ImMessageVO recall(Long messageId, Long userId);

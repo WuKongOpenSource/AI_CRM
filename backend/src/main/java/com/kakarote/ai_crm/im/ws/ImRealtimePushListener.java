@@ -4,6 +4,7 @@ import com.kakarote.ai_crm.entity.VO.ImMessageVO;
 import com.kakarote.ai_crm.im.event.ImConversationReadEvent;
 import com.kakarote.ai_crm.im.event.ImMessageRecalledEvent;
 import com.kakarote.ai_crm.im.event.ImMessageSentEvent;
+import com.kakarote.ai_crm.im.event.ImReactionChangedEvent;
 import com.kakarote.ai_crm.service.ImMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,16 @@ public class ImRealtimePushListener {
         } catch (Exception e) {
             log.error("IM 实时推送失败(onConversationRead) conversationId={}, userId={}: {}",
                     event.conversationId(), event.userId(), e.getMessage(), e);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onReactionChanged(ImReactionChangedEvent event) {
+        try {
+            pushService.pushReaction(event.conversationId(), event.messageId(), event.memberUserIds());
+        } catch (Exception e) {
+            log.error("IM 实时推送失败(onReactionChanged) conversationId={}, messageId={}: {}",
+                    event.conversationId(), event.messageId(), e.getMessage(), e);
         }
     }
 }

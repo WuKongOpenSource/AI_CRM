@@ -20,6 +20,7 @@ import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ImConversationService;
 import com.kakarote.ai_crm.service.ImMessageService;
+import com.kakarote.ai_crm.service.ImReactionService;
 import com.kakarote.ai_crm.service.ManageUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -53,6 +55,9 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
     @Autowired
     private ManageUserService manageUserService;
 
+    @Autowired
+    private ImReactionService reactionService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ImMessageVO send(Long senderId, ImSendMessageBO bo) {
@@ -75,6 +80,11 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
         m.setAttachmentSize(bo.getAttachmentSize());
         m.setAttachmentMime(bo.getAttachmentMime());
         m.setStatus("normal");
+        m.setParentId(bo.getParentId());
+        if (bo.getMentionedUserIds() != null && !bo.getMentionedUserIds().isEmpty()) {
+            m.setMentionedUserIds(cn.hutool.core.util.StrUtil.join(",", bo.getMentionedUserIds()));
+        }
+        m.setMentionAll(Boolean.TRUE.equals(bo.getMentionAll()));
         Date now = new Date();
         m.setCreateTime(now);
         m.setUpdateTime(now);
@@ -85,6 +95,13 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
         conv.setLastMessageId(m.getId());
         conv.setUpdateTime(now);
         conversationMapper.updateById(conv);
+
+        // bump root reply count when this is a thread reply (atomic: avoids lost-update race)
+        if (bo.getParentId() != null) {
+            update(new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<ImMessage>()
+                    .eq("id", bo.getParentId())
+                    .setSql("reply_count = COALESCE(reply_count, 0) + 1, last_reply_time = NOW()"));
+        }
 
         // sender has implicitly read their own message
         bumpReadIfNewer(bo.getConversationId(), senderId, m.getId());
@@ -97,21 +114,39 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
     }
 
     @Override
-    public List<ImMessageVO> history(Long conversationId, Long beforeId, int limit) {
+    public List<ImMessageVO> history(Long conversationId, Long viewerId, Long beforeId, int limit) {
         int size = Math.min(Math.max(limit, 1), 50);
-        String limitClause = "LIMIT " + size;
         LambdaQueryWrapper<ImMessage> w = new LambdaQueryWrapper<ImMessage>()
                 .eq(ImMessage::getConversationId, conversationId)
+                .isNull(ImMessage::getParentId)
                 .orderByDesc(ImMessage::getId)
-                .last(limitClause);
+                .last("LIMIT " + size);
         if (beforeId != null && beforeId > 0) {
             w.lt(ImMessage::getId, beforeId);
         }
         List<ImMessage> rows = list(w);
-        rows.sort(Comparator.comparing(ImMessage::getId)); // return ascending for display
+        rows.sort(Comparator.comparing(ImMessage::getId));
         List<ImMessageVO> out = new ArrayList<>();
-        for (ImMessage m : rows) {
-            out.add(toVO(m));
+        for (ImMessage msg : rows) {
+            out.add(toVO(msg, viewerId));
+        }
+        return out;
+    }
+
+    @Override
+    public List<ImMessageVO> getThread(Long rootId, Long viewerId) {
+        ImMessage root = getById(rootId);
+        if (root == null) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "话题不存在");
+        }
+        conversationService.assertMember(root.getConversationId(), viewerId);
+        List<ImMessageVO> out = new ArrayList<>();
+        out.add(toVO(root, viewerId));
+        List<ImMessage> replies = list(new LambdaQueryWrapper<ImMessage>()
+                .eq(ImMessage::getParentId, rootId)
+                .orderByAsc(ImMessage::getId));
+        for (ImMessage r : replies) {
+            out.add(toVO(r, viewerId));
         }
         return out;
     }
@@ -186,6 +221,10 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
     }
 
     private ImMessageVO toVO(ImMessage m) {
+        return toVO(m, null);
+    }
+
+    private ImMessageVO toVO(ImMessage m, Long viewerId) {
         ImMessageVO vo = new ImMessageVO();
         vo.setId(String.valueOf(m.getId()));
         vo.setConversationId(String.valueOf(m.getConversationId()));
@@ -197,6 +236,13 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
         vo.setAttachmentMime(m.getAttachmentMime());
         vo.setStatus(m.getStatus());
         vo.setCreateTime(m.getCreateTime());
+        vo.setParentId(m.getParentId() == null ? null : String.valueOf(m.getParentId()));
+        vo.setReplyCount(m.getReplyCount() == null ? 0 : m.getReplyCount());
+        vo.setMentionAll(Boolean.TRUE.equals(m.getMentionAll()));
+        if (StrUtil.isNotBlank(m.getMentionedUserIds())) {
+            vo.setMentionedUserIds(Arrays.asList(m.getMentionedUserIds().split(",")));
+        }
+        vo.setReactions(reactionService.aggregate(m.getId(), viewerId));
         if (m.getSenderId() != null) {
             try {
                 ManagerUser u = manageUserService.getById(m.getSenderId());

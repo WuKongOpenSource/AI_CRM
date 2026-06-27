@@ -1,5 +1,11 @@
 import { get, post } from '@/utils/request'
 
+export interface ImReaction {
+  emoji: string
+  count: number
+  mine: boolean
+}
+
 export interface ImMessage {
   id: string
   conversationId: string
@@ -13,6 +19,11 @@ export interface ImMessage {
   status: 'normal' | 'recalled'
   createTime: string
   senderName?: string | null
+  reactions?: ImReaction[]
+  mentionedUserIds?: string[]
+  mentionAll?: boolean
+  parentId?: string | null
+  replyCount?: number
 }
 
 export interface ImConversation {
@@ -45,6 +56,9 @@ export interface ImSendPayload {
   attachmentPath?: string
   attachmentSize?: number
   attachmentMime?: string
+  mentionedUserIds?: string[]
+  mentionAll?: boolean
+  parentId?: string
 }
 
 export const listConversations = () => get<ImConversation[]>('/im/conversations')
@@ -76,3 +90,6 @@ export const leaveChannel = (id: string) => post<string>(`/im/channels/${id}/lea
 export const addChannelMembers = (id: string, userIds: string[]) =>
   post<string>(`/im/channels/${id}/members`, { userIds })
 export const listChannelMembers = (id: string) => get<ImContact[]>(`/im/channels/${id}/members`)
+export const toggleReaction = (messageId: string, emoji: string) =>
+  post<ImReaction[]>(`/im/messages/${messageId}/reactions`, { emoji })
+export const fetchThread = (rootId: string) => get<ImMessage[]>(`/im/messages/${rootId}/thread`)

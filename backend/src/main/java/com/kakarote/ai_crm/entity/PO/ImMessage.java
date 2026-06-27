@@ -26,6 +26,11 @@ public class ImMessage implements Serializable {
     private Long attachmentSize;
     private String attachmentMime;
     private String status;
+    private Long parentId;
+    private Integer replyCount;
+    private Date lastReplyTime;
+    private String mentionedUserIds;
+    private Boolean mentionAll;
     private Date createTime;
     private Date updateTime;
 }

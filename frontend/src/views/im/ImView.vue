@@ -145,14 +145,72 @@
                   <span class="material-symbols-outlined" style="font-size:20px;color:#6d4aff;">description</span>
                   <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.msg.attachmentName }}</span>
                 </a>
-                <div v-else style="font-size:14.5px;line-height:1.5;color:#1d1c1d;white-space:pre-wrap;word-break:break-word;">{{ row.msg.content }}</div>
+                <template v-else>
+                  <div style="font-size:14.5px;line-height:1.5;color:#1d1c1d;white-space:pre-wrap;word-break:break-word;">
+                    <template v-for="(seg, si) in splitMentions(row.msg.content || '')" :key="si">
+                      <span
+                        v-if="isMentionToken(seg, row.msg)"
+                        style="color:#6d4aff;font-weight:600;background:rgba(109,74,255,0.08);border-radius:4px;padding:0 3px;"
+                      >{{ seg }}</span>
+                      <span v-else>{{ seg }}</span>
+                    </template>
+                  </div>
+                  <span
+                    v-if="row.msg.mentionAll || (row.msg.mentionedUserIds || []).includes(myId)"
+                    class="wk-im-mention-badge"
+                  >@你</span>
+                </template>
+                <!-- reaction chips -->
+                <div v-if="row.msg.reactions && row.msg.reactions.length" style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">
+                  <button
+                    v-for="r in row.msg.reactions"
+                    :key="r.emoji"
+                    class="wk-im-reaction"
+                    :class="{ mine: r.mine }"
+                    @click="im.toggleReactionAction(row.msg.id, r.emoji)"
+                  >
+                    <span>{{ r.emoji }}</span><span style="font-size:11px;margin-left:3px;">{{ r.count }}</span>
+                  </button>
+                </div>
+                <!-- reply count affordance -->
+                <div
+                  v-if="row.msg.replyCount && row.msg.replyCount > 0 && row.msg.status !== 'recalled'"
+                  class="wk-im-reply-count"
+                  @click="openThreadDrawer(row.msg.id)"
+                >
+                  <span class="material-symbols-outlined" style="font-size:13px;">forum</span>
+                  {{ row.msg.replyCount }} 条回复
+                </div>
               </div>
-              <!-- hover action: recall own recent message -->
+              <!-- hover action bar -->
               <div
-                v-if="hoveredMsg === row.msg.id && row.mine && row.msg.status === 'normal' && canRecall(row.msg)"
+                v-if="hoveredMsg === row.msg.id && row.msg.status === 'normal'"
                 class="wk-im-hoverbar"
               >
-                <button title="撤回" @click="im.recall(activeConv.id, row.msg.id)">
+                <!-- reaction picker trigger -->
+                <div style="position:relative;">
+                  <button title="回应" @click.stop="reactionPickerFor = reactionPickerFor === row.msg.id ? null : row.msg.id">
+                    <span class="material-symbols-outlined" style="font-size:17px;">add_reaction</span>
+                  </button>
+                  <div
+                    v-if="reactionPickerFor === row.msg.id"
+                    class="wk-im-emoji-picker"
+                    @click.stop
+                  >
+                    <button
+                      v-for="emoji in REACTION_EMOJIS"
+                      :key="emoji"
+                      class="wk-im-emoji-btn"
+                      @click="im.toggleReactionAction(row.msg.id, emoji); reactionPickerFor = null"
+                    >{{ emoji }}</button>
+                  </div>
+                </div>
+                <!-- thread reply button -->
+                <button title="回复话题" @click="openThreadDrawer(row.msg.id)">
+                  <span class="material-symbols-outlined" style="font-size:17px;">forum</span>
+                </button>
+                <!-- recall (own recent only) -->
+                <button v-if="row.mine && canRecall(row.msg)" title="撤回" @click="im.recall(activeConv.id, row.msg.id)">
                   <span class="material-symbols-outlined" style="font-size:17px;">undo</span>
                 </button>
               </div>
@@ -164,7 +222,23 @@
         </div>
 
         <!-- composer -->
-        <div style="padding:0 22px 16px;flex:none;">
+        <div style="padding:0 22px 16px;flex:none;position:relative;">
+          <!-- @mention dropdown -->
+          <div
+            v-if="mentionOpen && mentionCandidates.length"
+            class="wk-im-mention-dropdown"
+            @click.stop
+          >
+            <div
+              v-for="c in mentionCandidates"
+              :key="c.userId"
+              class="wk-im-mention-item"
+              @mousedown.prevent="selectMention(c)"
+            >
+              <span style="font-size:15px;margin-right:6px;">{{ c.userId === '__all__' ? '👥' : '👤' }}</span>
+              <span>{{ c.name }}</span>
+            </div>
+          </div>
           <div class="wk-im-composer">
             <textarea
               ref="composerEl"
@@ -172,6 +246,7 @@
               :placeholder="`发消息给 ${convName(activeConv)}`"
               rows="1"
               @keydown="onComposerKey"
+              @input="onComposerInput"
             ></textarea>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px 8px;">
               <div style="display:flex;align-items:center;gap:1px;">
@@ -261,6 +336,102 @@
       </div>
     </el-dialog>
 
+    <!-- thread drawer -->
+    <el-drawer
+      v-model="threadDrawerOpen"
+      direction="rtl"
+      size="440px"
+      :with-header="true"
+      title="话题"
+      @close="im.closeThread()"
+    >
+      <div style="display:flex;flex-direction:column;height:100%;">
+        <!-- thread messages -->
+        <div style="flex:1;overflow-y:auto;padding:8px 0;">
+          <template v-if="im.threadRoot">
+            <!-- root message -->
+            <div class="wk-im-msgrow" style="padding:8px 16px;margin-bottom:8px;border-bottom:1px solid #ededef;">
+              <div
+                class="wk-im-avatar"
+                :style="{ width:'36px', height:'36px', borderRadius:'9px', fontSize:'13px', flex:'none', background: avatarBg(im.threadRoot.senderId, im.threadRoot.senderName) }"
+              >{{ avatarText(im.threadRoot.senderName) }}</div>
+              <div style="flex:1;min-width:0;padding-top:2px;">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">
+                  <span style="font-weight:700;font-size:13.5px;color:#1d1c1d;">{{ im.threadRoot.senderId === myId ? '我' : im.threadRoot.senderName || '' }}</span>
+                  <span style="font-size:11px;color:#a7a7ab;">{{ clockTime(im.threadRoot.createTime) }}</span>
+                </div>
+                <div v-if="im.threadRoot.status === 'recalled'" style="font-size:13px;color:#a7a7ab;font-style:italic;">该消息已撤回</div>
+                <template v-else>
+                  <div style="font-size:13.5px;line-height:1.5;color:#1d1c1d;white-space:pre-wrap;word-break:break-word;">
+                    <template v-for="(seg, si) in splitMentions(im.threadRoot.content || '')" :key="si">
+                      <span v-if="isMentionToken(seg, im.threadRoot)" style="color:#6d4aff;font-weight:600;background:rgba(109,74,255,0.08);border-radius:4px;padding:0 3px;">{{ seg }}</span>
+                      <span v-else>{{ seg }}</span>
+                    </template>
+                  </div>
+                  <div v-if="im.threadRoot.reactions && im.threadRoot.reactions.length" style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">
+                    <button v-for="r in im.threadRoot.reactions" :key="r.emoji" class="wk-im-reaction" :class="{ mine: r.mine }" @click="im.toggleReactionAction(im.threadRoot!.id, r.emoji)">
+                      <span>{{ r.emoji }}</span><span style="font-size:11px;margin-left:3px;">{{ r.count }}</span>
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <!-- replies -->
+            <div v-for="msg in im.threadMessages" :key="msg.id" class="wk-im-msgrow" style="padding:6px 16px;">
+              <div
+                class="wk-im-avatar"
+                :style="{ width:'32px', height:'32px', borderRadius:'8px', fontSize:'12px', flex:'none', background: avatarBg(msg.senderId, msg.senderName) }"
+              >{{ avatarText(msg.senderName) }}</div>
+              <div style="flex:1;min-width:0;padding-top:2px;">
+                <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">
+                  <span style="font-weight:600;font-size:13px;color:#1d1c1d;">{{ msg.senderId === myId ? '我' : msg.senderName || '' }}</span>
+                  <span style="font-size:11px;color:#a7a7ab;">{{ clockTime(msg.createTime) }}</span>
+                </div>
+                <div v-if="msg.status === 'recalled'" style="font-size:13px;color:#a7a7ab;font-style:italic;">该消息已撤回</div>
+                <template v-else>
+                  <div style="font-size:13.5px;line-height:1.5;color:#1d1c1d;white-space:pre-wrap;word-break:break-word;">
+                    <template v-for="(seg, si) in splitMentions(msg.content || '')" :key="si">
+                      <span v-if="isMentionToken(seg, msg)" style="color:#6d4aff;font-weight:600;background:rgba(109,74,255,0.08);border-radius:4px;padding:0 3px;">{{ seg }}</span>
+                      <span v-else>{{ seg }}</span>
+                    </template>
+                  </div>
+                  <div v-if="msg.reactions && msg.reactions.length" style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">
+                    <button v-for="r in msg.reactions" :key="r.emoji" class="wk-im-reaction" :class="{ mine: r.mine }" @click="im.toggleReactionAction(msg.id, r.emoji)">
+                      <span>{{ r.emoji }}</span><span style="font-size:11px;margin-left:3px;">{{ r.count }}</span>
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div v-if="!im.threadMessages.length" style="padding:20px;text-align:center;color:#b0b0b4;font-size:13px;">还没有回复，来说说吧</div>
+          </template>
+        </div>
+        <!-- thread composer -->
+        <div style="flex:none;padding:12px 16px 16px;border-top:1px solid #ededef;">
+          <div class="wk-im-composer">
+            <textarea
+              v-model="threadDraft"
+              placeholder="回复话题…"
+              rows="1"
+              @keydown="onThreadComposerKey"
+              style="padding:10px 12px 4px;"
+            ></textarea>
+            <div style="display:flex;justify-content:flex-end;padding:4px 8px 8px;">
+              <button
+                class="wk-im-send"
+                :disabled="!threadDraft.trim()"
+                :style="{ background: threadDraft.trim() ? '#6d4aff' : '#d7d7da' }"
+                @click="sendThreadMessage"
+              >
+                <span class="material-symbols-outlined" style="font-size:18px;color:#fff;">send</span>
+              </button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#b0b0b4;margin-top:5px;">Enter 发送 · Shift+Enter 换行</div>
+        </div>
+      </div>
+    </el-drawer>
+
     <!-- channel members dialog -->
     <el-dialog v-model="openMembers" title="频道成员" width="420px" @open="loadMembers">
       <div style="max-height:240px;overflow-y:auto;margin-bottom:10px;">
@@ -282,7 +453,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useImStore } from '@/stores/im'
 import { useUserStore } from '@/stores/user'
@@ -295,6 +466,50 @@ const route = useRoute()
 const userStore = useUserStore()
 const myId = computed(() => String(userStore.userId ?? ''))
 const meAvatarText = computed(() => '我')
+
+// Reaction palette
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉', '👀', '✅', '🙏', '😄']
+const reactionPickerFor = ref<string | null>(null)
+
+// Thread drawer
+const threadDrawerOpen = ref(false)
+const threadDraft = ref('')
+
+async function openThreadDrawer(rootId: string) {
+  await im.openThread(rootId)
+  threadDrawerOpen.value = true
+}
+
+async function sendThreadMessage() {
+  const text = threadDraft.value.trim()
+  if (!text || !im.activeConversationId) return
+  threadDraft.value = ''
+  await im.sendThreadReply({ conversationId: im.activeConversationId, contentType: 'text', content: text })
+}
+
+function onThreadComposerKey(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    void sendThreadMessage()
+  }
+}
+
+// @mention composer state
+const mentionOpen = ref(false)
+const mentionQuery = ref('')
+const pendingMentions = ref<Record<string, string>>({}) // name -> userId
+const draftMentionAll = ref(false)
+const channelMembersCache = ref<ImContact[]>([])
+
+const mentionCandidates = computed(() => {
+  const base = activeConv.value && isChannel(activeConv.value) ? channelMembersCache.value : (activeConv.value ? [{ userId: activeConv.value.peerUserId, name: activeConv.value.peerName } as ImContact] : [])
+  const q = mentionQuery.value.toLowerCase()
+  const list = q ? base.filter((c) => c.name.toLowerCase().includes(q)) : base
+  if (activeConv.value && isChannel(activeConv.value)) {
+    return [{ userId: '__all__', name: '所有人' } as ImContact, ...list]
+  }
+  return list
+})
 
 const draft = ref('')
 const openContacts = ref(false)
@@ -469,22 +684,89 @@ function canRecall(m: ImMessage) {
   return Date.now() - parseTime(m.createTime) < 2 * 60 * 1000
 }
 
+// Mention rendering helpers (XSS-safe: split into segments, render with v-for spans)
+function splitMentions(text: string): string[] {
+  return text.split(/(@[^\s@]+)/g)
+}
+
+function isMentionToken(seg: string, msg: ImMessage | null): boolean {
+  if (!msg) return false
+  if (!seg.startsWith('@')) return false
+  const name = seg.slice(1)
+  if (name === '所有人') return true
+  // check against mentioned user names via member cache
+  if ((msg.mentionedUserIds || []).length > 0) {
+    // if any member in cache has matching name and their id is mentioned
+    const member = channelMembersCache.value.find((m) => m.name === name)
+    if (member && (msg.mentionedUserIds || []).includes(member.userId)) return true
+    // also check peer name for DMs
+    if (activeConv.value && !isChannel(activeConv.value) && activeConv.value.peerName === name) return true
+  }
+  return false
+}
+
+function buildMentionFields(text: string) {
+  const ids: string[] = []
+  let all = false
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  for (const [name, uid] of Object.entries(pendingMentions.value)) {
+    const re = new RegExp(`@${esc(name)}(?=\\s|$|[^\\w\\u4e00-\\u9fa5])`)
+    if (re.test(text)) ids.push(uid)
+  }
+  if (draftMentionAll.value && /@所有人(?=\s|$|[^\w一-龥])/.test(text)) all = true
+  return { mentionedUserIds: ids, mentionAll: all }
+}
+
 function openImage(url?: string | null) {
   if (url) window.open(url, '_blank')
 }
 
 function onComposerKey(e: KeyboardEvent) {
+  if (mentionOpen.value) {
+    if (e.key === 'Escape') { e.preventDefault(); mentionOpen.value = false; return }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); return } // let mention selection handle it
+  }
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     void onSend()
   }
 }
 
+function onComposerInput() {
+  const text = draft.value
+  // detect trailing @query token (no space after @)
+  const m = text.match(/@([^\s@]*)$/)
+  if (m) {
+    mentionOpen.value = true
+    mentionQuery.value = m[1]
+  } else {
+    mentionOpen.value = false
+    mentionQuery.value = ''
+  }
+}
+
+function selectMention(candidate: ImContact) {
+  // replace trailing @query with @Name
+  draft.value = draft.value.replace(/@([^\s@]*)$/, `@${candidate.name} `)
+  if (candidate.userId === '__all__') {
+    draftMentionAll.value = true
+  } else {
+    pendingMentions.value[candidate.name] = candidate.userId
+  }
+  mentionOpen.value = false
+  mentionQuery.value = ''
+  nextTick(() => composerEl.value?.focus())
+}
+
 async function onSend() {
   const text = draft.value.trim()
   if (!text || !im.activeConversationId) return
+  const mentionFields = buildMentionFields(text)
   draft.value = ''
-  await im.send({ conversationId: im.activeConversationId, contentType: 'text', content: text })
+  pendingMentions.value = {}
+  draftMentionAll.value = false
+  mentionOpen.value = false
+  await im.send({ conversationId: im.activeConversationId, contentType: 'text', content: text, ...mentionFields })
 }
 
 async function startChat(userId: string) {
@@ -569,13 +851,39 @@ watch(
   { deep: true }
 )
 
+// Sync myId into store for mention notifications
+watch(myId, (v) => { im.myId = v }, { immediate: true })
+
+// Load channel members when the active channel changes (for @ autocomplete)
+watch(
+  () => im.activeConversationId,
+  async (convId) => {
+    pendingMentions.value = {}
+    draftMentionAll.value = false
+    if (!convId) { channelMembersCache.value = []; return }
+    const conv = im.conversations.find((c) => c.id === convId)
+    if (conv && isChannel(conv)) {
+      channelMembersCache.value = await im.fetchChannelMembers(convId)
+    } else {
+      channelMembersCache.value = []
+    }
+  }
+)
+
+// Close reaction picker on outside click
+function onDocClick() { reactionPickerFor.value = null }
+
 onMounted(async () => {
   im.ensureNotificationPermission()
   im.connect()
+  im.myId = myId.value
   await im.refreshConversations()
   const peer = route.query.peer as string | undefined
   if (peer) await im.openConversationWith(peer)
+  document.addEventListener('click', onDocClick)
 })
+
+onUnmounted(() => { document.removeEventListener('click', onDocClick) })
 </script>
 
 <style scoped>
@@ -785,4 +1093,98 @@ onMounted(async () => {
   border-radius: 8px;
 }
 .wk-im-contact:hover { background: #f3f3f5; }
+
+/* Reaction chips */
+.wk-im-reaction {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1.5px solid #e0e0e4;
+  border-radius: 20px;
+  background: #f7f7f9;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1d1c1d;
+  line-height: 1.5;
+  transition: border-color 0.12s, background 0.12s;
+}
+.wk-im-reaction:hover { border-color: #6d4aff; background: rgba(109, 74, 255, 0.06); }
+.wk-im-reaction.mine { border-color: #6d4aff; background: rgba(109, 74, 255, 0.1); color: #5b3fe0; }
+
+/* Emoji picker popover */
+.wk-im-emoji-picker {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: #fff;
+  border: 1px solid #e8e8ea;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.13);
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  z-index: 20;
+  white-space: nowrap;
+}
+.wk-im-emoji-btn {
+  font-size: 20px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 7px;
+  line-height: 1;
+}
+.wk-im-emoji-btn:hover { background: #f3f3f5; }
+
+/* Reply count affordance */
+.wk-im-reply-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: #6d4aff;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.wk-im-reply-count:hover { text-decoration: underline; }
+
+/* @mention badge */
+.wk-im-mention-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6d4aff;
+  background: rgba(109, 74, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* @mention dropdown */
+.wk-im-mention-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e0e0e4;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.wk-im-mention-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: #1d1c1d;
+}
+.wk-im-mention-item:hover { background: rgba(109, 74, 255, 0.07); }
 </style>

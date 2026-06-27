@@ -11,4 +11,7 @@ public class ImSendMessageBO {
     private String attachmentPath;
     private Long attachmentSize;
     private String attachmentMime;
+    private java.util.List<Long> mentionedUserIds;
+    private Boolean mentionAll;
+    private Long parentId;       // set when sending a thread reply
 }
