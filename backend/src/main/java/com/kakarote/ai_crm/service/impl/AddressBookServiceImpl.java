@@ -12,7 +12,10 @@ import com.kakarote.ai_crm.entity.BO.AddressBookQueryBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kakarote.ai_crm.entity.PO.ManagerDept;
+import com.kakarote.ai_crm.entity.PO.ProjectTask;
+import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import com.kakarote.ai_crm.entity.VO.AddressBookDetailVO;
 import com.kakarote.ai_crm.entity.VO.AddressBookEmployeeVO;
 import com.kakarote.ai_crm.entity.VO.AddressBookRecentRecordVO;
@@ -67,6 +70,9 @@ public class AddressBookServiceImpl implements IAddressBookService {
 
     @Autowired
     private IKnowledgeService knowledgeService;
+
+    @Autowired
+    private ProjectTaskMapper projectTaskMapper;
 
     @Override
     public BasePage<AddressBookEmployeeVO> queryPageList(AddressBookQueryBO queryBO) {
@@ -144,11 +150,64 @@ public class AddressBookServiceImpl implements IAddressBookService {
         if (!hasPermission("task:view")) {
             return List.of();
         }
+        List<TaskVO> combined = new ArrayList<>();
+        // 独立任务（crm_task.assigned_to）
         TaskQueryBO queryBO = new TaskQueryBO();
         queryBO.setPage(1);
         queryBO.setLimit(RELATED_LIMIT);
         queryBO.setAssignedTo(userId);
-        return taskService.queryPageList(queryBO).getList();
+        combined.addAll(taskService.queryPageList(queryBO).getList());
+        // 项目任务（crm_project_task：负责人或参与人），与独立任务合并后统一排序限量
+        combined.addAll(loadRelatedProjectTasks(userId));
+        combined.sort(Comparator.comparing(
+                (TaskVO t) -> firstDate(t.getCompletedTime(), t.getDueDate(), t.getCreateTime()),
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return combined.stream().limit(RELATED_LIMIT).toList();
+    }
+
+    private List<TaskVO> loadRelatedProjectTasks(Long userId) {
+        String uid = String.valueOf(userId);
+        List<ProjectTask> rows = projectTaskMapper.selectList(new LambdaQueryWrapper<ProjectTask>()
+                .eq(ProjectTask::getOwnerId, userId)
+                .or()
+                .like(ProjectTask::getParticipantUserIds, uid));
+        List<TaskVO> out = new ArrayList<>();
+        for (ProjectTask pt : rows) {
+            boolean isOwner = userId.equals(pt.getOwnerId());
+            // 精确校验参与人（CSV 的 LIKE 可能误命中子串，按逗号拆分做精确匹配）
+            boolean isParticipant = csvContains(pt.getParticipantUserIds(), uid);
+            if (!isOwner && !isParticipant) {
+                continue;
+            }
+            TaskVO vo = new TaskVO();
+            vo.setTaskId(pt.getTaskId());
+            vo.setTitle(pt.getTitle());
+            vo.setDescription(pt.getDescription());
+            vo.setDueDate(pt.getDueDate());
+            vo.setPriority(pt.getPriority());
+            vo.setStatus(pt.getStatus());
+            vo.setAssignedTo(pt.getOwnerId());
+            vo.setAssignedToName(pt.getOwnerName());
+            vo.setProjectId(pt.getProjectId());
+            vo.setLaneId(pt.getLaneId());
+            vo.setParticipantNames(pt.getParticipantNames());
+            vo.setCreateTime(pt.getCreateTime());
+            vo.setTaskType("project");
+            out.add(vo);
+        }
+        return out;
+    }
+
+    private boolean csvContains(String csv, String value) {
+        if (StrUtil.isBlank(csv)) {
+            return false;
+        }
+        for (String part : csv.split(",")) {
+            if (value.equals(part.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<ScheduleVO> loadRelatedSchedules(Long userId) {
