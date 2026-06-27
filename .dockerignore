@@ -1,0 +1,12 @@
+# Keep the build context lean for `docker compose build crm`
+.git
+**/node_modules
+**/target
+**/dist
+frontend/dist
+frontend/android
+frontend/ios
+docker/aicrm/logs
+**/*.log
+.idea
+.vscode

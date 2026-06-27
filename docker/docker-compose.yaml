@@ -135,7 +135,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     ports:
-      - "5432:5432"
+      - "15432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -143,6 +143,7 @@ services:
       - crm-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      # NOTE: host 5432 is used by another project; CRM uses internal networking so this only affects external access
       interval: 10s # 增加时间间隔
       timeout: 10s # 增加超时时间
       retries: 3 # 减少重试次数，让失败更快反馈
@@ -201,7 +202,13 @@ services:
     networks:
       - crm-network
   crm:
-    image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260622
+    # build mode: build the CRM image from local backend/ + frontend/ source.
+    # To revert to the prebuilt image, delete the build: block and uncomment image: below.
+    build:
+      context: ..
+      dockerfile: Dockerfile.crm
+    image: wk_ai_crm:local
+    # image: wuknogcrm-registry.cn-beijing.cr.aliyuncs.com/wukongcrm/wk_ai_crm:20260622
     container_name: crm
     platform: linux/amd64
     ports:
