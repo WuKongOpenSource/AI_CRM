@@ -1,0 +1,29 @@
+# Desktop (local-first) profile.
+# Embedded Postgres + embedded Redis are started by DesktopEmbeddedServices, which injects
+# spring.datasource.* and spring.data.redis.* at runtime (overriding application.yml).
+# Files are stored on the local disk (MinIO off); the knowledge-base RAG service (WeKnora) is off.
+# Only the LLM API remains remote.
+
+minio:
+  enabled: false
+
+file:
+  upload-path: ${WK_DESKTOP_DATA_DIR:${user.home}/.wk-ai-crm}/uploads
+
+# logback-spring.xml reads `logging.file` as the log directory; keep logs in the local data dir
+# (otherwise it falls back to ./logs relative to the working dir, which may not be writable).
+logging:
+  file: ${WK_DESKTOP_DATA_DIR:${user.home}/.wk-ai-crm}/logs
+
+weknora:
+  enabled: false
+
+wukong:
+  captcha:
+    login-required: false
+
+spring:
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1

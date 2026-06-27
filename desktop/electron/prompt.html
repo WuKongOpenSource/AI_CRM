@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
+  <title>服务器地址设置</title>
+  <style>
+    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; padding: 20px; color: #1f2329; background: #fff; }
+    h1 { font-size: 15px; margin: 0 0 12px; }
+    p { font-size: 12px; color: #646a73; margin: 0 0 10px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 13px; border: 1px solid #c9cdd4; border-radius: 6px; outline: none; }
+    input:focus { border-color: #3370ff; }
+    .row { margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px; }
+    button { padding: 7px 16px; font-size: 13px; border-radius: 6px; cursor: pointer; border: 1px solid #c9cdd4; background: #fff; }
+    button.primary { background: #3370ff; border-color: #3370ff; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>设置后端服务器地址</h1>
+  <p>填写 CRM 部署的访问入口（docker 的 nginx 入口），例如 <b>http://localhost</b> 或 <b>http://192.168.1.10</b>。</p>
+  <input id="url" type="text" placeholder="http://localhost" />
+  <div class="row">
+    <button id="cancel">取消</button>
+    <button id="ok" class="primary">保存并重载</button>
+  </div>
+  <script>
+    const input = document.getElementById('url')
+    window.serverPrompt.onInit((value) => { input.value = value || ''; input.focus(); input.select() })
+    document.getElementById('ok').addEventListener('click', () => window.serverPrompt.submit(input.value))
+    document.getElementById('cancel').addEventListener('click', () => window.serverPrompt.cancel())
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') window.serverPrompt.submit(input.value)
+      if (e.key === 'Escape') window.serverPrompt.cancel()
+    })
+  </script>
+</body>
+</html>

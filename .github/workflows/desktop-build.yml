@@ -1,0 +1,73 @@
+name: Build desktop app (Windows + macOS)
+
+# Manual trigger (Actions tab -> Run workflow) or on a version tag like v1.0.0
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple Silicon (arm64) .dmg/.zip
+            builder: '--mac'
+          - os: windows-latest  # Windows x64 installer + portable
+            builder: '--win'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 1) Backend jar (desktop profile: embedded Postgres + Redis). One jar runs on
+      #    Windows + macOS; the matching Postgres binary is bundled and chosen at runtime.
+      - name: Build backend jar
+        shell: bash
+        run: |
+          cd backend
+          mvn -B -Pdesktop -DskipTests -Dmaven.test.skip=true package
+          mkdir -p ../desktop/resources/backend
+          cp target/crm-1.0.0.jar ../desktop/resources/backend/crm-desktop.jar
+
+      # 2) Frontend SPA
+      - name: Build frontend
+        shell: bash
+        run: |
+          cd frontend
+          npm ci
+          npm run build || npx vite build
+
+      # 3) Desktop app: stage SPA, fetch the matching JRE, make icons, package
+      - name: Build desktop installer
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # do not attempt code signing (no Apple cert)
+        run: |
+          cd desktop
+          npm ci
+          npm run sync:renderer
+          npm run fetch:jre
+          npm run make:icon
+          npx electron-builder ${{ matrix.builder }} --publish never
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          if-no-files-found: warn
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.exe

@@ -1,0 +1,5 @@
+node_modules/
+app/
+release/
+resources/jre/
+resources/backend/

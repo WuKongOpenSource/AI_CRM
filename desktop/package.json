@@ -1,0 +1,77 @@
+{
+  "name": "wk-ai-crm-desktop",
+  "version": "1.0.0",
+  "description": "AI CRM PC client (Electron) — bundles the SPA and proxies to a configurable backend",
+  "author": "tyr.ai",
+  "license": "MIT",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "build:renderer": "npm --prefix ../frontend run build",
+    "sync:renderer": "node scripts/sync-renderer.mjs",
+    "bundle": "npm run build:renderer && npm run sync:renderer",
+    "fetch:jre": "node scripts/fetch-jre.mjs",
+    "make:icon": "node scripts/make-icon.mjs",
+    "start": "electron .",
+    "dist:win": "npm run bundle && npm run fetch:jre && npm run make:icon && electron-builder --win",
+    "dist:mac": "npm run bundle && npm run fetch:jre && npm run make:icon && electron-builder --mac",
+    "dist:win:dir": "npm run bundle && npm run fetch:jre && electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "jimp": "^1.6.1",
+    "png-to-ico": "^3.0.1"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  },
+  "build": {
+    "appId": "ai.tyr.wkaicrm.desktop",
+    "productName": "AI CRM",
+    "asar": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "app/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      { "from": "resources/backend", "to": "backend" },
+      { "from": "resources/jre", "to": "jre" }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.business",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "AI CRM ${version}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "AI CRM",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+  <title>AI CRM</title>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body { display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #0f1f3d; color: #fff; }
+    .title { font-size: 18px; font-weight: 600; margin-bottom: 14px; letter-spacing: 1px; }
+    .msg { font-size: 13px; color: #b9c4dc; }
+    .bar { margin-top: 18px; width: 220px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 40%; border-radius: 2px; background: #4d8bff;
+      animation: slide 1.2s ease-in-out infinite; }
+    @keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="title">悟空 AI CRM</div>
+  <div class="msg">正在启动本地服务（数据库 / 文件系统）…首次启动稍慢</div>
+  <div class="bar"><i></i></div>
+</body>
+</html>
