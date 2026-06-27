@@ -108,6 +108,31 @@
         </button>
       </div>
 
+      <!-- IM 消息入口 -->
+      <div class="px-3 mb-[2px] pr-[10px]" :class="primarySidebarContentCollapsed ? '!px-2' : ''">
+        <button
+          class="flex items-center rounded-lg py-2 text-sm font-normal text-[#0d0d0d] transition-colors"
+          :class="[
+            route.path.startsWith('/im') ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]',
+            primarySidebarContentCollapsed
+              ? 'mx-auto w-[35px] shrink-0 justify-center px-0'
+              : 'ml-[2px] mr-[6px] w-full gap-2 pl-[10px] pr-[10px] max-w-[248px]',
+          ]"
+          :title="primarySidebarContentCollapsed ? '消息' : undefined"
+          @click="navigateTo('/im')"
+        >
+          <el-badge
+            :value="imStore.totalUnread"
+            :hidden="!imStore.totalUnread"
+            :max="99"
+            class="flex-shrink-0"
+          >
+            <span class="material-symbols-outlined text-[18px] leading-none">chat</span>
+          </el-badge>
+          <span style="margin-left: 2px;" v-if="!primarySidebarContentCollapsed">消息</span>
+        </button>
+      </div>
+
       <div class="ml-0 h-px w-full shrink-0 transition-colors duration-150 mr-2">
         <div
           v-if="primaryNavHasScrollbar"
@@ -2082,6 +2107,7 @@ import { useEnterpriseStore } from '@/stores/enterprise'
 import { useResponsive } from '@/composables/useResponsive'
 import { useTheme } from '@/composables/useTheme'
 import { useChatStore } from '@/stores/chat'
+import { useImStore } from '@/stores/im'
 import { useProjectStore } from '@/stores/project'
 import { useUserStore } from '@/stores/user'
 import { useEnumStore } from '@/stores/enums'
@@ -2114,6 +2140,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const enterpriseStore = useEnterpriseStore()
 const chatStore = useChatStore()
+const imStore = useImStore()
 const projectStore = useProjectStore()
 const enumStore = useEnumStore()
 enumStore.ensureCustomerStage()
@@ -3563,6 +3590,7 @@ function updatePrimaryNavScrollbar() {
 onMounted(() => {
   enterpriseStore.loadConfig()
   void chatStore.fetchSessions()
+  imStore.connect()
   void loadCurrentAppVersion()
   void handleExternalAuthBindingReturn()
   if (showSidebarCustomers.value) {

@@ -92,6 +92,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '项目详情', hidden: true, permission: 'task' }
       },
       {
+        path: 'im',
+        name: 'Im',
+        component: () => import('@/views/im/ImView.vue'),
+        meta: { title: '消息', icon: 'chat', permission: 'im' },
+      },
+      {
         path: 'mail',
         name: 'Mail',
         component: () => import('@/views/mail/MailView.vue'),
