@@ -86,6 +86,34 @@ public class TokenService {
     }
 
     /**
+     * 通过原始 token 字符串解析登录用户（用于 WebSocket 等无 HttpServletRequest 的场景）。
+     */
+    public LoginUser getLoginUser(String token) {
+        if (StrUtil.isEmpty(token)) {
+            return null;
+        }
+        try {
+            Claims claims = parseToken(token);
+            String uuid = (String) claims.get(Const.LOGIN_USER_KEY);
+            String loginUserJson = redisTemplate.opsForValue().get(getTokenKey(uuid));
+            if (StrUtil.isBlank(loginUserJson)) {
+                return null;
+            }
+            LoginUser loginUser = JSON.parseObject(loginUserJson, LoginUser.class);
+            if (loginUser == null) {
+                return null;
+            }
+            if (isTokenReplaced(loginUser, uuid)) {
+                return null;
+            }
+            return loginUser;
+        } catch (Exception e) {
+            log.debug("Failed to resolve login user from token string: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * 设置Login用户。
      */
     public void setLoginUser(LoginUser loginUser) {

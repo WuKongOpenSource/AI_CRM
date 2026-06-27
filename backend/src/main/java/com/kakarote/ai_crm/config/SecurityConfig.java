@@ -93,7 +93,9 @@ public class SecurityConfig {
                                 "/oauth2/token",
                                 "/oauth2/userinfo",
                                 "/oauth2/jwks",
-                                "/oauth2/minio-sso"
+                                "/oauth2/minio-sso",
+                                "/ws",
+                                "/ws/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

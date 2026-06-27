@@ -106,6 +106,15 @@
             </template>
           </el-table-column>
 
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #header>
+              <span class="normal-case tracking-normal">操作</span>
+            </template>
+            <template #default="{ row }">
+              <el-button size="small" @click.stop="messageEmployee(row.userId)">发消息</el-button>
+            </template>
+          </el-table-column>
+
           <template #empty>
             <div class="text-center py-16">
               <div class="size-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200 mx-auto mb-4">
@@ -328,6 +337,10 @@ function formatDateTime(value?: string) {
 
 function openEmployeeChat(employee: AddressBookEmployee) {
   router.push({ path: '/chat', query: { employeeId: employee.userId } })
+}
+
+function messageEmployee(userId: string | number) {
+  void router.push({ path: '/im', query: { peer: String(userId) } })
 }
 </script>
 
