@@ -13,6 +13,7 @@ import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.ai.tools.ContactTools;
 import com.kakarote.ai_crm.ai.tools.CrmNoopTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
+import com.kakarote.ai_crm.ai.tools.CandidateTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.MailTools;
@@ -87,6 +88,9 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private ProductTools productTools;
+
+    @Autowired
+    private CandidateTools candidateTools;
 
     @Autowired
     private KnowledgeTools knowledgeTools;
@@ -325,7 +329,7 @@ public class DynamicChatClientProvider {
 
     private Object[] resolveDefaultTools() {
         return java.util.Arrays.stream(new Object[] {
-                customerTools, taskTools, projectTools, productTools, knowledgeTools,
+                customerTools, taskTools, projectTools, productTools, candidateTools, knowledgeTools,
                 contactTools, followupTools, scheduleTools, relationTools, mailTools,
                 crmNoopTools
         }).filter(Objects::nonNull).toArray();
@@ -362,6 +366,7 @@ public class DynamicChatClientProvider {
             case ChatApplicationRegistry.TOOL_GROUP_PRODUCT -> addTool(tools, productTools);
             case ChatApplicationRegistry.TOOL_GROUP_PROJECT -> addTool(tools, projectTools);
             case ChatApplicationRegistry.TOOL_GROUP_RELATION -> addTool(tools, relationTools);
+            case ChatApplicationRegistry.TOOL_GROUP_CANDIDATE -> addTool(tools, candidateTools);
             case ChatApplicationRegistry.TOOL_GROUP_KNOWLEDGE -> addTool(tools, knowledgeTools);
             case ChatApplicationRegistry.TOOL_GROUP_CRM_NOOP -> addTool(tools, crmNoopTools);
             default -> {

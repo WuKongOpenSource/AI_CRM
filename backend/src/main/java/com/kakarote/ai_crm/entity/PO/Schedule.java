@@ -48,6 +48,9 @@ public class Schedule implements Serializable {
     @Schema(description = "关联关系人ID")
     private Long relationId;
 
+    @Schema(description = "关联候选人ID")
+    private Long candidateId;
+
     @Schema(description = "联系人ID")
     private Long contactId;
 

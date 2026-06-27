@@ -102,6 +102,15 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                     option("manual", "手动创建"),
                     option("customer_contact", "客户联系人"),
                     option("other", "其他")
+            ),
+            optionKey("candidate", "stage"), List.of(
+                    option("new", "新候选人"),
+                    option("screening", "初筛"),
+                    option("interview_scheduled", "安排面试"),
+                    option("interview_passed", "面试通过"),
+                    option("offer", "Offer"),
+                    option("hired", "已入职"),
+                    option("rejected", "已淘汰")
             )
     );
 
@@ -188,6 +197,37 @@ public class CustomFieldServiceImpl extends ServiceImpl<CustomFieldMapper, Custo
                             option("inactive", "停用")
                     ), 90),
                     systemField("description", "描述", "textarea", "description", "TEXT", null, "请输入描述", false, true, false, null, 100)
+            ),
+            "candidate", List.of(
+                    systemField("name", "姓名", "text", "name", "VARCHAR(100)", null, "请输入候选人姓名", true, true, true, null, 10),
+                    systemField("phone", "手机号", "text", "phone", "VARCHAR(50)", null, "请输入手机号", false, true, true, null, 20),
+                    systemField("email", "邮箱", "text", "email", "VARCHAR(100)", null, "请输入邮箱", false, true, true, null, 30),
+                    systemField("wechat", "微信", "text", "wechat", "VARCHAR(100)", null, "请输入微信号", false, true, false, null, 40),
+                    systemField("appliedPosition", "应聘岗位", "text", "applied_position", "VARCHAR(150)", null, "请输入应聘岗位", false, true, true, null, 50),
+                    systemField("jobRequirements", "岗位要求", "textarea", "job_requirements", "TEXT", null, "请输入岗位职责、任职要求或招聘偏好", false, true, false, null, 55),
+                    systemField("stage", "候选人阶段", "select", "stage", "VARCHAR(50)", "new", null, false, true, true, List.of(
+                            option("new", "新候选人"),
+                            option("screening", "初筛"),
+                            option("interview_scheduled", "安排面试"),
+                            option("interview_passed", "面试通过"),
+                            option("offer", "Offer"),
+                            option("hired", "已入职"),
+                            option("rejected", "已淘汰")
+                    ), 60),
+                    systemField("currentCompany", "当前公司", "text", "current_company", "VARCHAR(255)", null, "请输入当前公司", false, true, true, null, 70),
+                    systemField("currentPosition", "当前职位", "text", "current_position", "VARCHAR(100)", null, "请输入当前职位", false, true, true, null, 80),
+                    systemField("education", "学历", "text", "education", "VARCHAR(100)", null, "请输入学历", false, true, true, null, 90),
+                    systemField("school", "学校", "text", "school", "VARCHAR(150)", null, "请输入学校", false, true, true, null, 100),
+                    systemField("workYears", "工作年限", "number", "work_years", "NUMERIC(5,1)", null, "请输入工作年限", false, true, true, null, 110),
+                    systemField("expectedCity", "期望城市", "text", "expected_city", "VARCHAR(100)", null, "请输入期望城市", false, true, true, null, 120),
+                    systemField("expectedSalary", "期望薪资", "text", "expected_salary", "VARCHAR(100)", null, "请输入期望薪资", false, true, true, null, 130),
+                    systemField("skillTags", "技能标签", "textarea", "skill_tags", "TEXT", null, "请输入技能标签", false, true, true, null, 140),
+                    systemField("resumeSummary", "简历摘要", "textarea", "resume_summary", "TEXT", null, null, false, true, false, null, 150),
+                    systemField("aiEvaluation", "AI评估", "textarea", "ai_evaluation", "TEXT", null, null, false, true, false, null, 160),
+                    systemField("ownerId", "负责人", "number", "owner_id", "BIGINT", null, null, false, true, true, null, 170),
+                    systemField("source", "来源", "text", "source", "VARCHAR(100)", null, "请输入来源", false, true, true, null, 180),
+                    systemField("nextStepTime", "下一步时间", "datetime", "next_step_time", "TIMESTAMP", null, "请选择下一步时间", false, false, true, null, 190),
+                    systemField("remark", "备注", "textarea", "remark", "TEXT", null, "请输入备注", false, true, false, null, 200)
             )
     );
 

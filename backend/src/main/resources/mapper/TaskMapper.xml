@@ -14,6 +14,7 @@
             u.realname AS assigned_to_name,
             t.customer_id,
             t.relation_id,
+            t.candidate_id,
             t.project_id,
             p.name AS project_name,
             t.lane_id,
@@ -21,6 +22,7 @@
             t.source_follow_up_id,
             c.company_name AS customer_name,
             r.name AS relation_name,
+            ca.name AS candidate_name,
             t.generated_by_ai,
             t.completed_time,
             t.create_user_id,
@@ -36,6 +38,7 @@
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
         LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_candidate ca ON t.candidate_id = ca.candidate_id
         LEFT JOIN crm_project p ON t.project_id = p.project_id
         LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
@@ -64,6 +67,9 @@
         </if>
         <if test="query.relationId != null">
             AND t.relation_id = #{query.relationId}
+        </if>
+        <if test="query.candidateId != null">
+            AND t.candidate_id = #{query.candidateId}
         </if>
         <if test="query.projectId != null">
             AND t.project_id = #{query.projectId}
@@ -109,6 +115,7 @@
             u.realname AS assigned_to_name,
             t.customer_id,
             t.relation_id,
+            t.candidate_id,
             t.project_id,
             p.name AS project_name,
             t.lane_id,
@@ -116,6 +123,7 @@
             t.source_follow_up_id,
             c.company_name AS customer_name,
             r.name AS relation_name,
+            ca.name AS candidate_name,
             t.generated_by_ai,
             t.completed_time,
             t.create_user_id,
@@ -131,6 +139,7 @@
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
         LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_candidate ca ON t.candidate_id = ca.candidate_id
         LEFT JOIN crm_project p ON t.project_id = p.project_id
         LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
@@ -159,6 +168,9 @@
         </if>
         <if test="query.relationId != null">
             AND t.relation_id = #{query.relationId}
+        </if>
+        <if test="query.candidateId != null">
+            AND t.candidate_id = #{query.candidateId}
         </if>
         <if test="query.projectId != null">
             AND t.project_id = #{query.projectId}
@@ -200,6 +212,7 @@
             u.realname AS assigned_to_name,
             t.customer_id,
             t.relation_id,
+            t.candidate_id,
             t.project_id,
             p.name AS project_name,
             t.lane_id,
@@ -207,6 +220,7 @@
             t.source_follow_up_id,
             c.company_name AS customer_name,
             r.name AS relation_name,
+            ca.name AS candidate_name,
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
@@ -221,6 +235,7 @@
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
         LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_candidate ca ON t.candidate_id = ca.candidate_id
         LEFT JOIN crm_project p ON t.project_id = p.project_id
         LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id
@@ -243,6 +258,7 @@
             u.realname AS assigned_to_name,
             t.customer_id,
             t.relation_id,
+            t.candidate_id,
             t.project_id,
             p.name AS project_name,
             t.lane_id,
@@ -250,6 +266,7 @@
             t.source_follow_up_id,
             c.company_name AS customer_name,
             r.name AS relation_name,
+            ca.name AS candidate_name,
             t.generated_by_ai,
             t.create_user_id,
             cu.realname AS create_user_name,
@@ -264,6 +281,7 @@
         LEFT JOIN manager_user u ON t.assigned_to = u.user_id
         LEFT JOIN crm_customer c ON t.customer_id = c.customer_id
         LEFT JOIN crm_relation r ON t.relation_id = r.relation_id
+        LEFT JOIN crm_candidate ca ON t.candidate_id = ca.candidate_id
         LEFT JOIN crm_project p ON t.project_id = p.project_id
         LEFT JOIN crm_project_lane l ON t.project_id = l.project_id AND t.lane_id = l.lane_id
         LEFT JOIN manager_user cu ON t.create_user_id = cu.user_id

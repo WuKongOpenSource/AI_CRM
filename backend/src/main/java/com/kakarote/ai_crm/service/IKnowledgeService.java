@@ -34,6 +34,12 @@ public interface IKnowledgeService extends IService<Knowledge> {
     Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId, Long relationId, String summary);
 
     /**
+     * 上传文件到知识库，可关联客户、员工、关系人或候选人对象。
+     */
+    Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId,
+                    Long relationId, Long candidateId, String summary);
+
+    /**
      * 将已经上传到文件存储的文件归档到知识库/文档中心。
      */
     Long archiveExistingFile(String fileName, String filePath, Long fileSize, String mimeType, Long customerId, String summary);
@@ -52,6 +58,11 @@ public interface IKnowledgeService extends IService<Knowledge> {
      * 将已经上传到文件存储的文件归档到关系人知识库。
      */
     Long archiveExistingRelationFile(String fileName, String filePath, Long fileSize, String mimeType, Long relationId, String summary);
+
+    /**
+     * 将已经上传到文件存储的文件归档到候选人知识库。
+     */
+    Long archiveExistingCandidateFile(String fileName, String filePath, Long fileSize, String mimeType, Long candidateId, String summary);
 
     /**
      * Archive generated text as a knowledge document.

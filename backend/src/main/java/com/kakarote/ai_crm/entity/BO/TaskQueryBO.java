@@ -36,6 +36,9 @@ public class TaskQueryBO extends PageEntity {
     @Schema(description = "关系人ID")
     private Long relationId;
 
+    @Schema(description = "候选人ID")
+    private Long candidateId;
+
     @Schema(description = "所属项目ID")
     private Long projectId;
 

@@ -15,6 +15,7 @@
       <el-tab-pane label="联系人字段" name="contact" />
       <el-tab-pane label="关系字段" name="relation" />
       <el-tab-pane label="产品字段" name="product" />
+      <el-tab-pane label="候选人字段" name="candidate" />
     </el-tabs>
 
     <div v-if="loadingFields" class="text-center py-8">

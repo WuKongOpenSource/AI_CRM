@@ -68,6 +68,9 @@ public class Knowledge implements Serializable {
     @Schema(description = "Relation ID")
     private Long relationId;
 
+    @Schema(description = "Candidate ID")
+    private Long candidateId;
+
     /**
      * AI摘要
      */

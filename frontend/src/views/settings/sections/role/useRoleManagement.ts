@@ -15,7 +15,7 @@ import {
 import type { PermItem, RolePermissionVO, RoleVO } from '@/types/role'
 import { ROLE_AVATAR_COLORS, ROLE_DATA_SCOPE_OPTIONS } from './constants'
 
-const ROLE_PERMISSION_MODULE_ORDER = ['customer', 'product', 'addressBook', 'contact', 'followup', 'task', 'schedule', 'knowledge', 'chat', 'agent', 'user', 'dept', 'role', 'config', 'customField']
+const ROLE_PERMISSION_MODULE_ORDER = ['customer', 'candidate', 'product', 'addressBook', 'contact', 'followup', 'task', 'schedule', 'knowledge', 'chat', 'agent', 'user', 'dept', 'role', 'config', 'customField']
 const PRODUCT_PERMISSION_ACTIONS_WITHOUT_SCOPE = new Set(['category_manage', 'settings'])
 
 function sortRolePermissions(permissionList: RolePermissionVO[]): RolePermissionVO[] {

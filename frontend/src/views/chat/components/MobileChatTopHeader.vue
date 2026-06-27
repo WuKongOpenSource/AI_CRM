@@ -28,10 +28,10 @@
               :class="avatarClass"
             />
             <span
-              v-else-if="kind === 'product'"
+              v-else-if="kind === 'product' || kind === 'candidate'"
               class="material-symbols-outlined text-[17px] leading-none text-slate-400"
             >
-              inventory_2
+              {{ kind === 'candidate' ? 'badge' : 'inventory_2' }}
             </span>
             <span v-else class="text-xs font-bold text-slate-400">
               {{ title.charAt(0) || '?' }}
@@ -69,7 +69,7 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   visible: boolean
-  kind: 'customer' | 'employee' | 'relation' | 'product'
+  kind: 'customer' | 'employee' | 'relation' | 'product' | 'candidate'
   title: string
   avatarUrl?: string
   fixedStyle?: Record<string, string> | undefined
@@ -85,6 +85,7 @@ const detailLabel = computed(() => {
   if (props.kind === 'employee') return '通讯录详情'
   if (props.kind === 'relation') return '关系详情'
   if (props.kind === 'product') return '产品详情'
+  if (props.kind === 'candidate') return '候选人详情'
   return '客户详情'
 })
 
@@ -92,6 +93,7 @@ const avatarAlt = computed(() => {
   if (props.kind === 'employee') return 'employee avatar'
   if (props.kind === 'relation') return 'relation avatar'
   if (props.kind === 'product') return 'product icon'
+  if (props.kind === 'candidate') return 'candidate avatar'
   return 'company logo'
 })
 

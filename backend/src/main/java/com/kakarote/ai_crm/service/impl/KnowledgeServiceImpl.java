@@ -19,6 +19,7 @@ import com.kakarote.ai_crm.entity.BO.KnowledgeAskBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeAiSearchBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeQueryBO;
 import com.kakarote.ai_crm.entity.BO.KnowledgeTargetedScriptBO;
+import com.kakarote.ai_crm.entity.PO.Candidate;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Knowledge;
 import com.kakarote.ai_crm.entity.PO.KnowledgeTag;
@@ -32,6 +33,7 @@ import com.kakarote.ai_crm.entity.VO.KnowledgeVO;
 import com.kakarote.ai_crm.entity.VO.WeKnoraChunk;
 import com.kakarote.ai_crm.entity.VO.WeKnoraKnowledge;
 import com.kakarote.ai_crm.mapper.FollowUpMapper;
+import com.kakarote.ai_crm.mapper.CandidateMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeMapper;
 import com.kakarote.ai_crm.mapper.KnowledgeTagMapper;
@@ -97,6 +99,9 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
 
     @Autowired
     private CustomerMapper customerMapper;
+
+    @Autowired
+    private CandidateMapper candidateMapper;
 
     @Autowired
     private ManageUserMapper manageUserMapper;
@@ -207,13 +212,22 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId, Long relationId, String summary) {
+        return uploadFile(file, type, customerId, employeeId, relationId, null, summary);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long uploadFile(MultipartFile file, String type, Long customerId, Long employeeId,
+                           Long relationId, Long candidateId, String summary) {
         validateEmployee(employeeId);
         validateRelation(relationId);
+        validateCandidate(candidateId);
         Long knowledgeId = uploadFile(file, type, customerId, summary);
         Knowledge knowledge = getById(knowledgeId);
         if (knowledge != null) {
             knowledge.setEmployeeId(employeeId);
             knowledge.setRelationId(relationId);
+            knowledge.setCandidateId(candidateId);
             updateById(knowledge);
         }
         return knowledgeId;
@@ -289,6 +303,19 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
         Knowledge knowledge = getById(knowledgeId);
         if (knowledge != null) {
             knowledge.setRelationId(relationId);
+            updateById(knowledge);
+        }
+        return knowledgeId;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long archiveExistingCandidateFile(String fileName, String filePath, Long fileSize, String mimeType, Long candidateId, String summary) {
+        validateCandidate(candidateId);
+        Long knowledgeId = archiveExistingStandaloneFile(fileName, filePath, fileSize, mimeType, null, summary);
+        Knowledge knowledge = getById(knowledgeId);
+        if (knowledge != null) {
+            knowledge.setCandidateId(candidateId);
             updateById(knowledge);
         }
         return knowledgeId;
@@ -1335,6 +1362,17 @@ public class KnowledgeServiceImpl extends ServiceImpl<KnowledgeMapper, Knowledge
                 || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
         }
+    }
+
+    private void validateCandidate(Long candidateId) {
+        if (candidateId == null) {
+            return;
+        }
+        Candidate candidate = candidateMapper.selectById(candidateId);
+        if (candidate == null || Integer.valueOf(0).equals(candidate.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "候选人不存在或无权限访问");
+        }
+        dataPermissionService.assertUserDataAccessByPermission("candidate:view", candidate.getOwnerId());
     }
 
     private boolean isChatAttachmentAutoArchiveSummary(String summary) {

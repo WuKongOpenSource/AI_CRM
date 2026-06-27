@@ -118,6 +118,7 @@
               size="large"
             >
               <el-option label="会议" value="meeting" />
+              <el-option label="面试" value="interview" />
               <el-option label="电话" value="call" />
               <el-option label="拜访" value="visit" />
               <el-option label="其他" value="other" />
@@ -145,6 +146,9 @@
                 :value="item.value"
               />
             </el-select>
+            <p v-if="defaultCandidateName" class="mt-1 truncate text-xs font-medium text-cyan-700">
+              关联候选人：{{ defaultCandidateName }}
+            </p>
           </div>
         </div>
 
@@ -253,6 +257,10 @@ type DefaultRelation = {
   relationId?: string | number
   name?: string | null
 } | null
+type DefaultCandidate = {
+  candidateId?: string | number
+  candidateName?: string | null
+} | null
 type DefaultParticipantUser = {
   userId?: string | number
   realname?: string | null
@@ -266,6 +274,7 @@ type ScheduleFormState = {
   type: string
   customerId: string
   relationId: string
+  candidateId: string
   contactId: string
   location: string
   description: string
@@ -276,11 +285,13 @@ const props = withDefaults(defineProps<{
   editingSchedule?: ScheduleVO | null
   defaultCustomer?: DefaultCustomer
   defaultRelation?: DefaultRelation
+  defaultCandidate?: DefaultCandidate
   defaultParticipantUsers?: DefaultParticipantUser[]
 }>(), {
   editingSchedule: null,
   defaultCustomer: null,
   defaultRelation: null,
+  defaultCandidate: null,
   defaultParticipantUsers: () => []
 })
 
@@ -300,6 +311,7 @@ function createDefaultFormState(): ScheduleFormState {
     type: 'meeting',
     customerId: '',
     relationId: '',
+    candidateId: '',
     contactId: '',
     location: '',
     description: ''
@@ -323,6 +335,7 @@ const visible = computed({
 })
 
 const isEdit = computed(() => !!props.editingSchedule?.scheduleId)
+const defaultCandidateName = computed(() => props.defaultCandidate?.candidateName || '')
 
 const canSave = computed(() =>
   !!scheduleForm.title.trim() && !!scheduleForm.startTime && !saving.value
@@ -346,6 +359,8 @@ watch(
     props.defaultCustomer?.companyName,
     props.defaultRelation?.relationId,
     props.defaultRelation?.name,
+    props.defaultCandidate?.candidateId,
+    props.defaultCandidate?.candidateName,
     props.defaultParticipantUsers.map(user => `${user.userId || ''}:${user.realname || ''}:${user.username || ''}`).join('|')
   ] as const,
   () => {
@@ -370,6 +385,7 @@ function initScheduleForm() {
   if (!schedule) {
     applyDefaultCustomer()
     applyDefaultRelation()
+    applyDefaultCandidate()
     applyDefaultParticipantUsers()
     return
   }
@@ -381,6 +397,7 @@ function initScheduleForm() {
     type: normalizeScheduleType(schedule.type),
     customerId: schedule.customerId ? String(schedule.customerId) : '',
     relationId: schedule.relationId ? String(schedule.relationId) : '',
+    candidateId: schedule.candidateId ? String(schedule.candidateId) : '',
     contactId: schedule.contactId ? String(schedule.contactId) : '',
     location: schedule.location || '',
     description: schedule.description || ''
@@ -419,6 +436,16 @@ function applyDefaultRelation() {
   scheduleForm.relationId = String(relation.relationId)
 }
 
+function applyDefaultCandidate() {
+  const candidate = props.defaultCandidate
+  if (!candidate?.candidateId) return
+  scheduleForm.candidateId = String(candidate.candidateId)
+  scheduleForm.type = 'interview'
+  if (!scheduleForm.title.trim()) {
+    scheduleForm.title = `${candidate.candidateName || '候选人'} 面试`
+  }
+}
+
 function applyDefaultParticipantUsers() {
   const users = props.defaultParticipantUsers
     .filter(user => user.userId)
@@ -435,12 +462,14 @@ function applyDefaultParticipantUsers() {
 
 function normalizeScheduleType(type?: string): string {
   const raw = (type || '').trim().toLowerCase()
-  if (['meeting', 'call', 'visit', 'other'].includes(raw)) {
+  if (['meeting', 'interview', 'call', 'visit', 'other'].includes(raw)) {
     return raw
   }
   switch (type?.trim()) {
     case '会议':
       return 'meeting'
+    case '面试':
+      return 'interview'
     case '电话':
       return 'call'
     case '拜访':
@@ -652,6 +681,7 @@ async function handleSaveSchedule() {
       type: scheduleForm.type,
       customerId: scheduleForm.customerId || undefined,
       relationId: scheduleForm.relationId || undefined,
+      candidateId: scheduleForm.candidateId || undefined,
       contactId: scheduleForm.contactId || undefined,
       location: scheduleForm.location || undefined,
       description: scheduleForm.description || undefined,

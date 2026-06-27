@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kakarote.ai_crm.mapper.CandidateMapper">
+
+    <sql id="candidateColumns">
+        c.candidate_id,
+        c.name,
+        c.avatar,
+        c.phone,
+        c.email,
+        c.wechat,
+        c.current_company,
+        c.current_position,
+        c.applied_position,
+        c.job_requirements,
+        c.recruitment_job_id,
+        rj.job_name AS recruitment_job_name,
+        c.stage,
+        c.source,
+        c.education,
+        c.school,
+        c.major,
+        c.work_years,
+        c.expected_city,
+        c.expected_salary,
+        c.skill_tags,
+        c.resume_summary,
+        c.ai_evaluation,
+        c.owner_id,
+        owner.realname AS owner_name,
+        c.remark,
+        c.last_contact_time,
+        c.next_step_time,
+        c.status,
+        c.create_user_id,
+        creator.realname AS create_user_name,
+        c.create_time,
+        c.update_time
+    </sql>
+
+    <sql id="candidateQueryConditions">
+        <choose>
+            <when test="query.status != null">
+                c.status = #{query.status}
+            </when>
+            <otherwise>
+                c.status = 1
+            </otherwise>
+        </choose>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+                COALESCE(c.name, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.phone, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.email, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.wechat, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.current_company, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.current_position, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.applied_position, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.job_requirements, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(rj.job_name, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.school, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.skill_tags, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(c.resume_summary, '') ILIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <if test="query.stage != null and query.stage != ''">
+            AND c.stage = #{query.stage}
+        </if>
+        <if test="query.stages != null and query.stages.size() > 0">
+            AND c.stage IN
+            <foreach collection="query.stages" item="stage" open="(" separator="," close=")">
+                #{stage}
+            </foreach>
+        </if>
+        <if test="query.ownerId != null">
+            AND c.owner_id = #{query.ownerId}
+        </if>
+        <if test="query.source != null and query.source != ''">
+            AND c.source = #{query.source}
+        </if>
+        <if test="query.appliedPosition != null and query.appliedPosition != ''">
+            AND c.applied_position ILIKE CONCAT('%', #{query.appliedPosition}, '%')
+        </if>
+        <if test="query.recruitmentJobId != null">
+            AND c.recruitment_job_id = #{query.recruitmentJobId}
+        </if>
+        <if test="query.createTimeStart != null">
+            AND c.create_time &gt;= #{query.createTimeStart}
+        </if>
+        <if test="query.createTimeEnd != null">
+            AND c.create_time &lt;= #{query.createTimeEnd}
+        </if>
+        <if test="query.allData == null or query.allData == false">
+            <choose>
+                <when test="query.userIds != null and query.userIds.size() > 0">
+                    AND c.owner_id IN
+                    <foreach collection="query.userIds" item="userId" open="(" separator="," close=")">
+                        #{userId}
+                    </foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+
+    <sql id="candidateOrderBy">
+        <choose>
+            <when test="query.sortBy == 'createTime'">
+                ORDER BY c.create_time <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose>, c.candidate_id DESC
+            </when>
+            <when test="query.sortBy == 'nextStepTime'">
+                ORDER BY c.next_step_time <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose> NULLS LAST, c.update_time DESC
+            </when>
+            <when test="query.sortBy == 'lastContactTime'">
+                ORDER BY c.last_contact_time <choose><when test="query.sortOrder == 'asc'">ASC</when><otherwise>DESC</otherwise></choose> NULLS LAST, c.update_time DESC
+            </when>
+            <otherwise>
+                ORDER BY c.update_time DESC NULLS LAST, c.create_time DESC, c.candidate_id DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <select id="queryPageList" resultType="com.kakarote.ai_crm.entity.VO.CandidateListVO">
+        SELECT
+            <include refid="candidateColumns"/>,
+            (SELECT COUNT(1) FROM crm_knowledge k WHERE k.candidate_id = c.candidate_id AND k.status != 2) AS resume_count,
+            (SELECT COUNT(1) FROM crm_schedule s WHERE s.candidate_id = c.candidate_id AND COALESCE(s.type, '') = 'interview') AS interview_count
+        FROM crm_candidate c
+        LEFT JOIN manager_user owner ON c.owner_id = owner.user_id
+        LEFT JOIN manager_user creator ON c.create_user_id = creator.user_id
+        LEFT JOIN crm_recruitment_job rj ON c.recruitment_job_id = rj.recruitment_job_id AND rj.del_flag = 0
+        WHERE <include refid="candidateQueryConditions"/>
+        <include refid="candidateOrderBy"/>
+    </select>
+
+    <select id="getCandidateById" resultType="com.kakarote.ai_crm.entity.VO.CandidateDetailVO">
+        SELECT
+            <include refid="candidateColumns"/>,
+            c.ai_parse_snapshot,
+            c.conflict_snapshot
+        FROM crm_candidate c
+        LEFT JOIN manager_user owner ON c.owner_id = owner.user_id
+        LEFT JOIN manager_user creator ON c.create_user_id = creator.user_id
+        LEFT JOIN crm_recruitment_job rj ON c.recruitment_job_id = rj.recruitment_job_id AND rj.del_flag = 0
+        WHERE c.candidate_id = #{candidateId}
+          AND c.status = 1
+    </select>
+
+</mapper>

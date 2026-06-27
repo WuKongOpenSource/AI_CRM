@@ -10,6 +10,9 @@ export interface EnumOption {
 /** 客户阶段枚举（真相源：后端 crm_custom_field.options） */
 export const getCustomerStageEnum = () => get<EnumOption[]>('/enum/customerStage')
 
+/** 候选人阶段枚举（真相源：后端 crm_custom_field.options） */
+export const getCandidateStageEnum = () => get<EnumOption[]>('/enum/candidateStage')
+
 /** 客户级别枚举 */
 export const getCustomerLevelEnum = () => get<EnumOption[]>('/enum/customerLevel')
 

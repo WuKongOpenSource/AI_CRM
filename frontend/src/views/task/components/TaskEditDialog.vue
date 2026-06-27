@@ -281,6 +281,7 @@ import { normalizeTaskPriority } from '@/utils/taskPriority'
 type Option = { value: string; label: string }
 type DefaultCustomer = { customerId?: string | number; companyName?: string | null } | null
 type DefaultRelation = { relationId?: string | number; name?: string | null } | null
+type DefaultCandidate = { candidateId?: string | number; candidateName?: string | null } | null
 type DefaultAssignee = { userId?: string | number; realname?: string | null; username?: string | null } | null
 type TaskEditSavedPayload = {
   mode: 'create' | 'edit'
@@ -292,12 +293,14 @@ const props = withDefaults(defineProps<{
   editingTask?: Task | null
   defaultCustomer?: DefaultCustomer
   defaultRelation?: DefaultRelation
+  defaultCandidate?: DefaultCandidate
   defaultAssignee?: DefaultAssignee
   refreshStoreAfterSave?: boolean
 }>(), {
   editingTask: null,
   defaultCustomer: null,
   defaultRelation: null,
+  defaultCandidate: null,
   defaultAssignee: null,
   refreshStoreAfterSave: true
 })
@@ -320,7 +323,7 @@ const customerOptions = ref<Option[]>([])
 const customerSearchLoading = ref(false)
 const projectLoading = ref(false)
 const selectedParticipants = ref<string[]>([])
-const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string; relationId?: string; assignedToName?: string }>({
+const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string; relationId?: string; candidateId?: string; assignedToName?: string }>({
   title: '',
   description: '',
   priority: 'MEDIUM',
@@ -331,6 +334,7 @@ const formData = reactive<TaskAddBO & { status?: TaskStatus; customerId?: string
   laneId: '',
   customerId: '',
   relationId: '',
+  candidateId: '',
   assignedTo: '',
   assignedToName: ''
 })
@@ -372,6 +376,8 @@ watch(
     props.defaultCustomer?.companyName,
     props.defaultRelation?.relationId,
     props.defaultRelation?.name,
+    props.defaultCandidate?.candidateId,
+    props.defaultCandidate?.candidateName,
     props.defaultAssignee?.userId,
     props.defaultAssignee?.realname,
     props.defaultAssignee?.username
@@ -404,6 +410,7 @@ function hydrateForm() {
       laneId: task.laneId ? String(task.laneId) : '',
       customerId: task.customerId || '',
       relationId: task.relationId || '',
+      candidateId: task.candidateId || '',
       assignedTo: task.assignedTo || '',
       assignedToName: task.assignedToName || ''
     })
@@ -430,11 +437,13 @@ function hydrateForm() {
     laneId: '',
     customerId: '',
     relationId: '',
+    candidateId: '',
     assignedTo: '',
     assignedToName: ''
   })
   applyDefaultCustomer()
   applyDefaultRelation()
+  applyDefaultCandidate()
   applyDefaultAssignee()
 }
 
@@ -453,6 +462,15 @@ function applyDefaultRelation() {
   const relation = props.defaultRelation
   if (!relation?.relationId) return
   formData.relationId = String(relation.relationId)
+}
+
+function applyDefaultCandidate() {
+  const candidate = props.defaultCandidate
+  if (!candidate?.candidateId) return
+  formData.candidateId = String(candidate.candidateId)
+  if (!formData.taskType) {
+    formData.taskType = '面试'
+  }
 }
 
 function applyDefaultAssignee() {
@@ -601,6 +619,7 @@ async function handleSubmit() {
       laneId: formData.projectId ? (formData.laneId || undefined) : undefined,
       customerId: formData.customerId || undefined,
       relationId: formData.relationId || undefined,
+      candidateId: formData.candidateId || undefined,
       assignedTo: formData.assignedTo || undefined
     }
 

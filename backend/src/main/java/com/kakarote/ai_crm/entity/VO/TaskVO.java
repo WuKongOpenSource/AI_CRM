@@ -48,6 +48,9 @@ public class TaskVO {
     @Schema(description = "关系人ID")
     private Long relationId;
 
+    @Schema(description = "候选人ID")
+    private Long candidateId;
+
     @Schema(description = "Source follow-up ID")
     private Long sourceFollowUpId;
 
@@ -56,6 +59,9 @@ public class TaskVO {
 
     @Schema(description = "关系人姓名")
     private String relationName;
+
+    @Schema(description = "候选人姓名")
+    private String candidateName;
 
     @Schema(description = "所属项目ID")
     private Long projectId;

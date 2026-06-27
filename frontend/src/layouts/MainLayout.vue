@@ -490,6 +490,109 @@
           </div>
 
           <div
+            v-if="!sidebarSortMode && showSidebarCandidates"
+            class="wk-sidebar-candidate-section space-y-1 pt-1"
+            :style="{ order: getSidebarModuleRenderOrder('candidate') }"
+          >
+            <div
+              class="wk-customer-header-row group/candidate-header flex w-full items-center gap-2 rounded-lg pl-3 pr-1 py-[6px] mt-[12px] mb-[0px] hover:!bg-[#f9f9f9]"
+              :style="{ backgroundColor: candidateHeaderHovered ? '#f9f9f9' : 'transparent' }"
+              :title="sidebarCandidatesExpanded ? '收起候选人列表' : '展开候选人列表'"
+              @mouseenter="candidateHeaderHovered = true"
+              @mouseleave="candidateHeaderHovered = false"
+            >
+              <button
+                type="button"
+                class="wk-customer-header-toggle group flex min-w-0 flex-1 items-center gap-1 text-left"
+                :aria-expanded="sidebarCandidatesExpanded"
+                aria-controls="sidebar-candidates-panel"
+                @click="sidebarCandidatesExpanded = !sidebarCandidatesExpanded"
+              >
+                <span class="min-w-0 truncate text-[14px] font-semibold uppercase tracking-tight text-[#0d0d0d]">候选人</span>
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-md text-slate-400 transition-all duration-150" aria-hidden="true">
+                  <span class="material-symbols-outlined inline-flex h-5 shrink-0 items-center justify-center self-center text-[18px] leading-none text-[#c9c9c9]">
+                    {{ sidebarCandidatesExpanded ? 'keyboard_arrow_down' : 'chevron_right' }}
+                  </span>
+                </span>
+              </button>
+              <div class="ml-auto flex shrink-0 items-center justify-end gap-1">
+                <button
+                  type="button"
+                  class="wk-customer-header-action group/candidate-create-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="新建候选人"
+                  @click.stop="showCreateCandidate = true"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">person_add</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/candidate-create-action:opacity-100"
+                    role="tooltip"
+                  >
+                    新建候选人
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="wk-customer-header-action group/candidate-action relative flex size-6 items-center justify-center rounded-md text-[#8f8f8f] transition-colors hover:text-[#0d0d0d]"
+                  aria-label="查看候选人列表"
+                  @click.stop="navigateTo('/candidate')"
+                >
+                  <span class="material-symbols-outlined text-[18px] leading-none">format_list_bulleted</span>
+                  <span
+                    class="pointer-events-none absolute right-0 top-full z-[200] mt-2 whitespace-nowrap rounded-lg bg-black px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/candidate-action:opacity-100"
+                    role="tooltip"
+                  >
+                    查看候选人列表
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div id="sidebar-candidates-panel" v-show="sidebarCandidatesExpanded">
+              <div v-if="sidebarCandidatesLoading && sidebarCandidates.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarCandidates.length === 0" class="px-3 py-6 text-center text-xs text-slate-400">
+                暂无候选人数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="candidate in sidebarCandidates"
+                  :key="candidate.candidateId"
+                  type="button"
+                  class="group w-full min-w-0 overflow-hidden rounded-[8px] pl-[10px] pr-[10px] py-[6px] mt-[1px] ml-[2px] mr-[6px] text-left transition-all"
+                  :class="isCandidateActive(candidate.candidateId) ? 'bg-[#f3f3f3]' : 'hover:bg-[#f9f9f9]'"
+                  @click="handleSelectCandidateChat(candidate)"
+                >
+                  <div class="flex min-w-0 w-full items-center gap-2" style="height: 24px !important">
+                    <div class="flex size-[20px] shrink-0 items-center justify-center overflow-hidden rounded border border-slate-200 bg-slate-100 text-xs font-bold text-slate-500">
+                      <img
+                        v-if="candidate.avatarUrl"
+                        :src="candidate.avatarUrl"
+                        :alt="candidateName(candidate)"
+                        class="size-full object-cover"
+                      />
+                      <span v-else>{{ candidateInitial(candidate) }}</span>
+                    </div>
+                    <span class="block min-w-0 flex-1 truncate text-sm leading-5 text-[#0d0d0d]" :title="candidateName(candidate)">
+                      {{ candidateName(candidate) }}
+                    </span>
+                  </div>
+                </button>
+                <div v-if="sidebarCandidatesLoading" class="flex justify-center py-3">
+                  <span class="material-symbols-outlined animate-spin text-[18px] leading-none text-slate-300">progress_activity</span>
+                </div>
+                <button
+                  v-else-if="sidebarCandidatesHasMore"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center justify-center rounded-[8px] py-[7px] text-left text-[13px] text-[#8f8f8f] transition-all hover:bg-[#f9f9f9] hover:text-[#5f5f5f]"
+                  @click="loadMoreSidebarCandidates"
+                >
+                  加载更多
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div
             v-if="!sidebarSortMode && showSidebarProducts"
             class="wk-sidebar-product-section space-y-1 pt-1"
             :style="{ order: getSidebarModuleRenderOrder('product') }"
@@ -1357,6 +1460,66 @@
               </template>
             </div>
 
+            <div v-if="showSidebarCandidates" class="pt-3">
+              <div class="flex items-center gap-3 px-3 pb-2.5">
+                <p class="min-w-0 flex-1 text-[1rem] font-bold leading-7 text-[#0d0d0d]">候选人</p>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端新建候选人"
+                  title="新建候选人"
+                  @click.stop="handleMobileCreateCandidate"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">person_add</span>
+                </button>
+                <button
+                  type="button"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#8f8f8f] transition-colors active:bg-slate-100 active:text-[#0d0d0d]"
+                  aria-label="移动端查看候选人列表"
+                  title="查看候选人列表"
+                  @click.stop="mobileNavigate('/candidate')"
+                >
+                  <span class="material-symbols-outlined text-[20px] leading-none">format_list_bulleted</span>
+                </button>
+              </div>
+              <div v-if="sidebarCandidatesLoading && sidebarCandidates.length === 0" class="flex justify-center py-6">
+                <span class="material-symbols-outlined animate-spin text-slate-300">progress_activity</span>
+              </div>
+              <div v-else-if="sidebarCandidates.length === 0" class="px-3 py-[6px] text-sm text-slate-400">
+                暂无候选人数据
+              </div>
+              <template v-else>
+                <button
+                  v-for="candidate in sidebarCandidates"
+                  :key="candidate.candidateId"
+                  type="button"
+                  class="group flex w-full min-w-0 items-center gap-3 rounded-[8px] px-3 py-[9px] text-left transition-colors"
+                  :class="isCandidateActive(candidate.candidateId) ? 'bg-[#f3f3f3]' : 'text-[#0d0d0d] active:bg-slate-100'"
+                  @click="handleMobileSelectCandidateChat(candidate)"
+                >
+                  <div class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100 text-xs font-bold text-slate-500">
+                    <img
+                      v-if="candidate.avatarUrl"
+                      :src="candidate.avatarUrl"
+                      :alt="candidateName(candidate)"
+                      class="size-full object-cover"
+                    />
+                    <span v-else>{{ candidateInitial(candidate) }}</span>
+                  </div>
+                  <span class="block min-w-0 flex-1 truncate text-[1rem] leading-6">{{ candidateName(candidate) }}</span>
+                </button>
+                <button
+                  v-if="sidebarCandidatesHasMore"
+                  type="button"
+                  class="mt-1 flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-sm font-medium text-[#8f8f8f] transition-colors active:bg-slate-100"
+                  :disabled="sidebarCandidatesLoading"
+                  @click="loadMoreSidebarCandidates"
+                >
+                  {{ sidebarCandidatesLoading ? '加载中...' : '加载更多候选人' }}
+                </button>
+              </template>
+            </div>
+
             <div v-if="showSidebarProducts" class="pt-3">
               <div class="flex items-center gap-3 px-3 pb-2.5">
                 <p class="min-w-0 flex-1 text-[1rem] font-bold leading-7 text-[#0d0d0d]">产品列表</p>
@@ -1889,6 +2052,7 @@
     </div>
 
     <CustomerUpsertDialog v-model="showCreateCustomer" mode="create" @success="handleCreateCustomerSuccess" />
+    <CandidateUpsertDialog v-model="showCreateCandidate" @saved="handleCreateCandidateSuccess" />
     <RelationUpsertDialog
       v-model="showCreateRelation"
       @saved="handleCreateRelationSuccess"
@@ -2069,11 +2233,13 @@ import AiChatDrawer from '@/components/common/AiChatDrawer.vue'
 import AccountSettingsModal from '@/views/profile/components/AccountSettingsModal.vue'
 import ChatSessionActionsPopover from '@/components/layout/ChatSessionActionsPopover.vue'
 import CustomerUpsertDialog from '@/views/customer/components/CustomerUpsertDialog.vue'
+import CandidateUpsertDialog from '@/views/candidate/CandidateUpsertDialog.vue'
 import RelationUpsertDialog from '@/views/relation/components/RelationUpsertDialog.vue'
 import ProjectUpsertDialog from '@/views/project/components/ProjectUpsertDialog.vue'
 import type { WkIconName } from '@/components/common/wkIcon'
 import { queryGlobalSearch, type GlobalSearchResult } from '@/api/search'
 import { queryCustomerList } from '@/api/customer'
+import { queryCandidateList } from '@/api/candidate'
 import { queryProductList } from '@/api/product'
 import { queryAddressBook } from '@/api/addressBook'
 import { queryRelationList } from '@/api/relation'
@@ -2098,6 +2264,7 @@ import {
 } from '@/utils/sidebarModuleOrder'
 import type { ChatSession } from '@/types/common'
 import type { CustomerListVO } from '@/types/customer'
+import type { CandidateListVO } from '@/types/candidate'
 import type { ProductVO } from '@/types/product'
 import type { ProjectEntity } from '@/types/project'
 import type { AddressBookEmployee } from '@/types/addressBook'
@@ -2153,6 +2320,7 @@ const SIDEBAR_STORAGE_KEYS = {
   sidebarProjectsExpanded: 'wk_ai_crm:main_layout:sidebar_projects_expanded:v1',
   sidebarProjectCache: 'wk_ai_crm:main_layout:sidebar_project_cache:v1',
   sidebarCustomersExpanded: 'wk_ai_crm:main_layout:sidebar_customers_expanded:v1',
+  sidebarCandidatesExpanded: 'wk_ai_crm:main_layout:sidebar_candidates_expanded:v1',
   sidebarProductsExpanded: 'wk_ai_crm:main_layout:sidebar_products_expanded:v1',
   sidebarAddressBookExpanded: 'wk_ai_crm:main_layout:sidebar_address_book_expanded:v1',
   sidebarRelationsExpanded: 'wk_ai_crm:main_layout:sidebar_relations_expanded:v1'
@@ -2161,6 +2329,7 @@ const SIDEBAR_STORAGE_KEYS = {
 const SIDEBAR_MODULE_LABELS: Record<SidebarModuleKey, string> = {
   recent: '最近',
   customer: '客户',
+  candidate: '候选人',
   product: '产品',
   project: '项目',
   relation: '关系',
@@ -2170,6 +2339,7 @@ const SIDEBAR_MODULE_LABELS: Record<SidebarModuleKey, string> = {
 const SIDEBAR_MODULE_ICONS: Record<SidebarModuleKey, string> = {
   recent: 'forum',
   customer: 'business_center',
+  candidate: 'badge',
   product: 'inventory_2',
   project: 'folder',
   relation: 'account_tree',
@@ -2824,11 +2994,13 @@ const recentChatSessionsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.re
 const recentHistoryKeyword = ref('')
 const sidebarProjectsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProjectsExpanded, true))
 const sidebarCustomersExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, true))
+const sidebarCandidatesExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCandidatesExpanded, true))
 const sidebarProductsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProductsExpanded, true))
 const projectHeaderHovered = ref(false)
 const sidebarAddressBookExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarAddressBookExpanded, true))
 const sidebarRelationsExpanded = ref(readStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarRelationsExpanded, true))
 const customerHeaderHovered = ref(false)
+const candidateHeaderHovered = ref(false)
 const productHeaderHovered = ref(false)
 const addressBookHeaderHovered = ref(false)
 const relationHeaderHovered = ref(false)
@@ -2837,6 +3009,7 @@ const recentChatSessionsMoreVisible = ref(false)
 const RECENT_CHAT_SESSION_LIMIT = 5
 const MOBILE_RECENT_CHAT_SESSION_LIMIT = 8
 const SIDEBAR_CUSTOMER_LIMIT = 10
+const SIDEBAR_CANDIDATE_LIMIT = 10
 const SIDEBAR_PRODUCT_LIMIT = 10
 const SIDEBAR_EMPLOYEE_LIMIT = 10
 const SIDEBAR_RELATION_LIMIT = 10
@@ -2850,6 +3023,11 @@ const sidebarCustomersLoading = ref(false)
 const sidebarCustomersPage = ref(1)
 const sidebarCustomersTotal = ref(0)
 const sidebarCustomersHasMore = ref(true)
+const sidebarCandidates = ref<CandidateListVO[]>([])
+const sidebarCandidatesLoading = ref(false)
+const sidebarCandidatesPage = ref(1)
+const sidebarCandidatesTotal = ref(0)
+const sidebarCandidatesHasMore = ref(true)
 const sidebarProducts = ref<ProductVO[]>([])
 const sidebarProductsLoading = ref(false)
 const sidebarProductsPage = ref(1)
@@ -2870,6 +3048,7 @@ const currentAppVersion = ref(DEFAULT_CURRENT_VERSION)
 const checkingAppUpdate = ref(false)
 const showAccountSettingsModal = ref(false)
 const showCreateCustomer = ref(false)
+const showCreateCandidate = ref(false)
 const showCreateRelation = ref(false)
 const showCreateProject = ref(false)
 const customerSearchDialogVisible = ref(false)
@@ -2904,6 +3083,7 @@ let customerSearchFocusRequestId = 0
 let removeChatComposerNarrowListener: (() => void) | null = null
 let removeCustomerListRefreshListener: (() => void) | null = null
 let removeCustomerSidebarRefreshListener: (() => void) | null = null
+let removeCandidateSidebarRefreshListener: (() => void) | null = null
 let removeProductSidebarRefreshListener: (() => void) | null = null
 let removeRelationSidebarRefreshListener: (() => void) | null = null
 let removeProjectSidebarRefreshListener: (() => void) | null = null
@@ -2944,6 +3124,10 @@ function refreshSidebarRelationsFromEvent(payload?: SidebarRefreshPayload) {
 
 function refreshSidebarProductsFromEvent(payload?: SidebarRefreshPayload) {
   void fetchSidebarProducts({ reset: true, preserveScroll: payload?.preserveScroll !== false })
+}
+
+function refreshSidebarCandidatesFromEvent(payload?: SidebarRefreshPayload) {
+  void fetchSidebarCandidates({ reset: true, preserveScroll: payload?.preserveScroll !== false })
 }
 
 function refreshSidebarProjectsFromEvent(payload?: ProjectSidebarRefreshPayload) {
@@ -3021,6 +3205,7 @@ const sidebarProjects = computed<SidebarProjectItem[]>(() =>
   liveSidebarProjects.value.length > 0 ? liveSidebarProjects.value : sidebarProjectCache.value
 )
 const showSidebarCustomers = computed(() => userStore.hasPermission('customer:view'))
+const showSidebarCandidates = computed(() => userStore.hasPermission('candidate:view'))
 const showSidebarProducts = computed(() => userStore.hasPermission('product:view'))
 const showSidebarAddressBook = computed(() => userStore.hasPermission('addressBook:list'))
 const showSidebarRelations = computed(() => true)
@@ -3037,6 +3222,15 @@ watch(showSidebarCustomers, visible => {
   }
   if (!visible) {
     resetSidebarCustomers()
+  }
+})
+
+watch(showSidebarCandidates, visible => {
+  if (visible && sidebarCandidates.value.length === 0) {
+    void fetchSidebarCandidates({ reset: true })
+  }
+  if (!visible) {
+    resetSidebarCandidates()
   }
 })
 
@@ -3459,6 +3653,10 @@ watch(sidebarCustomersExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCustomersExpanded, expanded)
 })
 
+watch(sidebarCandidatesExpanded, expanded => {
+  writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarCandidatesExpanded, expanded)
+})
+
 watch(sidebarProductsExpanded, expanded => {
   writeStoredBoolean(SIDEBAR_STORAGE_KEYS.sidebarProductsExpanded, expanded)
 })
@@ -3568,6 +3766,9 @@ onMounted(() => {
   if (showSidebarCustomers.value) {
     void fetchSidebarCustomers({ reset: true })
   }
+  if (showSidebarCandidates.value) {
+    void fetchSidebarCandidates({ reset: true })
+  }
   if (showSidebarProducts.value) {
     void fetchSidebarProducts({ reset: true })
   }
@@ -3593,6 +3794,10 @@ onMounted(() => {
   removeCustomerSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
     APP_EVENT.CUSTOMER_SIDEBAR_REFRESH,
     refreshSidebarCustomersFromEvent
+  )
+  removeCandidateSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
+    APP_EVENT.CANDIDATE_SIDEBAR_REFRESH,
+    refreshSidebarCandidatesFromEvent
   )
   removeProductSidebarRefreshListener = appEvents.on<SidebarRefreshPayload>(
     APP_EVENT.PRODUCT_SIDEBAR_REFRESH,
@@ -3654,6 +3859,8 @@ onBeforeUnmount(() => {
   removeCustomerListRefreshListener = null
   removeCustomerSidebarRefreshListener?.()
   removeCustomerSidebarRefreshListener = null
+  removeCandidateSidebarRefreshListener?.()
+  removeCandidateSidebarRefreshListener = null
   removeProductSidebarRefreshListener?.()
   removeProductSidebarRefreshListener = null
   removeRelationSidebarRefreshListener?.()
@@ -3698,6 +3905,7 @@ watch(
     primarySidebarCollapsed.value,
     recentChatSessionsExpanded.value,
     sidebarCustomersExpanded.value,
+    sidebarCandidatesExpanded.value,
     sidebarProductsExpanded.value,
     sidebarAddressBookExpanded.value,
     sidebarRelationsExpanded.value,
@@ -3708,6 +3916,8 @@ watch(
     projectStore.loading,
     sidebarCustomers.value.length,
     sidebarCustomersLoading.value,
+    sidebarCandidates.value.length,
+    sidebarCandidatesLoading.value,
     sidebarProducts.value.length,
     sidebarProductsLoading.value,
     sidebarEmployees.value.length,
@@ -3801,6 +4011,7 @@ function groupSessionsByTime(sessions: ChatSession[]): ChatSessionGroups {
 
 function isUnboundChatSession(session: ChatSession): boolean {
   return !String(session.customerId || '').trim()
+    && !String(session.candidateId || '').trim()
     && !String(session.employeeId || '').trim()
     && !String(session.relationId || '').trim()
     && !String(session.productId || '').trim()
@@ -3825,9 +4036,10 @@ const filteredHistorySessions = computed(() => {
   return sidebarVisibleChatSessions.value.filter(session => {
     const title = (session.title || '').toLowerCase()
     const customerName = (session.customerName || '').toLowerCase()
+    const candidateNameValue = (session.candidateName || '').toLowerCase()
     const relationName = (session.relationName || '').toLowerCase()
     const productName = (session.productName || '').toLowerCase()
-    return title.includes(keyword) || customerName.includes(keyword) || relationName.includes(keyword) || productName.includes(keyword)
+    return title.includes(keyword) || customerName.includes(keyword) || candidateNameValue.includes(keyword) || relationName.includes(keyword) || productName.includes(keyword)
   })
 })
 
@@ -3838,6 +4050,15 @@ function resetSidebarCustomers(options: { keepItems?: boolean } = {}) {
   sidebarCustomersPage.value = 1
   sidebarCustomersTotal.value = 0
   sidebarCustomersHasMore.value = true
+}
+
+function resetSidebarCandidates(options: { keepItems?: boolean } = {}) {
+  if (!options.keepItems) {
+    sidebarCandidates.value = []
+  }
+  sidebarCandidatesPage.value = 1
+  sidebarCandidatesTotal.value = 0
+  sidebarCandidatesHasMore.value = true
 }
 
 function resetSidebarProducts(options: { keepItems?: boolean } = {}) {
@@ -3876,6 +4097,7 @@ function shouldLoadMoreSidebarCustomers(): boolean {
 
 function maybeLoadMoreSidebarObjects() {
   maybeLoadMoreSidebarCustomers()
+  maybeLoadMoreSidebarCandidates()
   maybeLoadMoreSidebarProducts()
   maybeLoadMoreSidebarEmployees()
   maybeLoadMoreSidebarRelations()
@@ -3886,6 +4108,13 @@ function maybeLoadMoreSidebarCustomers() {
   if (sidebarCustomersLoading.value || !sidebarCustomersHasMore.value) return
   if (!shouldLoadMoreSidebarCustomers()) return
   void fetchSidebarCustomers()
+}
+
+function maybeLoadMoreSidebarCandidates() {
+  if (!showSidebarCandidates.value || !sidebarCandidatesExpanded.value || primarySidebarContentCollapsed.value) return
+  if (sidebarCandidatesLoading.value || !sidebarCandidatesHasMore.value) return
+  if (!shouldLoadMoreSidebarCustomers()) return
+  void fetchSidebarCandidates()
 }
 
 function maybeLoadMoreSidebarProducts() {
@@ -3911,6 +4140,10 @@ function maybeLoadMoreSidebarRelations() {
 
 function loadMoreSidebarCustomers() {
   void fetchSidebarCustomers()
+}
+
+function loadMoreSidebarCandidates() {
+  void fetchSidebarCandidates()
 }
 
 function loadMoreSidebarProducts() {
@@ -3975,6 +4208,59 @@ async function fetchSidebarCustomers(options: { reset?: boolean; preserveScroll?
     scheduleMicrotask(() => {
       updatePrimaryNavScrollbar()
       maybeLoadMoreSidebarCustomers()
+    })
+  }
+}
+
+async function fetchSidebarCandidates(options: { reset?: boolean; preserveScroll?: boolean } = {}) {
+  if (sidebarCandidatesLoading.value) return
+  const preservedScrollTop = options.preserveScroll ? getPrimaryNavScrollTop() : null
+  if (!showSidebarCandidates.value) {
+    resetSidebarCandidates()
+    if (preservedScrollTop != null) {
+      void restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    return
+  }
+  if (options.reset) {
+    resetSidebarCandidates({ keepItems: options.preserveScroll })
+  }
+  if (!sidebarCandidatesHasMore.value) return
+
+  const page = sidebarCandidatesPage.value
+  sidebarCandidatesLoading.value = true
+  try {
+    const result = await queryCandidateList({
+      page,
+      limit: SIDEBAR_CANDIDATE_LIMIT
+    })
+    const nextCandidates = result.list || []
+    if (page === 1) {
+      sidebarCandidates.value = nextCandidates
+    } else {
+      const existingIds = new Set(sidebarCandidates.value.map(candidate => String(candidate.candidateId)))
+      sidebarCandidates.value = [
+        ...sidebarCandidates.value,
+        ...nextCandidates.filter(candidate => !existingIds.has(String(candidate.candidateId))),
+      ]
+    }
+    sidebarCandidatesTotal.value = result.totalRow || sidebarCandidates.value.length
+    sidebarCandidatesPage.value = page + 1
+    sidebarCandidatesHasMore.value = nextCandidates.length > 0 && sidebarCandidates.value.length < sidebarCandidatesTotal.value
+  } catch (error) {
+    console.error('Load sidebar candidates failed:', error)
+    sidebarCandidatesHasMore.value = false
+    if (page === 1) {
+      sidebarCandidates.value = []
+    }
+  } finally {
+    sidebarCandidatesLoading.value = false
+    if (preservedScrollTop != null) {
+      await restorePrimaryNavScrollTop(preservedScrollTop)
+    }
+    scheduleMicrotask(() => {
+      updatePrimaryNavScrollbar()
+      maybeLoadMoreSidebarObjects()
     })
   }
 }
@@ -4201,8 +4487,23 @@ async function handleFloatingNewChat() {
       return
     }
   }
+  if (route.name === 'CandidateDetail') {
+    const candidateId = String(route.params.id || '').trim()
+    if (candidateId) {
+      selectedPrimaryKey.value = ''
+      await router.push({ path: '/chat', query: { candidateId } })
+      if (!isMobile.value) {
+        chatStore.requestComposerFocus()
+      }
+      return
+    }
+  }
   if (route.name === 'CustomerList') {
     await handleNewSession('crm')
+    return
+  }
+  if (route.name === 'CandidateList') {
+    await handleNewSession('hr')
     return
   }
   if (route.name === 'ProjectList') {
@@ -4263,6 +4564,13 @@ function isCustomerActive(customerId: string): boolean {
   return route.path.startsWith('/chat') && String(current) === String(customerId)
 }
 
+function isCandidateActive(candidateId: string): boolean {
+  const raw = route.query.candidateId
+  const current = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  return (route.path.startsWith('/chat') && String(current) === String(candidateId))
+    || (route.name === 'CandidateDetail' && String(route.params.id || '') === String(candidateId))
+}
+
 function isProductActive(productId: string): boolean {
   const raw = route.query.productId
   const current = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
@@ -4306,6 +4614,21 @@ async function handleSelectCustomerChat(customer: CustomerListVO) {
 async function handleMobileSelectCustomerChat(customer: CustomerListVO) {
   closeMobileDrawer()
   await handleSelectCustomerChat(customer)
+}
+
+async function handleSelectCandidateChat(candidate: CandidateListVO) {
+  selectedPrimaryKey.value = ''
+  const candidateId = String(candidate.candidateId)
+  const sessionId = await chatStore.openCandidateChat(candidate)
+  await router.push({ path: '/chat', query: { sessionId, candidateId } })
+  if (!isMobile.value) {
+    chatStore.requestComposerFocus()
+  }
+}
+
+async function handleMobileSelectCandidateChat(candidate: CandidateListVO) {
+  closeMobileDrawer()
+  await handleSelectCandidateChat(candidate)
 }
 
 async function handleSelectProductChat(product: ProductVO) {
@@ -4362,6 +4685,14 @@ function employeeInitial(employee: AddressBookEmployee): string {
 
 function employeeAvatarUrl(employee: AddressBookEmployee): string {
   return employee.imgUrl || employee.img || ''
+}
+
+function candidateName(candidate: CandidateListVO): string {
+  return candidate.name || '未命名候选人'
+}
+
+function candidateInitial(candidate: CandidateListVO): string {
+  return candidateName(candidate).trim().charAt(0) || '?'
 }
 
 function relationName(relation: RelationVO): string {
@@ -4880,6 +5211,11 @@ function handleCreateCustomerSuccess(payload: { mode: 'create' | 'edit'; custome
   }
 }
 
+function handleCreateCandidateSuccess() {
+  sidebarCandidatesExpanded.value = true
+  appEvents.emit(APP_EVENT.CANDIDATE_SIDEBAR_REFRESH, { preserveScroll: true })
+}
+
 function openCreateRelationDialog() {
   showCreateRelation.value = true
 }
@@ -4896,6 +5232,11 @@ function openCreateProjectDialog() {
 function handleMobileCreateCustomer() {
   closeMobileDrawer()
   showCreateCustomer.value = true
+}
+
+function handleMobileCreateCandidate() {
+  closeMobileDrawer()
+  showCreateCandidate.value = true
 }
 
 function handleMobileCreateRelation() {
@@ -5015,6 +5356,10 @@ async function handleCreateProject(payload: {
 
 .wk-sidebar-customer-section {
   order: 20;
+}
+
+.wk-sidebar-candidate-section {
+  order: 25;
 }
 
 .wk-sidebar-project-section {

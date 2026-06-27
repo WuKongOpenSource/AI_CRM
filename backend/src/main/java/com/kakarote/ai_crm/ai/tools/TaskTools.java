@@ -83,6 +83,9 @@ public class TaskTools {
                 if (task.getRelationName() != null) {
                     sb.append(String.format("，关系人: %s", task.getRelationName()));
                 }
+                if (task.getCandidateName() != null) {
+                    sb.append(String.format("，候选人: %s", task.getCandidateName()));
+                }
                 if (task.getGeneratedByAi() != null && task.getGeneratedByAi() == 1) {
                     sb.append(" [AI生成]");
                 }
@@ -120,11 +123,15 @@ public class TaskTools {
 
             Long customerId = null;
             String matchedCompanyName = null;
+            Long currentCandidateId = AiContextHolder.getCurrentCandidateId();
             Long currentRelationId = AiContextHolder.getCurrentRelationId();
+            boolean useCandidateContext = currentCandidateId != null
+                && !hasTextValue(customerIdStr)
+                && !hasTextValue(customerName);
             boolean useRelationContext = currentRelationId != null
                 && !hasTextValue(customerIdStr)
                 && !hasTextValue(customerName);
-            if (!useRelationContext) {
+            if (!useCandidateContext && !useRelationContext) {
                 AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
                     customerIdStr, customerName, "关联该客户创建任务", "创建任务失败", "创建任务");
                 if (customerResolve.errorMessage() != null) {
@@ -143,6 +150,9 @@ public class TaskTools {
             bo.setCustomerId(customerId);
             if (useRelationContext) {
                 bo.setRelationId(currentRelationId);
+            }
+            if (useCandidateContext) {
+                bo.setCandidateId(currentCandidateId);
             }
             Long currentEmployeeId = AiContextHolder.getCurrentEmployeeId();
             if (currentEmployeeId != null) {
@@ -169,6 +179,9 @@ public class TaskTools {
             }
             if (useRelationContext) {
                 result.append("\n- relationId: ").append(currentRelationId);
+            }
+            if (useCandidateContext) {
+                result.append("\n- candidateId: ").append(currentCandidateId);
             }
             if (currentEmployeeId != null) {
                 result.append("\n- employeeId: ").append(currentEmployeeId);

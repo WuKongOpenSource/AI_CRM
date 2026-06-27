@@ -14,6 +14,8 @@
             c.company_name AS customer_name,
             s.relation_id,
             r.name AS relation_name,
+            s.candidate_id,
+            ca.name AS candidate_name,
             s.contact_id,
             ct.name AS contact_name,
             s.location,
@@ -24,6 +26,7 @@
         FROM crm_schedule s
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
         LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
+        LEFT JOIN crm_candidate ca ON s.candidate_id = ca.candidate_id
         LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON s.create_user_id = u.user_id
         WHERE 1=1
@@ -36,6 +39,9 @@
         <if test="query.relationId != null">
             AND s.relation_id = #{query.relationId}
         </if>
+        <if test="query.candidateId != null">
+            AND s.candidate_id = #{query.candidateId}
+        </if>
         <if test="query.participantUserId != null">
             AND (',' || COALESCE(s.participant_user_ids, '') || ',') LIKE ('%,' || CAST(#{query.participantUserId} AS TEXT) || ',%')
         </if>
@@ -46,6 +52,7 @@
                 OR COALESCE(s.location, '') LIKE CONCAT('%', #{query.keyword}, '%')
                 OR COALESCE(c.company_name, '') LIKE CONCAT('%', #{query.keyword}, '%')
                 OR COALESCE(r.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
+                OR COALESCE(ca.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
                 OR COALESCE(ct.name, '') LIKE CONCAT('%', #{query.keyword}, '%')
             )
         </if>
@@ -98,6 +105,8 @@
             c.company_name AS customer_name,
             s.relation_id,
             r.name AS relation_name,
+            s.candidate_id,
+            ca.name AS candidate_name,
             s.contact_id,
             ct.name AS contact_name,
             s.location,
@@ -108,6 +117,7 @@
         FROM crm_schedule s
         LEFT JOIN crm_customer c ON s.customer_id = c.customer_id
         LEFT JOIN crm_relation r ON s.relation_id = r.relation_id
+        LEFT JOIN crm_candidate ca ON s.candidate_id = ca.candidate_id
         LEFT JOIN crm_contact ct ON s.contact_id = ct.contact_id
         LEFT JOIN manager_user u ON s.create_user_id = u.user_id
         WHERE (
