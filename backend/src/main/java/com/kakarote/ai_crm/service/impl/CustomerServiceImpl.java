@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import org.springframework.context.ApplicationEventPublisher;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import cn.hutool.poi.excel.ExcelWriter;
@@ -64,6 +65,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private ContactMapper contactMapper;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Autowired
     private CustomerTagMapper customerTagMapper;
@@ -325,6 +329,14 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         populateCustomerLogoQuietly(customer.getCustomerId());
         refreshCustomerActivity(customer.getCustomerId());
+
+        // 发布领域事件,供订阅插件经 webhook 接收（事务提交后投递）
+        eventPublisher.publishEvent(new com.kakarote.ai_crm.plugin.PluginDomainEvent(
+                "customer.created",
+                java.util.Map.of(
+                        "customerId", String.valueOf(customer.getCustomerId()),
+                        "companyName", StrUtil.nullToEmpty(customer.getCompanyName()))));
+
         return customer.getCustomerId();
     }
 
