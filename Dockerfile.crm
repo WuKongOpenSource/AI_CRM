@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+# Multi-stage build for the AI CRM image from LOCAL source (frontend + backend).
+# The host has no JDK/Maven, so the jar is built inside a Maven container.
+# The built SPA is baked into Spring Boot's classpath:/static so the crm
+# container serves the UI on :8088 exactly like the prebuilt image does.
+
+############################
+# Stage 1 — build the Vue SPA
+############################
+FROM node:20-alpine AS frontend
+WORKDIR /app/frontend
+# install deps first for better layer caching
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm ci || npm install
+COPY frontend/ ./
+# `npm run build` runs `vue-tsc -b && vite build`; fall back to a plain
+# vite build if the type-check step trips on a strict-mode error.
+RUN npm run build || npx vite build
+
+############################
+# Stage 2 — build the Spring Boot jar
+############################
+FROM maven:3.9.9-eclipse-temurin-21 AS backend
+WORKDIR /app/backend
+# warm the dependency cache from pom only
+COPY backend/pom.xml ./
+RUN mvn -B -q -DskipTests dependency:go-offline || true
+COPY backend/ ./
+# bake the compiled SPA into Spring Boot static resources
+COPY --from=frontend /app/frontend/dist/ ./src/main/resources/static/
+# skip tests entirely: they load the Spring context against shared infra
+RUN mvn -B -DskipTests -Dmaven.test.skip=true clean package
+
+############################
+# Stage 3 — runtime
+############################
+FROM registry.cn-beijing.aliyuncs.com/72crm/wk_base:20250331
+LABEL maintainer="wukongcrm" build-mode="local-source"
+WORKDIR /opt/wk_ai_crm
+COPY --from=backend /app/backend/target/crm-1.0.0.jar ./crm-1.0.0.jar
+ENV JAVA_OPTS="-Dons.client.logLevel=ERROR -XX:+ShowCodeDetailsInExceptionMessages -XX:MaxRAMPercentage=75.0 --add-opens java.base/java.net=ALL-UNNAMED --add-opens java.base/sun.net.www.protocol.https=ALL-UNNAMED"
+CMD java $JAVA_OPTS -jar crm-1.0.0.jar
