@@ -22,4 +22,8 @@ public class ImConversation implements Serializable {
     private Long lastMessageId;
     private Date createTime;
     private Date updateTime;
+    private String name;
+    private String description;
+    private String visibility;
+    private Long ownerId;
 }

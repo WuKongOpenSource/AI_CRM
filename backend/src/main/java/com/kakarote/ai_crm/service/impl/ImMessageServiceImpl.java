@@ -16,9 +16,11 @@ import com.kakarote.ai_crm.im.event.ImMessageSentEvent;
 import com.kakarote.ai_crm.mapper.ImConversationMapper;
 import com.kakarote.ai_crm.mapper.ImConversationMemberMapper;
 import com.kakarote.ai_crm.mapper.ImMessageMapper;
+import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.service.FileStorageService;
 import com.kakarote.ai_crm.service.ImConversationService;
 import com.kakarote.ai_crm.service.ImMessageService;
+import com.kakarote.ai_crm.service.ManageUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,9 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
 
     @Autowired(required = false)
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private ManageUserService manageUserService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -192,6 +197,16 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
         vo.setAttachmentMime(m.getAttachmentMime());
         vo.setStatus(m.getStatus());
         vo.setCreateTime(m.getCreateTime());
+        if (m.getSenderId() != null) {
+            try {
+                ManagerUser u = manageUserService.getById(m.getSenderId());
+                if (u != null) {
+                    vo.setSenderName(StrUtil.blankToDefault(u.getRealname(), u.getUsername()));
+                }
+            } catch (Exception ignored) {
+                // leave senderName null if user lookup fails
+            }
+        }
         if (StrUtil.isNotBlank(m.getAttachmentPath()) && fileStorageService != null) {
             try {
                 vo.setAttachmentUrl(fileStorageService.getUrl(m.getAttachmentPath()));

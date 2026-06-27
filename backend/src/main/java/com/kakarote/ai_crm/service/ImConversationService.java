@@ -28,4 +28,10 @@ public interface ImConversationService extends IService<ImConversation> {
 
     /** All conversations the user is a member of, newest-activity first, with peer info, last message, and unread. */
     java.util.List<com.kakarote.ai_crm.entity.VO.ImConversationVO> listMyConversations(Long userId);
+
+    ImConversation createChannel(Long creatorId, String name, String description, String visibility, java.util.List<Long> memberIds);
+    java.util.List<com.kakarote.ai_crm.entity.VO.ImConversationVO> browsePublicChannels(Long userId, String keyword);
+    void joinChannel(Long userId, Long channelId);
+    void leaveChannel(Long userId, Long channelId);
+    void addMembers(Long actorId, Long channelId, java.util.List<Long> userIds);
 }

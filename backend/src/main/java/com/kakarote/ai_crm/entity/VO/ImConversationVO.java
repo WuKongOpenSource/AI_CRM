@@ -13,4 +13,8 @@ public class ImConversationVO {
     private ImMessageVO lastMessage;
     private long unreadCount;
     private Date updateTime;
+    private String type;          // direct | channel
+    private String name;          // channel name (null for direct)
+    private String visibility;    // public | private (channels)
+    private Integer memberCount;  // channels
 }

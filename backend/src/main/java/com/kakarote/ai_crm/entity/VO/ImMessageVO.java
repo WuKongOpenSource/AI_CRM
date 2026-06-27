@@ -17,4 +17,5 @@ public class ImMessageVO {
     private String attachmentMime;
     private String status;
     private Date createTime;
+    private String senderName;
 }

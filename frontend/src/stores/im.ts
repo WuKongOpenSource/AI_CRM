@@ -5,7 +5,8 @@ import { getToken } from '@/utils/request'
 import {
   listConversations, listContacts, openDirect, fetchHistory,
   sendMessage, recallMessage, markRead,
-  type ImConversation, type ImMessage, type ImContact, type ImSendPayload,
+  createChannel, browsePublicChannels, joinChannel, leaveChannel, addChannelMembers, listChannelMembers,
+  type ImConversation, type ImMessage, type ImContact, type ImSendPayload, type ImCreateChannelPayload,
 } from '@/api/im'
 
 interface PushEnvelope {
@@ -103,7 +104,7 @@ export const useImStore = defineStore('im', () => {
     const conv = conversations.value.find((c) => c.id === env.conversationId)
     const preview = env.message.status === 'recalled' ? '撤回了一条消息'
       : (env.message.contentType === 'text' ? (env.message.content || '') : '[附件]')
-    new Notification(conv?.peerName || '新消息', { body: preview })
+    new Notification(conv?.peerName || conv?.name || '新消息', { body: preview })
   }
 
   async function refreshConversations() {
@@ -149,9 +150,36 @@ export const useImStore = defineStore('im', () => {
     }
   }
 
+  async function createChannelAction(payload: ImCreateChannelPayload): Promise<string> {
+    const { conversationId } = await createChannel(payload)
+    await refreshConversations()
+    await selectConversation(conversationId)
+    return conversationId
+  }
+  async function browseChannels(keyword?: string): Promise<ImConversation[]> {
+    return browsePublicChannels(keyword)
+  }
+  async function joinChannelAction(channelId: string) {
+    await joinChannel(channelId)
+    await refreshConversations()
+    await selectConversation(channelId)
+  }
+  async function leaveChannelAction(channelId: string) {
+    await leaveChannel(channelId)
+    if (activeConversationId.value === channelId) activeConversationId.value = null
+    await refreshConversations()
+  }
+  async function addMembersAction(channelId: string, userIds: string[]) {
+    await addChannelMembers(channelId, userIds)
+  }
+  async function fetchChannelMembers(channelId: string): Promise<ImContact[]> {
+    return listChannelMembers(channelId)
+  }
+
   return {
     conversations, contacts, messagesByConv, presence, activeConversationId, connected, totalUnread,
     connect, disconnect, refreshConversations, refreshContacts, loadHistory,
     openConversationWith, selectConversation, send, recall, markReadAction, ensureNotificationPermission,
+    createChannelAction, browseChannels, joinChannelAction, leaveChannelAction, addMembersAction, fetchChannelMembers,
   }
 })

@@ -6,9 +6,16 @@
     >
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;">
         <div style="font-size:19px;font-weight:800;color:#1d1c1d;">消息</div>
-        <button class="wk-im-newchat" @click="openContacts = true">
-          <span class="material-symbols-outlined" style="font-size:16px;">add</span>发起聊天
-        </button>
+        <el-dropdown trigger="click" @command="onNewMenu">
+          <button class="wk-im-newchat"><span class="material-symbols-outlined" style="font-size:16px;">add</span>新建</button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="dm">发起私聊</el-dropdown-item>
+              <el-dropdown-item command="channel">创建频道</el-dropdown-item>
+              <el-dropdown-item command="browse">浏览频道</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
 
       <div style="padding:0 16px 10px;">
@@ -41,19 +48,19 @@
           <div style="position:relative;flex:none;">
             <div
               class="wk-im-avatar"
-              :style="{ width: '40px', height: '40px', borderRadius: '11px', fontSize: '15px', background: avatarBg(c.peerUserId, c.peerName) }"
+              :style="{ width: '40px', height: '40px', borderRadius: '11px', fontSize: '15px', background: avatarBg(c.id, convName(c)) }"
             >
-              <img v-if="c.peerAvatarUrl" :src="c.peerAvatarUrl" style="width:100%;height:100%;border-radius:11px;object-fit:cover;" />
-              <template v-else>{{ avatarText(c.peerName) }}</template>
+              <img v-if="!isChannel(c) && c.peerAvatarUrl" :src="c.peerAvatarUrl" style="width:100%;height:100%;border-radius:11px;object-fit:cover;" />
+              <template v-else>{{ convAvatarText(c) }}</template>
             </div>
-            <span v-if="im.presence[c.peerUserId]" class="wk-im-dot" />
+            <span v-if="!isChannel(c) && im.presence[c.peerUserId]" class="wk-im-dot" />
           </div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;">
               <span
                 style="font-size:14px;color:#1d1c1d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
                 :style="{ fontWeight: c.unreadCount ? 700 : 500 }"
-              >{{ c.peerName }}</span>
+              >{{ convName(c) }}</span>
               <span style="margin-left:auto;font-size:11px;color:#a7a7ab;flex:none;">{{ relativeTime(c.lastMessage?.createTime || c.updateTime) }}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:2px;">
@@ -63,7 +70,7 @@
           </div>
         </button>
         <div v-if="!filteredConversations.length" style="padding:24px 12px;text-align:center;color:#a7a7ab;font-size:13px;">
-          暂无会话，点击「发起聊天」开始
+          暂无会话，点击「新建」开始
         </div>
       </div>
     </section>
@@ -77,17 +84,23 @@
             <div style="position:relative;flex:none;">
               <div
                 class="wk-im-avatar"
-                :style="{ width: '38px', height: '38px', borderRadius: '10px', fontSize: '15px', background: avatarBg(activeConv.peerUserId, activeConv.peerName) }"
+                :style="{ width: '38px', height: '38px', borderRadius: '10px', fontSize: '15px', background: avatarBg(activeConv.id, convName(activeConv)) }"
               >
-                <img v-if="activeConv.peerAvatarUrl" :src="activeConv.peerAvatarUrl" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />
-                <template v-else>{{ avatarText(activeConv.peerName) }}</template>
+                <img v-if="!isChannel(activeConv) && activeConv.peerAvatarUrl" :src="activeConv.peerAvatarUrl" style="width:100%;height:100%;border-radius:10px;object-fit:cover;" />
+                <template v-else>{{ convAvatarText(activeConv) }}</template>
               </div>
-              <span v-if="im.presence[activeConv.peerUserId]" class="wk-im-dot" />
+              <span v-if="!isChannel(activeConv) && im.presence[activeConv.peerUserId]" class="wk-im-dot" />
             </div>
             <div style="min-width:0;">
-              <div style="font-size:15.5px;font-weight:700;color:#1d1c1d;">{{ activeConv.peerName }}</div>
-              <div style="font-size:12px;color:#86868a;">{{ im.presence[activeConv.peerUserId] ? '在线' : '离线' }}</div>
+              <div style="font-size:15.5px;font-weight:700;color:#1d1c1d;">{{ convName(activeConv) }}</div>
+              <div v-if="!isChannel(activeConv)" style="font-size:12px;color:#86868a;">{{ im.presence[activeConv.peerUserId] ? '在线' : '离线' }}</div>
+              <div v-else style="font-size:12px;color:#86868a;">{{ activeConv.memberCount != null ? activeConv.memberCount + ' 人' : '' }}</div>
             </div>
+          </div>
+          <div v-if="isChannel(activeConv)" style="flex:none;">
+            <button class="wk-im-tool" @click="openMembers = true" title="查看成员">
+              <span class="material-symbols-outlined" style="font-size:18px;">group</span>
+            </button>
           </div>
         </div>
 
@@ -108,12 +121,12 @@
                 <div
                   v-if="row.showAvatar"
                   class="wk-im-avatar"
-                  :style="{ width: '38px', height: '38px', borderRadius: '10px', fontSize: '14px', marginTop: '3px', background: row.mine ? '#6d4aff' : avatarBg(activeConv.peerUserId, activeConv.peerName) }"
-                >{{ row.mine ? meAvatarText : avatarText(activeConv.peerName) }}</div>
+                  :style="{ width: '38px', height: '38px', borderRadius: '10px', fontSize: '14px', marginTop: '3px', background: msgAvatarBg(row) }"
+                >{{ msgAvatarText(row) }}</div>
               </div>
               <div style="flex:1;min-width:0;padding-top:2px;">
                 <div v-if="row.showHeader" style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">
-                  <span style="font-weight:700;font-size:14.5px;color:#1d1c1d;">{{ row.mine ? '我' : activeConv.peerName }}</span>
+                  <span style="font-weight:700;font-size:14.5px;color:#1d1c1d;">{{ msgSenderName(row) }}</span>
                   <span style="font-size:11px;color:#a7a7ab;">{{ clockTime(row.msg.createTime) }}</span>
                 </div>
                 <div v-if="row.msg.status === 'recalled'" style="font-size:13.5px;color:#a7a7ab;font-style:italic;">该消息已撤回</div>
@@ -156,7 +169,7 @@
             <textarea
               ref="composerEl"
               v-model="draft"
-              :placeholder="`发消息给 ${activeConv.peerName}`"
+              :placeholder="`发消息给 ${convName(activeConv)}`"
               rows="1"
               @keydown="onComposerKey"
             ></textarea>
@@ -189,7 +202,7 @@
       </div>
     </main>
 
-    <!-- contacts picker -->
+    <!-- contacts picker (发起私聊) -->
     <el-dialog v-model="openContacts" title="发起聊天" width="420px" @open="im.refreshContacts()">
       <el-input v-model="contactKeyword" placeholder="搜索同事" class="mb-2" @input="im.refreshContacts(contactKeyword)" />
       <div style="max-height:320px;overflow-y:auto;">
@@ -209,6 +222,62 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- create channel dialog -->
+    <el-dialog v-model="openCreate" title="创建频道" width="460px">
+      <el-input v-model="channelForm.name" placeholder="频道名称" class="mb-2" maxlength="100" />
+      <el-input v-model="channelForm.description" placeholder="频道简介（可选）" class="mb-2" />
+      <el-radio-group v-model="channelForm.visibility" class="mb-3">
+        <el-radio value="public">公开（全员可浏览加入）</el-radio>
+        <el-radio value="private">私有（仅邀请）</el-radio>
+      </el-radio-group>
+      <el-input v-model="createMemberKeyword" placeholder="搜索同事添加为成员" class="mb-2" @input="im.refreshContacts(createMemberKeyword)" />
+      <div style="max-height:240px;overflow-y:auto;">
+        <label v-for="ct in im.contacts" :key="ct.userId" class="wk-im-contact" style="cursor:pointer;">
+          <input type="checkbox" :value="ct.userId" v-model="channelForm.memberIds" />
+          <span style="font-size:14px;">{{ ct.name }}</span>
+          <span style="margin-left:auto;font-size:12px;color:#a7a7ab;">{{ ct.deptName }}</span>
+        </label>
+      </div>
+      <template #footer>
+        <el-button @click="openCreate = false">取消</el-button>
+        <el-button type="primary" :disabled="!channelForm.name.trim()" @click="submitCreateChannel">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- browse public channels dialog -->
+    <el-dialog v-model="openBrowse" title="浏览公开频道" width="440px">
+      <el-input v-model="browseKeyword" placeholder="搜索频道" class="mb-2" @input="loadBrowse" />
+      <div style="max-height:320px;overflow-y:auto;">
+        <div v-for="ch in browseList" :key="ch.id" class="wk-im-contact">
+          <div class="wk-im-avatar" :style="{ width:'32px',height:'32px',borderRadius:'8px',fontSize:'14px',background: avatarBg(ch.id, ch.name) }">#</div>
+          <div style="min-width:0;">
+            <div style="font-size:14px;">{{ ch.name }}</div>
+            <div style="font-size:12px;color:#a7a7ab;">{{ ch.memberCount }} 人</div>
+          </div>
+          <el-button size="small" type="primary" style="margin-left:auto;" @click="joinAndOpen(ch.id)">加入</el-button>
+        </div>
+        <div v-if="!browseList.length" style="padding:20px;text-align:center;color:#a7a7ab;font-size:13px;">没有可加入的公开频道</div>
+      </div>
+    </el-dialog>
+
+    <!-- channel members dialog -->
+    <el-dialog v-model="openMembers" title="频道成员" width="420px" @open="loadMembers">
+      <div style="max-height:240px;overflow-y:auto;margin-bottom:10px;">
+        <div v-for="mb in memberList" :key="mb.userId" class="wk-im-contact">
+          <div class="wk-im-avatar" :style="{ width:'30px',height:'30px',borderRadius:'8px',fontSize:'12px',background: avatarBg(mb.userId, mb.name) }">{{ avatarText(mb.name) }}</div>
+          <span style="font-size:14px;">{{ mb.name }}</span>
+          <span v-if="mb.online" class="wk-im-dot" style="position:static;border:none;width:8px;height:8px;" />
+        </div>
+      </div>
+      <el-input v-model="addMemberKeyword" placeholder="搜索同事添加" class="mb-2" @input="im.refreshContacts(addMemberKeyword)" />
+      <div style="max-height:200px;overflow-y:auto;">
+        <div v-for="ct in addableContacts" :key="ct.userId" class="wk-im-contact" @click="addOneMember(ct.userId)">
+          <span style="font-size:14px;">{{ ct.name }}</span>
+          <span style="margin-left:auto;font-size:12px;color:#6d4aff;">添加</span>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -218,7 +287,7 @@ import { useRoute } from 'vue-router'
 import { useImStore } from '@/stores/im'
 import { useUserStore } from '@/stores/user'
 import { post } from '@/utils/request'
-import type { ImMessage } from '@/api/im'
+import type { ImMessage, ImConversation, ImContact } from '@/api/im'
 import type { UploadRequestOptions } from 'element-plus'
 
 const im = useImStore()
@@ -231,15 +300,29 @@ const draft = ref('')
 const openContacts = ref(false)
 const contactKeyword = ref('')
 const listKeyword = ref('')
-const listFilter = ref<'all' | 'unread'>('all')
+const listFilter = ref<'all' | 'unread' | 'channel'>('all')
 const hoveredMsg = ref<string | null>(null)
 const uploading = ref(false)
 const scrollEl = ref<HTMLElement | null>(null)
 const composerEl = ref<HTMLTextAreaElement | null>(null)
 
+// Channel dialog refs
+const openCreate = ref(false)
+const openBrowse = ref(false)
+const openMembers = ref(false)
+const createMemberKeyword = ref('')
+const addMemberKeyword = ref('')
+const browseKeyword = ref('')
+const browseList = ref<ImConversation[]>([])
+const memberList = ref<ImContact[]>([])
+const channelForm = ref<{ name: string; description: string; visibility: 'public' | 'private'; memberIds: string[] }>(
+  { name: '', description: '', visibility: 'public', memberIds: [] }
+)
+
 const filters = [
   { key: 'all' as const, label: '全部' },
   { key: 'unread' as const, label: '未读' },
+  { key: 'channel' as const, label: '频道' },
 ]
 
 const AVATAR_PALETTE = ['#7c5cff', '#f5832a', '#2bb673', '#19a3a3', '#0e9f6e', '#3a82f6', '#e8543f', '#9b5de5', '#f15bb5']
@@ -254,6 +337,28 @@ function avatarBg(seed?: string | null, fallback?: string | null): string {
 function avatarText(name?: string | null): string {
   const n = (name || '?').trim()
   return n ? n.slice(0, 1) : '?'
+}
+
+// Channel helpers
+function isChannel(c: ImConversation) { return c.type === 'channel' }
+function convName(c: ImConversation) { return c.type === 'channel' ? (c.name || '频道') : c.peerName }
+function convAvatarText(c: ImConversation) { return c.type === 'channel' ? '#' : avatarText(c.peerName) }
+
+// Per-message sender helpers (channel-aware)
+function msgSenderName(row: GroupedRow): string {
+  if (row.mine) return '我'
+  if (activeConv.value && isChannel(activeConv.value)) return row.msg.senderName || convName(activeConv.value)
+  return activeConv.value ? convName(activeConv.value) : ''
+}
+function msgAvatarText(row: GroupedRow): string {
+  if (row.mine) return meAvatarText.value
+  if (activeConv.value && isChannel(activeConv.value)) return avatarText(row.msg.senderName)
+  return activeConv.value ? convAvatarText(activeConv.value) : '?'
+}
+function msgAvatarBg(row: GroupedRow): string {
+  if (row.mine) return '#6d4aff'
+  if (activeConv.value && isChannel(activeConv.value)) return avatarBg(row.msg.senderId, row.msg.senderName)
+  return activeConv.value ? avatarBg(activeConv.value.id, convName(activeConv.value)) : '#7c5cff'
 }
 
 function parseTime(s?: string | null): number {
@@ -301,11 +406,16 @@ const activeConv = computed(() =>
   im.conversations.find((c) => c.id === im.activeConversationId) || null
 )
 
+const addableContacts = computed(() =>
+  im.contacts.filter(ct => !memberList.value.some(m => m.userId === ct.userId))
+)
+
 const filteredConversations = computed(() => {
   const kw = listKeyword.value.trim().toLowerCase()
   return im.conversations.filter((c) => {
     if (listFilter.value === 'unread' && !c.unreadCount) return false
-    if (kw && !(c.peerName || '').toLowerCase().includes(kw)) return false
+    if (listFilter.value === 'channel' && c.type !== 'channel') return false
+    if (kw && !convName(c).toLowerCase().includes(kw)) return false
     return true
   })
 })
@@ -380,6 +490,44 @@ async function onSend() {
 async function startChat(userId: string) {
   openContacts.value = false
   await im.openConversationWith(userId)
+}
+
+// New menu handler
+function onNewMenu(cmd: string) {
+  if (cmd === 'dm') { openContacts.value = true; im.refreshContacts() }
+  else if (cmd === 'channel') { openCreate.value = true; channelForm.value = { name: '', description: '', visibility: 'public', memberIds: [] }; createMemberKeyword.value = ''; im.refreshContacts() }
+  else { openBrowse.value = true; void loadBrowse() }
+}
+
+async function submitCreateChannel() {
+  if (!channelForm.value.name.trim()) return
+  try {
+    await im.createChannelAction({
+      name: channelForm.value.name.trim(),
+      description: channelForm.value.description.trim(),
+      visibility: channelForm.value.visibility,
+      memberIds: channelForm.value.memberIds,
+    })
+    openCreate.value = false
+  } catch { /* global handler shows the error toast; keep dialog open for retry */ }
+}
+
+async function loadBrowse() { browseList.value = await im.browseChannels(browseKeyword.value) }
+async function joinAndOpen(id: string) {
+  try {
+    await im.joinChannelAction(id)
+    openBrowse.value = false
+  } catch { /* global handler shows the error toast; keep dialog open for retry */ }
+}
+async function loadMembers() {
+  addMemberKeyword.value = ''
+  im.refreshContacts()
+  if (im.activeConversationId) memberList.value = await im.fetchChannelMembers(im.activeConversationId)
+}
+async function addOneMember(userId: string) {
+  if (!im.activeConversationId) return
+  await im.addMembersAction(im.activeConversationId, [userId])
+  await loadMembers()
 }
 
 // Presigned upload: POST /file/presigned-upload {fileName, contentType} -> {objectKey, uploadUrl, method}, PUT to MinIO, then send.
