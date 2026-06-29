@@ -39,6 +39,18 @@ public class EnumController {
         "lost", "#ef4444"
     );
 
+    /** 候选人阶段配色。 */
+    private static final Map<String, String> CANDIDATE_STAGE_COLORS = Map.of(
+        "new", "#6b7280",
+        "screening", "#3b82f6",
+        "interview_scheduled", "#f59e0b",
+        "interviewing", "#f59e0b",
+        "interview_passed", "#22c55e",
+        "offer", "#8b5cf6",
+        "hired", "#10b981",
+        "rejected", "#ef4444"
+    );
+
     /** 内置级别配色 */
     private static final Map<String, String> LEVEL_COLORS = Map.of(
         "A", "#22c55e",
@@ -53,6 +65,15 @@ public class EnumController {
     @Operation(summary = "客户阶段枚举")
     public Result<List<EnumVO>> customerStage() {
         return Result.ok(toEnumList("customer", "stage", STAGE_COLORS));
+    }
+
+    /**
+     * 候选人阶段枚举（真相源 crm_custom_field.options，支持本地自定义/新增）。
+     */
+    @GetMapping("/candidateStage")
+    @Operation(summary = "候选人阶段枚举")
+    public Result<List<EnumVO>> candidateStage() {
+        return Result.ok(toEnumList("candidate", "stage", CANDIDATE_STAGE_COLORS));
     }
 
     /**

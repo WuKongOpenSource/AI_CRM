@@ -34,6 +34,9 @@ public class ChatSendBO {
     @Schema(description = "产品对话绑定的产品ID")
     private Long productId;
 
+    @Schema(description = "候选人对话绑定的候选人ID")
+    private Long candidateId;
+
     @Schema(description = "项目对话绑定的项目ID")
     private Long projectId;
 

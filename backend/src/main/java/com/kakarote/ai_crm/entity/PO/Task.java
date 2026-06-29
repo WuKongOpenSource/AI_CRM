@@ -71,6 +71,9 @@ public class Task implements Serializable {
     @Schema(description = "Relation ID")
     private Long relationId;
 
+    @Schema(description = "Candidate ID")
+    private Long candidateId;
+
     @Schema(description = "Project ID")
     private Long projectId;
 

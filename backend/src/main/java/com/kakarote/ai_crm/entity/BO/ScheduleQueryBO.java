@@ -28,6 +28,9 @@ public class ScheduleQueryBO extends PageEntity {
     @Schema(description = "关系人ID")
     private Long relationId;
 
+    @Schema(description = "候选人ID")
+    private Long candidateId;
+
     @Schema(description = "参与人员工ID")
     private Long participantUserId;
 

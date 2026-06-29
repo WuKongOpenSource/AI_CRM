@@ -19,6 +19,8 @@ public final class UserPreferenceSupport {
 
     public static final String SIDEBAR_RECENT = "recent";
     public static final String SIDEBAR_CUSTOMER = "customer";
+    public static final String SIDEBAR_CANDIDATE = "candidate";
+    public static final String SIDEBAR_PRODUCT = "product";
     public static final String SIDEBAR_PROJECT = "project";
     public static final String SIDEBAR_RELATION = "relation";
     public static final String SIDEBAR_ADDRESS_BOOK = "addressBook";
@@ -27,6 +29,8 @@ public final class UserPreferenceSupport {
     private static final List<String> DEFAULT_SIDEBAR_MODULE_ORDER = List.of(
             SIDEBAR_RECENT,
             SIDEBAR_CUSTOMER,
+            SIDEBAR_CANDIDATE,
+            SIDEBAR_PRODUCT,
             SIDEBAR_PROJECT,
             SIDEBAR_RELATION,
             SIDEBAR_ADDRESS_BOOK

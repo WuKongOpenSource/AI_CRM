@@ -63,10 +63,11 @@ public class ScheduleTools {
 
             ScheduleAddBO bo = new ScheduleAddBO();
             bo.setTitle(title);
-            bo.setType(hasTextValue(type) ? type : "meeting");
             bo.setDescription(description);
             bo.setLocation(location);
             Long currentEmployeeId = AiContextHolder.getCurrentEmployeeId();
+            Long currentCandidateId = AiContextHolder.getCurrentCandidateId();
+            bo.setType(hasTextValue(type) ? type : (currentCandidateId != null ? "interview" : "meeting"));
             if (currentEmployeeId != null) {
                 bo.setParticipantUserIds(List.of(currentEmployeeId));
             }
@@ -88,10 +89,19 @@ public class ScheduleTools {
             String matchedCompanyName = null;
             Long customerId = null;
             Long currentRelationId = AiContextHolder.getCurrentRelationId();
+            boolean useCandidateContext = currentCandidateId != null
+                && !hasTextValue(customerIdStr)
+                && !hasTextValue(customerName)
+                && !hasTextValue(contactName);
             boolean useRelationContext = currentRelationId != null
                 && !hasTextValue(customerIdStr)
                 && !hasTextValue(customerName);
-            if (useRelationContext) {
+            if (useCandidateContext) {
+                bo.setCandidateId(currentCandidateId);
+                if (!hasTextValue(type)) {
+                    bo.setType("interview");
+                }
+            } else if (useRelationContext) {
                 bo.setRelationId(currentRelationId);
             } else {
                 AiToolCustomerResolver.CustomerResolveResult customerResolve = customerResolver.resolveForCreate(
@@ -131,6 +141,9 @@ public class ScheduleTools {
             }
             if (useRelationContext) {
                 result.append("\n- relationId: ").append(currentRelationId);
+            }
+            if (useCandidateContext) {
+                result.append("\n- candidateId: ").append(currentCandidateId);
             }
             if (currentEmployeeId != null) {
                 result.append("\n- employeeId: ").append(currentEmployeeId);
@@ -186,6 +199,9 @@ public class ScheduleTools {
                 }
                 if (vo.getRelationName() != null) {
                     sb.append(String.format("，关系人: %s", vo.getRelationName()));
+                }
+                if (vo.getCandidateName() != null) {
+                    sb.append(String.format("，候选人: %s", vo.getCandidateName()));
                 }
                 if (StrUtil.isNotBlank(vo.getLocation())) {
                     sb.append(String.format("，地点: %s", vo.getLocation()));
@@ -248,6 +264,7 @@ public class ScheduleTools {
             case "meeting" -> "会议";
             case "call" -> "电话";
             case "visit" -> "拜访";
+            case "interview" -> "面试";
             default -> type;
         };
     }

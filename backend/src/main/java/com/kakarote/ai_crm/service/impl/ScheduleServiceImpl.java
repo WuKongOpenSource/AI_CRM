@@ -16,12 +16,14 @@ import com.kakarote.ai_crm.entity.BO.ScheduleAddBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleAiParseBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleQueryBO;
 import com.kakarote.ai_crm.entity.BO.ScheduleUpdateBO;
+import com.kakarote.ai_crm.entity.PO.Candidate;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.Relation;
 import com.kakarote.ai_crm.entity.PO.Schedule;
 import com.kakarote.ai_crm.entity.VO.ScheduleAiParseVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleParticipantUserVO;
 import com.kakarote.ai_crm.entity.VO.ScheduleVO;
+import com.kakarote.ai_crm.mapper.CandidateMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.mapper.ScheduleMapper;
 import com.kakarote.ai_crm.service.DataPermissionService;
@@ -66,6 +68,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
 
     @Autowired
     private RelationMapper relationMapper;
+
+    @Autowired
+    private CandidateMapper candidateMapper;
 
     @Autowired
     private IGlobalSearchIndexService globalSearchIndexService;
@@ -122,6 +127,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     @Override
     public Long addSchedule(ScheduleAddBO scheduleAddBO) {
         validateOwnedRelation(scheduleAddBO.getRelationId());
+        validateVisibleCandidate(scheduleAddBO.getCandidateId());
         Schedule schedule = new Schedule();
         schedule.setTitle(StrUtil.trim(scheduleAddBO.getTitle()));
         schedule.setDescription(StrUtil.emptyToNull(StrUtil.trim(scheduleAddBO.getDescription())));
@@ -130,6 +136,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         schedule.setType(normalizeType(scheduleAddBO.getType()));
         schedule.setCustomerId(scheduleAddBO.getCustomerId());
         schedule.setRelationId(scheduleAddBO.getRelationId());
+        schedule.setCandidateId(scheduleAddBO.getCandidateId());
         schedule.setContactId(scheduleAddBO.getContactId());
         schedule.setLocation(StrUtil.emptyToNull(StrUtil.trim(scheduleAddBO.getLocation())));
         schedule.setParticipantUserIds(joinParticipantUserIds(scheduleAddBO.getParticipantUserIds()));
@@ -152,6 +159,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         }
         dataPermissionService.assertUserDataAccessByPermission("schedule:edit", schedule.getCreateUserId());
         validateOwnedRelation(scheduleUpdateBO.getRelationId());
+        validateVisibleCandidate(scheduleUpdateBO.getCandidateId());
         Long previousCustomerId = schedule.getCustomerId();
 
         schedule.setTitle(StrUtil.trim(scheduleUpdateBO.getTitle()));
@@ -161,6 +169,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         schedule.setType(normalizeType(scheduleUpdateBO.getType()));
         schedule.setCustomerId(scheduleUpdateBO.getCustomerId());
         schedule.setRelationId(scheduleUpdateBO.getRelationId());
+        schedule.setCandidateId(scheduleUpdateBO.getCandidateId());
         schedule.setContactId(scheduleUpdateBO.getContactId());
         schedule.setLocation(StrUtil.emptyToNull(StrUtil.trim(scheduleUpdateBO.getLocation())));
         schedule.setParticipantUserIds(joinParticipantUserIds(scheduleUpdateBO.getParticipantUserIds()));
@@ -209,6 +218,17 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
                 || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
         }
+    }
+
+    private void validateVisibleCandidate(Long candidateId) {
+        if (candidateId == null) {
+            return;
+        }
+        Candidate candidate = candidateMapper.selectById(candidateId);
+        if (candidate == null || Integer.valueOf(0).equals(candidate.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "候选人不存在或无权限访问");
+        }
+        dataPermissionService.assertUserDataAccessByPermission("candidate:view", candidate.getOwnerId());
     }
 
     @Override
@@ -323,6 +343,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             case "meeting" -> "会议";
             case "call" -> "电话";
             case "visit" -> "拜访";
+            case "interview" -> "面试";
             case "other" -> "其他";
             default -> type;
         };
@@ -746,6 +767,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             case "meeting", "会议" -> "meeting";
             case "call", "电话" -> "call";
             case "visit", "拜访" -> "visit";
+            case "interview", "面试" -> "interview";
             case "other", "其他" -> "other";
             default -> "meeting";
         };

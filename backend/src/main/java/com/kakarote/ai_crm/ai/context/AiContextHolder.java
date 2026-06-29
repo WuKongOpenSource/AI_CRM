@@ -33,6 +33,7 @@ public class AiContextHolder {
     private static final Map<Long, Long> SESSION_EMPLOYEE_MAP = new ConcurrentHashMap<>();
     private static final Map<Long, Long> SESSION_RELATION_MAP = new ConcurrentHashMap<>();
     private static final Map<Long, Long> SESSION_PRODUCT_MAP = new ConcurrentHashMap<>();
+    private static final Map<Long, Long> SESSION_CANDIDATE_MAP = new ConcurrentHashMap<>();
     private static final Map<Long, Long> SESSION_PROJECT_MAP = new ConcurrentHashMap<>();
     private static final Map<Long, Long> SESSION_PROJECT_TASK_MAP = new ConcurrentHashMap<>();
 
@@ -51,6 +52,7 @@ public class AiContextHolder {
     private static final ThreadLocal<Long> CURRENT_EMPLOYEE_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> CURRENT_RELATION_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> CURRENT_PRODUCT_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Long> CURRENT_CANDIDATE_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> CURRENT_PROJECT_ID = new ThreadLocal<>();
     private static final ThreadLocal<Long> CURRENT_PROJECT_TASK_ID = new ThreadLocal<>();
 
@@ -75,7 +77,7 @@ public class AiContextHolder {
 
     public static void setContext(Long sessionId, Long userId,
                                   Long customerId, Long employeeId, Long relationId,
-                                  Long productId, Long projectId, Long projectTaskId) {
+                                  Long productId, Long candidateId, Long projectId, Long projectTaskId) {
         setContext(sessionId, userId);
         if (sessionId == null || userId == null) {
             return;
@@ -84,18 +86,25 @@ public class AiContextHolder {
         putObjectContext(SESSION_EMPLOYEE_MAP, CURRENT_EMPLOYEE_ID, sessionId, employeeId);
         putObjectContext(SESSION_RELATION_MAP, CURRENT_RELATION_ID, sessionId, relationId);
         putObjectContext(SESSION_PRODUCT_MAP, CURRENT_PRODUCT_ID, sessionId, productId);
+        putObjectContext(SESSION_CANDIDATE_MAP, CURRENT_CANDIDATE_ID, sessionId, candidateId);
         putObjectContext(SESSION_PROJECT_MAP, CURRENT_PROJECT_ID, sessionId, projectId);
         putObjectContext(SESSION_PROJECT_TASK_MAP, CURRENT_PROJECT_TASK_ID, sessionId, projectTaskId);
-        log.debug("AI object context: sessionId={}, customerId={}, employeeId={}, relationId={}, productId={}, projectId={}, projectTaskId={}",
-            sessionId, customerId, employeeId, relationId, productId, projectId, projectTaskId);
+        log.debug("AI object context: sessionId={}, customerId={}, employeeId={}, relationId={}, productId={}, candidateId={}, projectId={}, projectTaskId={}",
+            sessionId, customerId, employeeId, relationId, productId, candidateId, projectId, projectTaskId);
+    }
+
+    public static void setContext(Long sessionId, Long userId,
+                                  Long customerId, Long employeeId, Long relationId,
+                                  Long productId, Long projectId, Long projectTaskId) {
+        setContext(sessionId, userId, customerId, employeeId, relationId, productId, null, projectId, projectTaskId);
     }
 
     public static void setContext(Long sessionId, Long userId, Long customerId) {
-        setContext(sessionId, userId, customerId, null, null, null, null, null);
+        setContext(sessionId, userId, customerId, null, null, null, null, null, null);
     }
 
     public static void setContext(Long sessionId, Long userId, Long ignoredContextId, Long customerId) {
-        setContext(sessionId, userId, customerId, null, null, null, null, null);
+        setContext(sessionId, userId, customerId, null, null, null, null, null, null);
     }
 
     public static void bindThreadContext(Long sessionId, Long userId) {
@@ -126,6 +135,7 @@ public class AiContextHolder {
             restoreObjectContext(SESSION_EMPLOYEE_MAP, CURRENT_EMPLOYEE_ID, sessionId);
             restoreObjectContext(SESSION_RELATION_MAP, CURRENT_RELATION_ID, sessionId);
             restoreObjectContext(SESSION_PRODUCT_MAP, CURRENT_PRODUCT_ID, sessionId);
+            restoreObjectContext(SESSION_CANDIDATE_MAP, CURRENT_CANDIDATE_ID, sessionId);
             restoreObjectContext(SESSION_PROJECT_MAP, CURRENT_PROJECT_ID, sessionId);
             restoreObjectContext(SESSION_PROJECT_TASK_MAP, CURRENT_PROJECT_TASK_ID, sessionId);
         }
@@ -177,6 +187,10 @@ public class AiContextHolder {
         return getCurrentObjectId(SESSION_PRODUCT_MAP, CURRENT_PRODUCT_ID);
     }
 
+    public static Long getCurrentCandidateId() {
+        return getCurrentObjectId(SESSION_CANDIDATE_MAP, CURRENT_CANDIDATE_ID);
+    }
+
     public static Long getCurrentProjectId() {
         return getCurrentObjectId(SESSION_PROJECT_MAP, CURRENT_PROJECT_ID);
     }
@@ -210,6 +224,7 @@ public class AiContextHolder {
         CURRENT_EMPLOYEE_ID.remove();
         CURRENT_RELATION_ID.remove();
         CURRENT_PRODUCT_ID.remove();
+        CURRENT_CANDIDATE_ID.remove();
         CURRENT_PROJECT_ID.remove();
         CURRENT_PROJECT_TASK_ID.remove();
     }
@@ -231,6 +246,7 @@ public class AiContextHolder {
             SESSION_EMPLOYEE_MAP.remove(sessionId);
             SESSION_RELATION_MAP.remove(sessionId);
             SESSION_PRODUCT_MAP.remove(sessionId);
+            SESSION_CANDIDATE_MAP.remove(sessionId);
             SESSION_PROJECT_MAP.remove(sessionId);
             SESSION_PROJECT_TASK_MAP.remove(sessionId);
             log.trace("移除会话: sessionId={}", sessionId);

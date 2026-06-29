@@ -7,6 +7,8 @@ export interface Task {
   customerName?: string
   relationId?: string
   relationName?: string
+  candidateId?: string
+  candidateName?: string
   projectId?: string
   projectName?: string
   laneId?: string
@@ -41,6 +43,7 @@ export interface TaskAddBO {
   customerId?: string
   priority?: TaskPriority
   relationId?: string
+  candidateId?: string
   projectId?: string
   laneId?: string
   dueDate?: string
@@ -62,6 +65,7 @@ export interface TaskQueryBO {
   customerId?: string
   assignedTo?: string
   relationId?: string
+  candidateId?: string
   projectId?: string
   laneId?: string
   filter?: 'all' | 'today' | 'thisWeek' | 'overdue' | 'mine'
@@ -82,6 +86,8 @@ export interface Knowledge {
   employeeName?: string
   relationId?: string
   relationName?: string
+  candidateId?: string
+  candidateName?: string
   filePath?: string
   /** 文件大小，单位：字节 (B)，来自知识库列表/详情等接口 */
   fileSize?: number | string
@@ -115,6 +121,7 @@ export interface KnowledgeQueryBO {
   customerId?: string
   employeeId?: string
   relationId?: string
+  candidateId?: string
   page?: number
   limit?: number
 }
@@ -218,6 +225,9 @@ export interface ChatSession {
   productName?: string
   productCode?: string
   productImageUrl?: string
+  candidateId?: string
+  candidateName?: string
+  candidateAvatarUrl?: string
   projectId?: string
   projectName?: string
   projectTaskId?: string
@@ -289,6 +299,7 @@ export interface ChatSendBO {
   appCode?: string
   ragEnabled?: boolean
   productId?: string
+  candidateId?: string
   modelProvider?: string
   modelName?: string
   /** 知识库文档 ID，服务端按 ID 限定 RAG，不经过文件下载上传 */

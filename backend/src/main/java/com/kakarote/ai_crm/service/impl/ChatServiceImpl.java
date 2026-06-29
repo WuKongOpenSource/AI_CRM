@@ -25,6 +25,7 @@ import com.kakarote.ai_crm.entity.BO.SessionPinBO;
 import com.kakarote.ai_crm.entity.PO.ChatAttachment;
 import com.kakarote.ai_crm.entity.PO.ChatMessage;
 import com.kakarote.ai_crm.entity.PO.ChatSession;
+import com.kakarote.ai_crm.entity.PO.Candidate;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.PO.Product;
@@ -35,8 +36,10 @@ import com.kakarote.ai_crm.entity.VO.ChatAppOptionVO;
 import com.kakarote.ai_crm.entity.VO.ChatMessageVO;
 import com.kakarote.ai_crm.entity.VO.ChatStreamEventVO;
 import com.kakarote.ai_crm.entity.VO.ChatSessionVO;
+import com.kakarote.ai_crm.entity.VO.CandidateResumeParseVO;
 import com.kakarote.ai_crm.mapper.ChatMessageMapper;
 import com.kakarote.ai_crm.mapper.ChatSessionMapper;
+import com.kakarote.ai_crm.mapper.CandidateMapper;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
 import com.kakarote.ai_crm.mapper.ManageUserMapper;
 import com.kakarote.ai_crm.mapper.ProductMapper;
@@ -96,6 +99,9 @@ public class ChatServiceImpl implements IChatService {
     private CustomerMapper customerMapper;
 
     @Autowired
+    private CandidateMapper candidateMapper;
+
+    @Autowired
     private ManageUserMapper manageUserMapper;
 
     @Autowired
@@ -117,7 +123,13 @@ public class ChatServiceImpl implements IChatService {
     private IKnowledgeService knowledgeService;
 
     @Autowired
+    private ICandidateService candidateService;
+
+    @Autowired
     private PermissionService permissionService;
+
+    @Autowired
+    private DataPermissionService dataPermissionService;
 
     @Autowired
     private FileStorageService fileStorageService;
@@ -304,6 +316,7 @@ public class ChatServiceImpl implements IChatService {
         session.setEmployeeId(sessionCreateBO.getEmployeeId());
         session.setRelationId(sessionCreateBO.getRelationId());
         session.setProductId(sessionCreateBO.getProductId());
+        session.setCandidateId(sessionCreateBO.getCandidateId());
         session.setProjectId(sessionCreateBO.getProjectId());
         session.setProjectTaskId(sessionCreateBO.getProjectTaskId());
         session.setAppCode(resolveSessionAppCode(sessionCreateBO));
@@ -332,6 +345,9 @@ public class ChatServiceImpl implements IChatService {
         if (sessionCreateBO.getProductId() != null) {
             boundObjectCount++;
         }
+        if (sessionCreateBO.getCandidateId() != null) {
+            boundObjectCount++;
+        }
         if (sessionCreateBO.getProjectId() != null || sessionCreateBO.getProjectTaskId() != null) {
             boundObjectCount++;
         }
@@ -343,6 +359,7 @@ public class ChatServiceImpl implements IChatService {
         validateBoundEmployee(sessionCreateBO.getEmployeeId());
         validateBoundRelation(sessionCreateBO.getRelationId());
         validateBoundProduct(sessionCreateBO.getProductId());
+        validateBoundCandidate(sessionCreateBO.getCandidateId());
         validateBoundProject(sessionCreateBO.getProjectId(), sessionCreateBO.getProjectTaskId());
     }
 
@@ -384,6 +401,17 @@ public class ChatServiceImpl implements IChatService {
         if (product == null || Integer.valueOf(1).equals(product.getDelFlag())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "产品不存在或无权限访问");
         }
+    }
+
+    private void validateBoundCandidate(Long candidateId) {
+        if (candidateId == null) {
+            return;
+        }
+        Candidate candidate = candidateMapper.selectById(candidateId);
+        if (candidate == null || Integer.valueOf(0).equals(candidate.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "候选人不存在或无权限访问");
+        }
+        dataPermissionService.assertUserDataAccessByPermission("candidate:view", candidate.getOwnerId());
     }
 
     private void validateBoundProject(Long projectId, Long projectTaskId) {
@@ -430,6 +458,7 @@ public class ChatServiceImpl implements IChatService {
         Set<Long> employeeIds = sessions.stream().map(ChatSessionVO::getEmployeeId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> relationIds = sessions.stream().map(ChatSessionVO::getRelationId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> productIds = sessions.stream().map(ChatSessionVO::getProductId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> candidateIds = sessions.stream().map(ChatSessionVO::getCandidateId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> projectIds = sessions.stream().map(ChatSessionVO::getProjectId).filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> projectTaskIds = sessions.stream().map(ChatSessionVO::getProjectTaskId).filter(Objects::nonNull).collect(Collectors.toSet());
 
@@ -445,6 +474,9 @@ public class ChatServiceImpl implements IChatService {
         Map<Long, Product> productMap = CollUtil.isEmpty(productIds)
                 ? Collections.emptyMap()
                 : productMapper.selectBatchIds(productIds).stream().collect(Collectors.toMap(Product::getProductId, item -> item, (a, b) -> a));
+        Map<Long, Candidate> candidateMap = CollUtil.isEmpty(candidateIds)
+                ? Collections.emptyMap()
+                : candidateMapper.selectBatchIds(candidateIds).stream().collect(Collectors.toMap(Candidate::getCandidateId, item -> item, (a, b) -> a));
         Map<Long, Project> projectMap = CollUtil.isEmpty(projectIds)
                 ? Collections.emptyMap()
                 : projectMapper.selectBatchIds(projectIds).stream().collect(Collectors.toMap(Project::getProjectId, item -> item, (a, b) -> a));
@@ -478,6 +510,12 @@ public class ChatServiceImpl implements IChatService {
                 session.setProductImageUrl(resolveObjectUrl(product.getMainImage()));
             }
 
+            Candidate candidate = candidateMap.get(session.getCandidateId());
+            if (candidate != null) {
+                session.setCandidateName(candidate.getName());
+                session.setCandidateAvatarUrl(resolveObjectUrl(candidate.getAvatar()));
+            }
+
             Project project = projectMap.get(session.getProjectId());
             if (project != null) {
                 session.setProjectName(project.getName());
@@ -494,12 +532,21 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isBlank(objectKey)) {
             return "";
         }
+        if (isExternalUrl(objectKey)) {
+            return StrUtil.trim(objectKey);
+        }
         try {
             return fileStorageService.getUrl(objectKey);
         } catch (Exception e) {
             log.debug("Resolve object url failed: {}", objectKey, e);
             return "";
         }
+    }
+
+    private boolean isExternalUrl(String value) {
+        String normalized = StrUtil.trim(value);
+        return StrUtil.startWithIgnoreCase(normalized, "http://")
+                || StrUtil.startWithIgnoreCase(normalized, "https://");
     }
 
     @Override
@@ -606,6 +653,14 @@ public class ChatServiceImpl implements IChatService {
         if (CollUtil.isNotEmpty(attachments)) {
             chatAttachmentService.saveBatchAttachments(messageId, attachments);
             archiveChatAttachments(session, messageId, attachments);
+        }
+
+        String candidateStageResponse = tryHandleCandidateStageCommand(session, content, attachments);
+        if (candidateStageResponse != null) {
+            saveMessage(sessionId, "assistant", candidateStageResponse);
+            updateSessionTime(sessionId);
+            AiContextHolder.clear();
+            return Flux.just(ChatStreamEventVO.message(candidateStageResponse));
         }
 
         boolean ragEnabled = resolveRagEnabled(sendBO, application);
@@ -800,6 +855,14 @@ public class ChatServiceImpl implements IChatService {
             archiveChatAttachments(session, messageId, attachments);
         }
 
+        String candidateStageResponse = tryHandleCandidateStageCommand(session, content, attachments);
+        if (candidateStageResponse != null) {
+            saveMessage(sessionId, "assistant", candidateStageResponse);
+            updateSessionTime(sessionId);
+            AiContextHolder.clear();
+            return candidateStageResponse;
+        }
+
         boolean ragEnabled = resolveRagEnabled(sendBO, application);
         log.debug("聊天请求 RAG 开关: sessionId={}, ragEnabled={}", sessionId, ragEnabled);
 
@@ -967,6 +1030,10 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isNotBlank(productContext)) {
             contexts.add(productContext);
         }
+        String candidateContext = buildBoundCandidateContext(session.getCandidateId());
+        if (StrUtil.isNotBlank(candidateContext)) {
+            contexts.add(candidateContext);
+        }
         String projectContext = buildBoundProjectContext(session.getProjectId(), session.getProjectTaskId());
         if (StrUtil.isNotBlank(projectContext)) {
             contexts.add(projectContext);
@@ -1052,6 +1119,35 @@ public class ChatServiceImpl implements IChatService {
         appendContextLine(builder, "状态", product.getStatus());
         appendContextLine(builder, "标准价", product.getStandardPrice());
         appendContextLine(builder, "描述", product.getDescription());
+        return builder.toString();
+    }
+
+    private String buildBoundCandidateContext(Long candidateId) {
+        if (candidateId == null) {
+            return "";
+        }
+        Candidate candidate = candidateMapper.selectById(candidateId);
+        if (candidate == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder("[当前绑定候选人]\n")
+                .append("- candidateId: ").append(candidate.getCandidateId()).append("\n")
+                .append("- 姓名: ").append(StrUtil.blankToDefault(candidate.getName(), "未命名候选人")).append("\n");
+        appendContextLine(builder, "应聘岗位", candidate.getAppliedPosition());
+        appendContextLine(builder, "阶段", candidate.getStage());
+        appendContextLine(builder, "手机号", candidate.getPhone());
+        appendContextLine(builder, "邮箱", candidate.getEmail());
+        appendContextLine(builder, "当前公司", candidate.getCurrentCompany());
+        appendContextLine(builder, "当前职位", candidate.getCurrentPosition());
+        appendContextLine(builder, "学历", candidate.getEducation());
+        appendContextLine(builder, "学校", candidate.getSchool());
+        appendContextLine(builder, "工作年限", candidate.getWorkYears());
+        appendContextLine(builder, "期望城市", candidate.getExpectedCity());
+        appendContextLine(builder, "期望薪资", candidate.getExpectedSalary());
+        appendContextLine(builder, "技能标签", candidate.getSkillTags());
+        appendContextLine(builder, "简历摘要", candidate.getResumeSummary());
+        appendContextLine(builder, "AI评估", candidate.getAiEvaluation());
+        appendContextLine(builder, "备注", candidate.getRemark());
         return builder.toString();
     }
 
@@ -1307,6 +1403,7 @@ public class ChatServiceImpl implements IChatService {
             session.getEmployeeId(),
             session.getRelationId(),
             session.getProductId(),
+            session.getCandidateId(),
             session.getProjectId(),
             session.getProjectTaskId());
     }
@@ -1325,6 +1422,8 @@ public class ChatServiceImpl implements IChatService {
                 appCode = ChatApplicationCodes.RELATION;
             } else if (sessionCreateBO.getProductId() != null) {
                 appCode = ChatApplicationCodes.PRODUCT;
+            } else if (sessionCreateBO.getCandidateId() != null) {
+                appCode = ChatApplicationCodes.HR;
             } else if (sessionCreateBO.getProjectId() != null || sessionCreateBO.getProjectTaskId() != null) {
                 appCode = ChatApplicationCodes.PROJECT;
             }
@@ -1339,6 +1438,9 @@ public class ChatServiceImpl implements IChatService {
         }
         if (StrUtil.isBlank(appCode) && sendBO != null && sendBO.getProductId() != null) {
             appCode = ChatApplicationCodes.PRODUCT;
+        }
+        if (StrUtil.isBlank(appCode) && sendBO != null && sendBO.getCandidateId() != null) {
+            appCode = ChatApplicationCodes.HR;
         }
         if (StrUtil.isBlank(appCode) && sendBO != null
                 && (sendBO.getProjectId() != null || sendBO.getProjectTaskId() != null)) {
@@ -1359,6 +1461,9 @@ public class ChatServiceImpl implements IChatService {
         if (StrUtil.isBlank(appCode) && session != null && session.getProductId() != null) {
             appCode = ChatApplicationCodes.PRODUCT;
         }
+        if (StrUtil.isBlank(appCode) && session != null && session.getCandidateId() != null) {
+            appCode = ChatApplicationCodes.HR;
+        }
         if (StrUtil.isBlank(appCode) && session != null
                 && (session.getProjectId() != null || session.getProjectTaskId() != null)) {
             appCode = ChatApplicationCodes.PROJECT;
@@ -1376,6 +1481,9 @@ public class ChatServiceImpl implements IChatService {
         }
         if (ChatApplicationCodes.PROJECT.equals(application.code())) {
             return bindProjectContextFromSendIfNeeded(sendBO, session);
+        }
+        if (ChatApplicationCodes.HR.equals(application.code())) {
+            return bindCandidateContextFromSendIfNeeded(sendBO, session);
         }
         return session;
     }
@@ -1422,14 +1530,37 @@ public class ChatServiceImpl implements IChatService {
         return session;
     }
 
+    private ChatSession bindCandidateContextFromSendIfNeeded(ChatSendBO sendBO, ChatSession session) {
+        Long candidateId = sendBO.getCandidateId();
+        if (candidateId == null) {
+            return session;
+        }
+        if (hasOtherBusinessBinding(session, ChatApplicationCodes.HR)) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "当前会话已绑定其他业务对象");
+        }
+        validateBoundCandidate(candidateId);
+        if (Objects.equals(session.getCandidateId(), candidateId)
+                && ChatApplicationCodes.HR.equals(chatApplicationRegistry.normalize(session.getAppCode()))) {
+            return session;
+        }
+        session.setCandidateId(candidateId);
+        session.setAppCode(ChatApplicationCodes.HR);
+        chatSessionMapper.updateById(session);
+        return session;
+    }
+
     private boolean hasOtherBusinessBinding(ChatSession session, String targetAppCode) {
         if (ChatApplicationCodes.PRODUCT.equals(targetAppCode)) {
             return session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
-                    || session.getProjectId() != null || session.getProjectTaskId() != null;
+                    || session.getCandidateId() != null || session.getProjectId() != null || session.getProjectTaskId() != null;
         }
         if (ChatApplicationCodes.PROJECT.equals(targetAppCode)) {
             return session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
-                    || session.getProductId() != null;
+                    || session.getProductId() != null || session.getCandidateId() != null;
+        }
+        if (ChatApplicationCodes.HR.equals(targetAppCode)) {
+            return session.getCustomerId() != null || session.getEmployeeId() != null || session.getRelationId() != null
+                    || session.getProductId() != null || session.getProjectId() != null || session.getProjectTaskId() != null;
         }
         return false;
     }
@@ -1491,6 +1622,103 @@ public class ChatServiceImpl implements IChatService {
                     sessionId, e.getMessage(), e);
             return null;
         }
+    }
+
+    private String tryHandleCandidateStageCommand(ChatSession session, String content,
+                                                  List<ChatSendBO.AttachmentDTO> attachments) {
+        if (session == null || session.getCandidateId() == null || CollUtil.isNotEmpty(attachments)) {
+            return null;
+        }
+        String stage = resolveCandidateStageCommand(content);
+        if (StrUtil.isBlank(stage)) {
+            return null;
+        }
+        if (!permissionService.hasPermission("candidate:change_stage")) {
+            return "你暂无变更候选人阶段的权限。";
+        }
+        Long candidateId = session.getCandidateId();
+        candidateService.updateStage(candidateId, stage);
+        Candidate candidate = candidateService.getVisibleCandidate(candidateId);
+        String candidateName = StrUtil.blankToDefault(candidate.getName(), "该候选人");
+        String stageLabel = candidateStageLabel(stage);
+        log.info("候选人阶段短指令已处理: candidateId={}, stage={}, content={}",
+                candidateId, stage, abbreviateForLog(content));
+        return "已将候选人" + candidateName + "的状态更新为“" + stageLabel + "”（" + stage + "）。";
+    }
+
+    private String resolveCandidateStageCommand(String content) {
+        String normalized = StrUtil.trim(content);
+        if (StrUtil.isBlank(normalized)) {
+            return null;
+        }
+        String compact = normalized
+                .replaceAll("[\\s,，。.!！;；:：\"“”'‘’、]", "")
+                .toLowerCase(Locale.ROOT);
+        if (StrUtil.isBlank(compact) || compact.length() > 40) {
+            return null;
+        }
+        if (containsAny(compact, "面试", "interview") && containsCandidateScheduleTimeExpression(normalized)) {
+            return null;
+        }
+        if (containsAny(compact, "吗", "么", "是否", "是不是", "要不要", "该不该", "为什么")) {
+            return null;
+        }
+        if (containsAny(compact, "别淘汰", "不要淘汰", "暂不淘汰", "不是淘汰")) {
+            return null;
+        }
+        boolean explicitStageIntent = compact.length() <= 12
+                || containsAny(compact, "阶段", "状态", "改成", "改为", "更新为", "设为", "设置为",
+                "标记为", "推进到", "进入", "转为", "变成", "调整为");
+        if (!explicitStageIntent) {
+            return null;
+        }
+        if (containsAny(compact, "淘汰", "已拒绝", "拒绝", "不合适", "面试不通过", "未通过", "pass掉", "不要了")) {
+            return "rejected";
+        }
+        if (containsAny(compact, "面试通过", "通过面试")) {
+            return "interview_passed";
+        }
+        if (containsAny(compact, "已入职", "入职了", "录用", "hired")) {
+            return "hired";
+        }
+        if (containsAny(compact, "offer", "发offer", "给offer")) {
+            return "offer";
+        }
+        if (containsAny(compact, "安排面试", "约面试", "待面试", "面试安排", "约了面试", "面试中", "进入面试")) {
+            return "interview_scheduled";
+        }
+        if (containsAny(compact, "初筛", "筛选")) {
+            return "screening";
+        }
+        if (containsAny(compact, "新候选人", "新建候选人")) {
+            return "new";
+        }
+        return null;
+    }
+
+    private boolean containsCandidateScheduleTimeExpression(String content) {
+        String text = StrUtil.trim(content);
+        if (StrUtil.isBlank(text)) {
+            return false;
+        }
+        return containsAny(text, "今天", "明天", "后天", "大后天", "上午", "下午", "中午", "晚上",
+                "周一", "周二", "周三", "周四", "周五", "周六", "周日",
+                "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")
+                || text.matches(".*\\d{1,2}\\s*[点:：].*")
+                || text.matches(".*\\d{4}\\s*[-/年].*");
+    }
+
+    private String candidateStageLabel(String stage) {
+        return switch (StrUtil.blankToDefault(stage, "")) {
+            case "new" -> "新候选人";
+            case "screening" -> "初筛";
+            case "interview_scheduled" -> "安排面试";
+            case "interview_passed" -> "面试通过";
+            case "offer" -> "Offer";
+            case "hired" -> "已入职";
+            case "rejected" -> "已淘汰";
+            default -> stage;
+        };
     }
 
     private String buildKnowledgeSelectionContext(List<Long> knowledgeIds) {
@@ -1867,21 +2095,60 @@ public class ChatServiceImpl implements IChatService {
     }
 
     private void archiveChatAttachments(ChatSession session, Long messageId, List<ChatSendBO.AttachmentDTO> attachments) {
-        if (session == null || CollUtil.isEmpty(attachments)
-                || (session.getCustomerId() == null && session.getEmployeeId() == null && session.getRelationId() == null)) {
+        if (session == null || CollUtil.isEmpty(attachments)) {
             return;
         }
+
+        boolean hrSession = ChatApplicationCodes.HR.equals(chatApplicationRegistry.normalize(session.getAppCode()));
+        boolean candidateResumeContext = session.getCandidateId() != null
+                || (hrSession && !hasOtherBusinessBinding(session, ChatApplicationCodes.HR));
+        boolean hasArchiveTarget = session.getCustomerId() != null || session.getEmployeeId() != null
+                || session.getRelationId() != null || session.getCandidateId() != null || candidateResumeContext;
+        if (!hasArchiveTarget) {
+            return;
+        }
+
+        if (candidateResumeContext) {
+            for (ChatSendBO.AttachmentDTO attachment : attachments) {
+                if (attachment == null || StrUtil.isBlank(attachment.getFilePath())) {
+                    continue;
+                }
+                try {
+                    CandidateResumeParseVO parseResult = candidateService.parseAndUpsertResumeAttachment(
+                            attachment.getFileName(),
+                            attachment.getFilePath(),
+                            attachment.getFileSize(),
+                            attachment.getMimeType(),
+                            session.getCandidateId()
+                    );
+                    if (session.getCandidateId() == null && parseResult != null && parseResult.getCandidateId() != null) {
+                        session.setCandidateId(parseResult.getCandidateId());
+                        session.setAppCode(ChatApplicationCodes.HR);
+                        chatSessionMapper.updateById(session);
+                    }
+                } catch (Exception exception) {
+                    log.info("候选人简历自动解析失败: sessionId={}, candidateId={}, fileName={}, error={}",
+                            session.getSessionId(), session.getCandidateId(), attachment.getFileName(), exception.getMessage());
+                }
+            }
+        }
+
+        if (session.getCustomerId() == null && session.getEmployeeId() == null
+                && session.getRelationId() == null && session.getCandidateId() == null) {
+            return;
+        }
+
         boolean canArchive;
         try {
             canArchive = permissionService.hasPermission("knowledge:upload");
         } catch (Exception exception) {
-            log.info("检查知识库上传权限失败，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, error={}",
-                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), exception.getMessage());
+            log.info("检查知识库上传权限失败，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, candidateId={}, error={}",
+                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), session.getCandidateId(), exception.getMessage());
             return;
         }
         if (!canArchive) {
-            log.info("用户无知识库上传权限，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}",
-                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId());
+            log.info("用户无知识库上传权限，跳过会话附件归档: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, candidateId={}",
+                    session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), session.getCandidateId());
             return;
         }
 
@@ -1908,6 +2175,15 @@ public class ChatServiceImpl implements IChatService {
                             session.getRelationId(),
                             null
                     );
+                } else if (session.getCandidateId() != null) {
+                    knowledgeService.archiveExistingCandidateFile(
+                            attachment.getFileName(),
+                            attachment.getFilePath(),
+                            attachment.getFileSize(),
+                            attachment.getMimeType(),
+                            session.getCandidateId(),
+                            null
+                    );
                 } else {
                     knowledgeService.archiveExistingFile(
                             attachment.getFileName(),
@@ -1919,8 +2195,8 @@ public class ChatServiceImpl implements IChatService {
                     );
                 }
             } catch (Exception exception) {
-                log.warn("会话附件归档失败: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, fileName={}, error={}",
-                        session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(),
+                log.warn("会话附件归档失败: sessionId={}, messageId={}, customerId={}, employeeId={}, relationId={}, candidateId={}, fileName={}, error={}",
+                        session.getSessionId(), messageId, session.getCustomerId(), session.getEmployeeId(), session.getRelationId(), session.getCandidateId(),
                         attachment.getFileName(), exception.getMessage(), exception);
             }
         }

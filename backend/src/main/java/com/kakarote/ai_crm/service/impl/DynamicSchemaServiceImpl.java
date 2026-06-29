@@ -27,7 +27,8 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
             "customer", "crm_customer",
             "contact", "crm_contact",
             "relation", "crm_relation",
-            "product", "crm_product"
+            "product", "crm_product",
+            "candidate", "crm_candidate"
     );
 
     /**
@@ -37,13 +38,14 @@ public class DynamicSchemaServiceImpl implements IDynamicSchemaService {
             "customer", "customer_id",
             "contact", "contact_id",
             "relation", "relation_id",
-            "product", "product_id"
+            "product", "product_id",
+            "candidate", "candidate_id"
     );
 
     /**
      * 支持的实体类型集合
      */
-    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact", "relation", "product");
+    public static final Set<String> SUPPORTED_ENTITIES = Set.of("customer", "contact", "relation", "product", "candidate");
 
     /**
      * 允许的列名正则（防止 SQL 注入）

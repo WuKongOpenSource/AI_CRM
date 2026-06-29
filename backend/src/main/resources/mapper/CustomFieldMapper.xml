@@ -46,4 +46,14 @@
         </if>
     </select>
 
+    <select id="countDuplicateCustomFieldValue" resultType="long">
+        SELECT COUNT(1)
+        FROM ${tableName}
+        WHERE ${columnName} = #{value}
+          AND status = 1
+        <if test="entityId != null">
+          AND ${idColumn} != #{entityId}
+        </if>
+    </select>
+
 </mapper>

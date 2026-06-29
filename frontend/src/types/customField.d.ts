@@ -1,7 +1,7 @@
 // Custom Field related types
 
 export type FieldType = 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'select' | 'multiselect' | 'checkbox'
-export type EntityType = 'customer' | 'contact' | 'relation' | 'product'
+export type EntityType = 'customer' | 'contact' | 'relation' | 'product' | 'candidate'
 export type FieldSource = 'system' | 'custom'
 
 export interface FieldOption {
@@ -110,5 +110,6 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
   customer: '客户',
   contact: '联系人',
   relation: '关系',
-  product: '产品'
+  product: '产品',
+  candidate: '候选人'
 }

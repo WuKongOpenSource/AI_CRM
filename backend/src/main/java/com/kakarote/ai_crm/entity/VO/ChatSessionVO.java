@@ -63,6 +63,15 @@ public class ChatSessionVO {
     @Schema(description = "Product image URL")
     private String productImageUrl;
 
+    @Schema(description = "关联候选人ID")
+    private Long candidateId;
+
+    @Schema(description = "关联候选人姓名")
+    private String candidateName;
+
+    @Schema(description = "关联候选人头像访问地址")
+    private String candidateAvatarUrl;
+
     @Schema(description = "关联项目ID")
     private Long projectId;
 
@@ -78,7 +87,7 @@ public class ChatSessionVO {
     @Schema(description = "会话标题")
     private String title;
 
-    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/product")
+    @Schema(description = "聊天应用编码: general/crm/knowledge/address_book/product/hr")
     private String appCode;
 
     @Schema(description = "Whether the session is pinned")

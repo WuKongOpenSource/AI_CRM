@@ -408,6 +408,55 @@
                   <span class="min-w-0 truncate">{{ desktopObjectHeaderMeta }}</span>
                 </span>
               </div>
+              <div v-if="chatObjectKind === 'candidate' && candidateDetail" class="flex shrink-0 items-center gap-2">
+                <el-dropdown
+                  v-if="canChangeSelectedCandidateStage"
+                  trigger="click"
+                  @command="handleSelectedCandidateStageCommand"
+                >
+                  <button
+                    type="button"
+                    class="inline-flex h-7 max-w-[150px] shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    :class="selectedCandidateStageButtonClass"
+                    :disabled="candidateStageChanging"
+                  >
+                    <span
+                      class="material-symbols-outlined text-[15px] leading-none"
+                      :class="{ 'animate-spin': candidateStageChanging }"
+                    >
+                      {{ candidateStageChanging ? 'progress_activity' : getCandidateStageIcon(candidateDetail.stage) }}
+                    </span>
+                    <span class="min-w-0 truncate">{{ selectedCandidateStageText }}</span>
+                    <span class="material-symbols-outlined text-[15px] leading-none">expand_more</span>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item
+                        v-for="stage in candidateStageOptions"
+                        :key="stage.value"
+                        :command="stage.value"
+                      >
+                        <span class="flex items-center gap-2">
+                          <span class="material-symbols-outlined shrink-0 text-[16px] leading-none">
+                            {{ getCandidateStageIcon(stage.value) }}
+                          </span>
+                          {{ stage.label }}
+                        </span>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+                <span
+                  v-else
+                  class="inline-flex h-7 max-w-[150px] shrink-0 items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-semibold"
+                  :class="selectedCandidateStageButtonClass"
+                >
+                  <span class="material-symbols-outlined text-[15px] leading-none">
+                    {{ getCandidateStageIcon(candidateDetail.stage) }}
+                  </span>
+                  <span class="min-w-0 truncate">{{ selectedCandidateStageText }}</span>
+                </span>
+              </div>
             </div>
             <button
               v-if="showObjectPanelShell && customerPanelVisible"
@@ -1459,6 +1508,21 @@
         :product="productDetail"
         @edit="handleObjectEditProduct"
       />
+      <CandidateChatInfoPanel
+        v-else-if="chatObjectKind === 'candidate' && candidateDetail"
+        :detail="candidateDetail"
+        :stage-options="candidateStageOptions"
+        :can-change-stage="canChangeSelectedCandidateStage"
+        :stage-changing="candidateStageChanging"
+        @add-task="handleObjectAddTask"
+        @add-schedule="handleObjectAddSchedule"
+        @add-attachment="handleObjectAddAttachment"
+        @view-task="handleObjectViewTask"
+        @view-schedule="handleObjectViewSchedule"
+        @view-attachment="handleObjectViewAttachment"
+        @change-stage="handleSelectedCandidateStageCommand"
+        @updated="handleCandidateDetailUpdated"
+      />
       <div v-else class="flex flex-1 items-center justify-center px-6 text-center text-sm text-slate-400">
         暂无关联对象详情
       </div>
@@ -1540,6 +1604,21 @@
                 :product="productDetail"
                 @edit="handleMobileObjectEditProduct"
               />
+              <CandidateChatInfoPanel
+                v-else-if="chatObjectKind === 'candidate' && candidateDetail"
+                :detail="candidateDetail"
+                :stage-options="candidateStageOptions"
+                :can-change-stage="canChangeSelectedCandidateStage"
+                :stage-changing="candidateStageChanging"
+                @add-task="handleMobileObjectAddTask"
+                @add-schedule="handleMobileObjectAddSchedule"
+                @add-attachment="handleMobileObjectAddAttachment"
+                @view-task="handleMobileObjectViewTask"
+                @view-schedule="handleMobileObjectViewSchedule"
+                @view-attachment="handleMobileObjectViewAttachment"
+                @change-stage="handleSelectedCandidateStageCommand"
+                @updated="handleCandidateDetailUpdated"
+              />
               <div v-else class="flex h-full flex-col items-center justify-center px-6 text-center">
                 <div class="mb-4 flex size-12 items-center justify-center rounded-2xl bg-[#f5f5f5] text-slate-400">
                   <span class="material-symbols-outlined text-[24px] leading-none">info</span>
@@ -1615,6 +1694,7 @@
       :editing-task="null"
       :default-customer="objectDialogDefaultCustomer"
       :default-relation="objectDialogDefaultRelation"
+      :default-candidate="objectDialogDefaultCandidate"
       :default-assignee="objectDialogDefaultAssignee"
       :refresh-store-after-save="false"
       @saved="handleObjectRelatedCreated"
@@ -1624,6 +1704,7 @@
       :editing-schedule="null"
       :default-customer="objectDialogDefaultCustomer"
       :default-relation="objectDialogDefaultRelation"
+      :default-candidate="objectDialogDefaultCandidate"
       :default-participant-users="objectDialogDefaultParticipantUsers"
       @created="handleObjectRelatedCreated"
       @updated="handleObjectRelatedCreated"
@@ -1648,6 +1729,7 @@ import { addCustomerTag, getCustomerDetail, removeCustomerTag, updateCustomerSta
 import { getAddressBookDetail } from '@/api/addressBook'
 import { getRelationDetail } from '@/api/relation'
 import { getProductDetail } from '@/api/product'
+import { getCandidateDetail, updateCandidateStage } from '@/api/candidate'
 import ApiKeySetupModal from '@/components/common/ApiKeySetupModal.vue'
 import ExternalAiMobileCompletionDialog from '@/components/common/ExternalAiMobileCompletionDialog.vue'
 import ExternalAiPurchaseDialog from '@/components/common/ExternalAiPurchaseDialog.vue'
@@ -1661,6 +1743,7 @@ import EmployeeChatInfoPanel from './components/EmployeeChatInfoPanel.vue'
 import MobileChatTopHeader from './components/MobileChatTopHeader.vue'
 import ProductChatInfoPanel from './components/ProductChatInfoPanel.vue'
 import RelationChatInfoPanel from './components/RelationChatInfoPanel.vue'
+import CandidateChatInfoPanel from './components/CandidateChatInfoPanel.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import {
   getAssistantMessagePlaceholder,
@@ -1697,6 +1780,7 @@ import type { ScheduleVO } from '@/api/schedule'
 import type { AddressBookDetail } from '@/types/addressBook'
 import type { ProductVO } from '@/types/product'
 import type { RelationDetailVO } from '@/types/relation'
+import type { CandidateDetailVO } from '@/types/candidate'
 import type { ChatSession, ChatAttachmentDTO, ChatAttachmentVO, ChatModelOption, Knowledge, Task } from '@/types/common'
 import type { Contact, CustomerDetailVO, CustomerTag } from '@/types/customer'
 import type { AiConfig, AiConfigUpdateBO, AiProvider, AiProviderPreset, ExternalAiUsage } from '@/types/systemConfig'
@@ -1784,6 +1868,8 @@ const resumeSendAfterApiKeySave = ref(false)
 const employeeDetail = ref<AddressBookDetail | null>(null)
 const relationDetail = ref<RelationDetailVO | null>(null)
 const productDetail = ref<ProductVO | null>(null)
+const candidateDetail = ref<CandidateDetailVO | null>(null)
+const candidateStageChanging = ref(false)
 const selectedCustomer = ref<CustomerDetailVO | null>(null)
 const selectedCustomerLoading = ref(false)
 const showSelectedCustomerBasicInfoDrawer = ref(false)
@@ -1826,7 +1912,7 @@ let removeNativeKeyboardInsetListeners: (() => void) | null = null
 let removeChatObjectPanelCloseListener: (() => void) | null = null
 let removeAiQuotaExhaustedListener: (() => void) | null = null
 
-const CHAT_CONTEXT_QUERY_KEYS = ['sessionId', 'customerId', 'employeeId', 'relationId', 'productId'] as const
+const CHAT_CONTEXT_QUERY_KEYS = ['sessionId', 'customerId', 'employeeId', 'relationId', 'productId', 'candidateId'] as const
 type ChatContextQueryKey = (typeof CHAT_CONTEXT_QUERY_KEYS)[number]
 
 const MAX_FILE_COUNT = MAX_CHAT_ATTACHMENT_COUNT
@@ -1998,13 +2084,14 @@ const sendActionTitle = computed(() => {
 const showUserAvatarImage = computed(() => Boolean(userStore.avatar) && !userAvatarLoadFailed.value)
 const userAvatarFallback = computed(() => (userStore.realname || userStore.username || 'U').charAt(0).toUpperCase())
 const currentChatSession = computed(() => chatStore.currentSession)
-const chatObjectKind = computed<'customer' | 'employee' | 'relation' | 'product' | ''>(() => {
+const chatObjectKind = computed<'customer' | 'employee' | 'relation' | 'product' | 'candidate' | ''>(() => {
   const session = currentChatSession.value
   if (!session) return ''
   if (session.customerId) return 'customer'
   if (session.employeeId) return 'employee'
   if (session.relationId) return 'relation'
   if (session.productId) return 'product'
+  if (session.candidateId) return 'candidate'
   return ''
 })
 const currentObjectId = computed(() => {
@@ -2014,6 +2101,7 @@ const currentObjectId = computed(() => {
   if (chatObjectKind.value === 'employee') return String(session.employeeId || '')
   if (chatObjectKind.value === 'relation') return String(session.relationId || '')
   if (chatObjectKind.value === 'product') return String(session.productId || '')
+  if (chatObjectKind.value === 'candidate') return String(session.candidateId || '')
   return ''
 })
 const objectDialogDefaultRelation = computed(() => {
@@ -2051,6 +2139,13 @@ const objectDialogDefaultAssignee = computed(() => {
     username: employeeDetail.value.email || null
   }
 })
+const objectDialogDefaultCandidate = computed(() => {
+  if (chatObjectKind.value !== 'candidate' || !currentObjectId.value) return null
+  return {
+    candidateId: currentObjectId.value,
+    candidateName: candidateDetail.value?.name || currentChatSession.value?.candidateName || currentChatSession.value?.title || null
+  }
+})
 const objectDialogDefaultParticipantUsers = computed(() => {
   if (chatObjectKind.value !== 'employee' || !employeeDetail.value?.userId) return []
   return [{
@@ -2081,7 +2176,7 @@ const showDesktopObjectHeader = computed(() =>
   !isMobile.value
   && currentView.value === 'chat'
   && Boolean(currentObjectId.value)
-  && (chatObjectKind.value === 'employee' || chatObjectKind.value === 'relation' || chatObjectKind.value === 'product')
+  && (chatObjectKind.value === 'employee' || chatObjectKind.value === 'relation' || chatObjectKind.value === 'product' || chatObjectKind.value === 'candidate')
 )
 const showMobileChatHeader = computed(() =>
   isMobile.value && mobilePanel.value === 'chat' && currentView.value === 'chat'
@@ -2142,10 +2237,11 @@ const chatMessagesAreaClass = computed(() => {
   if (isMobile.value || isNativeTabletChatLayout.value) return 'flex-1 overflow-hidden py-6'
   return isObjectContextChat.value ? 'flex-1 overflow-hidden py-6' : 'overflow-hidden py-6'
 })
-const mobileChatHeaderKind = computed<'customer' | 'employee' | 'relation' | 'product'>(() => {
+const mobileChatHeaderKind = computed<'customer' | 'employee' | 'relation' | 'product' | 'candidate'>(() => {
   if (chatObjectKind.value === 'employee') return 'employee'
   if (chatObjectKind.value === 'relation') return 'relation'
   if (chatObjectKind.value === 'product') return 'product'
+  if (chatObjectKind.value === 'candidate') return 'candidate'
   return 'customer'
 })
 const mobileChatHeaderTitle = computed(() => {
@@ -2162,6 +2258,9 @@ const mobileChatHeaderTitle = computed(() => {
   if (chatObjectKind.value === 'product') {
     return productDetail.value?.productName || session?.productName || session?.title || '产品对话'
   }
+  if (chatObjectKind.value === 'candidate') {
+    return candidateDetail.value?.name || session?.candidateName || session?.title || '候选人对话'
+  }
   return session?.title || 'AI 对话'
 })
 const mobileChatHeaderAvatarUrl = computed(() => {
@@ -2170,6 +2269,7 @@ const mobileChatHeaderAvatarUrl = computed(() => {
   if (chatObjectKind.value === 'employee') return employeeDetail.value?.imgUrl || session?.employeeAvatarUrl || employeeDetail.value?.img || ''
   if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.avatarUrl || session?.relationAvatarUrl || relationDetail.value?.relation?.avatar || ''
   if (chatObjectKind.value === 'product') return productDetail.value?.mainImageUrl || session?.productImageUrl || ''
+  if (chatObjectKind.value === 'candidate') return candidateDetail.value?.avatarUrl || session?.candidateAvatarUrl || ''
   return ''
 })
 const mobileObjectPanelLoading = computed(() =>
@@ -2186,6 +2286,19 @@ const customerStageOptions = computed(() =>
     ? enumStore.customerStage.map(item => ({ value: item.value, label: item.label }))
     : CUSTOMER_STAGE_FALLBACK_OPTIONS
 )
+const candidateStageOptions = computed(() =>
+  enumStore.candidateStage.length
+    ? enumStore.candidateStage.map(item => ({ value: item.value, label: item.label }))
+    : [
+        { value: 'new', label: '新候选人' },
+        { value: 'screening', label: '初筛' },
+        { value: 'interview_scheduled', label: '安排面试' },
+        { value: 'interview_passed', label: '面试通过' },
+        { value: 'offer', label: 'Offer' },
+        { value: 'hired', label: '已入职' },
+        { value: 'rejected', label: '已淘汰' }
+      ]
+)
 const selectedCustomerStageText = computed(() => {
   const customer = selectedCustomer.value
   if (!customer) return '-'
@@ -2197,6 +2310,21 @@ const selectedCustomerStageText = computed(() => {
 })
 const selectedCustomerStageButtonClass = computed(() => getCustomerStageButtonClass(selectedCustomer.value?.stage))
 const canChangeSelectedCustomerStage = computed(() => userStore.hasPermission('customer:change_stage'))
+const selectedCandidateStageText = computed(() => {
+  const candidate = candidateDetail.value
+  if (!candidate) return '-'
+  const stage = candidate.stage || ''
+  const stageOption = candidateStageOptions.value.find(item => item.value === stage)
+  if (stageOption?.label) return stageOption.label
+  if (candidate.stageName && candidate.stageName !== stage) return candidate.stageName
+  return enumStore.candidateStageLabel(stage) || stage || '-'
+})
+const selectedCandidateStageButtonClass = computed(() => getCandidateStageButtonClass(candidateDetail.value?.stage))
+const canChangeSelectedCandidateStage = computed(() =>
+  chatObjectKind.value === 'candidate'
+    && Boolean(candidateDetail.value)
+    && userStore.hasPermission('candidate:change_stage')
+)
 const canEditSelectedCustomerTags = computed(() => userStore.hasPermission('customer:edit'))
 const selectedCustomerVisibleTags = computed(() => selectedCustomer.value?.tags?.slice(0, 3) || [])
 const selectedCustomerHiddenTags = computed(() => selectedCustomer.value?.tags?.slice(3) || [])
@@ -2210,18 +2338,21 @@ const desktopObjectHeaderImageClass = computed(() =>
 const desktopObjectHeaderIcon = computed(() => {
   if (chatObjectKind.value === 'product') return 'inventory_2'
   if (chatObjectKind.value === 'relation') return 'diversity_3'
+  if (chatObjectKind.value === 'candidate') return 'badge'
   return ''
 })
 const desktopObjectHeaderBadge = computed(() => {
   if (chatObjectKind.value === 'employee') return employeeDetail.value?.post || '员工'
   if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.relationTypeName || relationDetail.value?.relation?.relationType || '关系'
   if (chatObjectKind.value === 'product') return productDetail.value?.productCode || '无编码'
+  if (chatObjectKind.value === 'candidate') return candidateDetail.value?.recruitmentJobName || candidateDetail.value?.appliedPosition || '候选人'
   return '对象'
 })
 const desktopObjectHeaderMeta = computed(() => {
   if (chatObjectKind.value === 'employee') return employeeDetail.value?.deptName || ''
   if (chatObjectKind.value === 'relation') return relationDetail.value?.relation?.company || relationDetail.value?.relation?.customerName || ''
   if (chatObjectKind.value === 'product') return productDetail.value?.categoryPath || productDetail.value?.categoryName || productDetail.value?.productType || ''
+  if (chatObjectKind.value === 'candidate') return [candidateDetail.value?.currentCompany, candidateDetail.value?.currentPosition].filter(Boolean).join(' · ')
   return ''
 })
 const mobileObjectDetailTitle = computed(() => {
@@ -2229,6 +2360,7 @@ const mobileObjectDetailTitle = computed(() => {
   if (chatObjectKind.value === 'employee') return '通讯录详情'
   if (chatObjectKind.value === 'relation') return '关系详情'
   if (chatObjectKind.value === 'product') return '产品详情'
+  if (chatObjectKind.value === 'candidate') return '候选人详情'
   return '对象详情'
 })
 
@@ -2253,6 +2385,7 @@ onMounted(async () => {
     agentStore.fetchEnabledAgents(),
     enterpriseStore.loadConfig(),
     enumStore.ensureCustomerStage(),
+    enumStore.ensureCandidateStage(),
     loadAiConfig()
   ])
   await applyChatRouteQuery()
@@ -2606,6 +2739,7 @@ async function loadObjectPanelDetail() {
   employeeDetail.value = null
   relationDetail.value = null
   productDetail.value = null
+  candidateDetail.value = null
   objectPanelError.value = ''
 
   if (!kind || !id || kind === 'customer') {
@@ -2629,6 +2763,11 @@ async function loadObjectPanelDetail() {
       const detail = await getProductDetail(id)
       if (requestId === objectDetailRequestId) {
         productDetail.value = detail
+      }
+    } else if (kind === 'candidate') {
+      const detail = await getCandidateDetail(id)
+      if (requestId === objectDetailRequestId) {
+        candidateDetail.value = detail
       }
     }
   } catch (error) {
@@ -2694,6 +2833,31 @@ async function handleSelectedCustomerStageCommand(value: string | number | objec
     console.error('Update customer stage failed:', error)
     if (!isRequestErrorHandled(error)) ElMessage.error('客户阶段更新失败')
   }
+}
+
+async function handleSelectedCandidateStageCommand(value: string | number | object) {
+  if (!candidateDetail.value || candidateStageChanging.value) return
+  const stage = String(value)
+  if (!stage || candidateDetail.value.stage === stage) return
+
+  const candidateId = String(candidateDetail.value.candidateId)
+  candidateStageChanging.value = true
+  try {
+    await updateCandidateStage(candidateId, stage)
+    const detail = await getCandidateDetail(candidateId)
+    handleCandidateDetailUpdated(detail)
+    ElMessage.success('候选人状态已更新')
+  } catch (error) {
+    console.error('Update candidate stage failed:', error)
+    if (!isRequestErrorHandled(error)) ElMessage.error('候选人状态更新失败')
+  } finally {
+    candidateStageChanging.value = false
+  }
+}
+
+function handleCandidateDetailUpdated(detail: CandidateDetailVO) {
+  candidateDetail.value = detail
+  appEvents.emit(APP_EVENT.CANDIDATE_SIDEBAR_REFRESH)
 }
 
 async function handleAddSelectedCustomerTag() {
@@ -2770,6 +2934,34 @@ function getCustomerStageIcon(stage?: string) {
     lost: 'block'
   }
   return map[stage || ''] || 'lens'
+}
+
+function getCandidateStageButtonClass(stage?: string) {
+  const map: Record<string, string> = {
+    new: 'bg-slate-100 text-slate-700',
+    screening: 'bg-blue-50 text-blue-700',
+    interview_scheduled: 'bg-orange-50 text-orange-700',
+    interviewing: 'bg-orange-50 text-orange-700',
+    interview_passed: 'bg-emerald-50 text-emerald-700',
+    offer: 'bg-indigo-50 text-indigo-700',
+    hired: 'bg-green-50 text-green-700',
+    rejected: 'bg-rose-50 text-rose-700'
+  }
+  return map[String(stage || '')] || 'bg-primary/10 text-primary'
+}
+
+function getCandidateStageIcon(stage?: string) {
+  const map: Record<string, string> = {
+    new: 'fiber_new',
+    screening: 'filter_alt',
+    interview_scheduled: 'event_available',
+    interviewing: 'record_voice_over',
+    interview_passed: 'check_circle',
+    offer: 'workspace_premium',
+    hired: 'how_to_reg',
+    rejected: 'block'
+  }
+  return map[String(stage || '')] || 'radio_button_checked'
 }
 
 function normalizeAiConfig(config?: Partial<AiConfig> | Partial<AiConfigUpdateBO> | null): AiConfig {
@@ -3401,6 +3593,12 @@ async function handleSend() {
   if (effectiveAppCode === 'crm') {
     appEvents.emit(APP_EVENT.CUSTOMER_LIST_REFRESH, { source: 'chat' })
   }
+  if (effectiveAppCode === 'hr' || chatObjectKind.value === 'candidate') {
+    appEvents.emit(APP_EVENT.CANDIDATE_SIDEBAR_REFRESH, { source: 'chat' })
+    if (chatObjectKind.value === 'candidate') {
+      await loadObjectPanelDetail()
+    }
+  }
   await refocusChatInputAfterSend()
 }
 
@@ -4007,6 +4205,20 @@ async function openRouteProductChat(productId: string) {
   }
 }
 
+async function openRouteCandidateChat(candidateId: string) {
+  try {
+    const candidate = await getCandidateDetail(candidateId)
+    await chatStore.openCandidateChat({
+      candidateId,
+      name: candidate.name || '候选人',
+      avatarUrl: candidate.avatarUrl
+    })
+  } catch (error) {
+    console.warn('Load route candidate detail failed:', error)
+    await chatStore.openCandidateChat({ candidateId, name: '候选人' })
+  }
+}
+
 async function applyChatRouteQuery() {
   if (applyingChatRouteQuery) return
 
@@ -4015,8 +4227,9 @@ async function applyChatRouteQuery() {
   const employeeId = getRouteQueryString('employeeId')
   const relationId = getRouteQueryString('relationId')
   const productId = getRouteQueryString('productId')
+  const candidateId = getRouteQueryString('candidateId')
 
-  if (!sessionId && !customerId && !employeeId && !relationId && !productId) return
+  if (!sessionId && !customerId && !employeeId && !relationId && !productId && !candidateId) return
 
   applyingChatRouteQuery = true
   try {
@@ -4044,6 +4257,8 @@ async function applyChatRouteQuery() {
       await openRouteRelationChat(relationId)
     } else if (productId) {
       await openRouteProductChat(productId)
+    } else if (candidateId) {
+      await openRouteCandidateChat(candidateId)
     }
 
     focusComposerWhenReady()
@@ -4202,7 +4417,7 @@ function handleObjectAddAttachment() {
 }
 
 async function handleObjectRelatedCreated() {
-  if (chatObjectKind.value === 'employee' || chatObjectKind.value === 'relation') {
+  if (chatObjectKind.value === 'employee' || chatObjectKind.value === 'relation' || chatObjectKind.value === 'candidate') {
     await loadObjectPanelDetail()
   }
 }
@@ -4243,7 +4458,8 @@ function resolveChatAppIcon(code: string): string {
     address_book: 'badge',
     relation: 'contacts',
     product: 'inventory_2',
-    project: 'task_alt'
+    project: 'task_alt',
+    hr: 'badge'
   }
   return iconMap[code] || 'auto_awesome'
 }

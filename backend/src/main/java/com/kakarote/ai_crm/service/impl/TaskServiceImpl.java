@@ -16,6 +16,7 @@ import com.kakarote.ai_crm.entity.BO.TaskAddBO;
 import com.kakarote.ai_crm.entity.BO.TaskAiParseBO;
 import com.kakarote.ai_crm.entity.BO.TaskQueryBO;
 import com.kakarote.ai_crm.entity.BO.TaskUpdateBO;
+import com.kakarote.ai_crm.entity.PO.Candidate;
 import com.kakarote.ai_crm.entity.PO.Customer;
 import com.kakarote.ai_crm.entity.PO.Project;
 import com.kakarote.ai_crm.entity.PO.ProjectLane;
@@ -24,6 +25,7 @@ import com.kakarote.ai_crm.entity.PO.Task;
 import com.kakarote.ai_crm.entity.VO.TaskAiParseVO;
 import com.kakarote.ai_crm.entity.VO.TaskVO;
 import com.kakarote.ai_crm.mapper.CustomerMapper;
+import com.kakarote.ai_crm.mapper.CandidateMapper;
 import com.kakarote.ai_crm.mapper.ProjectLaneMapper;
 import com.kakarote.ai_crm.mapper.ProjectMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
@@ -67,6 +69,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
 
     @Autowired
     private CustomerMapper customerMapper;
+
+    @Autowired
+    private CandidateMapper candidateMapper;
 
     @Autowired
     private RelationMapper relationMapper;
@@ -118,6 +123,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
     @Override
     public Long addTask(TaskAddBO taskAddBO) {
         validateOwnedRelation(taskAddBO.getRelationId());
+        validateVisibleCandidate(taskAddBO.getCandidateId());
         Task task = BeanUtil.copyProperties(taskAddBO, Task.class);
         if (StrUtil.isEmpty(task.getStatus())) {
             task.setStatus("pending");
@@ -147,6 +153,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "任务不存在");
         }
         validateOwnedRelation(taskUpdateBO.getRelationId());
+        validateVisibleCandidate(taskUpdateBO.getCandidateId());
         Long previousCustomerId = task.getCustomerId();
         Long previousProjectId = task.getProjectId();
         BeanUtil.copyProperties(taskUpdateBO, task, "taskId", "createUserId", "createTime");
@@ -271,6 +278,16 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements IT
         if (relation == null || Integer.valueOf(0).equals(relation.getStatus())
                 || !UserUtil.getUserId().equals(relation.getCreateUserId())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "关系人不存在或无权限访问");
+        }
+    }
+
+    private void validateVisibleCandidate(Long candidateId) {
+        if (candidateId == null) {
+            return;
+        }
+        Candidate candidate = candidateMapper.selectById(candidateId);
+        if (candidate == null || Integer.valueOf(0).equals(candidate.getStatus())) {
+            throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "候选人不存在或无权限访问");
         }
     }
 

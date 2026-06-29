@@ -23,6 +23,9 @@ public class KnowledgeUploadBO {
     @Schema(description = "关联关系人ID")
     private Long relationId;
 
+    @Schema(description = "关联候选人ID")
+    private Long candidateId;
+
     @Schema(description = "标签列表")
     private List<String> tags;
 

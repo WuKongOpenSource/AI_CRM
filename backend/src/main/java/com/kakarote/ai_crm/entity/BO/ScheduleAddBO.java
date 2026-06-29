@@ -38,6 +38,9 @@ public class ScheduleAddBO {
     @Schema(description = "关系人ID")
     private Long relationId;
 
+    @Schema(description = "候选人ID")
+    private Long candidateId;
+
     @Schema(description = "联系人ID")
     private Long contactId;
 

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, type Ref } from 'vue'
 import {
   getCustomerStageEnum,
+  getCandidateStageEnum,
   getCustomerLevelEnum,
   getRelationTypeEnum,
   getRelationSourceEnum,
@@ -21,6 +22,20 @@ const CUSTOMER_STAGE_LABELS = new Map(
   CUSTOMER_STAGE_FALLBACK_OPTIONS.map(option => [option.value, option.label])
 )
 
+const CANDIDATE_STAGE_FALLBACK_OPTIONS: EnumOption[] = [
+  { value: 'new', label: '新候选人' },
+  { value: 'screening', label: '初筛' },
+  { value: 'interview_scheduled', label: '安排面试' },
+  { value: 'interview_passed', label: '面试通过' },
+  { value: 'offer', label: 'Offer' },
+  { value: 'hired', label: '已入职' },
+  { value: 'rejected', label: '已淘汰' }
+]
+
+const CANDIDATE_STAGE_LABELS = new Map(
+  CANDIDATE_STAGE_FALLBACK_OPTIONS.map(option => [option.value, option.label])
+)
+
 /**
  * 选项枚举 store（单一真相源）。
  *
@@ -30,6 +45,7 @@ const CUSTOMER_STAGE_LABELS = new Map(
  */
 export const useEnumStore = defineStore('enums', () => {
   const customerStage = ref<EnumOption[]>([])
+  const candidateStage = ref<EnumOption[]>([])
   const customerLevel = ref<EnumOption[]>([])
   const relationType = ref<EnumOption[]>([])
   const relationSource = ref<EnumOption[]>([])
@@ -81,8 +97,29 @@ export const useEnumStore = defineStore('enums', () => {
     return normalized.length ? normalized : CUSTOMER_STAGE_FALLBACK_OPTIONS
   }
 
+  function normalizeCandidateStageOptions(options: EnumOption[]): EnumOption[] {
+    const normalized = options
+      .map(option => {
+        const value = String(option?.value || '').trim()
+        if (!value) return null
+        const fallbackLabel = CANDIDATE_STAGE_LABELS.get(value)
+        const rawLabel = String(option?.label || '').trim()
+        const rawLabelIsCode = rawLabel.toLowerCase() === value.toLowerCase()
+        const label = fallbackLabel && (!rawLabel || rawLabelIsCode) ? fallbackLabel : (rawLabel || fallbackLabel || value)
+        return {
+          ...option,
+          value,
+          label
+        }
+      })
+      .filter((option): option is EnumOption => Boolean(option))
+    return normalized.length ? normalized : CANDIDATE_STAGE_FALLBACK_OPTIONS
+  }
+
   const ensureCustomerStage = (force = false) =>
     ensure('customerStage', customerStage, getCustomerStageEnum, normalizeCustomerStageOptions, force)
+  const ensureCandidateStage = (force = false) =>
+    ensure('candidateStage', candidateStage, getCandidateStageEnum, normalizeCandidateStageOptions, force)
   const ensureCustomerLevel = (force = false) =>
     ensure('customerLevel', customerLevel, getCustomerLevelEnum, undefined, force)
   const ensureRelationType = (force = false) =>
@@ -96,6 +133,7 @@ export const useEnumStore = defineStore('enums', () => {
   }
 
   const stageLabel = (value?: string | null) => labelOf(customerStage.value, value)
+  const candidateStageLabel = (value?: string | null) => labelOf(candidateStage.value, value)
   const levelLabel = (value?: string | null) => labelOf(customerLevel.value, value)
   const relationTypeLabel = (value?: string | null) => labelOf(relationType.value, value)
   const sourceLabel = (value?: string | null) => labelOf(relationSource.value, value)
@@ -104,6 +142,7 @@ export const useEnumStore = defineStore('enums', () => {
   async function refreshAll(): Promise<void> {
     await Promise.all([
       ensureCustomerStage(true),
+      ensureCandidateStage(true),
       ensureCustomerLevel(true),
       ensureRelationType(true),
       ensureRelationSource(true)
@@ -112,14 +151,17 @@ export const useEnumStore = defineStore('enums', () => {
 
   return {
     customerStage,
+    candidateStage,
     customerLevel,
     relationType,
     relationSource,
     ensureCustomerStage,
+    ensureCandidateStage,
     ensureCustomerLevel,
     ensureRelationType,
     ensureRelationSource,
     stageLabel,
+    candidateStageLabel,
     levelLabel,
     relationTypeLabel,
     sourceLabel,

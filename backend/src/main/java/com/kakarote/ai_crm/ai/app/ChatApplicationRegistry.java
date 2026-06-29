@@ -21,6 +21,7 @@ public class ChatApplicationRegistry {
     public static final String TOOL_GROUP_PRODUCT = "product";
     public static final String TOOL_GROUP_PROJECT = "project";
     public static final String TOOL_GROUP_RELATION = "relation";
+    public static final String TOOL_GROUP_CANDIDATE = "candidate";
     public static final String TOOL_GROUP_KNOWLEDGE = "knowledge";
     public static final String TOOL_GROUP_CRM_NOOP = "crm_noop";
     public static final String TOOL_GROUP_EMPLOYEE = "employee";
@@ -143,6 +144,22 @@ public class ChatApplicationRegistry {
                 List.of(TOOL_GROUP_RELATION, TOOL_GROUP_FOLLOW_UP,
                         TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_KNOWLEDGE),
                 List.of("下周三提醒我去拜访他", "记录一下，他对我们的新产品比较感兴趣", "总结这个关系人的任务和附件")
+        ));
+        register(new ChatApplicationDefinition(
+                ChatApplicationCodes.HR,
+                "人力资源",
+                "badge",
+                "围绕候选人管理、简历解析、面试日程和候选人资料进行对话。",
+                """
+                当前应用是人力资源候选人助手。你可以围绕候选人资料、简历、面试安排、任务和候选人相关知识库内容提供帮助。
+                当用户说“这个候选人”“该候选人”“他/她”且当前会话绑定了候选人时，默认指当前 candidateId。
+                用户上传简历后，系统会自动解析并补全候选人资料；已有非空字段不要覆盖，冲突信息留给用户核对。
+                出现具体面试时间点时创建 type=interview 的日程，location 可填写面试间、会议室或会议链接；没有具体时间但有待办语义时创建任务。
+                新增或修改候选人必须调用 CandidateTools，并且只有工具结果确认成功后才能说数据已创建或更新成功。
+                """,
+                false,
+                List.of(TOOL_GROUP_CANDIDATE, TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_KNOWLEDGE),
+                List.of("查看这个候选人的简历摘要", "安排明天下午的面试", "帮我新建一个候选人", "列出已安排面试的候选人")
         ));
     }
 
