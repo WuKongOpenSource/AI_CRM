@@ -65,6 +65,14 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "缺少会话ID");
         }
         conversationService.assertMember(bo.getConversationId(), senderId);
+        // SECURITY: 话题回复的父消息必须存在且属于同一会话，否则会话A的成员可把回复注入到
+        // 自己无权访问的会话/频道B、并篡改其 reply_count（越权 / IDOR）。
+        if (bo.getParentId() != null) {
+            ImMessage parent = getById(bo.getParentId());
+            if (parent == null || !bo.getConversationId().equals(parent.getConversationId())) {
+                throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "回复的话题不存在或不属于当前会话");
+            }
+        }
         String type = StrUtil.blankToDefault(bo.getContentType(), "text");
         if ("text".equals(type) && StrUtil.isBlank(bo.getContent())) {
             throw new BusinessException(SystemCodeEnum.SYSTEM_NO_VALID, "消息内容不能为空");
@@ -144,6 +152,7 @@ public class ImMessageServiceImpl extends ServiceImpl<ImMessageMapper, ImMessage
         out.add(toVO(root, viewerId));
         List<ImMessage> replies = list(new LambdaQueryWrapper<ImMessage>()
                 .eq(ImMessage::getParentId, rootId)
+                .eq(ImMessage::getConversationId, root.getConversationId())
                 .orderByAsc(ImMessage::getId));
         for (ImMessage r : replies) {
             out.add(toVO(r, viewerId));
