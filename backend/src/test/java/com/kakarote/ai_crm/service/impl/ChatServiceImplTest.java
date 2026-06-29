@@ -244,4 +244,26 @@ class ChatServiceImplTest {
         assertThat(updated.getProjectTaskId()).isEqualTo(801L);
         assertThat(updated.getAppCode()).isEqualTo("project");
     }
+
+    @Test
+    void detectsTokenLimitTruncationFromJsonEofMessage() {
+        ChatServiceImpl service = new ChatServiceImpl();
+        Throwable truncated = new IllegalStateException(
+                "Conversion from JSON to Map failed",
+                new RuntimeException("Unexpected end-of-input: was expecting closing quote for a string value"));
+
+        Boolean result = ReflectionTestUtils.invokeMethod(service, "isTokenLimitTruncationError", truncated);
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void doesNotFlagUnrelatedErrorAsTokenLimitTruncation() {
+        ChatServiceImpl service = new ChatServiceImpl();
+        Throwable other = new RuntimeException("connection reset by peer");
+
+        Boolean result = ReflectionTestUtils.invokeMethod(service, "isTokenLimitTruncationError", other);
+
+        assertThat(result).isFalse();
+    }
 }

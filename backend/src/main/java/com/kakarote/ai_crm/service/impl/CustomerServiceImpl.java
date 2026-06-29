@@ -25,6 +25,7 @@ import com.kakarote.ai_crm.service.ICustomFieldService;
 import com.kakarote.ai_crm.service.ICustomerService;
 import com.kakarote.ai_crm.service.IGlobalSearchIndexService;
 import com.kakarote.ai_crm.service.ITaskService;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -2713,14 +2714,11 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             String response;
 
             if (StrUtil.isNotEmpty(parseBO.getImageObjectKey())) {
-                // Multimodal: text + image
-                String imageUrl = fileStorageService.getUrl(parseBO.getImageObjectKey());
+                // Multimodal: text + image。直接内嵌图片字节（Spring AI base64 编码），
+                // 不能传对象存储 URL：它可能是相对地址，且外部模型服务商无法访问内网 MinIO。
                 String mimeTypeStr = StrUtil.blankToDefault(parseBO.getImageMimeType(), "image/png");
                 MimeType mimeType = MimeType.valueOf(mimeTypeStr);
-                Media media = Media.builder()
-                        .mimeType(mimeType)
-                        .data(URI.create(imageUrl).toURL())
-                        .build();
+                Media media = AiMediaUtil.buildMedia(fileStorageService, parseBO.getImageObjectKey(), mimeType);
 
                 response = chatClientProvider.getChatClient()
                         .prompt()

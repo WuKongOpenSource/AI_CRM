@@ -14,6 +14,7 @@ import com.kakarote.ai_crm.ai.app.ChatApplicationRegistry;
 import com.kakarote.ai_crm.ai.context.AiContextHolder;
 import com.kakarote.ai_crm.ai.provider.AiModelCapabilities;
 import com.kakarote.ai_crm.ai.state.PendingCustomerCreationStore;
+import com.kakarote.ai_crm.ai.state.PendingEmployeeImportStore;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.support.AiToolExecutionRecorder;
 import com.kakarote.ai_crm.common.exception.BusinessException;
@@ -43,6 +44,7 @@ import com.kakarote.ai_crm.mapper.ProjectMapper;
 import com.kakarote.ai_crm.mapper.ProjectTaskMapper;
 import com.kakarote.ai_crm.mapper.RelationMapper;
 import com.kakarote.ai_crm.service.*;
+import com.kakarote.ai_crm.utils.AiMediaUtil;
 import com.kakarote.ai_crm.utils.UserUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
@@ -127,6 +129,9 @@ public class ChatServiceImpl implements IChatService {
     private PendingCustomerCreationStore pendingCustomerCreationStore;
 
     @Autowired
+    private PendingEmployeeImportStore pendingEmployeeImportStore;
+
+    @Autowired
     private KnowledgeTools knowledgeTools;
 
     @Autowired
@@ -134,6 +139,10 @@ public class ChatServiceImpl implements IChatService {
 
     private static final int MAX_EXTRACTED_TEXT_LENGTH = 3000;
     private static final String CHAT_ERROR_MESSAGE = "抱歉，处理您的请求时发生错误。请稍后重试。";
+    private static final String TOKEN_LIMIT_HINT =
+            "本次需要处理的数据较多，AI 生成的内容超出了「最大 Token 数」限制被截断，导致本次操作无法完成。\n"
+            + "请前往「系统设置 → API/AI」调高「最大 Token 数」（例如 8192）后重试；"
+            + "如果单次数据量很大，也可以分批处理（例如分多次上传或粘贴名单）。";
 
     private final Tika tika = new Tika();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -511,6 +520,7 @@ public class ChatServiceImpl implements IChatService {
         );
         chatSessionMapper.deleteById(sessionId);
         pendingCustomerCreationStore.clear(sessionId);
+        pendingEmployeeImportStore.clear(sessionId);
         weKnoraClient.clearConversationSession(sessionId);
         AiContextHolder.clearSession(sessionId);
     }
@@ -1103,12 +1113,10 @@ public class ChatServiceImpl implements IChatService {
         for (ChatSendBO.AttachmentDTO att : attachments) {
             if (att.getMimeType() != null && att.getMimeType().startsWith("image/")) {
                 try {
-                    String imageUrl = fileStorageService.getUrl(att.getFilePath());
+                    // 直接内嵌图片字节（Spring AI 会 base64 编码后随请求发出）。
+                    // 不能传对象存储 URL：它可能是相对地址，且外部模型服务商无法访问内网 MinIO。
                     MimeType mimeType = MimeType.valueOf(att.getMimeType());
-                    Media media = Media.builder()
-                            .mimeType(mimeType)
-                            .data(URI.create(imageUrl).toURL())
-                            .build();
+                    Media media = AiMediaUtil.buildMedia(fileStorageService, att.getFilePath(), mimeType);
                     mediaList.add(media);
                     log.debug("添加图片媒体: {}", att.getFileName());
                 } catch (Exception e) {
@@ -1590,6 +1598,10 @@ public class ChatServiceImpl implements IChatService {
 
     private String resolveAiChatErrorMessage(Throwable error,
                                              DynamicChatClientProvider.AiRuntimeConfigSnapshot runtimeConfig) {
+        // 工具调用参数因「最大 Token 数」上限被截断，导致 JSON 解析失败（典型场景：一次导入大量数据）。
+        if (isTokenLimitTruncationError(error)) {
+            return TOKEN_LIMIT_HINT;
+        }
         WebClientResponseException exception = findWebClientResponseException(error);
         if (exception == null) {
             return CHAT_ERROR_MESSAGE;
@@ -1621,6 +1633,30 @@ public class ChatServiceImpl implements IChatService {
             return "AI 服务返回错误：" + providerMessage + "。请检查 AI 配置后重试。";
         }
         return CHAT_ERROR_MESSAGE;
+    }
+
+    /**
+     * 判断异常是否为「模型输出被 max tokens 截断、导致工具调用参数 JSON 不完整」这一类错误。
+     * 典型表现：Jackson 抛出 JsonEOFException（"Unexpected end-of-input" / 缺少结束引号），
+     * 外层包成 ToolExecutionException。沿 cause 链查找以兼容不同包装层级。
+     */
+    private boolean isTokenLimitTruncationError(Throwable error) {
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth++ < 12) {
+            if (current.getClass().getName().contains("JsonEOFException")) {
+                return true;
+            }
+            if (containsAny(current.getMessage(), "Unexpected end-of-input", "expecting closing quote")) {
+                return true;
+            }
+            Throwable cause = current.getCause();
+            if (cause == current) {
+                break;
+            }
+            current = cause;
+        }
+        return false;
     }
 
     private String extractProviderErrorMessage(String responseBody) {

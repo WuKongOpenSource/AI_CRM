@@ -12,6 +12,7 @@ import com.kakarote.ai_crm.entity.PO.ManagerUser;
 import com.kakarote.ai_crm.entity.VO.ManageUserVO;
 import com.kakarote.ai_crm.entity.VO.UserPreferenceVO;
 
+import java.util.Collection;
 import java.util.List;
 
 
@@ -34,6 +35,13 @@ public interface ManageUserService extends IService<ManagerUser> {
      * 通过用户名查询所有员工。
      */
     List<ManagerUser> queryUsersByUsername(String username);
+
+    /**
+     * 批量按用户名查询员工（供 AI 批量导入查重使用）。
+     * @param usernames 用户名集合
+     * @return 已存在的用户列表
+     */
+    List<ManagerUser> findUsersByUsernames(Collection<String> usernames);
 
     /**
      * 添加用户

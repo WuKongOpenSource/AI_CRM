@@ -23,6 +23,8 @@ public class ChatApplicationRegistry {
     public static final String TOOL_GROUP_RELATION = "relation";
     public static final String TOOL_GROUP_KNOWLEDGE = "knowledge";
     public static final String TOOL_GROUP_CRM_NOOP = "crm_noop";
+    public static final String TOOL_GROUP_EMPLOYEE = "employee";
+    public static final String TOOL_GROUP_EMPLOYEE_LOOKUP = "employee_lookup";
 
     private final Map<String, ChatApplicationDefinition> applications = new LinkedHashMap<>();
 
@@ -83,9 +85,10 @@ public class ChatApplicationRegistry {
                 当用户要求管理项目或项目任务时，优先调用 ProjectTools 中的项目工具，不要把项目任务误当作普通个人任务。
                 创建或修改项目、项目任务后，只有在工具结果确认成功后，才能说数据已创建、更新、移动或删除成功。
                 如果用户只说“任务”但上下文明确是在项目技能中，请先判断是否指项目任务；缺少项目ID或任务ID且无法从上下文确认时，请先询问。
+                当需要按人名给项目或任务指派负责人时，先调用 searchEmployees 在通讯录中按姓名模糊查找，拿到对应的用户ID再作为 ownerIdStr 传入；不要凭空编造用户ID。若一个名字匹配到多个人或无法确定，请把候选列表给用户确认后再指派。
                 """,
                 false,
-                List.of(TOOL_GROUP_PROJECT, TOOL_GROUP_KNOWLEDGE),
+                List.of(TOOL_GROUP_PROJECT, TOOL_GROUP_KNOWLEDGE, TOOL_GROUP_EMPLOYEE_LOOKUP),
                 List.of("列出进行中的项目", "帮我新建一个项目", "查看这个项目的任务", "给某个项目新增一个任务")
         ));
         register(new ChatApplicationDefinition(
@@ -106,17 +109,22 @@ public class ChatApplicationRegistry {
                 ChatApplicationCodes.ADDRESS_BOOK,
                 "通讯录",
                 "customer",
-                "围绕企业员工做任务安排、日程记录、附件归档和知识库检索。",
+                "围绕企业员工做任务安排、日程记录、附件归档和知识库检索，并支持上传名单批量导入员工。",
                 """
                 当前应用是通讯录员工对象助手。你是在围绕当前员工做工作安排、任务记录、日程记录和附件归档，不是在给员工发送即时消息。
                 当用户说“他/她/这个员工/该员工”且当前会话绑定了员工时，默认指当前员工。
                 没有具体执行时间点、只有截止或待办语义时创建任务；出现具体执行时间点时创建日程。
                 创建任务时默认负责人是当前员工；创建日程时默认把当前员工加入参与人。
+                当用户想新增或批量添加员工到通讯录时（无论是上传文件、在对话中粘贴名单文本，还是直接说出一个或多个员工的信息）：
+                你必须调用 previewEmployeeImport 工具来生成预览——把识别到的员工整理成 JSON 数组作为该工具的参数传入。
+                禁止你自己整理或直接以表格、列表等形式输出员工名单当作预览；预览内容只能来自 previewEmployeeImport 工具的返回结果，你把工具返回的内容原样转述给用户即可。
+                随后询问用户是否确认导入；用户确认后你必须调用 confirmEmployeeImport 才算真正建号，用户放弃则调用 cancelEmployeeImport。
+                只有当内容中确实没有任何可识别的员工信息时，才说明无法识别并且不调用导入工具。未填密码的员工将使用默认密码 123456。
                 只有在工具结果确认成功后，才能说数据已创建、更新或关联成功。
                 """,
                 false,
-                List.of(TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_KNOWLEDGE),
-                List.of("明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会", "总结这个员工最近的任务和附件")
+                List.of(TOOL_GROUP_TASK_SCHEDULE, TOOL_GROUP_KNOWLEDGE, TOOL_GROUP_EMPLOYEE, TOOL_GROUP_EMPLOYEE_LOOKUP),
+                List.of("上传名单帮我批量添加员工", "明天下午让他完成客户资料整理", "下周一上午和他开项目复盘会", "总结这个员工最近的任务和附件")
         ));
         register(new ChatApplicationDefinition(
                 ChatApplicationCodes.RELATION,

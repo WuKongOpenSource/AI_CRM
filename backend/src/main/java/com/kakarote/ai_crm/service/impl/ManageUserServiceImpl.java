@@ -5,6 +5,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.kakarote.ai_crm.common.BasePage;
@@ -80,6 +81,16 @@ public class ManageUserServiceImpl extends ServiceImpl<ManageUserMapper, Manager
             return Collections.emptyList();
         }
         return baseMapper.queryUsersByUsername(StrUtil.trim(username));
+    }
+
+    @Override
+    public List<ManagerUser> findUsersByUsernames(Collection<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return baseMapper.selectList(
+                new LambdaQueryWrapper<ManagerUser>()
+                        .in(ManagerUser::getUsername, usernames));
     }
 
     /**

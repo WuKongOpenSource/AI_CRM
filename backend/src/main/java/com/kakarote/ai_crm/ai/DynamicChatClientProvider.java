@@ -13,6 +13,8 @@ import com.kakarote.ai_crm.ai.provider.AiProviderRegistry;
 import com.kakarote.ai_crm.ai.tools.ContactTools;
 import com.kakarote.ai_crm.ai.tools.CrmNoopTools;
 import com.kakarote.ai_crm.ai.tools.CustomerTools;
+import com.kakarote.ai_crm.ai.tools.EmployeeTools;
+import com.kakarote.ai_crm.ai.tools.EmployeeLookupTools;
 import com.kakarote.ai_crm.ai.tools.FollowupTools;
 import com.kakarote.ai_crm.ai.tools.KnowledgeTools;
 import com.kakarote.ai_crm.ai.tools.MailTools;
@@ -102,6 +104,12 @@ public class DynamicChatClientProvider {
 
     @Autowired
     private RelationTools relationTools;
+
+    @Autowired
+    private EmployeeTools employeeTools;
+
+    @Autowired
+    private EmployeeLookupTools employeeLookupTools;
 
     @Autowired
     private MailTools mailTools;
@@ -364,6 +372,8 @@ public class DynamicChatClientProvider {
             case ChatApplicationRegistry.TOOL_GROUP_RELATION -> addTool(tools, relationTools);
             case ChatApplicationRegistry.TOOL_GROUP_KNOWLEDGE -> addTool(tools, knowledgeTools);
             case ChatApplicationRegistry.TOOL_GROUP_CRM_NOOP -> addTool(tools, crmNoopTools);
+            case ChatApplicationRegistry.TOOL_GROUP_EMPLOYEE -> addTool(tools, employeeTools);
+            case ChatApplicationRegistry.TOOL_GROUP_EMPLOYEE_LOOKUP -> addTool(tools, employeeLookupTools);
             default -> {
             }
         }
